@@ -9,6 +9,8 @@ This project was created with [Better-T-Stack](https://github.com/AmanVarshney01
 - **TailwindCSS** - Utility-first CSS for rapid UI development
 - **Shared UI package** - shadcn/ui primitives live in `packages/ui`
 - **Express** - Fast, unopinionated web framework
+- **Effect** - Typed application workflows, errors, services, Layers, and runtime lifecycle
+- **OpenTelemetry** - Vendor-neutral tracing and metrics with safe local defaults
 - **oRPC** - End-to-end type-safe APIs with OpenAPI integration
 - **Node.js** - Runtime environment
 - **Drizzle** - TypeScript-first ORM
@@ -47,6 +49,11 @@ pnpm run dev
 
 Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
 The API is running at [http://localhost:3000](http://localhost:3000).
+
+- Liveness: `GET http://localhost:3000/`
+- Readiness: `GET http://localhost:3000/ready`
+
+Set `OTEL_EXPORTER_OTLP_ENDPOINT` in `apps/server/.env` to enable OTLP/HTTP trace and metric export. When it is omitted, development prints bounded trace summaries locally, while production performs no network telemetry export.
 
 ## UI Customization
 
@@ -92,6 +99,7 @@ For more details, see the guide on [Deploying with Docker Compose](https://www.b
 ## Git Hooks and Formatting
 
 - Run checks: `pnpm run check`
+- Run the complete review gate: `pnpm run ready`
 
 ## Project Structure
 
@@ -111,6 +119,9 @@ framerfordevs/
 
 - `pnpm run dev`: Start all applications in development mode
 - `pnpm run build`: Build all applications
+- `pnpm run test`: Run all automated tests
+- `pnpm run test:coverage`: Run tests with coverage
+- `pnpm run ready`: Format, lint, type-check, test, collect coverage, and build
 - `pnpm run dev:web`: Start only the web application
 - `pnpm run dev:server`: Start only the server
 - `pnpm run check-types`: Check TypeScript types across all apps

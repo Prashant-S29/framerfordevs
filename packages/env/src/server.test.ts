@@ -5,6 +5,9 @@ const environmentKeys = [
   "BETTER_AUTH_SECRET",
   "BETTER_AUTH_URL",
   "CORS_ORIGIN",
+  "OTEL_EXPORTER_OTLP_ENDPOINT",
+  "OTEL_SERVICE_NAME",
+  "OTEL_SERVICE_VERSION",
   "NODE_ENV",
   "SKIP_ENV_VALIDATION",
 ];
@@ -16,6 +19,9 @@ beforeEach(() => {
   process.env.BETTER_AUTH_SECRET = "test-secret-that-is-at-least-32-characters";
   process.env.BETTER_AUTH_URL = "http://localhost:3000";
   process.env.CORS_ORIGIN = "http://localhost:3001";
+  delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  delete process.env.OTEL_SERVICE_NAME;
+  delete process.env.OTEL_SERVICE_VERSION;
   process.env.NODE_ENV = "test";
   delete process.env.SKIP_ENV_VALIDATION;
 });
@@ -40,6 +46,21 @@ describe("server environment", () => {
     expect(env.BETTER_AUTH_SECRET.length).toBeGreaterThanOrEqual(32);
     expect(new URL(env.BETTER_AUTH_URL)).toBeInstanceOf(URL);
     expect(new URL(env.CORS_ORIGIN)).toBeInstanceOf(URL);
+    expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
+    expect(env.OTEL_SERVICE_NAME).toBe("framerfordevs-server");
+    expect(env.OTEL_SERVICE_VERSION).toBe("0.0.0");
+  });
+
+  it("accepts optional OpenTelemetry exporter configuration", async () => {
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:4318";
+    process.env.OTEL_SERVICE_NAME = "framerfordevs-test";
+    process.env.OTEL_SERVICE_VERSION = "1.2.3";
+
+    const { env } = await import("./server");
+
+    expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("http://localhost:4318");
+    expect(env.OTEL_SERVICE_NAME).toBe("framerfordevs-test");
+    expect(env.OTEL_SERVICE_VERSION).toBe("1.2.3");
   });
 
   it("fails early for invalid configuration without leaking secret values", async () => {

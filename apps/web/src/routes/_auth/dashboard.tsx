@@ -16,7 +16,7 @@ function RouteComponent() {
     <div>
       <h1>Dashboard</h1>
       <p>Welcome {session.data?.user.name}</p>
-      <p>API: {privateData.data?.message}</p>
+      <p>API: {privateData.data?.data.message}</p>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 0 approved; Milestone 1 ready to begin
+**Overall status:** Milestone 1 automated criteria complete; awaiting developer review
 **Active milestone:** Milestone 1 — Effect foundation, error contract, and observability
 **Last updated:** 2026-07-29
 
@@ -18,7 +18,7 @@
 | #   | Milestone                                | Status | Automated tests | Manual review | Commit    |
 | --- | ---------------------------------------- | ------ | --------------- | ------------- | --------- |
 | 0   | Validate existing foundation             | `[A]`  | 26 passing      | Approved      | `7d5a312` |
-| 1   | Effect foundation, errors, observability | `[ ]`  | Not run         | Pending       | None      |
+| 1   | Effect foundation, errors, observability | `[R]`  | 90 passing      | Pending       | None      |
 | 2   | Platform kernel                          | `[ ]`  | Not run         | Pending       | None      |
 | 3   | Membership, policies, credentials        | `[ ]`  | Not run         | Pending       | None      |
 | 4   | Project locales                          | `[ ]`  | Not run         | Pending       | None      |
@@ -101,28 +101,47 @@
 - `[x]` Request developer manual review.
 - `[A]` Developer manually verified and approved Milestone 0.
 
-## Milestone 1 readiness
+## Active Milestone 1 checklist
 
-- `[x]` Stable Effect v3 direction selected.
-- `[x]` Stable `effect@3.22.0` source pinned for local research.
-- `[x]` Better Auth protocol-boundary exception documented.
-- `[x]` ManagedRuntime and typed adapter direction documented.
-- `[ ]` Install aligned Effect runtime, testing, and OpenTelemetry packages.
-- `[ ]` Implement central schemas for API responses and error codes.
-- `[ ]` Implement request correlation, tracing, structured logging, metrics, Layers, and ManagedRuntime.
-- `[ ]` Wrap database and Better Auth session access with typed Effect adapters.
-- `[ ]` Route application-owned oRPC procedures through the runtime and central error boundary.
-- `[ ]` Add property, contract, redaction, lifecycle, and failure-translation tests.
+- `[x]` Install aligned stable Effect 3.22 runtime, testing, platform, and OpenTelemetry packages.
+- `[x]` Implement schema-backed API response, error detail, error-code, and request-ID contracts.
+- `[x]` Implement schema-backed tagged application and infrastructure failures.
+- `[x]` Add deterministic HTTP mapping and centralized failure/defect/interruption handling.
+- `[x]` Add validated request IDs and W3C traceparent parsing/continuation.
+- `[x]` Add structured logging with bounded recursive secret redaction.
+- `[x]` Add bounded request count, latency, status-family, and defect metrics.
+- `[x]` Add safe development trace summaries and optional OTLP/HTTP trace/metric export.
+- `[x]` Add replaceable Database, Better Auth session, logger, telemetry, and clock test Layers.
+- `[x]` Route liveness, readiness, public oRPC, and protected oRPC operations through one ManagedRuntime.
+- `[x]` Preserve native Better Auth protocol responses while observing the HTTP boundary.
+- `[x]` Add graceful runtime resource initialization and shutdown.
+- `[x]` Add property, contract snapshot, redaction, propagation, adapter, lifecycle, and cause-classification tests.
+- `[x]` Document Effect, Drizzle, Better Auth, and observability boundaries.
+- `[R]` Request developer manual review.
 
 ## Current blockers
 
-None. Milestone 1 may begin.
+None. Milestone 1 is waiting only for developer manual review.
 
 ## Database actions awaiting developer
 
 The developer generated and applied `0000_initial_auth_schema`. Milestone 1 is an application-architecture milestone and is not expected to require another database migration.
 
 ## Test results
+
+### Milestone 1
+
+- `pnpm run check`: pass.
+- `pnpm run check-types`: pass across all TypeScript packages.
+- `pnpm run test`: 90 tests pass across 14 files.
+- `pnpm run test:coverage`: pass; Effect/API foundation 93.1% statements, 87.79% branches, and 89.36% functions.
+- `pnpm run build`: server and web production builds pass.
+- Development runtime: liveness, readiness, public oRPC, anonymous protected rejection, frontend, structured logs, and safe trace summaries pass.
+- Valid inbound W3C trace context is continued; malformed context is ignored safely.
+- Docker images build; PostgreSQL, server, and web become healthy; container liveness/readiness/frontend checks pass.
+- No database schema change or migration is required.
+
+### Milestone 0
 
 - `pnpm run check`: pass.
 - `pnpm run check-types`: pass across all seven TypeScript packages.
@@ -140,3 +159,5 @@ The developer generated and applied `0000_initial_auth_schema`. Milestone 1 is a
 The developer found that authenticated users could revisit `/login`. The route now checks the server session before rendering and redirects authenticated users to `/dashboard`; automated coverage and a live HTTP 307 integration check pass.
 
 Milestone 0 was manually approved and committed by the developer as `7d5a312` (`feat(m0): harden and validate the application foundation`).
+
+Milestone 1 is awaiting developer review of successful/failed trace summaries, redacted structured logs, package versions, API contracts, and framework boundaries. No commit has been created.

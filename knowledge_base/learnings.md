@@ -78,6 +78,22 @@ Record a learning when an implementation or decision:
 
 ---
 
+## 2026-07-29 — Stable package declarations are the executable Effect API contract
+
+**Context:** Milestone 1 introduced stable `effect@3.22.0` while the installed Effect skill and source-oriented examples use some newer source API names.
+
+**Incorrect assumption or decision:** Treating guide/source names such as `Context.Service`, `Schema.TaggedErrorClass`, and `Schema.optionalKey` as guaranteed stable package exports caused the first implementation pass to target APIs absent from the installed stable declaration surface.
+
+**Cost or risk:** The service, error, and schema foundation required avoidable rewrites and could have encouraged upgrading to beta packages merely to satisfy examples.
+
+**Learning:** For a pinned stable Effect release, the installed package's public declarations and compile-time behavior are the executable contract. Guides and source remain research inputs, not permission to cross the approved stability boundary.
+
+**Prevention:** Keep exact aligned stable versions, inspect the installed public declarations when an API differs, compile incrementally, and use stable 3.22 equivalents (`Context.Tag`, `Schema.TaggedError`, and exact `Schema.optionalWith`) rather than changing versions speculatively.
+
+**Status:** Resolved with stable versions and compatibility tests.
+
+---
+
 ## Current implementation learnings
 
 No CMS-domain implementation has started. Additional entries should be added only when a consequential product or architecture decision causes drift or rework.

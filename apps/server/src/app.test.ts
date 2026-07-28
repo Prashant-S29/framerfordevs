@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
 import { getDefaultCookieAttributes } from "@framerfordevs/auth";
 import { createDb, db } from "@framerfordevs/db";
 import { session, user } from "@framerfordevs/db/schema/auth";
@@ -34,7 +35,7 @@ async function createTestUser(email: string) {
 
 afterAll(async () => {
   await db.delete(user).where(like(user.email, testEmailPattern));
-  await db.$client.end();
+  await disposeApplicationRuntime();
 });
 
 describe("server foundation", () => {
@@ -42,7 +43,41 @@ describe("server foundation", () => {
     const response = await request(app).get("/");
 
     expect(response.status).toBe(200);
-    expect(response.text).toBe("OK");
+    expect(response.headers["x-request-id"]).toBeTypeOf("string");
+    expect(response.body).toEqual({
+      ok: true,
+      data: { status: "ok" },
+      error: null,
+      message: "Service is healthy.",
+    });
+  });
+
+  it("returns readiness separately from liveness", async () => {
+    const response = await request(app).get("/ready");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      ok: true,
+      data: { status: "ready" },
+      error: null,
+      message: "Service is ready.",
+    });
+  });
+
+  it("propagates a valid inbound request ID", async () => {
+    const response = await request(app).get("/").set("X-Request-Id", "request.valid-123");
+
+    expect(response.headers["x-request-id"]).toBe("request.valid-123");
+  });
+
+  it("replaces malformed and oversized request IDs", async () => {
+    const malformed = await request(app).get("/").set("X-Request-Id", "invalid request id");
+    const oversized = await request(app).get("/").set("X-Request-Id", "x".repeat(129));
+
+    expect(malformed.headers["x-request-id"]).not.toBe("invalid request id");
+    expect(oversized.headers["x-request-id"]).not.toBe("x".repeat(129));
+    expect(String(malformed.headers["x-request-id"])).toMatch(/^[A-Za-z0-9._:-]{1,128}$/);
+    expect(String(oversized.headers["x-request-id"])).toMatch(/^[A-Za-z0-9._:-]{1,128}$/);
   });
 
   it("serves the OpenAPI reference for GET requests", async () => {
@@ -56,7 +91,14 @@ describe("server foundation", () => {
     const response = await request(app).post("/rpc/healthCheck").send({});
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ json: "OK" });
+    expect(response.body).toEqual({
+      json: {
+        ok: true,
+        data: { status: "ok" },
+        error: null,
+        message: "Service is healthy.",
+      },
+    });
   });
 
   it("rejects an unsupported method for an oRPC procedure", async () => {
@@ -70,6 +112,17 @@ describe("server foundation", () => {
 
     expect(response.status).toBe(401);
     expect(response.body.json.code).toBe("UNAUTHORIZED");
+    expect(response.body.json.data).toEqual({
+      ok: false,
+      data: null,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Authentication is required.",
+        retryable: false,
+        requestId: response.headers["x-request-id"],
+      },
+      message: "Authentication is required.",
+    });
   });
 });
 
@@ -104,6 +157,8 @@ describe("CORS policy", () => {
 
     expect(response.status).toBe(403);
     expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(response.body.error.code).toBe("FORBIDDEN");
+    expect(response.body.error.requestId).toBe(response.headers["x-request-id"]);
   });
 
   it("explicitly rejects preflight from an untrusted origin", async () => {
@@ -114,6 +169,7 @@ describe("CORS policy", () => {
 
     expect(response.status).toBe(403);
     expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(response.body.error.code).toBe("FORBIDDEN");
   });
 });
 
@@ -145,6 +201,8 @@ describe.sequential("Better Auth foundation", () => {
       .send({ name: "M0 Test User", email, password });
 
     expect(signUp.status).toBe(200);
+    expect(signUp.headers["x-request-id"]).toBeTypeOf("string");
+    expect(signUp.body.ok).toBeUndefined();
     expect(signUp.body.user.email).toBe(email);
     const setCookie = String(signUp.headers["set-cookie"] ?? "");
     expect(setCookie).toContain("HttpOnly");
@@ -208,7 +266,7 @@ describe.sequential("Better Auth foundation", () => {
     expect(signIn.status).toBe(200);
     expect(signIn.body.user.email).toBe(email);
     expect(privateData.status).toBe(200);
-    expect(privateData.body.json.user.email).toBe(email);
+    expect(privateData.body.json.data.user.email).toBe(email);
   });
 
   it("invalidates the session after sign-out", async () => {
