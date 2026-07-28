@@ -7,7 +7,10 @@
     "check-types": "tsc -b",
     "compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server",
     "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.mjs"
+    "start": "node dist/index.mjs",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@framerfordevs/api": "workspace:*",
@@ -28,8 +31,13 @@
     "@types/cors": "^2.8.19",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
+    "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "^3.2.7",
+    "drizzle-orm": "^0.45.2",
+    "supertest": "^7.2.2",
     "tsdown": "^0.22.3",
     "tsx": "^4.22.5",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^3.2.7"
   }
 }

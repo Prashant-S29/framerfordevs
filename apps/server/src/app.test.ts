@@ -1,0 +1,304 @@
+import { randomUUID } from "node:crypto";
+
+import { getDefaultCookieAttributes } from "@framerfordevs/auth";
+import { createDb, db } from "@framerfordevs/db";
+import { session, user } from "@framerfordevs/db/schema/auth";
+import { and, eq, like, sql } from "drizzle-orm";
+import request from "supertest";
+import { afterAll, describe, expect, it } from "vitest";
+
+import { createApp } from "./app";
+
+const app = createApp();
+const testEmailPattern = "m0-%@example.test";
+const password = "M0-Test-Password-123!";
+
+function makeEmail() {
+  return `m0-${randomUUID()}@example.test`;
+}
+
+async function createTestUser(email: string) {
+  const agent = request.agent(app);
+  const response = await agent
+    .post("/api/auth/sign-up/email")
+    .set("Origin", "http://localhost:3001")
+    .send({
+      name: "M0 Test User",
+      email,
+      password,
+    });
+
+  expect(response.status).toBe(200);
+  return agent;
+}
+
+afterAll(async () => {
+  await db.delete(user).where(like(user.email, testEmailPattern));
+  await db.$client.end();
+});
+
+describe("server foundation", () => {
+  it("returns the root health response", async () => {
+    const response = await request(app).get("/");
+
+    expect(response.status).toBe(200);
+    expect(response.text).toBe("OK");
+  });
+
+  it("serves the OpenAPI reference for GET requests", async () => {
+    const response = await request(app).get("/api-reference");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/html");
+  });
+
+  it("serves the public oRPC health procedure", async () => {
+    const response = await request(app).post("/rpc/healthCheck").send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ json: "OK" });
+  });
+
+  it("rejects an unsupported method for an oRPC procedure", async () => {
+    const response = await request(app).get("/rpc/healthCheck");
+
+    expect(response.status).toBe(405);
+  });
+
+  it("rejects anonymous access to a protected oRPC procedure", async () => {
+    const response = await request(app).post("/rpc/privateData").send({});
+
+    expect(response.status).toBe(401);
+    expect(response.body.json.code).toBe("UNAUTHORIZED");
+  });
+});
+
+describe("CORS policy", () => {
+  it("allows requests without a browser Origin header", async () => {
+    const response = await request(app).get("/");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("allows the configured web origin with credentials", async () => {
+    const response = await request(app).get("/").set("Origin", "http://localhost:3001");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:3001");
+    expect(response.headers["access-control-allow-credentials"]).toBe("true");
+  });
+
+  it("allows preflight from the configured web origin", async () => {
+    const response = await request(app)
+      .options("/rpc/healthCheck")
+      .set("Origin", "http://localhost:3001")
+      .set("Access-Control-Request-Method", "POST");
+
+    expect(response.status).toBe(204);
+    expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:3001");
+  });
+
+  it("explicitly rejects an untrusted origin", async () => {
+    const response = await request(app).get("/").set("Origin", "https://untrusted.example");
+
+    expect(response.status).toBe(403);
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("explicitly rejects preflight from an untrusted origin", async () => {
+    const response = await request(app)
+      .options("/rpc/healthCheck")
+      .set("Origin", "https://untrusted.example")
+      .set("Access-Control-Request-Method", "POST");
+
+    expect(response.status).toBe(403);
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+});
+
+describe.sequential("Better Auth foundation", () => {
+  it("uses environment-appropriate cookie defaults", () => {
+    expect(getDefaultCookieAttributes("development")).toEqual({
+      sameSite: "lax",
+      secure: false,
+      httpOnly: true,
+    });
+    expect(getDefaultCookieAttributes("test")).toEqual({
+      sameSite: "lax",
+      secure: false,
+      httpOnly: true,
+    });
+    expect(getDefaultCookieAttributes("production")).toEqual({
+      sameSite: "none",
+      secure: true,
+      httpOnly: true,
+    });
+  });
+
+  it("signs up a user and creates an authenticated session", async () => {
+    const email = makeEmail();
+    const agent = request.agent(app);
+    const signUp = await agent
+      .post("/api/auth/sign-up/email")
+      .set("Origin", "http://localhost:3001")
+      .send({ name: "M0 Test User", email, password });
+
+    expect(signUp.status).toBe(200);
+    expect(signUp.body.user.email).toBe(email);
+    const setCookie = String(signUp.headers["set-cookie"] ?? "");
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie).toContain("SameSite=Lax");
+    expect(setCookie).not.toContain("Secure");
+
+    const currentSession = await agent
+      .get("/api/auth/get-session")
+      .set("Origin", "http://localhost:3001");
+
+    expect(currentSession.status).toBe(200);
+    expect(currentSession.body.user.email).toBe(email);
+  });
+
+  it("rejects duplicate sign-up without creating another user", async () => {
+    const email = makeEmail();
+    await createTestUser(email);
+
+    const duplicate = await request(app)
+      .post("/api/auth/sign-up/email")
+      .set("Origin", "http://localhost:3001")
+      .send({ name: "Duplicate", email, password });
+
+    expect(duplicate.status).toBe(422);
+    expect(duplicate.body.code).toBeTypeOf("string");
+
+    const rows = await db.select({ id: user.id }).from(user).where(eq(user.email, email));
+    expect(rows).toHaveLength(1);
+  });
+
+  it("returns the same public failure for an unknown account and a wrong password", async () => {
+    const email = makeEmail();
+    await createTestUser(email);
+
+    const wrongPassword = await request(app)
+      .post("/api/auth/sign-in/email")
+      .set("Origin", "http://localhost:3001")
+      .send({ email, password: "wrong-password" });
+    const unknownAccount = await request(app)
+      .post("/api/auth/sign-in/email")
+      .set("Origin", "http://localhost:3001")
+      .send({ email: makeEmail(), password: "wrong-password" });
+
+    expect(wrongPassword.status).toBe(401);
+    expect(unknownAccount.status).toBe(401);
+    expect(wrongPassword.body.code).toBe(unknownAccount.body.code);
+    expect(wrongPassword.body.message).toBe(unknownAccount.body.message);
+  });
+
+  it("signs in with valid credentials and authorizes the protected procedure", async () => {
+    const email = makeEmail();
+    const agent = await createTestUser(email);
+    await agent.post("/api/auth/sign-out").set("Origin", "http://localhost:3001");
+
+    const signIn = await agent
+      .post("/api/auth/sign-in/email")
+      .set("Origin", "http://localhost:3001")
+      .send({ email, password });
+    const privateData = await agent.post("/rpc/privateData").send({});
+
+    expect(signIn.status).toBe(200);
+    expect(signIn.body.user.email).toBe(email);
+    expect(privateData.status).toBe(200);
+    expect(privateData.body.json.user.email).toBe(email);
+  });
+
+  it("invalidates the session after sign-out", async () => {
+    const email = makeEmail();
+    const agent = await createTestUser(email);
+
+    const signOut = await agent.post("/api/auth/sign-out").set("Origin", "http://localhost:3001");
+    const currentSession = await agent
+      .get("/api/auth/get-session")
+      .set("Origin", "http://localhost:3001");
+
+    expect(signOut.status).toBe(200);
+    expect(currentSession.status).toBe(200);
+    expect(currentSession.body).toBeNull();
+  });
+
+  it("rejects a database-expired session", async () => {
+    const email = makeEmail();
+    const agent = await createTestUser(email);
+    const [createdUser] = await db
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.email, email))
+      .limit(1);
+
+    expect(createdUser).toBeDefined();
+    if (!createdUser) return;
+
+    await db
+      .update(session)
+      .set({ expiresAt: new Date(0) })
+      .where(eq(session.userId, createdUser.id));
+
+    const currentSession = await agent
+      .get("/api/auth/get-session")
+      .set("Origin", "http://localhost:3001");
+
+    expect(currentSession.status).toBe(200);
+    expect(currentSession.body).toBeNull();
+  });
+
+  it("refreshes a session whose update age has elapsed", async () => {
+    const email = makeEmail();
+    const agent = await createTestUser(email);
+    const [createdUser] = await db
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.email, email))
+      .limit(1);
+
+    expect(createdUser).toBeDefined();
+    if (!createdUser) return;
+
+    const staleTime = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const refreshThreshold = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000 - 1000);
+    await db
+      .update(session)
+      .set({ expiresAt: refreshThreshold, updatedAt: staleTime })
+      .where(eq(session.userId, createdUser.id));
+
+    const currentSession = await agent
+      .get("/api/auth/get-session")
+      .set("Origin", "http://localhost:3001");
+    const [refreshedSession] = await db
+      .select({ expiresAt: session.expiresAt, updatedAt: session.updatedAt })
+      .from(session)
+      .where(and(eq(session.userId, createdUser.id), sql`${session.expiresAt} > now()`))
+      .limit(1);
+
+    expect(currentSession.status).toBe(200);
+    expect(currentSession.body.user.email).toBe(email);
+    expect(refreshedSession).toBeDefined();
+    expect(refreshedSession?.updatedAt.getTime()).toBeGreaterThan(staleTime.getTime());
+    expect(refreshedSession?.expiresAt.getTime()).toBeGreaterThan(refreshThreshold.getTime());
+  });
+});
+
+describe("database connectivity", () => {
+  it("executes a read-only query against PostgreSQL", async () => {
+    const result = await db.execute(sql`select 1 as value`);
+
+    expect(result.rows).toEqual([{ value: 1 }]);
+  });
+
+  it("fails safely when a database is unreachable", async () => {
+    const unreachable = createDb(
+      "postgresql://postgres:invalid@127.0.0.1:65432/framerfordevs?connect_timeout=1",
+    );
+
+    await expect(unreachable.execute(sql`select 1`)).rejects.toBeDefined();
+    await unreachable.$client.end();
+  });
+});

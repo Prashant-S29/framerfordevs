@@ -6,7 +6,7 @@ export const env = createEnv({
   client: {
     VITE_SERVER_URL: z.url(),
   },
-  runtimeEnv: (import.meta as any).env,
-  skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+  runtimeEnv: import.meta.env,
+  skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
   emptyStringAsUndefined: true,
 });

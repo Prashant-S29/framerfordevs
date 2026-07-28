@@ -7,9 +7,13 @@
   ],
   "type": "module",
   "scripts": {
+    "prepare": "./scripts/prepare-effect.sh",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "check-types": "turbo run check-types",
+    "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage",
+    "ready": "pnpm run format && pnpm run check && pnpm run check-types && pnpm run test && pnpm run test:coverage && pnpm run build",
     "dev:web": "turbo run dev -F web",
     "dev:server": "turbo run dev -F server",
     "db:push": "turbo run db:push -F @framerfordevs/db",
@@ -24,7 +28,9 @@
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
-    "check": "oxlint && oxfmt --write"
+    "check": "oxlint && oxfmt --check .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
   },
   "dependencies": {
     "@framerfordevs/env": "workspace:*",

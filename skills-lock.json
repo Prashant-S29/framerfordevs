@@ -7,11 +7,53 @@
       "skillPath": "better-auth/best-practices/SKILL.md",
       "computedHash": "61ba0ef64ed2e7c424401cc848ca33dd6d790a720c44727717dc0c5cba5fc122"
     },
+    "drizzle-orm-patterns": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-typescript/skills/drizzle-orm-patterns/SKILL.md",
+      "computedHash": "d63e6d73a9f579b505a5694af2f3b3200c2b5eeea147e88b9b6d1e5fce23bcbb"
+    },
+    "effect-ts": {
+      "source": "effect-ts/skills",
+      "sourceType": "github",
+      "skillPath": "skills/effect-ts/SKILL.md",
+      "computedHash": "16dc62c9087d4b74035d4071fe931ff43c4218acb414407a17066045a80762fa"
+    },
+    "express-typescript": {
+      "source": "mindrally/skills",
+      "sourceType": "github",
+      "skillPath": "express-typescript/SKILL.md",
+      "computedHash": "356f5459a3ec3cddc3500f4c00039d61c8f950fb367d6f11495d7f5d41ea57e9"
+    },
     "shadcn": {
       "source": "shadcn/ui",
       "sourceType": "github",
       "skillPath": "skills/shadcn/SKILL.md",
       "computedHash": "c1a68ee06a668aced9ab2b5fbdea5f989864123794eb2e056b339a072dbb7f10"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "ec56a54fba0e97bee52c7f244ba603bb284bf8d1b739c66a5cc84ec3df709d9d"
+    },
+    "tanstack-query-best-practices": {
+      "source": "deckardger/tanstack-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tanstack-query/SKILL.md",
+      "computedHash": "21d2e8b7468a81d772b6527ad8ca178cc2f3f08af777bb9061333013ee88a0c9"
+    },
+    "tanstack-router-best-practices": {
+      "source": "deckardger/tanstack-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tanstack-router/SKILL.md",
+      "computedHash": "65764bc7b90e47f6023cb7f89b3af93eaaafc517754f10b9382e184d4646a77d"
+    },
+    "tanstack-start-best-practices": {
+      "source": "deckardger/tanstack-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/tanstack-start/SKILL.md",
+      "computedHash": "8b073187405a10f9997158f9139a9664cc801595d2fe63d542a0bac9bf2152f5"
     },
     "turborepo": {
       "source": "vercel/turborepo",

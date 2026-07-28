@@ -7,6 +7,11 @@
     "./server": "./src/server.ts",
     "./web": "./src/web.ts"
   },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
   "dependencies": {
     "@t3-oss/env-core": "^0.13.11",
     "dotenv": "catalog:",
@@ -15,6 +20,8 @@
   "devDependencies": {
     "@framerfordevs/config": "workspace:*",
     "@types/node": "catalog:",
-    "typescript": "catalog:"
+    "@vitest/coverage-v8": "^3.2.7",
+    "typescript": "catalog:",
+    "vitest": "^3.2.7"
   }
 }
