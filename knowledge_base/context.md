@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-07-28  
-**Current phase:** Milestone 0 automated criteria complete; awaiting developer review  
-**Active milestone:** Milestone 0 — Validate the existing foundation
+**Last updated:** 2026-07-29
+**Current phase:** Milestone 0 approved; Milestone 1 ready to begin
+**Active milestone:** Milestone 1 — Effect foundation, error contract, and observability
 
 ## What this project is
 
@@ -119,16 +119,24 @@ The starter does not yet have:
 - Do not expose `.env`, auth/session secrets, credentials, or content payloads in logs.
 - Update `progress.md`, this file, and `learnings.md` as work proceeds.
 
+## Milestone 0 completion
+
+Milestone 0 passed `pnpm run ready`, 26 automated tests, coverage, local runtime checks, Docker health validation, and developer manual review. The developer approved and committed it as `7d5a312` (`feat(m0): harden and validate the application foundation`).
+
+PostgreSQL remains available locally. Docker web/server containers were stopped after successful validation so ports 3000/3001 remain available.
+
 ## What to do next
 
-Milestone 0 is complete automatically. The developer must manually:
+Begin Milestone 1 without changing product behavior:
 
-1. Run `pnpm run dev` and verify sign-up, sign-in, dashboard refresh, protected access, sign-out, and that an authenticated visit to `/login` redirects to `/dashboard`.
-2. Confirm local cookie behavior and the production `Secure; SameSite=None` policy.
-3. Review the generated initial auth migration and the Milestone 0 source changes.
-4. Approve or request changes.
-5. Commit manually if approved.
+1. Confirm the exact stable Effect v3 package set and package boundaries using the installed skill and pinned 3.22.0 source.
+2. Install Effect runtime, `@effect/vitest`, and OpenTelemetry-compatible dependencies through pnpm.
+3. Define the schema-backed error-code registry, tagged errors, deterministic HTTP mapping, and discriminated `ApiResponse<T>` schemas/helpers.
+4. Add validated request IDs, trace-context propagation, structured redacted logging, bounded metrics, and health/readiness separation.
+5. Build replaceable database, auth-session, clock, logger, and telemetry services as Layers.
+6. Create one shared ManagedRuntime with explicit initialization and shutdown, then integrate application-owned Express/oRPC boundaries.
+7. Preserve native Better Auth protocol responses while translating internal auth/session failures through typed Effect adapters.
+8. Add contract snapshots, property tests, test Layers, redaction tests, lifecycle tests, and failure/defect/interruption coverage.
+9. Run `pnpm run ready`, update the knowledge base, provide a Conventional Commits message, and stop for developer manual review.
 
-PostgreSQL remains running locally; Docker web/server containers were stopped after successful health validation so they do not block ports 3000/3001.
-
-The developer generated and applied `packages/db/src/migrations/0000_initial_auth_schema.sql`. Do not generate or apply another migration. Do not begin the Effect migration until Milestone 0 is explicitly approved.
+Milestone 1 is not expected to require a database schema change. Never generate or apply a migration.

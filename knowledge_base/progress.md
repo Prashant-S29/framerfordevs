@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 0 automated criteria complete; awaiting developer review  
-**Active milestone:** Milestone 0 — Validate the existing foundation  
-**Last updated:** 2026-07-28
+**Overall status:** Milestone 0 approved; Milestone 1 ready to begin
+**Active milestone:** Milestone 1 — Effect foundation, error contract, and observability
+**Last updated:** 2026-07-29
 
 ## Status legend
 
@@ -15,24 +15,24 @@
 
 ## Milestone tracker
 
-| #   | Milestone                                | Status | Automated tests | Manual review | Commit |
-| --- | ---------------------------------------- | ------ | --------------- | ------------- | ------ |
-| 0   | Validate existing foundation             | `[R]`  | 26 passing      | Retest needed | None   |
-| 1   | Effect foundation, errors, observability | `[ ]`  | Not run         | Pending       | None   |
-| 2   | Platform kernel                          | `[ ]`  | Not run         | Pending       | None   |
-| 3   | Membership, policies, credentials        | `[ ]`  | Not run         | Pending       | None   |
-| 4   | Project locales                          | `[ ]`  | Not run         | Pending       | None   |
-| 5   | Versioned schema engine                  | `[ ]`  | Not run         | Pending       | None   |
-| 6   | Field system and generated forms         | `[ ]`  | Not run         | Pending       | None   |
-| 7   | Entries and multilingual drafts          | `[ ]`  | Not run         | Pending       | None   |
-| 8   | Per-locale publication and snapshots     | `[ ]`  | Not run         | Pending       | None   |
-| 9   | Delivery API                             | `[ ]`  | Not run         | Pending       | None   |
-| 10  | Preview API                              | `[ ]`  | Not run         | Pending       | None   |
-| 11  | Events, webhooks, invalidation           | `[ ]`  | Not run         | Pending       | None   |
-| 12  | Generated developer tooling              | `[ ]`  | Not run         | Pending       | None   |
-| 13  | Client handover                          | `[ ]`  | Not run         | Pending       | None   |
-| 14  | Production hardening                     | `[ ]`  | Not run         | Pending       | None   |
-| 15  | Visual-builder readiness contracts       | `[ ]`  | Not run         | Pending       | None   |
+| #   | Milestone                                | Status | Automated tests | Manual review | Commit    |
+| --- | ---------------------------------------- | ------ | --------------- | ------------- | --------- |
+| 0   | Validate existing foundation             | `[A]`  | 26 passing      | Approved      | `7d5a312` |
+| 1   | Effect foundation, errors, observability | `[ ]`  | Not run         | Pending       | None      |
+| 2   | Platform kernel                          | `[ ]`  | Not run         | Pending       | None      |
+| 3   | Membership, policies, credentials        | `[ ]`  | Not run         | Pending       | None      |
+| 4   | Project locales                          | `[ ]`  | Not run         | Pending       | None      |
+| 5   | Versioned schema engine                  | `[ ]`  | Not run         | Pending       | None      |
+| 6   | Field system and generated forms         | `[ ]`  | Not run         | Pending       | None      |
+| 7   | Entries and multilingual drafts          | `[ ]`  | Not run         | Pending       | None      |
+| 8   | Per-locale publication and snapshots     | `[ ]`  | Not run         | Pending       | None      |
+| 9   | Delivery API                             | `[ ]`  | Not run         | Pending       | None      |
+| 10  | Preview API                              | `[ ]`  | Not run         | Pending       | None      |
+| 11  | Events, webhooks, invalidation           | `[ ]`  | Not run         | Pending       | None      |
+| 12  | Generated developer tooling              | `[ ]`  | Not run         | Pending       | None      |
+| 13  | Client handover                          | `[ ]`  | Not run         | Pending       | None      |
+| 14  | Production hardening                     | `[ ]`  | Not run         | Pending       | None      |
+| 15  | Visual-builder readiness contracts       | `[ ]`  | Not run         | Pending       | None      |
 
 ## Documentation completed
 
@@ -61,7 +61,7 @@
 - `[x]` Confirmed protocol-owned auth responses must remain native.
 - `[x]` Selected stable Effect v3 instead of Effect v4 beta/Drizzle RC.
 
-## Active Milestone 0 checklist
+## Completed Milestone 0 checklist
 
 ### Foundation checks
 
@@ -98,15 +98,29 @@
 - `[x]` Resolve/document the pre-existing lint, task-coverage, CORS, cookie, build-output, and Docker-build issues.
 - `[x]` Run all Milestone 0 automated criteria.
 - `[x]` Update this file with commands and results.
-- `[R]` Request developer manual review.
+- `[x]` Request developer manual review.
+- `[A]` Developer manually verified and approved Milestone 0.
+
+## Milestone 1 readiness
+
+- `[x]` Stable Effect v3 direction selected.
+- `[x]` Stable `effect@3.22.0` source pinned for local research.
+- `[x]` Better Auth protocol-boundary exception documented.
+- `[x]` ManagedRuntime and typed adapter direction documented.
+- `[ ]` Install aligned Effect runtime, testing, and OpenTelemetry packages.
+- `[ ]` Implement central schemas for API responses and error codes.
+- `[ ]` Implement request correlation, tracing, structured logging, metrics, Layers, and ManagedRuntime.
+- `[ ]` Wrap database and Better Auth session access with typed Effect adapters.
+- `[ ]` Route application-owned oRPC procedures through the runtime and central error boundary.
+- `[ ]` Add property, contract, redaction, lifecycle, and failure-translation tests.
 
 ## Current blockers
 
-None. Milestone 0 is waiting only for developer manual review.
+None. Milestone 1 may begin.
 
 ## Database actions awaiting developer
 
-The developer generated and applied `0000_initial_auth_schema`. No CMS schema change or additional migration is currently required.
+The developer generated and applied `0000_initial_auth_schema`. Milestone 1 is an application-architecture milestone and is not expected to require another database migration.
 
 ## Test results
 
@@ -123,4 +137,6 @@ The developer generated and applied `0000_initial_auth_schema`. No CMS schema ch
 
 ## Manual review log
 
-The developer found that authenticated users could revisit `/login`. The route now checks the server session before rendering and redirects authenticated users to `/dashboard`; automated coverage and a live HTTP 307 integration check pass. Milestone 0 is awaiting developer retest. No commit has been created.
+The developer found that authenticated users could revisit `/login`. The route now checks the server session before rendering and redirects authenticated users to `/dashboard`; automated coverage and a live HTTP 307 integration check pass.
+
+Milestone 0 was manually approved and committed by the developer as `7d5a312` (`feat(m0): harden and validate the application foundation`).
