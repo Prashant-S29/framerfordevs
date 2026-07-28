@@ -1,0 +1,24 @@
+{
+  "name": "@framerfordevs/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@framerfordevs/db": "workspace:*",
+    "@framerfordevs/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@framerfordevs/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
