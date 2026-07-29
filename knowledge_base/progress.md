@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 1 automated criteria complete; awaiting developer review
-**Active milestone:** Milestone 1 — Effect foundation, error contract, and observability
+**Overall status:** Milestone 1 approved; Milestone 2 ready to begin
+**Active milestone:** Milestone 2 — Platform kernel
 **Last updated:** 2026-07-29
 
 ## Status legend
@@ -18,8 +18,8 @@
 | #   | Milestone                                | Status | Automated tests | Manual review | Commit    |
 | --- | ---------------------------------------- | ------ | --------------- | ------------- | --------- |
 | 0   | Validate existing foundation             | `[A]`  | 26 passing      | Approved      | `7d5a312` |
-| 1   | Effect foundation, errors, observability | `[R]`  | 90 passing      | Pending       | None      |
-| 2   | Platform kernel                          | `[ ]`  | Not run         | Pending       | None      |
+| 1   | Effect foundation, errors, observability | `[A]`  | 90 passing      | Approved      | `c28f6fa` |
+| 2   | Platform kernel                          | `[~]`  | Not run         | Pending       | None      |
 | 3   | Membership, policies, credentials        | `[ ]`  | Not run         | Pending       | None      |
 | 4   | Project locales                          | `[ ]`  | Not run         | Pending       | None      |
 | 5   | Versioned schema engine                  | `[ ]`  | Not run         | Pending       | None      |
@@ -101,7 +101,7 @@
 - `[x]` Request developer manual review.
 - `[A]` Developer manually verified and approved Milestone 0.
 
-## Active Milestone 1 checklist
+## Completed Milestone 1 checklist
 
 - `[x]` Install aligned stable Effect 3.22 runtime, testing, platform, and OpenTelemetry packages.
 - `[x]` Implement schema-backed API response, error detail, error-code, and request-ID contracts.
@@ -117,15 +117,24 @@
 - `[x]` Add graceful runtime resource initialization and shutdown.
 - `[x]` Add property, contract snapshot, redaction, propagation, adapter, lifecycle, and cause-classification tests.
 - `[x]` Document Effect, Drizzle, Better Auth, and observability boundaries.
-- `[R]` Request developer manual review.
+- `[x]` Request developer manual review.
+- `[A]` Developer manually verified and approved Milestone 1.
+
+## Active Milestone 2 checklist
+
+- `[ ]` Review and approve the platform-kernel domain and database design.
+- `[ ]` Implement workspaces, projects, capability state, stable branded IDs, and the internal `main` environment.
+- `[ ]` Add ownership/membership and audit-event foundations.
+- `[ ]` Add project creation, listing, editing, and archive APIs/UI.
+- `[ ]` Add tenant-isolation, concurrency, pagination, index, audit, and contract tests.
 
 ## Current blockers
 
-None. Milestone 1 is waiting only for developer manual review.
+None. Milestone 2 is ready to begin with design review.
 
 ## Database actions awaiting developer
 
-The developer generated and applied `0000_initial_auth_schema`. Milestone 1 is an application-architecture milestone and is not expected to require another database migration.
+Milestone 2 is expected to require the `create_platform_kernel` migration. The agent must first present the domain and schema design for approval, must never generate or apply the migration, and must stop for the developer to run the provided commands after the approved Drizzle schema changes are made.
 
 ## Test results
 
@@ -160,4 +169,4 @@ The developer found that authenticated users could revisit `/login`. The route n
 
 Milestone 0 was manually approved and committed by the developer as `7d5a312` (`feat(m0): harden and validate the application foundation`).
 
-Milestone 1 is awaiting developer review of successful/failed trace summaries, redacted structured logs, package versions, API contracts, and framework boundaries. No commit has been created.
+Milestone 1 was manually approved and committed by the developer as `c28f6fa` (`feat(m1): add Effect runtime, typed errors, and observability`). The anonymous protected-route review returned the expected HTTP 401, request correlation, and standardized `UNAUTHORIZED` failure without exposing sensitive data.

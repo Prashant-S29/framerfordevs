@@ -1,8 +1,8 @@
 # Agent Session Context
 
 **Last updated:** 2026-07-29
-**Current phase:** Milestone 1 automated criteria complete; awaiting developer review
-**Active milestone:** Milestone 1 — Effect foundation, error contract, and observability
+**Current phase:** Milestone 1 approved; Milestone 2 ready to begin
+**Active milestone:** Milestone 2 — Platform kernel
 
 ## What this project is
 
@@ -88,7 +88,7 @@ Relevant installed skills also include:
 
 ## Current repository state
 
-The starter currently has:
+The repository currently has:
 
 - Basic Better Auth schema and email/password configuration
 - Basic sign-in/sign-up/dashboard UI
@@ -104,7 +104,7 @@ The starter currently has:
 - Request correlation, W3C trace continuation, structured redacted logs, bounded metrics, and OpenTelemetry export
 - Separate liveness/readiness and graceful ManagedRuntime shutdown
 
-The starter does not yet have:
+The repository does not yet have:
 
 - CMS domain models
 - CMS domain workflows and CMS-specific test suites
@@ -127,7 +127,7 @@ Milestone 0 passed `pnpm run ready`, 26 automated tests, coverage, local runtime
 
 PostgreSQL remains available locally. Docker web/server containers were stopped after successful validation so ports 3000/3001 remain available.
 
-## Milestone 1 implementation
+## Milestone 1 completion
 
 - Stable package set: `effect@3.22.0`, `@effect/vitest@0.30.0`, `@effect/platform@0.97.0`, and `@effect/opentelemetry@0.64.0`.
 - `packages/api/src/contracts/` owns the schema-backed response and error contracts.
@@ -136,16 +136,17 @@ PostgreSQL remains available locally. Docker web/server containers were stopped 
 - `packages/api/src/runtime.ts` owns the shared Layer graph, ManagedRuntime, cause classification, framework execution boundary, and shutdown.
 - Application-owned health and oRPC responses use the standard envelope. Better Auth remains protocol-native.
 - `knowledge_base/decisions/m1-effect-boundaries.md` records compatibility and observability decisions.
+- The developer manually verified the anonymous protected-route failure contract, approved Milestone 1, and committed it as `c28f6fa` (`feat(m1): add Effect runtime, typed errors, and observability`).
 
 ## What to do next
 
-The developer must manually:
+Milestone 2 creates the durable platform kernel:
 
-1. Run `pnpm run dev` and inspect successful liveness/readiness trace summaries.
-2. Request the protected oRPC endpoint anonymously and inspect the failed operation trace/log without exposing credentials or cookies.
-3. Sign in and verify the dashboard still loads private data through the enveloped oRPC response.
-4. Confirm `GET /` reports liveness and `GET /ready` reports database-backed readiness.
-5. Review the Effect/OpenTelemetry package versions and `knowledge_base/decisions/m1-effect-boundaries.md`.
-6. Approve or request changes, then commit manually if approved.
+1. Design workspaces, projects, optional capability state, and the internal `main` environment.
+2. Define stable branded IDs, ownership/membership foundations, and audit events.
+3. Review tenant boundaries, uniqueness rules, archive behavior, cursor pagination, and required indexes.
+4. Present the domain and Drizzle schema design for developer approval before editing the schema.
+5. After approval, implement through typed Effect services and application contracts with isolation and concurrency tests.
+6. Provide the `create_platform_kernel` migration commands and stop for the developer to generate and apply the migration.
 
-PostgreSQL remains running. Docker web/server containers were stopped after successful validation so ports 3000/3001 are available. Milestone 1 requires no migration. Do not begin Milestone 2 until Milestone 1 is explicitly approved.
+PostgreSQL remains running. Milestone 2 is expected to require a database migration; the agent must never generate or apply it.
