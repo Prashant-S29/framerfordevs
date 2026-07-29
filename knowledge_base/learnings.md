@@ -94,6 +94,22 @@ Record a learning when an implementation or decision:
 
 ---
 
+## 2026-07-30 — Container health must exercise server-rendered dependencies
+
+**Context:** The Docker web root was healthy, but the server-rendered login route failed while resolving the current Better Auth session.
+
+**Incorrect assumption or decision:** The web container used the browser-facing `http://localhost:3000` API URL during server-side rendering. Inside the web container, `localhost` referred to the web container itself. The root-only health check did not exercise authentication and therefore reported healthy.
+
+**Cost or risk:** Docker appeared production-ready while `/login` rendered a fetch failure, blocking authentication and all manual platform review.
+
+**Learning:** Universal applications need separate public browser and internal service-discovery URLs. Container health checks must traverse a representative server-rendered dependency, not only a static or dependency-free root.
+
+**Prevention:** Docker supplies `INTERNAL_SERVER_URL=http://server:3000` for SSR while retaining the public Vite URL for browsers. URL resolution has dedicated tests, and the web health check now requests `/login`, which exercises the auth service dependency.
+
+**Status:** Resolved and validated with 163 tests, a production rebuild, healthy containers, and an HTTP 200 login response.
+
+---
+
 ## Current implementation learnings
 
-No CMS-domain implementation has started. Additional entries should be added only when a consequential product or architecture decision causes drift or rework.
+The platform kernel is implemented through Milestone 2. CMS-domain implementation has not started. Additional entries should be added only when a consequential decision causes drift or rework.

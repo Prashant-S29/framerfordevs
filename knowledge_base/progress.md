@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 1 approved; Milestone 2 ready to begin
+**Overall status:** Milestone 2 complete and manually approved; awaiting developer commit
 **Active milestone:** Milestone 2 — Platform kernel
-**Last updated:** 2026-07-29
+**Last updated:** 2026-07-30
 
 ## Status legend
 
@@ -19,7 +19,7 @@
 | --- | ---------------------------------------- | ------ | --------------- | ------------- | --------- |
 | 0   | Validate existing foundation             | `[A]`  | 26 passing      | Approved      | `7d5a312` |
 | 1   | Effect foundation, errors, observability | `[A]`  | 90 passing      | Approved      | `c28f6fa` |
-| 2   | Platform kernel                          | `[~]`  | Not run         | Pending       | None      |
+| 2   | Platform kernel                          | `[A]`  | 163 passing     | Approved      | Pending   |
 | 3   | Membership, policies, credentials        | `[ ]`  | Not run         | Pending       | None      |
 | 4   | Project locales                          | `[ ]`  | Not run         | Pending       | None      |
 | 5   | Versioned schema engine                  | `[ ]`  | Not run         | Pending       | None      |
@@ -120,23 +120,42 @@
 - `[x]` Request developer manual review.
 - `[A]` Developer manually verified and approved Milestone 1.
 
-## Active Milestone 2 checklist
+## Completed Milestone 2 checklist
 
-- `[ ]` Review and approve the platform-kernel domain and database design.
-- `[ ]` Implement workspaces, projects, capability state, stable branded IDs, and the internal `main` environment.
-- `[ ]` Add ownership/membership and audit-event foundations.
-- `[ ]` Add project creation, listing, editing, and archive APIs/UI.
-- `[ ]` Add tenant-isolation, concurrency, pagination, index, audit, and contract tests.
+- `[x]` Review and approve the platform-kernel domain and database design.
+- `[x]` Implement workspaces, projects, capability state, stable branded IDs, and the internal `main` environment.
+- `[x]` Add ownership/membership and audit-event foundations.
+- `[x]` Add project creation, listing, editing, and archive APIs/UI.
+- `[x]` Add tenant-isolation, concurrency, pagination, index, audit, and contract tests.
+- `[x]` Validate development runtime, OpenAPI generation, production builds, and Docker health.
+- `[x]` Request developer manual review.
+- `[A]` Developer manually verified and approved Milestone 2.
 
 ## Current blockers
 
-None. Milestone 2 is ready to begin with design review.
+None. Milestone 2 is approved and awaiting the developer commit.
 
-## Database actions awaiting developer
+## Database migration state
 
-Milestone 2 is expected to require the `create_platform_kernel` migration. The agent must first present the domain and schema design for approval, must never generate or apply the migration, and must stop for the developer to run the provided commands after the approved Drizzle schema changes are made.
+The developer generated and applied `packages/db/src/migrations/0001_create_platform_kernel.sql`. The agent inspected the generated SQL and live PostgreSQL catalog against the approved design. The agent did not generate, run, or apply the migration.
 
 ## Test results
+
+### Milestone 2
+
+- `pnpm run ready`: pass, including formatting, lint, all package type checks, tests, V8 coverage, and production builds.
+- `pnpm run test`: 163 tests pass across 21 files: 85 API/domain, 39 server/API integration, 34 web URL-resolution/validation/accessibility, and 5 environment tests.
+- `pnpm run test:coverage`: pass; API/domain code is 96.26% statements, 86.51% branches, and 84.94% functions; tested web helpers are 100%.
+- PostgreSQL integration covers transactional workspace/project creation, rollback, audit rows, tenant isolation, key reservation, pagination, composite constraints, and intended index plans.
+- Concurrent same-key project creation, same-version updates, and CMS enablement each produce exactly one winner with typed loser conflicts.
+- Every protected platform procedure denies anonymous callers and preserves non-enumerating cross-tenant behavior.
+- Effect-backed input and success-output contracts are represented in the generated OpenAPI reference.
+- Automated axe checks pass for create-workspace, create-project, edit-project, and archive-confirmation dialogs; a source-level web-interface-guideline review found no remaining M2 issues.
+- Development runtime liveness/readiness/OpenAPI/frontend smoke checks pass.
+- Docker images build; PostgreSQL, server, and web are healthy; container liveness, readiness, OpenAPI, frontend, and SSR login checks return HTTP 200.
+- Docker SSR resolves the API through `http://server:3000`; the browser retains `http://localhost:3000`. The web health check now exercises `/login` and therefore its auth dependency.
+- Cleanup verification reports zero Milestone 2 test users and workspaces remaining in PostgreSQL.
+- The developer generated/applied the migration; the agent did not generate or apply any migration.
 
 ### Milestone 1
 
@@ -170,3 +189,5 @@ The developer found that authenticated users could revisit `/login`. The route n
 Milestone 0 was manually approved and committed by the developer as `7d5a312` (`feat(m0): harden and validate the application foundation`).
 
 Milestone 1 was manually approved and committed by the developer as `c28f6fa` (`feat(m1): add Effect runtime, typed errors, and observability`). The anonymous protected-route review returned the expected HTTP 401, request correlation, and standardized `UNAUTHORIZED` failure without exposing sensitive data.
+
+Milestone 2 automated criteria are complete. During manual review, the developer found Docker SSR could not load `/login`; the internal service URL was corrected and covered by URL-resolution tests plus the container health check. The developer verified the corrected Docker login flow and approved Milestone 2. The milestone is awaiting the developer commit.

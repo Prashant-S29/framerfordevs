@@ -35,6 +35,18 @@ export class ConflictFailure extends Schema.TaggedError<ConflictFailure>("Confli
   {},
 ) {}
 
+export class ProjectKeyConflictFailure extends Schema.TaggedError<ProjectKeyConflictFailure>(
+  "ProjectKeyConflictFailure",
+)("ProjectKeyConflictFailure", {}) {}
+
+export class VersionConflictFailure extends Schema.TaggedError<VersionConflictFailure>(
+  "VersionConflictFailure",
+)("VersionConflictFailure", {}) {}
+
+export class InvalidStateTransitionFailure extends Schema.TaggedError<InvalidStateTransitionFailure>(
+  "InvalidStateTransitionFailure",
+)("InvalidStateTransitionFailure", {}) {}
+
 export class RateLimitedFailure extends Schema.TaggedError<RateLimitedFailure>(
   "RateLimitedFailure",
 )("RateLimitedFailure", {}) {}
@@ -60,6 +72,9 @@ export type ApplicationError =
   | ForbiddenFailure
   | NotFoundFailure
   | ConflictFailure
+  | ProjectKeyConflictFailure
+  | VersionConflictFailure
+  | InvalidStateTransitionFailure
   | RateLimitedFailure
   | DatabaseFailure
   | AuthSessionFailure;
@@ -70,6 +85,9 @@ export const apiErrorHttpStatus = {
   FORBIDDEN: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
+  PROJECT_KEY_CONFLICT: 409,
+  VERSION_CONFLICT: 409,
+  INVALID_STATE_TRANSITION: 409,
   RATE_LIMITED: 429,
   SERVICE_UNAVAILABLE: 503,
   INTERNAL_ERROR: 500,
@@ -113,6 +131,24 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
       return {
         code: "CONFLICT",
         message: "The request conflicts with the current resource state.",
+        retryable: false,
+      };
+    case "ProjectKeyConflictFailure":
+      return {
+        code: "PROJECT_KEY_CONFLICT",
+        message: "A project with this key already exists in the workspace.",
+        retryable: false,
+      };
+    case "VersionConflictFailure":
+      return {
+        code: "VERSION_CONFLICT",
+        message: "The project changed since it was loaded. Refresh and try again.",
+        retryable: false,
+      };
+    case "InvalidStateTransitionFailure":
+      return {
+        code: "INVALID_STATE_TRANSITION",
+        message: "The requested state transition is not allowed.",
         retryable: false,
       };
     case "RateLimitedFailure":

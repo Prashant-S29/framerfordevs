@@ -25,7 +25,11 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "My App",
+        title: "Framer for Devs",
+      },
+      {
+        name: "theme-color",
+        content: "#252525",
       },
     ],
     links: [
@@ -46,13 +50,25 @@ function RootDocument() {
         <HeadContent />
       </head>
       <body>
+        <a
+          href="#main-content"
+          className="bg-background text-foreground sr-only z-50 p-2 focus:not-sr-only focus:fixed focus:left-2 focus:top-2"
+        >
+          Skip to main content
+        </a>
         <div className="grid h-svh grid-rows-[auto_1fr]">
           <Header />
-          <Outlet />
+          <div id="main-content" className="min-w-0 overflow-auto">
+            <Outlet />
+          </div>
         </div>
         <Toaster richColors />
-        <TanStackRouterDevtools position="bottom-left" />
-        <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+        {import.meta.env.DEV ? (
+          <>
+            <TanStackRouterDevtools position="bottom-left" />
+            <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+          </>
+        ) : null}
         <Scripts />
       </body>
     </html>

@@ -11,6 +11,7 @@ import { AuthSessionFailure } from "./contracts/errors";
 import { AuthSessionService } from "./services/auth-session";
 import { DatabaseFailure } from "./contracts/errors";
 import { Database } from "./services/database";
+import { PlatformRepositoryLive } from "./services/platform-repository";
 
 const logRecords: Array<LogRecord> = [];
 const requestMetrics: Array<HttpRequestMetric> = [];
@@ -46,7 +47,13 @@ const DatabaseTest = Layer.succeed(Database, {
   ping: Effect.void,
 });
 
-const TestLive = Layer.mergeAll(LoggerTest, TelemetryTest, AuthSessionTest, DatabaseTest);
+const TestLive = Layer.mergeAll(
+  LoggerTest,
+  TelemetryTest,
+  AuthSessionTest,
+  DatabaseTest,
+  PlatformRepositoryLive,
+);
 const testRuntime = ManagedRuntime.make(TestLive);
 
 const request = RequestContext.make({
@@ -190,7 +197,13 @@ describe("replaceable infrastructure services", () => {
       ),
     });
     const runtime = ManagedRuntime.make(
-      Layer.mergeAll(LoggerTest, TelemetryTest, AuthSessionTest, DatabaseRejected),
+      Layer.mergeAll(
+        LoggerTest,
+        TelemetryTest,
+        AuthSessionTest,
+        DatabaseRejected,
+        PlatformRepositoryLive,
+      ),
     );
 
     const result = await executeWithRuntime(
@@ -217,7 +230,7 @@ describe("replaceable infrastructure services", () => {
         ),
     });
     const runtime = ManagedRuntime.make(
-      Layer.mergeAll(LoggerTest, TelemetryTest, AuthRejected, DatabaseTest),
+      Layer.mergeAll(LoggerTest, TelemetryTest, AuthRejected, DatabaseTest, PlatformRepositoryLive),
     );
 
     const result = await executeWithRuntime(

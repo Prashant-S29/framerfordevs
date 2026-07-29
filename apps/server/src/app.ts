@@ -1,4 +1,5 @@
 import { createContext } from "@framerfordevs/api/context";
+import { EffectSchemaToJsonSchemaConverter } from "@framerfordevs/api/contracts/effect-schema-converter";
 import { apiFailure } from "@framerfordevs/api/contracts/api-response";
 import { readinessCheck, healthCheck } from "@framerfordevs/api/operations/system";
 import { makeRequestContext } from "@framerfordevs/api/observability/request-context";
@@ -19,7 +20,7 @@ const rpcHandler = new RPCHandler(appRouter);
 const apiHandler = new OpenAPIHandler(appRouter, {
   plugins: [
     new OpenAPIReferencePlugin({
-      schemaConverters: [new ZodToJsonSchemaConverter()],
+      schemaConverters: [new EffectSchemaToJsonSchemaConverter(), new ZodToJsonSchemaConverter()],
     }),
   ],
 });

@@ -1,7 +1,7 @@
 # Agent Session Context
 
-**Last updated:** 2026-07-29
-**Current phase:** Milestone 1 approved; Milestone 2 ready to begin
+**Last updated:** 2026-07-30
+**Current phase:** Milestone 2 complete and manually approved; awaiting developer commit
 **Active milestone:** Milestone 2 — Platform kernel
 
 ## What this project is
@@ -103,14 +103,18 @@ The repository currently has:
 - Schema-backed application response/error contracts and deterministic HTTP mapping
 - Request correlation, W3C trace continuation, structured redacted logs, bounded metrics, and OpenTelemetry export
 - Separate liveness/readiness and graceful ManagedRuntime shutdown
+- Migrated workspace, owner-membership, project, internal `main` environment, capability, and immutable audit-event tables
+- Branded Effect platform contracts, opaque keyset cursors, typed conflicts, and Effect-backed oRPC/OpenAPI procedures
+- Transactional Drizzle repository workflows with tenant non-enumeration, optimistic concurrency, rollback guarantees, and audit persistence
+- TanStack/shadcn workspace and project management UI with create/edit/archive/CMS-enable flows
+- Property, Effect service, PostgreSQL concurrency/isolation/index-plan, API, UI validation, and automated accessibility tests
 
 The repository does not yet have:
 
-- CMS domain models
-- CMS domain workflows and CMS-specific test suites
-- Production telemetry backend/collector deployment
-- Workspaces/projects/memberships/permissions
+- Full membership policy, invitation, role, or credential workflows
+- CMS domain models and CMS-specific workflows
 - Locale/schema/content/publication/delivery systems
+- Production telemetry backend/collector deployment
 
 ## Mandatory constraints
 
@@ -125,7 +129,7 @@ The repository does not yet have:
 
 Milestone 0 passed `pnpm run ready`, 26 automated tests, coverage, local runtime checks, Docker health validation, and developer manual review. The developer approved and committed it as `7d5a312` (`feat(m0): harden and validate the application foundation`).
 
-PostgreSQL remains available locally. Docker web/server containers were stopped after successful validation so ports 3000/3001 remain available.
+The validated Docker PostgreSQL, server, and web services are currently running for developer manual review.
 
 ## Milestone 1 completion
 
@@ -138,15 +142,20 @@ PostgreSQL remains available locally. Docker web/server containers were stopped 
 - `knowledge_base/decisions/m1-effect-boundaries.md` records compatibility and observability decisions.
 - The developer manually verified the anonymous protected-route failure contract, approved Milestone 1, and committed it as `c28f6fa` (`feat(m1): add Effect runtime, typed errors, and observability`).
 
+## Milestone 2 completion
+
+- The developer generated and applied `0001_create_platform_kernel.sql`; the agent only inspected it and never generated or applied a migration.
+- All platform contracts, repository workflows, APIs, UI flows, and planned automated test categories are implemented.
+- `pnpm run ready` passes with 163 tests across 21 files, API/domain coverage at 96.26% statements, and production builds for server and web.
+- Docker images build, all three services are healthy, and container liveness, readiness, OpenAPI, frontend, and SSR login checks return HTTP 200.
+- Docker SSR uses the internal `server` service URL while browser API calls retain the public `localhost:3000` URL.
+- Milestone test fixtures are fully removed from PostgreSQL.
+- The developer manually verified the corrected Docker login flow and approved Milestone 2.
+
 ## What to do next
 
-Milestone 2 creates the durable platform kernel:
+1. The developer reviews the working tree and commits Milestone 2.
+2. Record the commit hash in `knowledge_base/progress.md` and this file.
+3. Do not begin Milestone 3 until the Milestone 2 commit is confirmed.
 
-1. Design workspaces, projects, optional capability state, and the internal `main` environment.
-2. Define stable branded IDs, ownership/membership foundations, and audit events.
-3. Review tenant boundaries, uniqueness rules, archive behavior, cursor pagination, and required indexes.
-4. Present the domain and Drizzle schema design for developer approval before editing the schema.
-5. After approval, implement through typed Effect services and application contracts with isolation and concurrency tests.
-6. Provide the `create_platform_kernel` migration commands and stop for the developer to generate and apply the migration.
-
-PostgreSQL remains running. Milestone 2 is expected to require a database migration; the agent must never generate or apply it.
+The agent must never generate or apply migrations.

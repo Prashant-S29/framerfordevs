@@ -14,14 +14,21 @@ import type { RequestContext } from "./observability/request-context";
 import { Telemetry, TelemetryLive, toStatusFamily } from "./observability/telemetry";
 import { AuthSessionLive, AuthSessionService } from "./services/auth-session";
 import { Database, DatabaseLive } from "./services/database";
+import { PlatformRepository, PlatformRepositoryLive } from "./services/platform-repository";
 
-export type ApplicationServices = ApplicationLogger | Telemetry | AuthSessionService | Database;
+export type ApplicationServices =
+  | ApplicationLogger
+  | Telemetry
+  | AuthSessionService
+  | Database
+  | PlatformRepository;
 
 const InfrastructureLive = Layer.mergeAll(
   ApplicationLoggerLive,
   TelemetryLive,
   AuthSessionLive,
   DatabaseLive,
+  PlatformRepositoryLive,
 );
 
 export const ApplicationLive = Layer.mergeAll(InfrastructureLive, OpenTelemetryLive);

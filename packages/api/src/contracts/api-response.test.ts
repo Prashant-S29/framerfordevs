@@ -15,10 +15,13 @@ import {
   ConflictFailure,
   DatabaseFailure,
   ForbiddenFailure,
+  InvalidStateTransitionFailure,
   NotFoundFailure,
+  ProjectKeyConflictFailure,
   RateLimitedFailure,
   UnauthorizedFailure,
   ValidationFailure,
+  VersionConflictFailure,
   apiErrorHttpStatus,
   applicationFailure,
 } from "./errors";
@@ -165,6 +168,9 @@ describe("application error mapping", () => {
     ForbiddenFailure.make(),
     NotFoundFailure.make({ resource: "entry" }),
     ConflictFailure.make(),
+    ProjectKeyConflictFailure.make(),
+    VersionConflictFailure.make(),
+    InvalidStateTransitionFailure.make(),
     RateLimitedFailure.make(),
     DatabaseFailure.make({ operation: "database.query", cause: new Error("connection failed") }),
     AuthSessionFailure.make({ operation: "auth.session.get", cause: new Error("auth failed") }),
@@ -212,6 +218,24 @@ describe("application error mapping", () => {
           "retryable": false,
           "status": 409,
           "tag": "ConflictFailure",
+        },
+        {
+          "code": "PROJECT_KEY_CONFLICT",
+          "retryable": false,
+          "status": 409,
+          "tag": "ProjectKeyConflictFailure",
+        },
+        {
+          "code": "VERSION_CONFLICT",
+          "retryable": false,
+          "status": 409,
+          "tag": "VersionConflictFailure",
+        },
+        {
+          "code": "INVALID_STATE_TRANSITION",
+          "retryable": false,
+          "status": 409,
+          "tag": "InvalidStateTransitionFailure",
         },
         {
           "code": "RATE_LIMITED",
@@ -275,11 +299,14 @@ describe("application error mapping", () => {
           "false:null:CONFLICT:409",
           "false:null:FORBIDDEN:403",
           "false:null:INTERNAL_ERROR:500",
+          "false:null:INVALID_STATE_TRANSITION:409",
           "false:null:NOT_FOUND:404",
+          "false:null:PROJECT_KEY_CONFLICT:409",
           "false:null:RATE_LIMITED:429",
           "false:null:SERVICE_UNAVAILABLE:503",
           "false:null:UNAUTHORIZED:401",
           "false:null:VALIDATION_ERROR:400",
+          "false:null:VERSION_CONFLICT:409",
         ],
         "success": {
           "data": {
@@ -298,11 +325,14 @@ describe("application error mapping", () => {
       "CONFLICT",
       "FORBIDDEN",
       "INTERNAL_ERROR",
+      "INVALID_STATE_TRANSITION",
       "NOT_FOUND",
+      "PROJECT_KEY_CONFLICT",
       "RATE_LIMITED",
       "SERVICE_UNAVAILABLE",
       "UNAUTHORIZED",
       "VALIDATION_ERROR",
+      "VERSION_CONFLICT",
     ]);
   });
 
