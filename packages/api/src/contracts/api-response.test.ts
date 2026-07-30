@@ -13,12 +13,17 @@ import {
 import {
   AuthSessionFailure,
   ConflictFailure,
+  CredentialInvalidFailure,
   DatabaseFailure,
   ForbiddenFailure,
   InvalidStateTransitionFailure,
+  InvitationConflictFailure,
+  InvitationInvalidFailure,
+  LastOwnerRequiredFailure,
   NotFoundFailure,
   ProjectKeyConflictFailure,
   RateLimitedFailure,
+  SecurityServiceFailure,
   UnauthorizedFailure,
   ValidationFailure,
   VersionConflictFailure,
@@ -171,9 +176,17 @@ describe("application error mapping", () => {
     ProjectKeyConflictFailure.make(),
     VersionConflictFailure.make(),
     InvalidStateTransitionFailure.make(),
+    InvitationConflictFailure.make(),
+    InvitationInvalidFailure.make(),
+    LastOwnerRequiredFailure.make(),
+    CredentialInvalidFailure.make(),
     RateLimitedFailure.make(),
     DatabaseFailure.make({ operation: "database.query", cause: new Error("connection failed") }),
     AuthSessionFailure.make({ operation: "auth.session.get", cause: new Error("auth failed") }),
+    SecurityServiceFailure.make({
+      operation: "security.credential.random",
+      cause: new Error("entropy unavailable"),
+    }),
   ];
 
   it("maps every initial error deterministically to a documented HTTP status", () => {
@@ -238,6 +251,30 @@ describe("application error mapping", () => {
           "tag": "InvalidStateTransitionFailure",
         },
         {
+          "code": "INVITATION_CONFLICT",
+          "retryable": false,
+          "status": 409,
+          "tag": "InvitationConflictFailure",
+        },
+        {
+          "code": "INVITATION_INVALID",
+          "retryable": false,
+          "status": 404,
+          "tag": "InvitationInvalidFailure",
+        },
+        {
+          "code": "LAST_OWNER_REQUIRED",
+          "retryable": false,
+          "status": 409,
+          "tag": "LastOwnerRequiredFailure",
+        },
+        {
+          "code": "CREDENTIAL_INVALID",
+          "retryable": false,
+          "status": 401,
+          "tag": "CredentialInvalidFailure",
+        },
+        {
           "code": "RATE_LIMITED",
           "retryable": true,
           "status": 429,
@@ -254,6 +291,12 @@ describe("application error mapping", () => {
           "retryable": true,
           "status": 503,
           "tag": "AuthSessionFailure",
+        },
+        {
+          "code": "SERVICE_UNAVAILABLE",
+          "retryable": true,
+          "status": 503,
+          "tag": "SecurityServiceFailure",
         },
       ]
     `);
@@ -297,9 +340,13 @@ describe("application error mapping", () => {
       {
         "failures": [
           "false:null:CONFLICT:409",
+          "false:null:CREDENTIAL_INVALID:401",
           "false:null:FORBIDDEN:403",
           "false:null:INTERNAL_ERROR:500",
           "false:null:INVALID_STATE_TRANSITION:409",
+          "false:null:INVITATION_CONFLICT:409",
+          "false:null:INVITATION_INVALID:404",
+          "false:null:LAST_OWNER_REQUIRED:409",
           "false:null:NOT_FOUND:404",
           "false:null:PROJECT_KEY_CONFLICT:409",
           "false:null:RATE_LIMITED:429",
@@ -323,9 +370,13 @@ describe("application error mapping", () => {
   it("covers every registered error code with an HTTP status", () => {
     expect(Object.keys(apiErrorHttpStatus).sort()).toEqual([
       "CONFLICT",
+      "CREDENTIAL_INVALID",
       "FORBIDDEN",
       "INTERNAL_ERROR",
       "INVALID_STATE_TRANSITION",
+      "INVITATION_CONFLICT",
+      "INVITATION_INVALID",
+      "LAST_OWNER_REQUIRED",
       "NOT_FOUND",
       "PROJECT_KEY_CONFLICT",
       "RATE_LIMITED",

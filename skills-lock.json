@@ -25,6 +25,12 @@
       "skillPath": "express-typescript/SKILL.md",
       "computedHash": "356f5459a3ec3cddc3500f4c00039d61c8f950fb367d6f11495d7f5d41ea57e9"
     },
+    "security-and-hardening": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-and-hardening/SKILL.md",
+      "computedHash": "a0246e67cf8f8a18687a7736442738318b1997715fbdf53dfcf767082c51cca5"
+    },
     "shadcn": {
       "source": "shadcn/ui",
       "sourceType": "github",

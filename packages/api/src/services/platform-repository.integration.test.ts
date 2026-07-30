@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, assert, beforeAll, describe, it } from "@effect/vitest";
 import { db } from "@framerfordevs/db";
 import { and, eq, or, sql } from "@framerfordevs/db/query";
+import { projectMembership } from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
 import {
   auditEvent,
@@ -94,6 +95,11 @@ afterAll(async () => {
         eq(environment.createdByUserId, firstUserId),
         eq(environment.createdByUserId, secondUserId),
       ),
+    );
+  await db
+    .delete(projectMembership)
+    .where(
+      or(eq(projectMembership.userId, firstUserId), eq(projectMembership.userId, secondUserId)),
     );
   await db
     .delete(project)
@@ -203,38 +209,47 @@ describe.sequential("platform repository PostgreSQL integration", () => {
     }),
   );
 
-  it.effect("atomically creates a project and its primary main environment", () =>
-    Effect.gen(function* () {
-      const ownerWorkspace = required(firstWorkspace, "first workspace");
-      primaryProject = yield* repository.createProject(
-        firstActor,
-        yield* Schema.decodeUnknown(CreateProjectInput)({
-          workspaceId: ownerWorkspace.id,
-          name: "Marketing Site",
-          key: "marketing-site",
-          description: "secret=must-not-enter-audit",
-        }),
-        "request-m2-project-create",
-      );
+  it.effect(
+    "atomically creates a project, explicit owner membership, and primary environment",
+    () =>
+      Effect.gen(function* () {
+        const ownerWorkspace = required(firstWorkspace, "first workspace");
+        primaryProject = yield* repository.createProject(
+          firstActor,
+          yield* Schema.decodeUnknown(CreateProjectInput)({
+            workspaceId: ownerWorkspace.id,
+            name: "Marketing Site",
+            key: "marketing-site",
+            description: "secret=must-not-enter-audit",
+          }),
+          "request-m2-project-create",
+        );
 
-      const created = required(primaryProject, "primary project");
-      const environments = yield* Effect.promise(() =>
-        db.select().from(environment).where(eq(environment.projectId, created.id)),
-      );
-      const audits = yield* Effect.promise(() =>
-        db.select().from(auditEvent).where(eq(auditEvent.projectId, created.id)),
-      );
+        const created = required(primaryProject, "primary project");
+        const environments = yield* Effect.promise(() =>
+          db.select().from(environment).where(eq(environment.projectId, created.id)),
+        );
+        const memberships = yield* Effect.promise(() =>
+          db.select().from(projectMembership).where(eq(projectMembership.projectId, created.id)),
+        );
+        const audits = yield* Effect.promise(() =>
+          db.select().from(auditEvent).where(eq(auditEvent.projectId, created.id)),
+        );
 
-      assert.strictEqual(created.environment.key, "main");
-      assert.isTrue(created.environment.isPrimary);
-      assert.strictEqual(created.capabilities[0]?.status, "disabled");
-      assert.strictEqual(environments.length, 1);
-      assert.deepEqual(audits.map((event) => event.action).sort(), [
-        "environment.created",
-        "project.created",
-      ]);
-      assert.notInclude(JSON.stringify(audits), "must-not-enter-audit");
-    }),
+        assert.strictEqual(created.environment.key, "main");
+        assert.isTrue(created.environment.isPrimary);
+        assert.strictEqual(created.capabilities[0]?.status, "disabled");
+        assert.strictEqual(environments.length, 1);
+        assert.strictEqual(memberships.length, 1);
+        assert.strictEqual(memberships[0]?.userId, firstUserId);
+        assert.strictEqual(memberships[0]?.role, "owner");
+        assert.deepEqual(audits.map((event) => event.action).sort(), [
+          "environment.created",
+          "project.created",
+          "project.membership.created",
+        ]);
+        assert.notInclude(JSON.stringify(audits), "must-not-enter-audit");
+      }),
   );
 
   it.effect("rolls back project and environment when audit creation fails", () =>

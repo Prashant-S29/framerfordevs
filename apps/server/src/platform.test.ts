@@ -3,6 +3,12 @@ import { randomUUID } from "node:crypto";
 import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
 import { db } from "@framerfordevs/db";
 import { eq, or } from "@framerfordevs/db/query";
+import {
+  apiCredential,
+  apiCredentialScope,
+  projectInvitation,
+  projectMembership,
+} from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
 import {
   auditEvent,
@@ -31,6 +37,7 @@ let secondUserId = "";
 let firstWorkspaceId = "";
 let secondWorkspaceId = "";
 let projectId = "";
+let environmentId = "";
 let projectVersion = 1;
 
 async function signUp(email: string, name: string) {
@@ -62,6 +69,26 @@ afterAll(async () => {
   await db
     .delete(auditEvent)
     .where(or(eq(auditEvent.actorId, firstUserId), eq(auditEvent.actorId, secondUserId)));
+  const credentialRows = await db
+    .select({ id: apiCredential.id })
+    .from(apiCredential)
+    .where(eq(apiCredential.projectId, projectId));
+  if (credentialRows.length > 0) {
+    await db
+      .delete(apiCredentialScope)
+      .where(or(...credentialRows.map(({ id }) => eq(apiCredentialScope.credentialId, id))));
+    await db
+      .delete(apiCredential)
+      .where(or(...credentialRows.map(({ id }) => eq(apiCredential.id, id))));
+  }
+  await db
+    .delete(projectInvitation)
+    .where(
+      or(
+        eq(projectInvitation.invitedByUserId, firstUserId),
+        eq(projectInvitation.invitedByUserId, secondUserId),
+      ),
+    );
   await db
     .delete(projectCapability)
     .where(
@@ -77,6 +104,11 @@ afterAll(async () => {
         eq(environment.createdByUserId, firstUserId),
         eq(environment.createdByUserId, secondUserId),
       ),
+    );
+  await db
+    .delete(projectMembership)
+    .where(
+      or(eq(projectMembership.userId, firstUserId), eq(projectMembership.userId, secondUserId)),
     );
   await db
     .delete(project)
@@ -134,6 +166,69 @@ describe.sequential("platform API contracts", () => {
     [
       "platform/projects/enableCapability",
       { projectId: "019fae8b-1234-7000-8000-000000000001", capability: "cms" },
+    ],
+    ["platform/projects/access", { projectId: "019fae8b-1234-7000-8000-000000000001" }],
+    [
+      "platform/projects/members/list",
+      { projectId: "019fae8b-1234-7000-8000-000000000001", cursor: null, limit: 20 },
+    ],
+    [
+      "platform/projects/members/updateRole",
+      {
+        membershipId: "019fae8b-1234-7000-8000-000000000001",
+        version: 1,
+        role: "editor",
+      },
+    ],
+    [
+      "platform/projects/members/remove",
+      { membershipId: "019fae8b-1234-7000-8000-000000000001", version: 1 },
+    ],
+    [
+      "platform/projects/invitations/create",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        email: "anonymous@example.test",
+        role: "editor",
+      },
+    ],
+    [
+      "platform/projects/invitations/list",
+      { projectId: "019fae8b-1234-7000-8000-000000000001", cursor: null, limit: 20 },
+    ],
+    ["platform/projects/invitations/inspect", { token: "A".repeat(43) }],
+    ["platform/projects/invitations/accept", { token: "A".repeat(43) }],
+    [
+      "platform/projects/invitations/revoke",
+      { invitationId: "019fae8b-1234-7000-8000-000000000001", version: 1 },
+    ],
+    [
+      "platform/projects/credentials/issue",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        family: "delivery",
+        name: "Anonymous",
+        scopes: ["delivery.read"],
+        expiresAt: null,
+      },
+    ],
+    [
+      "platform/projects/credentials/list",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        cursor: null,
+        limit: 20,
+      },
+    ],
+    [
+      "platform/projects/credentials/rotate",
+      { credentialId: "019fae8b-1234-7000-8000-000000000001", version: 1 },
+    ],
+    [
+      "platform/projects/credentials/revoke",
+      { credentialId: "019fae8b-1234-7000-8000-000000000001", version: 1 },
     ],
   ])("rejects anonymous access to %s", async (path, input) => {
     const response = await rpc(request.agent(app), path, input);
@@ -213,6 +308,7 @@ describe.sequential("platform API contracts", () => {
       description: "Managed through the API",
     });
     projectId = response.body.json.data.id;
+    environmentId = response.body.json.data.environment.id;
     projectVersion = response.body.json.data.version;
 
     expect(response.status).toBe(200);
@@ -222,6 +318,9 @@ describe.sequential("platform API contracts", () => {
       environment: { key: "main", name: "main", isPrimary: true },
       capabilities: [{ key: "cms", status: "disabled", version: null }],
     });
+    const access = await rpc(firstAgent, "platform/projects/access", { projectId });
+    expect(access.body.json.data.role).toBe("owner");
+    expect(access.body.json.data.allowedActions).toContain("project.member.invite");
   });
 
   it("returns a typed same-workspace key conflict", async () => {
@@ -293,6 +392,113 @@ describe.sequential("platform API contracts", () => {
     expect(enabled.body.json.data).toMatchObject({ key: "cms", status: "enabled" });
     expect(repeated.status).toBe(409);
     expect(repeated.body.json.data.error.code).toBe("INVALID_STATE_TRANSITION");
+  });
+
+  it("invites and accepts a project member with role-aware API denial", async () => {
+    const issued = await rpc(firstAgent, "platform/projects/invitations/create", {
+      projectId,
+      email: secondEmail,
+      role: "editor",
+    });
+    const token = issued.body.json.data.token;
+    const invitationId = issued.body.json.data.invitation.id;
+    const invitationVersion = issued.body.json.data.invitation.version;
+    const listed = await rpc(firstAgent, "platform/projects/invitations/list", {
+      projectId,
+      cursor: null,
+      limit: 20,
+    });
+    const inspected = await rpc(secondAgent, "platform/projects/invitations/inspect", { token });
+    const accepted = await rpc(secondAgent, "platform/projects/invitations/accept", { token });
+    const reused = await rpc(secondAgent, "platform/projects/invitations/accept", { token });
+    const memberId = accepted.body.json.data.id;
+
+    expect(issued.status).toBe(200);
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/u);
+    expect(listed.body.json.data.items[0]).not.toHaveProperty("token");
+    expect(inspected.body.json.data).toMatchObject({ projectId, role: "editor" });
+    expect(accepted.body.json.data).toMatchObject({ projectId, role: "editor" });
+    expect(reused.status).toBe(404);
+    expect(reused.body.json.data.error.code).toBe("INVITATION_INVALID");
+
+    const memberRead = await rpc(secondAgent, "platform/projects/get", { projectId });
+    const memberUpdate = await rpc(secondAgent, "platform/projects/update", {
+      projectId,
+      version: projectVersion,
+      name: "Unauthorized member update",
+      description: null,
+    });
+    const memberListDenied = await rpc(secondAgent, "platform/projects/members/list", {
+      projectId,
+      cursor: null,
+      limit: 20,
+    });
+    const ownerList = await rpc(firstAgent, "platform/projects/members/list", {
+      projectId,
+      cursor: null,
+      limit: 20,
+    });
+
+    expect(memberRead.status).toBe(200);
+    expect(memberUpdate.status).toBe(403);
+    expect(memberUpdate.body.json.data.error.code).toBe("FORBIDDEN");
+    expect(memberListDenied.status).toBe(403);
+    expect(ownerList.body.json.data.items.map((item: { id: string }) => item.id)).toContain(
+      memberId,
+    );
+
+    const removed = await rpc(firstAgent, "platform/projects/members/remove", {
+      membershipId: memberId,
+      version: accepted.body.json.data.version,
+    });
+    const accessAfterRemoval = await rpc(secondAgent, "platform/projects/get", { projectId });
+    expect(removed.status).toBe(200);
+    expect(removed.body.json.data.removedAt).toBeTypeOf("string");
+    expect(accessAfterRemoval.status).toBe(404);
+
+    const staleRevoke = await rpc(firstAgent, "platform/projects/invitations/revoke", {
+      invitationId,
+      version: invitationVersion,
+    });
+    expect(staleRevoke.status).toBe(409);
+    expect(staleRevoke.body.json.data.error.code).toBe("VERSION_CONFLICT");
+  });
+
+  it("issues, lists, rotates, and revokes environment-bound credentials", async () => {
+    const issued = await rpc(firstAgent, "platform/projects/credentials/issue", {
+      projectId,
+      environmentId,
+      family: "delivery",
+      name: "API delivery key",
+      scopes: ["delivery.read"],
+      expiresAt: null,
+    });
+    const key = issued.body.json.data.key;
+    const credential = issued.body.json.data.credential;
+    const listed = await rpc(firstAgent, "platform/projects/credentials/list", {
+      projectId,
+      environmentId,
+      cursor: null,
+      limit: 20,
+    });
+    const rotated = await rpc(firstAgent, "platform/projects/credentials/rotate", {
+      credentialId: credential.id,
+      version: credential.version,
+    });
+    const revoked = await rpc(firstAgent, "platform/projects/credentials/revoke", {
+      credentialId: rotated.body.json.data.credential.id,
+      version: rotated.body.json.data.credential.version,
+    });
+
+    expect(issued.status).toBe(200);
+    expect(key).toMatch(/^ffd_del_[0-9a-f-]{36}_[A-Za-z0-9_-]{43}$/u);
+    expect(listed.body.json.data.items[0]).not.toHaveProperty("key");
+    expect(listed.body.json.data.items[0]).not.toHaveProperty("keyDigest");
+    expect(rotated.status).toBe(200);
+    expect(rotated.body.json.data.key).not.toBe(key);
+    expect(revoked.status).toBe(200);
+    expect(revoked.body.json.data.revokedAt).toBeTypeOf("string");
+    expect(JSON.stringify(revoked.body)).not.toContain(key);
   });
 
   it("archives into the archived cursor list and blocks future mutations", async () => {

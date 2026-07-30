@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 import { ArchiveProjectDialog } from "@/components/archive-project-dialog";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
+import { ProjectAccessSettings } from "@/components/project-access-settings";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/_auth/projects/$projectId")({
@@ -33,6 +34,9 @@ function ProjectDetail() {
   const { projectId } = Route.useParams();
   const queryClient = useQueryClient();
   const projectQuery = useQuery(orpc.platform.projects.get.queryOptions({ input: { projectId } }));
+  const accessQuery = useQuery(
+    orpc.platform.projects.access.queryOptions({ input: { projectId } }),
+  );
   const enableCapability = useMutation(
     orpc.platform.projects.enableCapability.mutationOptions({
       onSuccess: async (response) => {
@@ -43,12 +47,17 @@ function ProjectDetail() {
     }),
   );
 
-  if (projectQuery.isPending) return <ProjectDetailSkeleton />;
-  if (!projectQuery.data) return null;
+  if (projectQuery.isPending || accessQuery.isPending) return <ProjectDetailSkeleton />;
+  if (!projectQuery.data || !accessQuery.data) return null;
 
   const project = projectQuery.data.data;
+  const access = accessQuery.data.data;
+  const allowedActions = new Set(access.allowedActions);
   const cms = project.capabilities.find((capability) => capability.key === "cms");
   const isArchived = project.archivedAt !== null;
+  const canUpdate = allowedActions.has("project.update");
+  const canArchive = allowedActions.has("project.archive");
+  const canManageCapability = allowedActions.has("project.capability.manage");
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">
@@ -74,10 +83,10 @@ function ProjectDetail() {
               {project.key}
             </p>
           </div>
-          {!isArchived ? (
+          {!isArchived && (canUpdate || canArchive) ? (
             <div className="flex flex-wrap gap-2">
-              <EditProjectDialog key={project.version} project={project} />
-              <ArchiveProjectDialog project={project} />
+              {canUpdate ? <EditProjectDialog key={project.version} project={project} /> : null}
+              {canArchive ? <ArchiveProjectDialog project={project} /> : null}
             </div>
           ) : null}
         </div>
@@ -132,7 +141,7 @@ function ProjectDetail() {
               <DetailRow label="Changed" value={dateFormatter.format(new Date(cms.changedAt))} />
             ) : null}
           </CardContent>
-          {!isArchived && cms?.status !== "enabled" ? (
+          {!isArchived && canManageCapability && cms?.status !== "enabled" ? (
             <CardFooter>
               <Button
                 className="w-full"
@@ -150,6 +159,13 @@ function ProjectDetail() {
           ) : null}
         </Card>
       </section>
+
+      <ProjectAccessSettings
+        projectId={project.id}
+        environmentId={project.environment.id}
+        role={access.role}
+        allowedActions={access.allowedActions}
+      />
 
       <Card>
         <CardHeader>

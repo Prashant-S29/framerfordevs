@@ -13,6 +13,7 @@ import { ArchiveProjectDialog } from "./archive-project-dialog";
 import { CreateProjectDialog } from "./create-project-dialog";
 import { CreateWorkspaceDialog } from "./create-workspace-dialog";
 import { EditProjectDialog } from "./edit-project-dialog";
+import { InviteMemberDialog, IssueCredentialDialog } from "./project-access-settings";
 
 const project = Schema.decodeUnknownSync(Project)({
   id: "019fae8b-1234-7000-8000-000000000001",
@@ -73,5 +74,17 @@ describe("platform management accessibility", () => {
   it("has accessible destructive-confirmation semantics", async () => {
     renderWithQueryClient(<ArchiveProjectDialog project={project} />);
     await expectOpenDialogToHaveNoViolations(/archive project/i, "alertdialog");
+  });
+
+  it("has accessible invitation creation semantics", async () => {
+    renderWithQueryClient(<InviteMemberDialog projectId={project.id} />);
+    await expectOpenDialogToHaveNoViolations(/invite member/i);
+  });
+
+  it("has accessible credential issuance semantics", async () => {
+    renderWithQueryClient(
+      <IssueCredentialDialog projectId={project.id} environmentId={project.environment.id} />,
+    );
+    await expectOpenDialogToHaveNoViolations(/issue credential/i);
   });
 });

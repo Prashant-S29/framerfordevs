@@ -37,6 +37,7 @@ const TelemetryTest = Layer.succeed(Telemetry, {
     Effect.sync(() => {
       defectRoutes.push(routeFamily);
     }),
+  recordCredentialVerification: () => Effect.void,
 });
 
 const AuthSessionTest = Layer.succeed(AuthSessionService, {

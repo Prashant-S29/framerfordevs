@@ -1,6 +1,7 @@
 # Milestone 2 platform-kernel design
 
-**Status:** Implemented and manually approved; awaiting developer commit  
+**Status:** Implemented, manually approved, and committed as `60adb39`
+
 **Date:** 2026-07-29
 
 ## Decision summary
@@ -306,4 +307,4 @@ The final handoff will run the full `pnpm run ready`, live runtime checks, and D
 
 The developer generated and applied `0001_create_platform_kernel.sql`; the agent inspected it and the live PostgreSQL catalog without generating or applying a migration. The approved model, constraints, partial/composite indexes, transactional workflows, Effect/oRPC contracts, and management UI are implemented.
 
-The final automated gate passes with 163 tests across 21 files. Coverage includes property contracts, operation Layers, PostgreSQL rollback/concurrency/isolation/index plans, authenticated API contracts, non-enumeration, Docker SSR URL resolution, form validation, and axe accessibility checks. Production server/web builds and Docker health/HTTP smoke checks also pass. The developer manually verified the corrected Docker login flow and approved Milestone 2; it is now awaiting the developer commit.
+The final automated gate passes with 163 tests across 21 files. Coverage includes property contracts, operation Layers, PostgreSQL rollback/concurrency/isolation/index plans, authenticated API contracts, non-enumeration, Docker SSR URL resolution, form validation, and axe accessibility checks. Production server/web builds and Docker health/HTTP smoke checks also pass. The developer manually verified the corrected Docker login flow, approved Milestone 2, and committed it as `60adb39` (`feat(m2): add workspace and project platform kernel`).

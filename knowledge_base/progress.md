@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 2 complete and manually approved; awaiting developer commit
-**Active milestone:** Milestone 2 — Platform kernel
+**Overall status:** Milestone 3 automated criteria complete; awaiting developer manual review
+**Active milestone:** Milestone 3 — Membership, roles, policies, and API credentials
 **Last updated:** 2026-07-30
 
 ## Status legend
@@ -19,8 +19,8 @@
 | --- | ---------------------------------------- | ------ | --------------- | ------------- | --------- |
 | 0   | Validate existing foundation             | `[A]`  | 26 passing      | Approved      | `7d5a312` |
 | 1   | Effect foundation, errors, observability | `[A]`  | 90 passing      | Approved      | `c28f6fa` |
-| 2   | Platform kernel                          | `[A]`  | 163 passing     | Approved      | Pending   |
-| 3   | Membership, policies, credentials        | `[ ]`  | Not run         | Pending       | None      |
+| 2   | Platform kernel                          | `[A]`  | 163 passing     | Approved      | `60adb39` |
+| 3   | Membership, policies, credentials        | `[R]`  | 381 passing     | Pending       | None      |
 | 4   | Project locales                          | `[ ]`  | Not run         | Pending       | None      |
 | 5   | Versioned schema engine                  | `[ ]`  | Not run         | Pending       | None      |
 | 6   | Field system and generated forms         | `[ ]`  | Not run         | Pending       | None      |
@@ -131,15 +131,56 @@
 - `[x]` Request developer manual review.
 - `[A]` Developer manually verified and approved Milestone 2.
 
+## Milestone 3 checklist — awaiting manual review
+
+- `[x]` Re-read the product, CMS PRD, mandatory rules, current context, milestone plan, progress, and learnings.
+- `[x]` Apply the installed Better Auth, Effect, Drizzle, PostgreSQL, Express, TanStack, shadcn/ui, React performance, and web-interface guidance relevant to M3.
+- `[x]` Review the current platform schema, Effect services, repository workflows, API contracts, UI, and M2 test patterns.
+- `[x]` Review current Better Auth 1.6 organization, API-key, and security documentation.
+- `[x]` Reconcile stale M2 documentation with commit `60adb39`.
+- `[x]` Propose the complete M3 access and credential design in `knowledge_base/decisions/m3-access-and-credentials-design.md`.
+- `[A]` Developer approved the M3 design.
+- `[x]` Update the Drizzle access/platform schema and foundational access/error contracts.
+- `[x]` Pass database/API type checks and 19 targeted access/response contract tests.
+- `[x]` Developer generated `0002_add_memberships_policies_credentials.sql`; the agent inspected it without applying it.
+- `[x]` Developer installed the reviewed `security-and-hardening` skill; apply it throughout M3 security-sensitive work.
+- `[x]` After explicit developer authorization, add and inspect the existing-project owner-membership backfill without applying the migration.
+- `[x]` Developer reviewed and applied the migration; read-only verification confirms the access tables and exact owner backfill.
+- `[x]` Implement explicit owner membership on project creation and policy-backed access for all existing project operations.
+- `[x]` Implement the exhaustive default-deny role/action and credential-family policy service.
+- `[x]` Implement invitation create/list/inspect/accept/revoke and membership list/role-update/remove workflows.
+- `[x]` Preserve stable membership identity, serialize cross-project collaborator cleanup, and protect the last explicit project owner under concurrency.
+- `[x]` Implement management/delivery/preview credential issue/list/rotate/revoke/authentication, strict scope/environment isolation, and immediate revocation.
+- `[x]` Implement high-entropy one-time secrets, digest-only persistence, constant-time verification, source fingerprinting, and bounded attempt limiting.
+- `[x]` Add M3 oRPC routes, response/error mappings, runtime Layers, spans, bounded security metrics, and secret-free audits.
+- `[x]` Add permission-aware member/invitation/credential management UI and fragment-safe invitation acceptance through authentication.
+- `[x]` Add API, PostgreSQL concurrency/isolation/index-plan, service, UI fragment-safety, and automated accessibility coverage.
+- `[x]` Run workspace readiness and read-only fixture/invariant verification.
+- `[R]` Await developer manual review and approval before commit or Milestone 4.
+
 ## Current blockers
 
-None. Milestone 2 is approved and awaiting the developer commit.
+None. Automated M3 criteria are complete. The agent did not generate, execute, or apply the migration.
 
 ## Database migration state
 
 The developer generated and applied `packages/db/src/migrations/0001_create_platform_kernel.sql`. The agent inspected the generated SQL and live PostgreSQL catalog against the approved design. The agent did not generate, run, or apply the migration.
 
+The developer generated and applied `packages/db/src/migrations/0002_add_memberships_policies_credentials.sql`. The agent inspected it and confirmed the structural tables, constraints, tenant foreign keys, lifecycle checks, indexes, and authorized owner-membership backfill match the approved design. Read-only verification reports four access tables, two projects, two active owner memberships, and zero projects without exactly one active owner.
+
 ## Test results
+
+### Milestone 3
+
+- `pnpm run ready`: pass, including formatting, lint, all package type checks, tests, V8 coverage, and production builds.
+- `pnpm run test`: 381 tests pass across 28 files: 283 API/domain, 54 server/API integration, 39 web helper/accessibility, and 5 environment tests.
+- `pnpm run test:coverage`: pass; API/domain code is 93.62% statements, 81.85% branches, and 77.61% functions; tested web helpers are 100% statements.
+- The exhaustive policy suite covers all 164 role/action and credential-family decisions, including unknown/default-deny behavior.
+- PostgreSQL integration covers owner creation/backfill, invitation uniqueness/reuse/acceptance, stable membership reactivation, cross-tenant isolation, last-owner concurrency, immediate access removal, credential family/scope/environment isolation, rotation/revocation races, secret-free persistence/audits, bounded pagination, and intended index plans.
+- Server tests cover every protected management group anonymously plus authenticated invitation, membership, role-boundary, and complete credential lifecycle workflows while preserving the standard response union.
+- UI tests cover invitation and credential dialog accessibility; fragment-safety tests prove tokens remain out of query parameters.
+- Read-only cleanup/invariant verification reports two expected active owner memberships, zero invitations, zero credentials, zero projects without an owner, and zero leaked test audit rows.
+- The developer generated/applied the migration; the agent did not generate or apply any migration.
 
 ### Milestone 2
 
@@ -190,4 +231,6 @@ Milestone 0 was manually approved and committed by the developer as `7d5a312` (`
 
 Milestone 1 was manually approved and committed by the developer as `c28f6fa` (`feat(m1): add Effect runtime, typed errors, and observability`). The anonymous protected-route review returned the expected HTTP 401, request correlation, and standardized `UNAUTHORIZED` failure without exposing sensitive data.
 
-Milestone 2 automated criteria are complete. During manual review, the developer found Docker SSR could not load `/login`; the internal service URL was corrected and covered by URL-resolution tests plus the container health check. The developer verified the corrected Docker login flow and approved Milestone 2. The milestone is awaiting the developer commit.
+Milestone 2 automated criteria are complete. During manual review, the developer found Docker SSR could not load `/login`; the internal service URL was corrected and covered by URL-resolution tests plus the container health check. The developer verified the corrected Docker login flow, approved Milestone 2, and committed it as `60adb39` (`feat(m2): add workspace and project platform kernel`).
+
+Milestone 3 started after the Milestone 2 commit was confirmed. The developer approved its membership, invitation, role-policy, and credential design, then generated and applied the inspected migration/backfill. Automated implementation and readiness criteria are complete; M3 is paused for developer manual review before any commit or Milestone 4 work.

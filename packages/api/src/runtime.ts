@@ -12,16 +12,34 @@ import { ApplicationLogger, ApplicationLoggerLive, sanitizeCause } from "./obser
 import { OpenTelemetryLive } from "./observability/opentelemetry";
 import type { RequestContext } from "./observability/request-context";
 import { Telemetry, TelemetryLive, toStatusFamily } from "./observability/telemetry";
+import { AccessRepository, AccessRepositoryLive } from "./services/access-repository";
 import { AuthSessionLive, AuthSessionService } from "./services/auth-session";
+import {
+  CredentialAttemptLimiter,
+  CredentialAttemptLimiterLive,
+} from "./services/credential-attempt-limiter";
+import {
+  CredentialAuthenticator,
+  CredentialAuthenticatorLive,
+} from "./services/credential-authenticator";
+import { CredentialRepository, CredentialRepositoryLive } from "./services/credential-repository";
 import { Database, DatabaseLive } from "./services/database";
 import { PlatformRepository, PlatformRepositoryLive } from "./services/platform-repository";
+import { PolicyService, PolicyServiceLive } from "./services/policy";
+import { SecretGenerator, SecretGeneratorLive } from "./services/secret-generator";
 
 export type ApplicationServices =
   | ApplicationLogger
   | Telemetry
   | AuthSessionService
   | Database
-  | PlatformRepository;
+  | PlatformRepository
+  | AccessRepository
+  | PolicyService
+  | SecretGenerator
+  | CredentialAttemptLimiter
+  | CredentialRepository
+  | CredentialAuthenticator;
 
 const InfrastructureLive = Layer.mergeAll(
   ApplicationLoggerLive,
@@ -29,6 +47,12 @@ const InfrastructureLive = Layer.mergeAll(
   AuthSessionLive,
   DatabaseLive,
   PlatformRepositoryLive,
+  AccessRepositoryLive,
+  PolicyServiceLive,
+  SecretGeneratorLive,
+  CredentialAttemptLimiterLive,
+  CredentialRepositoryLive,
+  CredentialAuthenticatorLive,
 );
 
 export const ApplicationLive = Layer.mergeAll(InfrastructureLive, OpenTelemetryLive);
@@ -84,8 +108,8 @@ export function withRequestSpan<A, E, R>(
   );
 }
 
-function observeOperation<A, E>(
-  effect: Effect.Effect<A, E, ApplicationServices>,
+function observeOperation<A, E, R>(
+  effect: Effect.Effect<A, E, R>,
   request: RequestContext,
   operation: string,
 ) {
@@ -163,17 +187,15 @@ export interface ApplicationResult<A extends ApiData> {
   readonly response: ApiResponse<A>;
 }
 
-export interface ApplicationRuntime {
-  readonly runPromiseExit: <A, E>(
-    effect: Effect.Effect<A, E, ApplicationServices>,
-  ) => Promise<Exit.Exit<A, E>>;
+export interface ApplicationRuntime<R> {
+  readonly runPromiseExit: <A, E>(effect: Effect.Effect<A, E, R>) => Promise<Exit.Exit<A, E>>;
 }
 
-export async function executeWithRuntime<A extends ApiData>(
-  runtime: ApplicationRuntime,
+export async function executeWithRuntime<A extends ApiData, R>(
+  runtime: ApplicationRuntime<R | ApplicationLogger | Telemetry>,
   operation: string,
   request: RequestContext,
-  effect: Effect.Effect<A, ApplicationError, ApplicationServices>,
+  effect: Effect.Effect<A, ApplicationError, R>,
   successMessage: string,
 ): Promise<ApplicationResult<A>> {
   const exit = await runtime.runPromiseExit(observeOperation(effect, request, operation));
@@ -207,7 +229,13 @@ export function executeApplication<A extends ApiData>(
   effect: Effect.Effect<A, ApplicationError, ApplicationServices>,
   successMessage: string,
 ): Promise<ApplicationResult<A>> {
-  return executeWithRuntime(applicationRuntime, operation, request, effect, successMessage);
+  return executeWithRuntime<A, ApplicationServices>(
+    applicationRuntime,
+    operation,
+    request,
+    effect,
+    successMessage,
+  );
 }
 
 export const recordHttpRequest = Effect.fn("recordHttpRequest")(function* (

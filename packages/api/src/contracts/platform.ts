@@ -114,6 +114,9 @@ export type CapabilityKey = typeof CapabilityKey.Type;
 export const CapabilityStatus = Schema.Literal("enabled", "disabled");
 export type CapabilityStatus = typeof CapabilityStatus.Type;
 
+export const WorkspaceRole = Schema.Literal("owner", "collaborator");
+export type WorkspaceRole = typeof WorkspaceRole.Type;
+
 export class CreateWorkspaceInput extends Schema.Class<CreateWorkspaceInput>(
   "CreateWorkspaceInput",
 )({
@@ -166,7 +169,7 @@ export class Workspace extends Schema.Class<Workspace>("Workspace")({
   id: WorkspaceId,
   name: WorkspaceName,
   version: ResourceVersion,
-  role: Schema.Literal("owner"),
+  role: WorkspaceRole,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 }) {}

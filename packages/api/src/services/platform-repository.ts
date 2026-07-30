@@ -1,5 +1,6 @@
 import { db } from "@framerfordevs/db";
 import { and, desc, eq, isNotNull, isNull, lt, or, sql } from "@framerfordevs/db/query";
+import { projectMembership } from "@framerfordevs/db/schema/access";
 import {
   auditEvent,
   environment,
@@ -16,8 +17,10 @@ import {
   encodeProjectCursor,
   encodeWorkspaceCursor,
 } from "../contracts/cursor";
+import type { ProjectPermissionAction } from "../contracts/access";
 import {
   DatabaseFailure,
+  ForbiddenFailure,
   InvalidStateTransitionFailure,
   NotFoundFailure,
   ProjectKeyConflictFailure,
@@ -42,6 +45,7 @@ import {
   WorkspaceMembershipId,
   WorkspacePage,
 } from "../contracts/platform";
+import { authorizeUserProject } from "./project-access";
 
 const mainEnvironment: {
   readonly key: "main";
@@ -113,35 +117,10 @@ function projectSummaryValue(row: typeof project.$inferSelect) {
   };
 }
 
-async function selectAuthorizedProject(
+async function loadProjectDetail(
   executor: PlatformExecutor,
-  actorId: AuthUserId,
-  projectId: string,
+  projectRow: typeof project.$inferSelect,
 ) {
-  const [row] = await executor
-    .select({ project })
-    .from(project)
-    .innerJoin(
-      workspaceMembership,
-      and(
-        eq(workspaceMembership.workspaceId, project.workspaceId),
-        eq(workspaceMembership.userId, actorId),
-        eq(workspaceMembership.role, "owner"),
-      ),
-    )
-    .where(eq(project.id, projectId))
-    .limit(1);
-  return row?.project;
-}
-
-async function selectProjectDetail(
-  executor: PlatformExecutor,
-  actorId: AuthUserId,
-  projectId: string,
-) {
-  const projectRow = await selectAuthorizedProject(executor, actorId, projectId);
-  if (!projectRow) return undefined;
-
   const [environmentRows, capabilityRows] = await Promise.all([
     executor
       .select()
@@ -201,6 +180,19 @@ async function selectProjectDetail(
           },
     ],
   };
+}
+
+async function selectProjectDetail(
+  executor: PlatformExecutor,
+  actorId: AuthUserId,
+  projectId: string,
+  action: ProjectPermissionAction,
+) {
+  const authorization = await authorizeUserProject(executor, actorId, projectId, action);
+  if (authorization.kind === "not_found") return outcome("not_found");
+  if (authorization.kind === "forbidden") return outcome("forbidden");
+  const detail = await loadProjectDetail(executor, authorization.access.project);
+  return outcomeWith("success", { detail });
 }
 
 function makeAuditValues(options: {
@@ -312,7 +304,7 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
             .where(
               and(
                 eq(workspaceMembership.userId, actorId),
-                eq(workspaceMembership.role, "owner"),
+                isNull(workspaceMembership.revokedAt),
                 cursorCondition,
               ),
             )
@@ -329,7 +321,7 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
           id: row.workspace.id,
           name: row.workspace.name,
           version: row.workspace.version,
-          role: "owner",
+          role: row.membership.role,
           createdAt: toIso(row.workspace.createdAt),
           updatedAt: toIso(row.workspace.updatedAt),
         }),
@@ -366,6 +358,7 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                   eq(workspaceMembership.workspaceId, input.workspaceId),
                   eq(workspaceMembership.userId, actorId),
                   eq(workspaceMembership.role, "owner"),
+                  isNull(workspaceMembership.revokedAt),
                 ),
               )
               .limit(1);
@@ -382,6 +375,20 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
               })
               .returning();
             if (!projectRow) throw new Error("Project insert returned no row.");
+
+            const [projectMembershipRow] = await transaction
+              .insert(projectMembership)
+              .values({
+                workspaceId: input.workspaceId,
+                projectId: projectRow.id,
+                userId: actorId,
+                role: "owner",
+                createdByUserId: actorId,
+              })
+              .returning({ id: projectMembership.id });
+            if (!projectMembershipRow) {
+              throw new Error("Project owner membership insert returned no row.");
+            }
 
             const [environmentRow] = await transaction
               .insert(environment)
@@ -407,6 +414,15 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
               makeAuditValues({
                 workspaceId: input.workspaceId,
                 projectId: projectRow.id,
+                actorId,
+                action: "project.membership.created",
+                resourceType: "project_membership",
+                resourceId: projectMembershipRow.id,
+                requestId,
+              }),
+              makeAuditValues({
+                workspaceId: input.workspaceId,
+                projectId: projectRow.id,
                 environmentId: environmentRow.id,
                 actorId,
                 action: "environment.created",
@@ -416,8 +432,7 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
               }),
             ]);
 
-            const detail = await selectProjectDetail(transaction, actorId, projectRow.id);
-            if (!detail) throw new Error("Created project could not be loaded.");
+            const detail = await loadProjectDetail(transaction, projectRow);
             return outcomeWith("success", { detail });
           }),
         catch: (cause) =>
@@ -440,18 +455,18 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const [owner] = await transaction
-              .select({ id: workspaceMembership.id })
+            const [workspaceAccess] = await transaction
+              .select({ role: workspaceMembership.role })
               .from(workspaceMembership)
               .where(
                 and(
                   eq(workspaceMembership.workspaceId, input.workspaceId),
                   eq(workspaceMembership.userId, actorId),
-                  eq(workspaceMembership.role, "owner"),
+                  isNull(workspaceMembership.revokedAt),
                 ),
               )
               .limit(1);
-            if (!owner) return outcomeWith("not_found", { rows: [] });
+            if (!workspaceAccess) return outcomeWith("not_found", { rows: [] });
 
             const sortColumn = input.status === "active" ? project.createdAt : project.archivedAt;
             const archiveCondition =
@@ -464,14 +479,43 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                   and(eq(sortColumn, new Date(cursor.sortAt)), lt(project.id, cursor.projectId)),
                 )
               : undefined;
-            const rows = await transaction
-              .select()
-              .from(project)
-              .where(
-                and(eq(project.workspaceId, input.workspaceId), archiveCondition, cursorCondition),
-              )
-              .orderBy(desc(sortColumn), desc(project.id))
-              .limit(input.limit + 1);
+            const rows =
+              workspaceAccess.role === "owner"
+                ? await transaction
+                    .select()
+                    .from(project)
+                    .where(
+                      and(
+                        eq(project.workspaceId, input.workspaceId),
+                        archiveCondition,
+                        cursorCondition,
+                      ),
+                    )
+                    .orderBy(desc(sortColumn), desc(project.id))
+                    .limit(input.limit + 1)
+                : (
+                    await transaction
+                      .select({ project })
+                      .from(projectMembership)
+                      .innerJoin(
+                        project,
+                        and(
+                          eq(project.id, projectMembership.projectId),
+                          eq(project.workspaceId, projectMembership.workspaceId),
+                        ),
+                      )
+                      .where(
+                        and(
+                          eq(projectMembership.workspaceId, input.workspaceId),
+                          eq(projectMembership.userId, actorId),
+                          isNull(projectMembership.removedAt),
+                          archiveCondition,
+                          cursorCondition,
+                        ),
+                      )
+                      .orderBy(desc(sortColumn), desc(project.id))
+                      .limit(input.limit + 1)
+                  ).map((row) => row.project);
             return outcomeWith("success", { rows });
           }),
         catch: (cause) => databaseFailure("platform.project.list", cause),
@@ -508,15 +552,18 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
       actorId: AuthUserId,
       input: GetProjectInput,
     ) {
-      const detail = yield* Effect.tryPromise({
+      const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction((transaction) =>
-            selectProjectDetail(transaction, actorId, input.projectId),
+            selectProjectDetail(transaction, actorId, input.projectId, "project.read"),
           ),
         catch: (cause) => databaseFailure("platform.project.get", cause),
       });
-      if (!detail) return yield* NotFoundFailure.make({ resource: "project" });
-      return yield* decodeDatabaseValue("platform.project.get", Project, detail);
+      if (result.kind === "not_found") {
+        return yield* NotFoundFailure.make({ resource: "project" });
+      }
+      if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
+      return yield* decodeDatabaseValue("platform.project.get", Project, result.detail);
     }),
 
     updateProject: Effect.fn("PlatformRepository.updateProject")(function* (
@@ -527,16 +574,22 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const current = await selectAuthorizedProject(transaction, actorId, input.projectId);
-            if (!current) return outcome("not_found");
+            const authorization = await authorizeUserProject(
+              transaction,
+              actorId,
+              input.projectId,
+              "project.update",
+            );
+            if (authorization.kind === "not_found") return outcome("not_found");
+            if (authorization.kind === "forbidden") return outcome("forbidden");
+            const current = authorization.access.project;
             if (current.archivedAt) return outcome("invalid_state");
             if (current.version !== input.version) return outcome("version_conflict");
 
             const isUnchanged =
               current.name === input.name && current.description === input.description;
             if (isUnchanged) {
-              const detail = await selectProjectDetail(transaction, actorId, input.projectId);
-              if (!detail) throw new Error("Project disappeared during update.");
+              const detail = await loadProjectDetail(transaction, current);
               return outcomeWith("success", { detail });
             }
 
@@ -556,7 +609,7 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                   isNull(project.archivedAt),
                 ),
               )
-              .returning({ id: project.id });
+              .returning();
             if (!updated) return outcome("version_conflict");
 
             await transaction.insert(auditEvent).values(
@@ -570,8 +623,7 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                 requestId,
               }),
             );
-            const detail = await selectProjectDetail(transaction, actorId, input.projectId);
-            if (!detail) throw new Error("Updated project could not be loaded.");
+            const detail = await loadProjectDetail(transaction, updated);
             return outcomeWith("success", { detail });
           }),
         catch: (cause) => databaseFailure("platform.project.update", cause),
@@ -580,6 +632,8 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
       switch (result.kind) {
         case "not_found":
           return yield* NotFoundFailure.make({ resource: "project" });
+        case "forbidden":
+          return yield* ForbiddenFailure.make();
         case "invalid_state":
           return yield* InvalidStateTransitionFailure.make();
         case "version_conflict":
@@ -597,8 +651,15 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const current = await selectAuthorizedProject(transaction, actorId, input.projectId);
-            if (!current) return outcome("not_found");
+            const authorization = await authorizeUserProject(
+              transaction,
+              actorId,
+              input.projectId,
+              "project.archive",
+            );
+            if (authorization.kind === "not_found") return outcome("not_found");
+            if (authorization.kind === "forbidden") return outcome("forbidden");
+            const current = authorization.access.project;
             if (current.archivedAt) return outcome("invalid_state");
             if (current.version !== input.version) return outcome("version_conflict");
 
@@ -619,7 +680,7 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                   isNull(project.archivedAt),
                 ),
               )
-              .returning({ id: project.id });
+              .returning();
             if (!archived) return outcome("version_conflict");
 
             await transaction.insert(auditEvent).values(
@@ -633,8 +694,7 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                 requestId,
               }),
             );
-            const detail = await selectProjectDetail(transaction, actorId, input.projectId);
-            if (!detail) throw new Error("Archived project could not be loaded.");
+            const detail = await loadProjectDetail(transaction, archived);
             return outcomeWith("success", { detail });
           }),
         catch: (cause) => databaseFailure("platform.project.archive", cause),
@@ -643,6 +703,8 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
       switch (result.kind) {
         case "not_found":
           return yield* NotFoundFailure.make({ resource: "project" });
+        case "forbidden":
+          return yield* ForbiddenFailure.make();
         case "invalid_state":
           return yield* InvalidStateTransitionFailure.make();
         case "version_conflict":
@@ -660,8 +722,15 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const current = await selectAuthorizedProject(transaction, actorId, input.projectId);
-            if (!current) return outcome("not_found");
+            const authorization = await authorizeUserProject(
+              transaction,
+              actorId,
+              input.projectId,
+              "project.capability.manage",
+            );
+            if (authorization.kind === "not_found") return outcome("not_found");
+            if (authorization.kind === "forbidden") return outcome("forbidden");
+            const current = authorization.access.project;
             if (current.archivedAt) return outcome("invalid_state");
 
             const [capabilityRow] = await transaction
@@ -698,6 +767,7 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
       if (result.kind === "not_found") {
         return yield* NotFoundFailure.make({ resource: "project" });
       }
+      if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
       if (result.kind === "invalid_state") {
         return yield* InvalidStateTransitionFailure.make();
       }

@@ -98,6 +98,7 @@ function Dashboard() {
               <FieldLabel htmlFor="workspace-selector">Workspace</FieldLabel>
               <NativeSelect
                 id="workspace-selector"
+                name="workspace-selector"
                 className="w-full"
                 value={selectedWorkspace.id}
                 onChange={(event) =>
@@ -114,12 +115,14 @@ function Dashboard() {
                 ))}
               </NativeSelect>
             </Field>
-            <CreateProjectDialog
-              workspaceId={selectedWorkspace.id}
-              onCreated={(projectId) =>
-                navigate({ to: "/projects/$projectId", params: { projectId } })
-              }
-            />
+            {selectedWorkspace.role === "owner" ? (
+              <CreateProjectDialog
+                workspaceId={selectedWorkspace.id}
+                onCreated={(projectId) =>
+                  navigate({ to: "/projects/$projectId", params: { projectId } })
+                }
+              />
+            ) : null}
           </div>
 
           <div className="flex items-center justify-between gap-4">
@@ -127,7 +130,9 @@ function Dashboard() {
               <h2 id="workspace-projects-heading" className="font-medium">
                 {selectedWorkspace.name}
               </h2>
-              <p className="text-muted-foreground text-sm">Owner access</p>
+              <p className="text-muted-foreground text-sm">
+                {selectedWorkspace.role === "owner" ? "Owner access" : "Collaborator access"}
+              </p>
             </div>
             <Tabs
               value={search.status}

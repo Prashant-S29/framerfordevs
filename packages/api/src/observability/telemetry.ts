@@ -15,6 +15,11 @@ export interface HttpRequestMetric {
   readonly durationMs: number;
 }
 
+export interface CredentialVerificationMetric {
+  readonly family: "management" | "delivery" | "preview";
+  readonly outcome: "success" | "invalid" | "rate_limited";
+}
+
 const requestCount = Metric.counter("http_requests_total", {
   description: "Total inbound HTTP requests",
   incremental: true,
@@ -28,6 +33,11 @@ const requestLatency = Metric.histogram(
 
 const defectCount = Metric.counter("application_unhandled_defects_total", {
   description: "Unhandled application defects",
+  incremental: true,
+});
+
+const credentialVerificationCount = Metric.counter("credential_verifications_total", {
+  description: "Credential verification outcomes by bounded family and result",
   incremental: true,
 });
 
@@ -47,6 +57,9 @@ export class Telemetry extends Context.Tag("Telemetry")<
   {
     readonly recordHttpRequest: (event: HttpRequestMetric) => Effect.Effect<void>;
     readonly recordDefect: (routeFamily: RouteFamily) => Effect.Effect<void>;
+    readonly recordCredentialVerification: (
+      event: CredentialVerificationMetric,
+    ) => Effect.Effect<void>;
   }
 >() {}
 
@@ -57,6 +70,15 @@ export const TelemetryLive = Layer.succeed(Telemetry, {
       Metric.update(withRequestLabels(requestLatency, event), event.durationMs),
     ]).pipe(Effect.asVoid),
   recordDefect: (routeFamily) => Metric.update(Metric.tagged(defectCount, "route", routeFamily), 1),
+  recordCredentialVerification: (event) =>
+    Metric.update(
+      Metric.tagged(
+        Metric.tagged(credentialVerificationCount, "family", event.family),
+        "outcome",
+        event.outcome,
+      ),
+      1,
+    ),
 });
 
 export function toStatusFamily(status: number): StatusFamily {

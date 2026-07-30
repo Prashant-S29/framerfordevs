@@ -1,8 +1,8 @@
 # Agent Session Context
 
 **Last updated:** 2026-07-30
-**Current phase:** Milestone 2 complete and manually approved; awaiting developer commit
-**Active milestone:** Milestone 2 — Platform kernel
+**Current phase:** Milestone 3 automated criteria complete; awaiting developer manual review
+**Active milestone:** Milestone 3 — Membership, roles, policies, and API credentials
 
 ## What this project is
 
@@ -108,10 +108,12 @@ The repository currently has:
 - Transactional Drizzle repository workflows with tenant non-enumeration, optimistic concurrency, rollback guarantees, and audit persistence
 - TanStack/shadcn workspace and project management UI with create/edit/archive/CMS-enable flows
 - Property, Effect service, PostgreSQL concurrency/isolation/index-plan, API, UI validation, and automated accessibility tests
+- First-party project memberships, fixed default-deny role policies, invitations, and last-owner protection
+- Environment-bound management/delivery/preview credentials with one-time keys, immediate revocation, rotation, bounded attempt limiting, and security telemetry
+- Permission-aware project access management and fragment-safe invitation acceptance UI
 
 The repository does not yet have:
 
-- Full membership policy, invitation, role, or credential workflows
 - CMS domain models and CMS-specific workflows
 - Locale/schema/content/publication/delivery systems
 - Production telemetry backend/collector deployment
@@ -151,11 +153,29 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 - Docker SSR uses the internal `server` service URL while browser API calls retain the public `localhost:3000` URL.
 - Milestone test fixtures are fully removed from PostgreSQL.
 - The developer manually verified the corrected Docker login flow and approved Milestone 2.
+- The developer committed Milestone 2 as `60adb39` (`feat(m2): add workspace and project platform kernel`).
+
+## Milestone 3 implementation status
+
+- The developer approved `knowledge_base/decisions/m3-access-and-credentials-design.md`, which defines first-party project invitations, memberships, fixed role presets, a default-deny Effect policy service, and environment-bound management/delivery/preview credentials.
+- Better Auth remains the identity/session boundary; its organization and API-key plugins are not adopted because they would duplicate the platform tenant model and cannot enforce the full application resource/environment contract.
+- Invitation and credential secrets use 32 random bytes, one-time disclosure, SHA-256 digest-only storage, strict parsing, safe URL-fragment handoff for invitations, and secret-free logs/audits.
+- The design includes explicit goal-alignment, correctness, security, reliability, performance, UX, DX, observability, and maintainability review plus the complete M3 test matrix.
+- The developer installed `addyosmani/agent-skills@security-and-hardening`; its threat-model, authorization, least-privilege, secret-handling, and audit guidance now applies to M3 implementation and review.
+- `packages/db/src/schema/access.ts` and the extended platform schema define memberships, invitations, environment-bound credentials/scopes, lifecycle constraints, tenant foreign keys, and query-path indexes.
+- `packages/api/src/contracts/access.ts` and the centralized error registry define branded IDs, role/action/scope registries, secret formats, management inputs/models, and safe M3 error contracts.
+- The developer applied `0002_add_memberships_policies_credentials.sql`. Read-only verification confirms all four access tables exist and both existing projects have exactly one active owner membership.
+- New project creation atomically creates its explicit owner membership and audit event; collaborator discovery and every existing project operation now use active access plus policy decisions.
+- Invitation create/list/inspect/accept/revoke and membership list/role-update/remove workflows are transactional, non-enumerating, optimistic, concurrency-tested, and last-owner-safe.
+- Management, delivery, and preview credential issue/list/rotate/revoke/authentication workflows enforce family/scope/environment isolation, one-time disclosure, digest-only storage, immediate revocation, bounded attempts, and secret-free auditing.
+- Permission-aware member/invitation/credential management UI and fragment-safe invitation acceptance are implemented with one-time-secret acknowledgement and accessibility coverage.
+- `pnpm run ready` passes: 381 tests across 28 files, API/domain coverage of 93.62% statements and 81.85% branches, plus server and web production builds.
+- Read-only cleanup verification reports two expected active owner memberships, zero projects without an owner, zero invitations, zero credentials, and zero leaked test audit rows.
 
 ## What to do next
 
-1. The developer reviews the working tree and commits Milestone 2.
-2. Record the commit hash in `knowledge_base/progress.md` and this file.
-3. Do not begin Milestone 3 until the Milestone 2 commit is confirmed.
+1. Developer manually reviews the M3 role, invitation, membership, credential, and one-time-secret flows.
+2. Address any findings, rerun `pnpm run ready`, and wait for explicit developer approval.
+3. The developer commits M3. Do not start Milestone 4 before approval and commit confirmation.
 
 The agent must never generate or apply migrations.

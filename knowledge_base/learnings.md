@@ -110,6 +110,22 @@ Record a learning when an implementation or decision:
 
 ---
 
+## 2026-07-30 — Authorization lifecycle must update discovery and serialize cleanup
+
+**Context:** Milestone 3 replaced owner-only project access with explicit project memberships and collaborator workspace discovery.
+
+**Incorrect assumption or decision:** Treating authorization as only a per-project operation guard would leave owner-only discovery queries in place, while independently removing the same collaborator from two projects could race and leave an active workspace collaborator row after the final project access disappeared.
+
+**Cost or risk:** Valid collaborators could be hidden from the dashboard, or stale workspace discovery access could survive concurrent project removals even though project authorization correctly denied access.
+
+**Learning:** Authorization includes discovery and lifecycle maintenance, not only endpoint checks. Invariants spanning multiple resources need a stable serialization point in addition to unique constraints and optimistic versions.
+
+**Prevention:** Workspace/project list queries resolve active effective access; project owner mutations lock the project; invitation acceptance serializes on the user; and collaborator cleanup locks the workspace membership before counting remaining project memberships. Integration tests cover collaborator visibility, immediate access loss, stable reactivation, and concurrency.
+
+**Status:** Resolved in Milestone 3 and awaiting developer manual review.
+
+---
+
 ## Current implementation learnings
 
-The platform kernel is implemented through Milestone 2. CMS-domain implementation has not started. Additional entries should be added only when a consequential decision causes drift or rework.
+The platform authorization foundation is implemented through Milestone 3 automated readiness. CMS-domain implementation has not started. Additional entries should be added only when a consequential decision causes drift or rework.

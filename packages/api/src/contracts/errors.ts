@@ -47,6 +47,22 @@ export class InvalidStateTransitionFailure extends Schema.TaggedError<InvalidSta
   "InvalidStateTransitionFailure",
 )("InvalidStateTransitionFailure", {}) {}
 
+export class InvitationConflictFailure extends Schema.TaggedError<InvitationConflictFailure>(
+  "InvitationConflictFailure",
+)("InvitationConflictFailure", {}) {}
+
+export class InvitationInvalidFailure extends Schema.TaggedError<InvitationInvalidFailure>(
+  "InvitationInvalidFailure",
+)("InvitationInvalidFailure", {}) {}
+
+export class LastOwnerRequiredFailure extends Schema.TaggedError<LastOwnerRequiredFailure>(
+  "LastOwnerRequiredFailure",
+)("LastOwnerRequiredFailure", {}) {}
+
+export class CredentialInvalidFailure extends Schema.TaggedError<CredentialInvalidFailure>(
+  "CredentialInvalidFailure",
+)("CredentialInvalidFailure", {}) {}
+
 export class RateLimitedFailure extends Schema.TaggedError<RateLimitedFailure>(
   "RateLimitedFailure",
 )("RateLimitedFailure", {}) {}
@@ -66,6 +82,13 @@ export class AuthSessionFailure extends Schema.TaggedError<AuthSessionFailure>(
   cause: Schema.Defect,
 }) {}
 
+export class SecurityServiceFailure extends Schema.TaggedError<SecurityServiceFailure>(
+  "SecurityServiceFailure",
+)("SecurityServiceFailure", {
+  operation: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128)),
+  cause: Schema.Defect,
+}) {}
+
 export type ApplicationError =
   | ValidationFailure
   | UnauthorizedFailure
@@ -75,9 +98,14 @@ export type ApplicationError =
   | ProjectKeyConflictFailure
   | VersionConflictFailure
   | InvalidStateTransitionFailure
+  | InvitationConflictFailure
+  | InvitationInvalidFailure
+  | LastOwnerRequiredFailure
+  | CredentialInvalidFailure
   | RateLimitedFailure
   | DatabaseFailure
-  | AuthSessionFailure;
+  | AuthSessionFailure
+  | SecurityServiceFailure;
 
 export const apiErrorHttpStatus = {
   VALIDATION_ERROR: 400,
@@ -88,6 +116,10 @@ export const apiErrorHttpStatus = {
   PROJECT_KEY_CONFLICT: 409,
   VERSION_CONFLICT: 409,
   INVALID_STATE_TRANSITION: 409,
+  INVITATION_CONFLICT: 409,
+  INVITATION_INVALID: 404,
+  LAST_OWNER_REQUIRED: 409,
+  CREDENTIAL_INVALID: 401,
   RATE_LIMITED: 429,
   SERVICE_UNAVAILABLE: 503,
   INTERNAL_ERROR: 500,
@@ -151,6 +183,30 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
         message: "The requested state transition is not allowed.",
         retryable: false,
       };
+    case "InvitationConflictFailure":
+      return {
+        code: "INVITATION_CONFLICT",
+        message: "A pending invitation already exists for this project and email address.",
+        retryable: false,
+      };
+    case "InvitationInvalidFailure":
+      return {
+        code: "INVITATION_INVALID",
+        message: "The invitation is invalid or no longer available.",
+        retryable: false,
+      };
+    case "LastOwnerRequiredFailure":
+      return {
+        code: "LAST_OWNER_REQUIRED",
+        message: "The project must retain at least one owner.",
+        retryable: false,
+      };
+    case "CredentialInvalidFailure":
+      return {
+        code: "CREDENTIAL_INVALID",
+        message: "The credential is invalid or no longer available.",
+        retryable: false,
+      };
     case "RateLimitedFailure":
       return {
         code: "RATE_LIMITED",
@@ -159,6 +215,7 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
       };
     case "DatabaseFailure":
     case "AuthSessionFailure":
+    case "SecurityServiceFailure":
       return {
         code: "SERVICE_UNAVAILABLE",
         message: "A required service is temporarily unavailable.",

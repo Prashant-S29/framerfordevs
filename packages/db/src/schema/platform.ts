@@ -55,16 +55,28 @@ export const workspaceMembership = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
     role: varchar("role", { length: 32 }).default("owner").notNull(),
+    version: integer("version").default(1).notNull(),
+    revokedAt: platformTimestamp("revoked_at"),
+    revokedByUserId: text("revoked_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
     createdAt: platformTimestamp("created_at").defaultNow().notNull(),
+    updatedAt: platformTimestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
     unique("workspace_membership_workspace_user_unique").on(table.workspaceId, table.userId),
-    check("workspace_membership_role_valid", sql`${table.role} = 'owner'`),
-    index("workspace_membership_user_created_id_idx").on(
-      table.userId,
-      table.createdAt.desc(),
-      table.id.desc(),
+    check("workspace_membership_role_valid", sql`${table.role} in ('owner', 'collaborator')`),
+    check("workspace_membership_version_positive", sql`${table.version} > 0`),
+    check(
+      "workspace_membership_revocation_consistent",
+      sql`(${table.revokedAt} is null and ${table.revokedByUserId} is null) or (${table.revokedAt} is not null and ${table.revokedByUserId} is not null)`,
     ),
+    index("workspace_membership_user_active_created_id_idx")
+      .on(table.userId, table.createdAt.desc(), table.id.desc())
+      .where(sql`${table.revokedAt} is null`),
+    index("workspace_membership_revoked_by_user_idx")
+      .on(table.revokedByUserId)
+      .where(sql`${table.revokedByUserId} is not null`),
   ],
 );
 
@@ -221,7 +233,7 @@ export const auditEvent = pgTable(
       columns: [table.environmentId, table.projectId, table.workspaceId],
       foreignColumns: [environment.id, environment.projectId, environment.workspaceId],
     }).onDelete("restrict"),
-    check("audit_event_actor_type_valid", sql`${table.actorType} = 'user'`),
+    check("audit_event_actor_type_valid", sql`${table.actorType} in ('user', 'credential')`),
     check("audit_event_actor_id_nonempty", sql`char_length(${table.actorId}) between 1 and 255`),
     check("audit_event_action_valid", sql`${table.action} ~ '^[a-z][a-z0-9_.-]{0,127}$'`),
     check(
@@ -269,6 +281,11 @@ export const workspaceMembershipRelations = relations(workspaceMembership, ({ on
   user: one(user, {
     relationName: "workspaceMember",
     fields: [workspaceMembership.userId],
+    references: [user.id],
+  }),
+  revokedBy: one(user, {
+    relationName: "workspaceMembershipRevoker",
+    fields: [workspaceMembership.revokedByUserId],
     references: [user.id],
   }),
 }));
