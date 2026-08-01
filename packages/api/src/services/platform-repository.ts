@@ -1,6 +1,7 @@
 import { db } from "@framerfordevs/db";
 import { and, desc, eq, isNotNull, isNull, lt, or, sql } from "@framerfordevs/db/query";
 import { projectMembership } from "@framerfordevs/db/schema/access";
+import { projectLocale } from "@framerfordevs/db/schema/locale";
 import {
   auditEvent,
   environment,
@@ -401,6 +402,21 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
               .returning();
             if (!environmentRow) throw new Error("Environment insert returned no row.");
 
+            const [localeRow] = await transaction
+              .insert(projectLocale)
+              .values({
+                workspaceId: input.workspaceId,
+                projectId: projectRow.id,
+                tag: "en",
+                displayName: "English",
+                status: "enabled",
+                position: 0,
+                createdByUserId: actorId,
+                changedByUserId: actorId,
+              })
+              .returning({ id: projectLocale.id });
+            if (!localeRow) throw new Error("English locale insert returned no row.");
+
             await transaction.insert(auditEvent).values([
               makeAuditValues({
                 workspaceId: input.workspaceId,
@@ -428,6 +444,15 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                 action: "environment.created",
                 resourceType: "environment",
                 resourceId: environmentRow.id,
+                requestId,
+              }),
+              makeAuditValues({
+                workspaceId: input.workspaceId,
+                projectId: projectRow.id,
+                actorId,
+                action: "project.locale.created",
+                resourceType: "project_locale",
+                resourceId: localeRow.id,
                 requestId,
               }),
             ]);

@@ -7,13 +7,18 @@ import {
   CredentialScopes,
   CredentialSecret,
   InvitationToken,
+  LocaleAccessMode,
   ProjectInvitationStatus,
+  ProjectLocaleAccess,
   ProjectPermissionAction,
   ProjectRole,
+  UpdateProjectMemberLocaleAccessInput,
 } from "./access";
 
 const credentialId = "019fae8b-1234-7000-8000-000000000001";
 const secret = "A".repeat(43);
+const membershipId = "019fae8b-1234-7000-8000-000000000002";
+const localeId = "019fae8b-1234-7000-8000-000000000003";
 
 describe("access contracts", () => {
   it.effect("canonicalizes invitation email addresses", () =>
@@ -67,8 +72,49 @@ describe("access contracts", () => {
     }),
   );
 
+  it.effect("accepts all, none, and bounded unique selected locale access", () =>
+    Effect.gen(function* () {
+      const values = yield* Effect.all([
+        Schema.decodeUnknown(ProjectLocaleAccess)({ mode: "all" }),
+        Schema.decodeUnknown(ProjectLocaleAccess)({ mode: "none" }),
+        Schema.decodeUnknown(ProjectLocaleAccess)({ mode: "selected", localeIds: [localeId] }),
+        Schema.decodeUnknown(UpdateProjectMemberLocaleAccessInput)({
+          membershipId,
+          version: 1,
+          access: { mode: "selected", localeIds: [localeId] },
+        }),
+      ]);
+
+      assert.deepEqual(
+        values.map((value) => ("access" in value ? value.access.mode : value.mode)),
+        ["all", "none", "selected", "selected"],
+      );
+    }),
+  );
+
+  it.effect("rejects empty, duplicate, and unknown locale access", () =>
+    Effect.gen(function* () {
+      const exits = yield* Effect.all([
+        Effect.exit(Schema.decodeUnknown(ProjectLocaleAccess)({ mode: "selected", localeIds: [] })),
+        Effect.exit(
+          Schema.decodeUnknown(ProjectLocaleAccess)({
+            mode: "selected",
+            localeIds: [localeId, localeId],
+          }),
+        ),
+        Effect.exit(Schema.decodeUnknown(LocaleAccessMode)("inherited")),
+      ]);
+
+      assert.isTrue(exits.every((exit) => exit._tag === "Failure"));
+    }),
+  );
+
   it.effect("rejects unknown roles, actions, scopes, and invitation states", () =>
     Effect.gen(function* () {
+      assert.strictEqual(
+        yield* Schema.decodeUnknown(ProjectPermissionAction)("project.member.locale.update"),
+        "project.member.locale.update",
+      );
       const exits = yield* Effect.all([
         Effect.exit(Schema.decodeUnknown(ProjectRole)("admin")),
         Effect.exit(Schema.decodeUnknown(ProjectPermissionAction)("project.delete")),

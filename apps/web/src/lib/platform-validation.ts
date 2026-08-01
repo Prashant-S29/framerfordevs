@@ -1,3 +1,9 @@
+import {
+  canonicalizeLocaleTag,
+  localeTagMaxLength,
+  localeTagValidationMessage,
+  validateAndCanonicalizeLocaleTag,
+} from "@framerfordevs/api/contracts/locale-tag";
 import { z } from "zod";
 
 const projectKeyPattern = /^[a-z][a-z0-9-]{0,62}$/u;
@@ -43,6 +49,27 @@ export const projectFormSchema = z.object({
 export const editProjectFormSchema = projectFormSchema.pick({
   name: true,
   description: true,
+});
+
+export const localeFormSchema = z.object({
+  tag: z
+    .string()
+    .trim()
+    .max(localeTagMaxLength, `Locale tags can contain at most ${localeTagMaxLength} characters.`)
+    .superRefine((value, context) => {
+      const result = validateAndCanonicalizeLocaleTag(value);
+      if (!result.ok) {
+        context.addIssue({ code: "custom", message: localeTagValidationMessage(result.code) });
+      }
+    })
+    .transform((value) => canonicalizeLocaleTag(value) ?? value),
+  displayName: z
+    .string()
+    .trim()
+    .min(1, "Enter a display name.")
+    .max(100, "Display names can contain at most 100 characters.")
+    .refine((value) => !hasControlCharacter(value), "Remove control characters.")
+    .transform((value) => value.normalize("NFC")),
 });
 
 export function projectKeyFromName(name: string): string {

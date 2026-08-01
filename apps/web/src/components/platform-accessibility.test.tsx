@@ -1,5 +1,7 @@
 /** @vitest-environment jsdom */
 
+import { ProjectMember } from "@framerfordevs/api/contracts/access";
+import { ProjectLocale } from "@framerfordevs/api/contracts/locales";
 import { Project } from "@framerfordevs/api/contracts/platform";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -7,13 +9,54 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { Schema } from "effect";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ArchiveProjectDialog } from "./archive-project-dialog";
 import { CreateProjectDialog } from "./create-project-dialog";
 import { CreateWorkspaceDialog } from "./create-workspace-dialog";
 import { EditProjectDialog } from "./edit-project-dialog";
-import { InviteMemberDialog, IssueCredentialDialog } from "./project-access-settings";
+import { LocaleTabs } from "./locale-tabs";
+import {
+  InviteMemberDialog,
+  IssueCredentialDialog,
+  LocaleAccessDialog,
+} from "./project-access-settings";
+import { AddLocaleDialog } from "./project-locale-settings";
+
+const locale = Schema.decodeUnknownSync(ProjectLocale)({
+  id: "019fae8b-1234-7000-8000-000000000004",
+  workspaceId: "019fae8b-1234-7000-8000-000000000002",
+  projectId: "019fae8b-1234-7000-8000-000000000001",
+  tag: "en",
+  displayName: "English",
+  status: "enabled",
+  position: 0,
+  version: 1,
+  createdAt: "2026-07-29T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z",
+});
+
+const hindiLocale = Schema.decodeUnknownSync(ProjectLocale)({
+  ...locale,
+  id: "019fae8b-1234-7000-8000-000000000005",
+  tag: "hi",
+  displayName: "Hindi",
+  position: 1,
+});
+
+const member = Schema.decodeUnknownSync(ProjectMember)({
+  id: "019fae8b-1234-7000-8000-000000000006",
+  projectId: "019fae8b-1234-7000-8000-000000000001",
+  userId: "accessible-user",
+  name: "Accessible member",
+  email: "member@example.test",
+  role: "editor",
+  localeAccess: { mode: "all" },
+  version: 1,
+  removedAt: null,
+  createdAt: "2026-07-29T00:00:00.000Z",
+  updatedAt: "2026-07-29T00:00:00.000Z",
+});
 
 const project = Schema.decodeUnknownSync(Project)({
   id: "019fae8b-1234-7000-8000-000000000001",
@@ -86,5 +129,82 @@ describe("platform management accessibility", () => {
       <IssueCredentialDialog projectId={project.id} environmentId={project.environment.id} />,
     );
     await expectOpenDialogToHaveNoViolations(/issue credential/i);
+  });
+
+  it("has accessible locale creation semantics", async () => {
+    renderWithQueryClient(<AddLocaleDialog projectId={project.id} />);
+    await expectOpenDialogToHaveNoViolations(/add locale/i);
+  });
+
+  it("validates locale tags before creating a locale", async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<AddLocaleDialog projectId={project.id} />);
+    await user.click(screen.getByRole("button", { name: /add locale/i }));
+    await user.type(screen.getByLabelText(/locale tag/i), "en_US");
+    await user.type(screen.getByLabelText(/display name/i), "English US");
+    await user.click(screen.getByRole("button", { name: /add locale/i }));
+
+    expect(await screen.findByText(/use a registered bcp 47 locale tag/i)).toBeTruthy();
+  });
+
+  it("has accessible membership locale-access semantics", async () => {
+    renderWithQueryClient(
+      <LocaleAccessDialog member={member} projectLocales={[locale, hindiLocale]} />,
+    );
+    await expectOpenDialogToHaveNoViolations(/locale access/i);
+  });
+
+  it("requires confirmation before reducing member locale access", async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(
+      <LocaleAccessDialog member={member} projectLocales={[locale, hindiLocale]} />,
+    );
+    await user.click(screen.getByRole("button", { name: /locale access/i }));
+    await user.selectOptions(screen.getByLabelText(/access mode/i), "none");
+
+    const save = screen.getByRole("button", { name: /save locale access/i });
+    expect(save.hasAttribute("disabled")).toBe(true);
+    await user.click(screen.getByRole("checkbox", { name: /immediately reduces/i }));
+    expect(save.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("supports keyboard locale-tab navigation", async () => {
+    const user = userEvent.setup();
+    const onSelectedLocaleChange = vi.fn();
+    renderWithQueryClient(
+      <LocaleTabs
+        locales={[locale, hindiLocale]}
+        selectedLocaleId={locale.id}
+        onSelectedLocaleChange={onSelectedLocaleChange}
+        hasUnsavedChanges={false}
+        renderContent={(item) => <p>Editing {item.displayName}</p>}
+      />,
+    );
+
+    screen.getByRole("tab", { name: /english/i }).focus();
+    await user.keyboard("{ArrowRight}");
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: /hindi/i }));
+  });
+
+  it("confirms locale switches when a form has unsaved changes", async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(
+      <LocaleTabs
+        locales={[locale, hindiLocale]}
+        selectedLocaleId={locale.id}
+        onSelectedLocaleChange={() => undefined}
+        hasUnsavedChanges
+        renderContent={(item) => <p>Editing {item.displayName}</p>}
+      />,
+    );
+
+    await user.click(screen.getByRole("tab", { name: /hindi/i }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toMatch(/unsaved changes in english may be lost/i);
+    expect((await axe.run(dialog)).violations).toEqual([]);
+    await user.click(screen.getByRole("button", { name: /keep editing/i }));
+    expect(screen.getByRole("tab", { name: /english/i }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
   });
 });

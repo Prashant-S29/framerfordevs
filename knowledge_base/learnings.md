@@ -122,10 +122,42 @@ Record a learning when an implementation or decision:
 
 **Prevention:** Workspace/project list queries resolve active effective access; project owner mutations lock the project; invitation acceptance serializes on the user; and collaborator cleanup locks the workspace membership before counting remaining project memberships. Integration tests cover collaborator visibility, immediate access loss, stable reactivation, and concurrency.
 
-**Status:** Resolved in Milestone 3 and awaiting developer manual review.
+**Status:** Resolved and approved in Milestone 3, committed as `a74aeb8`.
+
+---
+
+## 2026-08-01 — Shared browser utilities must remain runtime-light
+
+**Context:** Milestone 4 reused locale-tag canonicalization in browser form validation.
+
+**Incorrect assumption or decision:** Importing the helper from the Effect schema-heavy locale contract module treated a shared runtime function like a type-only contract import.
+
+**Cost or risk:** The browser validation chunk grew to roughly 230 kB and pulled Effect contract machinery into a client path for one `Intl` helper.
+
+**Learning:** Shared browser/server algorithms should live in narrow dependency-free modules; schema modules may safely consume those utilities, but browser code should not import schema-heavy modules merely to reuse a pure function.
+
+**Prevention:** `contracts/locale-tag.ts` now owns dependency-free canonicalization. Effect locale schemas re-export it, browser validation imports the lightweight module directly, and the production client validation chunk is roughly 29 kB.
+
+**Status:** Resolved before manual review; the registry-backed client validation chunk remains dependency-free at roughly 75 kB raw/34 kB gzip instead of the schema-heavy roughly 230 kB path, and type checks, tests, and production builds pass.
+
+---
+
+## 2026-08-01 — Structural BCP 47 parsing does not prove IANA registration
+
+**Context:** Milestone 4 initially used `Intl.getCanonicalLocales()` for locale identity validation, and manual testing entered `doekdoek`, `xlw`, and `oedll`.
+
+**Incorrect assumption or decision:** Runtime canonicalization was treated as authoritative registration validation. It validates BCP 47 structure and canonical casing/known aliases, but accepts many structurally valid unregistered language subtags.
+
+**Cost or risk:** Invalid project locale identities passed the browser, API, and structural database check consistently. Relying on runtime ICU data would also make accepted aliases vary with host/runtime updates.
+
+**Learning:** Syntax, canonicalization, and registry membership are separate concerns. Stable persisted standards-based identifiers require an explicit authoritative dataset and an application-specific supported profile.
+
+**Prevention:** Browser and API validation now share a generated official IANA Language Subtag Registry snapshot pinned at `File-Date: 2026-06-14`. Tests reject unknown language/script/region/variant subtags, private-use/reserved ranges, extensions, and unsafe grandfathered tags; aliases come from snapshot `Preferred-Value` metadata. The API remains authoritative, and no runtime network, OS, ICU-registry, or opaque package-data lookup is used.
+
+**Status:** Resolved. The developer-authorized guarded cleanup permanently deleted the three soft-removed invalid rows after confirming they had no membership grants.
 
 ---
 
 ## Current implementation learnings
 
-The platform authorization foundation is implemented through Milestone 3 automated readiness. CMS-domain implementation has not started. Additional entries should be added only when a consequential decision causes drift or rework.
+The platform authorization foundation is implemented, approved, and committed through Milestone 3. Milestone 4 locale schema, pinned-registry contracts, repository, policy, APIs, UI, observability, cleanup, and automated tests are complete and await developer manual review. The developer generated and applied the M4 migration; the agent did neither. Additional entries should be added only when a consequential decision causes drift or rework.

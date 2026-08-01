@@ -24,6 +24,7 @@
     "db:watch": "docker compose up postgres",
     "db:stop": "docker compose stop postgres",
     "db:down": "docker compose down postgres",
+    "locale-registry:update": "node scripts/update-language-subtag-registry.mjs",
     "docker:build": "docker compose build",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",

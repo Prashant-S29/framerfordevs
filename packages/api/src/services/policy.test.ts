@@ -11,6 +11,8 @@ import { PolicyService, PolicyServiceLive } from "./policy";
 const workspaceId = "019fae8b-1234-7000-8000-000000000001";
 const projectId = "019fae8b-1234-7000-8000-000000000002";
 const environmentId = "019fae8b-1234-7000-8000-000000000003";
+const localeId = "019fae8b-1234-7000-8000-000000000004";
+const otherLocaleId = "019fae8b-1234-7000-8000-000000000005";
 
 const expectedAllowedActions = {
   owner: new Set(projectPermissionActionValues),
@@ -71,6 +73,9 @@ function userRequest(role: string, action: string) {
     subjectProjectId: projectId,
     workspaceId,
     projectId,
+    localeAccessMode: "all",
+    allowedLocaleIds: [],
+    requestedLocaleId: action.startsWith("content.") ? localeId : null,
     isActive: true,
   };
 }
@@ -137,6 +142,74 @@ describe("PolicyService", () => {
               "explicit_deny",
               "scope_mismatch",
             ],
+          );
+        }),
+    );
+
+    it.effect("enforces exact selected locale access and denies missing content context", () =>
+      Effect.gen(function* () {
+        const policy = yield* PolicyService;
+        const selected = {
+          ...userRequest("editor", "content.write"),
+          localeAccessMode: "selected",
+          allowedLocaleIds: [localeId],
+        };
+        const decisions = yield* Effect.all([
+          policy.decideUser({ ...selected, requestedLocaleId: localeId }),
+          policy.decideUser({ ...selected, requestedLocaleId: otherLocaleId }),
+          policy.decideUser({ ...selected, requestedLocaleId: null }),
+          policy.decideUser({
+            ...selected,
+            action: "locale.manage",
+            requestedLocaleId: null,
+          }),
+          policy.decideUser({
+            ...selected,
+            action: "project.credential.issue",
+            requestedLocaleId: null,
+          }),
+          policy.decideUser({
+            ...selected,
+            action: "project.credential.revoke",
+            requestedLocaleId: null,
+          }),
+        ]);
+
+        assert.deepEqual(
+          decisions.map((decision) => [decision.allowed, decision.reason]),
+          [
+            [true, "allowed"],
+            [false, "locale_denied"],
+            [false, "missing_context"],
+            [false, "role_denied"],
+            [false, "role_denied"],
+            [false, "role_denied"],
+          ],
+        );
+      }),
+    );
+
+    it.effect(
+      "prevents locale-restricted developers from managing locales or issuing credentials",
+      () =>
+        Effect.gen(function* () {
+          const policy = yield* PolicyService;
+          const selectedDeveloper = {
+            ...userRequest("developer", "locale.manage"),
+            localeAccessMode: "selected",
+            allowedLocaleIds: [localeId],
+          };
+          const decisions = yield* Effect.all([
+            policy.decideUser(selectedDeveloper),
+            policy.decideUser({ ...selectedDeveloper, action: "project.credential.issue" }),
+            policy.decideUser({ ...selectedDeveloper, action: "project.credential.rotate" }),
+            policy.decideUser({ ...selectedDeveloper, action: "project.credential.revoke" }),
+            policy.decideUser({ ...selectedDeveloper, action: "locale.read" }),
+          ]);
+
+          assert.deepEqual(
+            decisions.map((decision) => decision.allowed),
+            [false, false, false, true, true],
           );
         }),
     );

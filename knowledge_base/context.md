@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-07-30
-**Current phase:** Milestone 3 automated criteria complete; awaiting developer manual review
-**Active milestone:** Milestone 3 — Membership, roles, policies, and API credentials
+**Last updated:** 2026-08-01
+**Current phase:** Milestone 4 automated implementation complete; awaiting developer manual review
+**Active milestone:** Milestone 4 — Project locales and strict locale contracts
 
 ## What this project is
 
@@ -17,6 +17,7 @@ Framer for Devs is a backend-agnostic visual frontend and website-operations pla
 5. `knowledge_base/progress.md`
 6. The active section in `knowledge_base/milestone.md`
 7. `knowledge_base/learnings.md`
+8. Check `git log`
 
 ## Confirmed stack
 
@@ -111,11 +112,13 @@ The repository currently has:
 - First-party project memberships, fixed default-deny role policies, invitations, and last-owner protection
 - Environment-bound management/delivery/preview credentials with one-time keys, immediate revocation, rotation, bounded attempt limiting, and security telemetry
 - Permission-aware project access management and fragment-safe invitation acceptance UI
+- Stable project locales with required English, generated/pinned IANA-registry BCP 47 identity validation, ordering, reversible lifecycle, exact enabled-locale resolution, audits, telemetry, and strict no-fallback contracts
+- Durable per-membership locale access with owner invariants and restricted-member credential escalation prevention
+- Permission-aware locale settings, locale-access controls, client validation, and accessible stable-ID locale tabs with unsaved-change guards
 
 The repository does not yet have:
 
-- CMS domain models and CMS-specific workflows
-- Locale/schema/content/publication/delivery systems
+- Schema, collection, field, entry, draft, publication, delivery, or preview workflows
 - Production telemetry backend/collector deployment
 
 ## Mandatory constraints
@@ -155,7 +158,7 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 - The developer manually verified the corrected Docker login flow and approved Milestone 2.
 - The developer committed Milestone 2 as `60adb39` (`feat(m2): add workspace and project platform kernel`).
 
-## Milestone 3 implementation status
+## Milestone 3 completion
 
 - The developer approved `knowledge_base/decisions/m3-access-and-credentials-design.md`, which defines first-party project invitations, memberships, fixed role presets, a default-deny Effect policy service, and environment-bound management/delivery/preview credentials.
 - Better Auth remains the identity/session boundary; its organization and API-key plugins are not adopted because they would duplicate the platform tenant model and cannot enforce the full application resource/environment contract.
@@ -171,11 +174,29 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 - Permission-aware member/invitation/credential management UI and fragment-safe invitation acceptance are implemented with one-time-secret acknowledgement and accessibility coverage.
 - `pnpm run ready` passes: 381 tests across 28 files, API/domain coverage of 93.62% statements and 81.85% branches, plus server and web production builds.
 - Read-only cleanup verification reports two expected active owner memberships, zero projects without an owner, zero invitations, zero credentials, and zero leaked test audit rows.
+- The developer approved and committed Milestone 3 as `a74aeb8` (`feat(m3): add project access, invitations, and API credentials`).
+
+## Milestone 4 implementation status
+
+- Repository, requirements, standards, security, database, Effect, API, policy, UI, and test discovery is complete.
+- The developer approved `knowledge_base/decisions/m4-project-locales-design.md`, including the first-review revisions.
+- The Drizzle schema now defines project locales, membership locale-access modes, normalized membership allowlists, tenant-composite foreign keys, lifecycle checks, and query-path indexes.
+- Foundational Effect contracts now define canonical BCP 47 tags, stable locale IDs, strict explicit-locale context, locale management inputs/models, discriminated member locale access, and the three locale error codes.
+- Browser and API validation share an official IANA Language Subtag Registry snapshot pinned at `File-Date: 2026-06-14`. Validation is deterministic and runtime-network/OS/ICU independent, accepts registered preferred aliases, and rejects unknown subtags, extensions, private use, reserved ranges, and grandfathered tags without safe preferred replacements.
+- `VERSION_CONFLICT` feedback is resource-neutral and covered by a targeted contract test. Locale dependency feedback carries bounded safe details and explicit draft-lockout guidance.
+- Non-migration database/API type checks and 31 targeted contract tests pass.
+- The developer generated and applied `0003_add_project_locales.sql`. The agent inspected its structural DDL and, with explicit developer authorization, added the existing-project enabled-English backfill using each project's workspace, creator, and timestamps. The agent did not generate or apply the migration.
+- Read-only verification confirms both locale tables and nine intended indexes exist, all four current projects have exactly one enabled `en`, all seven memberships use `locale_access_mode = all`, and no owner has an invalid locale mode.
+- New projects create enabled English in the project transaction. Locale management, exact resolution, dependency policy, membership access, owner transitions, API wiring, audit events, and bounded telemetry are implemented and tested.
+- The project UI now provides locale creation/editing/ordering/lifecycle controls, configured membership allowlists, owner-demotion guidance, restricted-credential UX, BCP 47 validation, and accessible stable-ID tabs with missing-selection and unsaved-change guards.
+- With explicit developer authorization, a guarded transaction permanently deleted exactly the three soft-removed invalid manual-test rows (`doekdoek`, `oedll`, and `xlw`) after confirming no membership grants referenced them.
+- Workspace checks, all package type checks, 453 tests, coverage, and production builds pass. Final read-only checks report zero missing/duplicate enabled-English project invariants, zero restricted owners, zero configured locale grants on removed memberships, and zero registry-invalid rows across all 11 persisted locale records.
 
 ## What to do next
 
-1. Developer manually reviews the M3 role, invitation, membership, credential, and one-time-secret flows.
-2. Address any findings, rerun `pnpm run ready`, and wait for explicit developer approval.
-3. The developer commits M3. Do not start Milestone 4 before approval and commit confirmation.
+1. Developer manually creates or restores Hindi (`hi`) and Gujarati (`gu`), verifies unregistered tags such as `doekdoek` are rejected, reorders locales, edits display names, and verifies English cannot be disabled or removed.
+2. Developer checks locale tabs with keyboard navigation and reviews responsive/accessibility behavior.
+3. Developer restricts a non-owner to selected locales, verifies content/locale policy behavior and credential issue/rotation lockout, then restores all-locale access.
+4. After manual approval, the developer decides whether to commit and advance to Milestone 5.
 
 The agent must never generate or apply migrations.

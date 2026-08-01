@@ -9,6 +9,7 @@ import {
   projectMembership,
 } from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
+import { projectLocale } from "@framerfordevs/db/schema/locale";
 import {
   auditEvent,
   environment,
@@ -174,6 +175,9 @@ afterAll(async () => {
     .delete(environment)
     .where(eq(environment.projectId, required(projectModel, "project").id));
   await db
+    .delete(projectLocale)
+    .where(eq(projectLocale.projectId, required(projectModel, "project").id));
+  await db
     .delete(projectMembership)
     .where(or(...actorIds.map((id) => eq(projectMembership.userId, id))));
   await db.delete(project).where(eq(project.id, required(projectModel, "project").id));
@@ -293,6 +297,62 @@ describe.sequential("credential repository PostgreSQL integration", () => {
           assert.strictEqual(failureTag(expired), "ValidationFailure");
           assert.strictEqual(failureTag(editor), "ForbiddenFailure");
         }),
+    );
+
+    it.effect("prevents locale-restricted developers from issuing or rotating credentials", () =>
+      Effect.gen(function* () {
+        const currentProject = required(projectModel, "project");
+        yield* Effect.promise(() =>
+          db
+            .update(projectMembership)
+            .set({ localeAccessMode: "selected" })
+            .where(
+              and(
+                eq(projectMembership.projectId, currentProject.id),
+                eq(projectMembership.userId, developerId),
+              ),
+            ),
+        );
+        const issue = yield* Effect.exit(
+          issueApiCredential(
+            developerId,
+            yield* Schema.decodeUnknown(IssueApiCredentialInput)({
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
+              family: "management",
+              name: "Restricted issue",
+              scopes: ["project.read"],
+              expiresAt: null,
+            }),
+            "request-m4-restricted-credential-issue",
+          ),
+        );
+        const currentManagement = required(managementCredential, "management credential");
+        const rotate = yield* Effect.exit(
+          rotateApiCredential(
+            developerId,
+            yield* Schema.decodeUnknown(RotateApiCredentialInput)({
+              credentialId: currentManagement.credential.id,
+              version: currentManagement.credential.version,
+            }),
+            "request-m4-restricted-credential-rotate",
+          ),
+        );
+        yield* Effect.promise(() =>
+          db
+            .update(projectMembership)
+            .set({ localeAccessMode: "all" })
+            .where(
+              and(
+                eq(projectMembership.projectId, currentProject.id),
+                eq(projectMembership.userId, developerId),
+              ),
+            ),
+        );
+
+        assert.strictEqual(failureTag(issue), "ForbiddenFailure");
+        assert.strictEqual(failureTag(rotate), "ForbiddenFailure");
+      }),
     );
 
     it.effect("lists bounded credential metadata without exposing keys or digests", () =>

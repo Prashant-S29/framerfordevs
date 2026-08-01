@@ -20,6 +20,11 @@ export interface CredentialVerificationMetric {
   readonly outcome: "success" | "invalid" | "rate_limited";
 }
 
+export interface LocaleMutationMetric {
+  readonly action: "create" | "update_display_name" | "reorder" | "update_status";
+  readonly outcome: "success" | "failure";
+}
+
 const requestCount = Metric.counter("http_requests_total", {
   description: "Total inbound HTTP requests",
   incremental: true,
@@ -38,6 +43,11 @@ const defectCount = Metric.counter("application_unhandled_defects_total", {
 
 const credentialVerificationCount = Metric.counter("credential_verifications_total", {
   description: "Credential verification outcomes by bounded family and result",
+  incremental: true,
+});
+
+const localeMutationCount = Metric.counter("project_locale_mutations_total", {
+  description: "Project locale mutation outcomes by bounded action and result",
   incremental: true,
 });
 
@@ -60,6 +70,7 @@ export class Telemetry extends Context.Tag("Telemetry")<
     readonly recordCredentialVerification: (
       event: CredentialVerificationMetric,
     ) => Effect.Effect<void>;
+    readonly recordLocaleMutation: (event: LocaleMutationMetric) => Effect.Effect<void>;
   }
 >() {}
 
@@ -74,6 +85,15 @@ export const TelemetryLive = Layer.succeed(Telemetry, {
     Metric.update(
       Metric.tagged(
         Metric.tagged(credentialVerificationCount, "family", event.family),
+        "outcome",
+        event.outcome,
+      ),
+      1,
+    ),
+  recordLocaleMutation: (event) =>
+    Metric.update(
+      Metric.tagged(
+        Metric.tagged(localeMutationCount, "action", event.action),
         "outcome",
         event.outcome,
       ),

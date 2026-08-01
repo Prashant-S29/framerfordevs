@@ -5,6 +5,7 @@ import { db } from "@framerfordevs/db";
 import { and, eq, or, sql } from "@framerfordevs/db/query";
 import { projectInvitation, projectMembership } from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
+import { projectLocale, projectMembershipLocaleAccess } from "@framerfordevs/db/schema/locale";
 import {
   auditEvent,
   environment,
@@ -20,6 +21,7 @@ import {
   ListProjectInvitationsInput,
   ListProjectMembersInput,
   RemoveProjectMemberInput,
+  UpdateProjectMemberLocaleAccessInput,
   UpdateProjectMemberRoleInput,
 } from "../contracts/access";
 import {
@@ -101,6 +103,20 @@ afterAll(async () => {
   await db
     .delete(environment)
     .where(or(...actorIds.map((actorId) => eq(environment.createdByUserId, actorId))));
+  const membershipRows = await db
+    .select({ id: projectMembership.id })
+    .from(projectMembership)
+    .where(or(...actorIds.map((actorId) => eq(projectMembership.userId, actorId))));
+  if (membershipRows.length > 0) {
+    await db
+      .delete(projectMembershipLocaleAccess)
+      .where(
+        or(...membershipRows.map(({ id }) => eq(projectMembershipLocaleAccess.membershipId, id))),
+      );
+  }
+  await db
+    .delete(projectLocale)
+    .where(or(...actorIds.map((actorId) => eq(projectLocale.createdByUserId, actorId))));
   await db
     .delete(projectMembership)
     .where(or(...actorIds.map((actorId) => eq(projectMembership.userId, actorId))));
@@ -448,8 +464,67 @@ describe.sequential("access repository PostgreSQL integration", () => {
         "request-m3-reaccept",
       );
       assert.strictEqual(accepted.id, required(developerMembershipId, "developer membership"));
+      developerMembershipVersion = accepted.version;
       assert.strictEqual(accepted.role, "reviewer");
+      assert.strictEqual(accepted.localeAccess.mode, "all");
       assert.isNull(accepted.removedAt);
+    }),
+  );
+
+  it.effect("resets locale access on owner promotion and retains all access on demotion", () =>
+    Effect.gen(function* () {
+      const currentProject = required(projectModel, "project");
+      const membershipId = required(developerMembershipId, "developer membership");
+      const [english] = yield* Effect.promise(() =>
+        db
+          .select()
+          .from(projectLocale)
+          .where(and(eq(projectLocale.projectId, currentProject.id), eq(projectLocale.tag, "en")))
+          .limit(1),
+      );
+      assert.isDefined(english);
+      if (!english) return;
+      const selected = yield* access.updateMemberLocaleAccess(
+        ownerActor,
+        yield* Schema.decodeUnknown(UpdateProjectMemberLocaleAccessInput)({
+          membershipId,
+          version: required(developerMembershipVersion, "developer version"),
+          access: { mode: "selected", localeIds: [english.id] },
+        }),
+        new Date(),
+        "request-m4-member-selected",
+      );
+      const promoted = yield* access.updateMemberRole(
+        ownerActor,
+        yield* Schema.decodeUnknown(UpdateProjectMemberRoleInput)({
+          membershipId,
+          version: selected.version,
+          role: "owner",
+        }),
+        new Date(),
+        "request-m4-member-promote-owner",
+      );
+      const configuredRows = yield* Effect.promise(() =>
+        db
+          .select()
+          .from(projectMembershipLocaleAccess)
+          .where(eq(projectMembershipLocaleAccess.membershipId, membershipId)),
+      );
+      const demoted = yield* access.updateMemberRole(
+        ownerActor,
+        yield* Schema.decodeUnknown(UpdateProjectMemberRoleInput)({
+          membershipId,
+          version: promoted.version,
+          role: "reviewer",
+        }),
+        new Date(),
+        "request-m4-member-demote-owner",
+      );
+      developerMembershipVersion = demoted.version;
+
+      assert.strictEqual(promoted.localeAccess.mode, "all");
+      assert.strictEqual(configuredRows.length, 0);
+      assert.strictEqual(demoted.localeAccess.mode, "all");
     }),
   );
 

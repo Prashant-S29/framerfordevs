@@ -3,6 +3,7 @@ import { Context, Effect, Layer, Option, Schema } from "effect";
 import {
   CredentialFamily,
   CredentialScope,
+  LocaleAccessMode,
   type CredentialFamily as CredentialFamilyType,
   type CredentialScope as CredentialScopeType,
   type ProjectPermissionAction as ProjectPermissionActionType,
@@ -22,6 +23,7 @@ export type PolicyDecisionReason =
   | "role_denied"
   | "family_denied"
   | "scope_denied"
+  | "locale_denied"
   | "explicit_deny";
 
 export interface PolicyDecision {
@@ -36,6 +38,9 @@ export interface UserPolicyRequest {
   readonly subjectProjectId: string | null;
   readonly workspaceId: string | null;
   readonly projectId: string | null;
+  readonly localeAccessMode: string | null;
+  readonly allowedLocaleIds: ReadonlyArray<string>;
+  readonly requestedLocaleId: string | null;
   readonly isActive: boolean;
   readonly hasExplicitDeny?: boolean;
 }
@@ -55,6 +60,17 @@ export interface CredentialPolicyRequest {
 }
 
 const allActions = new Set<ProjectPermissionActionType>(projectPermissionActionValues);
+const localeScopedContentActions = new Set<ProjectPermissionActionType>([
+  "content.read",
+  "content.write",
+  "content.review",
+  "content.publish",
+]);
+const unrestrictedLocaleActions = new Set<ProjectPermissionActionType>([
+  "locale.manage",
+  "project.credential.issue",
+  "project.credential.rotate",
+]);
 const developerActions = new Set<ProjectPermissionActionType>([
   "project.read",
   "project.update",
@@ -178,8 +194,25 @@ export function decideUserPolicy(request: UserPolicyRequest): PolicyDecision {
   const action = decodeOption(ProjectPermissionAction, request.action);
   if (action === undefined) return deny("unknown_action");
   const role = decodeOption(ProjectRole, request.role);
-  if (role === undefined) return deny("role_denied");
-  return projectRolePermissions[role].has(action) ? allow() : deny("role_denied");
+  if (role === undefined || !projectRolePermissions[role].has(action)) return deny("role_denied");
+  const localeAccessMode =
+    request.localeAccessMode === null
+      ? undefined
+      : decodeOption(LocaleAccessMode, request.localeAccessMode);
+  if (localeAccessMode === undefined) return deny("missing_context");
+  if (unrestrictedLocaleActions.has(action) && localeAccessMode !== "all") {
+    return deny("locale_denied");
+  }
+  if (!localeScopedContentActions.has(action)) return allow();
+  if (request.requestedLocaleId === null) return deny("missing_context");
+  if (localeAccessMode === "all") return allow();
+  if (
+    localeAccessMode === "selected" &&
+    request.allowedLocaleIds.includes(request.requestedLocaleId)
+  ) {
+    return allow();
+  }
+  return deny("locale_denied");
 }
 
 export function decideCredentialPolicy(request: CredentialPolicyRequest): PolicyDecision {

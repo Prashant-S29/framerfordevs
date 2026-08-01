@@ -41,6 +41,7 @@ export const projectMembership = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
     role: varchar("role", { length: 32 }).notNull(),
+    localeAccessMode: varchar("locale_access_mode", { length: 16 }).default("all").notNull(),
     version: integer("version").default(1).notNull(),
     createdByUserId: text("created_by_user_id")
       .notNull()
@@ -65,6 +66,14 @@ export const projectMembership = pgTable(
       table.workspaceId,
     ),
     check("project_membership_role_valid", sql`${table.role} in ${projectRoleSql}`),
+    check(
+      "project_membership_locale_access_mode_valid",
+      sql`${table.localeAccessMode} in ('all', 'selected', 'none')`,
+    ),
+    check(
+      "project_membership_owner_locale_access_all",
+      sql`${table.role} <> 'owner' or ${table.localeAccessMode} = 'all'`,
+    ),
     check("project_membership_version_positive", sql`${table.version} > 0`),
     check(
       "project_membership_removal_consistent",

@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 
 import { ApiSuccessSchema } from "./api-response";
+import { ProjectLocaleId } from "./locales";
 import {
   AuthUserId,
   Cursor,
@@ -47,6 +48,7 @@ export const projectPermissionActionValues = [
   "project.member.read",
   "project.member.invite",
   "project.member.role.update",
+  "project.member.locale.update",
   "project.member.remove",
   "project.credential.read",
   "project.credential.issue",
@@ -95,6 +97,44 @@ export type ApiCredentialId = typeof ApiCredentialId.Type;
 
 export const ProjectRole = Schema.Literal(...projectRoleValues);
 export type ProjectRole = typeof ProjectRole.Type;
+
+export const LocaleAccessMode = Schema.Literal("all", "selected", "none");
+export type LocaleAccessMode = typeof LocaleAccessMode.Type;
+
+export const SelectedProjectLocaleIds = Schema.Array(ProjectLocaleId).pipe(
+  Schema.minItems(1),
+  Schema.maxItems(100),
+  Schema.filter((localeIds) => new Set(localeIds).size === localeIds.length, {
+    message: () => "Selected locale IDs must be unique.",
+  }),
+);
+export type SelectedProjectLocaleIds = typeof SelectedProjectLocaleIds.Type;
+
+export class AllProjectLocaleAccess extends Schema.Class<AllProjectLocaleAccess>(
+  "AllProjectLocaleAccess",
+)({
+  mode: Schema.Literal("all"),
+}) {}
+
+export class SelectedProjectLocaleAccess extends Schema.Class<SelectedProjectLocaleAccess>(
+  "SelectedProjectLocaleAccess",
+)({
+  mode: Schema.Literal("selected"),
+  localeIds: SelectedProjectLocaleIds,
+}) {}
+
+export class NoProjectLocaleAccess extends Schema.Class<NoProjectLocaleAccess>(
+  "NoProjectLocaleAccess",
+)({
+  mode: Schema.Literal("none"),
+}) {}
+
+export const ProjectLocaleAccess = Schema.Union(
+  AllProjectLocaleAccess,
+  SelectedProjectLocaleAccess,
+  NoProjectLocaleAccess,
+);
+export type ProjectLocaleAccess = typeof ProjectLocaleAccess.Type;
 
 export const ProjectPermissionAction = Schema.Literal(...projectPermissionActionValues);
 export type ProjectPermissionAction = typeof ProjectPermissionAction.Type;
@@ -233,6 +273,14 @@ export class RemoveProjectMemberInput extends Schema.Class<RemoveProjectMemberIn
   version: ResourceVersion,
 }) {}
 
+export class UpdateProjectMemberLocaleAccessInput extends Schema.Class<UpdateProjectMemberLocaleAccessInput>(
+  "UpdateProjectMemberLocaleAccessInput",
+)({
+  membershipId: ProjectMembershipId,
+  version: ResourceVersion,
+  access: ProjectLocaleAccess,
+}) {}
+
 export class IssueApiCredentialInput extends Schema.Class<IssueApiCredentialInput>(
   "IssueApiCredentialInput",
 )({
@@ -272,6 +320,7 @@ export class CurrentProjectAccess extends Schema.Class<CurrentProjectAccess>(
 )({
   projectId: ProjectId,
   role: ProjectRole,
+  localeAccess: ProjectLocaleAccess,
   allowedActions: Schema.Array(ProjectPermissionAction).pipe(
     Schema.minItems(1),
     Schema.maxItems(projectPermissionActionValues.length),
@@ -285,6 +334,7 @@ export class ProjectMember extends Schema.Class<ProjectMember>("ProjectMember")(
   name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(255)),
   email: CanonicalEmail,
   role: ProjectRole,
+  localeAccess: ProjectLocaleAccess,
   version: ResourceVersion,
   removedAt: Schema.NullOr(IsoDateTime),
   createdAt: IsoDateTime,
@@ -392,6 +442,9 @@ export const UpdateProjectMemberRoleInputSchema = Schema.standardSchemaV1(
   UpdateProjectMemberRoleInput,
 );
 export const RemoveProjectMemberInputSchema = Schema.standardSchemaV1(RemoveProjectMemberInput);
+export const UpdateProjectMemberLocaleAccessInputSchema = Schema.standardSchemaV1(
+  UpdateProjectMemberLocaleAccessInput,
+);
 export const IssueApiCredentialInputSchema = Schema.standardSchemaV1(IssueApiCredentialInput);
 export const ListApiCredentialsInputSchema = Schema.standardSchemaV1(ListApiCredentialsInput);
 export const RotateApiCredentialInputSchema = Schema.standardSchemaV1(RotateApiCredentialInput);

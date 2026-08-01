@@ -23,8 +23,18 @@ import {
   RevokeApiCredentialInputSchema,
   RevokeProjectInvitationInputSchema,
   RotateApiCredentialInputSchema,
+  UpdateProjectMemberLocaleAccessInputSchema,
   UpdateProjectMemberRoleInputSchema,
 } from "../contracts/access";
+import {
+  CreateProjectLocaleInputSchema,
+  ListProjectLocalesInputSchema,
+  ProjectLocaleListOutputSchema,
+  ProjectLocaleOutputSchema,
+  ReorderProjectLocalesInputSchema,
+  UpdateProjectLocaleDisplayNameInputSchema,
+  UpdateProjectLocaleStatusInputSchema,
+} from "../contracts/locales";
 import {
   ArchiveProjectInputSchema,
   CapabilityOutputSchema,
@@ -50,6 +60,7 @@ import {
   listProjectMembers,
   removeProjectMember,
   revokeProjectInvitation,
+  updateProjectMemberLocaleAccess,
   updateProjectMemberRole,
 } from "../operations/access";
 import {
@@ -58,6 +69,13 @@ import {
   revokeApiCredential,
   rotateApiCredential,
 } from "../operations/credentials";
+import {
+  createProjectLocale,
+  listProjectLocales,
+  reorderProjectLocales,
+  updateProjectLocaleDisplayName,
+  updateProjectLocaleStatus,
+} from "../operations/locales";
 import {
   archiveProject,
   createProject,
@@ -208,6 +226,21 @@ export const appRouter = {
               "Member role updated.",
             ),
           ),
+        updateLocaleAccess: protectedProcedure
+          .input(UpdateProjectMemberLocaleAccessInputSchema)
+          .output(ProjectMemberOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.access.member.locale.update",
+              updateProjectMemberLocaleAccess(
+                context.session.user.id,
+                input,
+                context.request.requestId,
+              ),
+              "Member locale access updated.",
+            ),
+          ),
         remove: protectedProcedure
           .input(RemoveProjectMemberInputSchema)
           .output(ProjectMemberOutputSchema)
@@ -217,6 +250,67 @@ export const appRouter = {
               "api.access.member.remove",
               removeProjectMember(context.session.user.id, input, context.request.requestId),
               "Member removed.",
+            ),
+          ),
+      },
+      locales: {
+        list: protectedProcedure
+          .input(ListProjectLocalesInputSchema)
+          .output(ProjectLocaleListOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.locale.list",
+              listProjectLocales(context.session.user.id, input),
+              "Project locales loaded.",
+            ),
+          ),
+        create: protectedProcedure
+          .input(CreateProjectLocaleInputSchema)
+          .output(ProjectLocaleOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.locale.create",
+              createProjectLocale(context.session.user.id, input, context.request.requestId),
+              "Locale created.",
+            ),
+          ),
+        updateDisplayName: protectedProcedure
+          .input(UpdateProjectLocaleDisplayNameInputSchema)
+          .output(ProjectLocaleOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.locale.display_name.update",
+              updateProjectLocaleDisplayName(
+                context.session.user.id,
+                input,
+                context.request.requestId,
+              ),
+              "Locale display name updated.",
+            ),
+          ),
+        reorder: protectedProcedure
+          .input(ReorderProjectLocalesInputSchema)
+          .output(ProjectLocaleListOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.locale.reorder",
+              reorderProjectLocales(context.session.user.id, input, context.request.requestId),
+              "Locales reordered.",
+            ),
+          ),
+        updateStatus: protectedProcedure
+          .input(UpdateProjectLocaleStatusInputSchema)
+          .output(ProjectLocaleOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.locale.status.update",
+              updateProjectLocaleStatus(context.session.user.id, input, context.request.requestId),
+              "Locale status updated.",
             ),
           ),
       },

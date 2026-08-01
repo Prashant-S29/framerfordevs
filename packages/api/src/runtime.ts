@@ -24,6 +24,7 @@ import {
 } from "./services/credential-authenticator";
 import { CredentialRepository, CredentialRepositoryLive } from "./services/credential-repository";
 import { Database, DatabaseLive } from "./services/database";
+import { LocaleRepository, LocaleRepositoryLive } from "./services/locale-repository";
 import { PlatformRepository, PlatformRepositoryLive } from "./services/platform-repository";
 import { PolicyService, PolicyServiceLive } from "./services/policy";
 import { SecretGenerator, SecretGeneratorLive } from "./services/secret-generator";
@@ -34,6 +35,7 @@ export type ApplicationServices =
   | AuthSessionService
   | Database
   | PlatformRepository
+  | LocaleRepository
   | AccessRepository
   | PolicyService
   | SecretGenerator
@@ -47,6 +49,7 @@ const InfrastructureLive = Layer.mergeAll(
   AuthSessionLive,
   DatabaseLive,
   PlatformRepositoryLive,
+  LocaleRepositoryLive,
   AccessRepositoryLive,
   PolicyServiceLive,
   SecretGeneratorLive,

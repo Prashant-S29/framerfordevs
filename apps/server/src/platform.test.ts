@@ -10,6 +10,7 @@ import {
   projectMembership,
 } from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
+import { projectLocale, projectMembershipLocaleAccess } from "@framerfordevs/db/schema/locale";
 import {
   auditEvent,
   environment,
@@ -38,6 +39,7 @@ let firstWorkspaceId = "";
 let secondWorkspaceId = "";
 let projectId = "";
 let environmentId = "";
+let hindiLocaleId = "";
 let projectVersion = 1;
 
 async function signUp(email: string, name: string) {
@@ -103,6 +105,27 @@ afterAll(async () => {
       or(
         eq(environment.createdByUserId, firstUserId),
         eq(environment.createdByUserId, secondUserId),
+      ),
+    );
+  const membershipRows = await db
+    .select({ id: projectMembership.id })
+    .from(projectMembership)
+    .where(
+      or(eq(projectMembership.userId, firstUserId), eq(projectMembership.userId, secondUserId)),
+    );
+  if (membershipRows.length > 0) {
+    await db
+      .delete(projectMembershipLocaleAccess)
+      .where(
+        or(...membershipRows.map(({ id }) => eq(projectMembershipLocaleAccess.membershipId, id))),
+      );
+  }
+  await db
+    .delete(projectLocale)
+    .where(
+      or(
+        eq(projectLocale.createdByUserId, firstUserId),
+        eq(projectLocale.createdByUserId, secondUserId),
       ),
     );
   await db
@@ -181,8 +204,56 @@ describe.sequential("platform API contracts", () => {
       },
     ],
     [
+      "platform/projects/members/updateLocaleAccess",
+      {
+        membershipId: "019fae8b-1234-7000-8000-000000000001",
+        version: 1,
+        access: { mode: "none" },
+      },
+    ],
+    [
       "platform/projects/members/remove",
       { membershipId: "019fae8b-1234-7000-8000-000000000001", version: 1 },
+    ],
+    [
+      "platform/projects/locales/list",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        view: "enabled",
+        includeRemoved: false,
+      },
+    ],
+    [
+      "platform/projects/locales/create",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        tag: "hi",
+        displayName: "Hindi",
+      },
+    ],
+    [
+      "platform/projects/locales/updateDisplayName",
+      {
+        localeId: "019fae8b-1234-7000-8000-000000000001",
+        version: 1,
+        displayName: "Hindi",
+      },
+    ],
+    [
+      "platform/projects/locales/reorder",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        locales: [{ localeId: "019fae8b-1234-7000-8000-000000000002", version: 1 }],
+      },
+    ],
+    [
+      "platform/projects/locales/updateStatus",
+      {
+        localeId: "019fae8b-1234-7000-8000-000000000001",
+        version: 1,
+        status: "disabled",
+        confirmDraftImpact: false,
+      },
     ],
     [
       "platform/projects/invitations/create",
@@ -320,6 +391,7 @@ describe.sequential("platform API contracts", () => {
     });
     const access = await rpc(firstAgent, "platform/projects/access", { projectId });
     expect(access.body.json.data.role).toBe("owner");
+    expect(access.body.json.data.localeAccess).toEqual({ mode: "all" });
     expect(access.body.json.data.allowedActions).toContain("project.member.invite");
   });
 
@@ -394,6 +466,86 @@ describe.sequential("platform API contracts", () => {
     expect(repeated.body.json.data.error.code).toBe("INVALID_STATE_TRANSITION");
   });
 
+  it("manages canonical project locales with strict lifecycle and validation contracts", async () => {
+    const initial = await rpc(firstAgent, "platform/projects/locales/list", {
+      projectId,
+      view: "settings",
+      includeRemoved: true,
+    });
+    const english = initial.body.json.data.items[0];
+    const hindi = await rpc(firstAgent, "platform/projects/locales/create", {
+      projectId,
+      tag: "HI",
+      displayName: "Hindi",
+    });
+    const gujarati = await rpc(firstAgent, "platform/projects/locales/create", {
+      projectId,
+      tag: "gu",
+      displayName: "Gujarati",
+    });
+    hindiLocaleId = hindi.body.json.data.id;
+    const duplicate = await rpc(firstAgent, "platform/projects/locales/create", {
+      projectId,
+      tag: "hi",
+      displayName: "Duplicate Hindi",
+    });
+    const missingLocale = await rpc(firstAgent, "platform/projects/locales/create", {
+      projectId,
+      displayName: "Missing tag",
+    });
+    const reordered = await rpc(firstAgent, "platform/projects/locales/reorder", {
+      projectId,
+      locales: [gujarati.body.json.data, hindi.body.json.data, english].map(
+        (locale: { id: string; version: number }) => ({
+          localeId: locale.id,
+          version: locale.version,
+        }),
+      ),
+    });
+    const englishAfterReorder = reordered.body.json.data.items.find(
+      (locale: { tag: string }) => locale.tag === "en",
+    );
+    const englishDenied = await rpc(firstAgent, "platform/projects/locales/updateStatus", {
+      localeId: englishAfterReorder.id,
+      version: englishAfterReorder.version,
+      status: "disabled",
+      confirmDraftImpact: true,
+    });
+    const hindiAfterReorder = reordered.body.json.data.items.find(
+      (locale: { tag: string }) => locale.tag === "hi",
+    );
+    const disabled = await rpc(firstAgent, "platform/projects/locales/updateStatus", {
+      localeId: hindiAfterReorder.id,
+      version: hindiAfterReorder.version,
+      status: "disabled",
+      confirmDraftImpact: false,
+    });
+    const enabled = await rpc(firstAgent, "platform/projects/locales/updateStatus", {
+      localeId: disabled.body.json.data.id,
+      version: disabled.body.json.data.version,
+      status: "enabled",
+      confirmDraftImpact: false,
+    });
+
+    expect(initial.status).toBe(200);
+    expect(initial.body.json.data.items).toHaveLength(1);
+    expect(english).toMatchObject({ tag: "en", status: "enabled", position: 0 });
+    expect(hindi.body.json.data).toMatchObject({ tag: "hi", displayName: "Hindi" });
+    expect(gujarati.body.json.data).toMatchObject({ tag: "gu" });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.json.data.error.code).toBe("LOCALE_CONFLICT");
+    expect(missingLocale.status).toBe(400);
+    expect(missingLocale.body.json.data.error.code).toBe("VALIDATION_ERROR");
+    expect(reordered.body.json.data.items.map((locale: { tag: string }) => locale.tag)).toEqual([
+      "gu",
+      "hi",
+      "en",
+    ]);
+    expect(englishDenied.status).toBe(409);
+    expect(englishDenied.body.json.data.error.code).toBe("INVALID_STATE_TRANSITION");
+    expect(enabled.body.json.data.status).toBe("enabled");
+  });
+
   it("invites and accepts a project member with role-aware API denial", async () => {
     const issued = await rpc(firstAgent, "platform/projects/invitations/create", {
       projectId,
@@ -417,7 +569,11 @@ describe.sequential("platform API contracts", () => {
     expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/u);
     expect(listed.body.json.data.items[0]).not.toHaveProperty("token");
     expect(inspected.body.json.data).toMatchObject({ projectId, role: "editor" });
-    expect(accepted.body.json.data).toMatchObject({ projectId, role: "editor" });
+    expect(accepted.body.json.data).toMatchObject({
+      projectId,
+      role: "editor",
+      localeAccess: { mode: "all" },
+    });
     expect(reused.status).toBe(404);
     expect(reused.body.json.data.error.code).toBe("INVITATION_INVALID");
 
@@ -447,9 +603,28 @@ describe.sequential("platform API contracts", () => {
       memberId,
     );
 
-    const removed = await rpc(firstAgent, "platform/projects/members/remove", {
+    const scopedMember = await rpc(firstAgent, "platform/projects/members/updateLocaleAccess", {
       membershipId: memberId,
       version: accepted.body.json.data.version,
+      access: { mode: "selected", localeIds: [hindiLocaleId] },
+    });
+    const selectedLocales = await rpc(secondAgent, "platform/projects/locales/list", {
+      projectId,
+      view: "enabled",
+      includeRemoved: false,
+    });
+    expect(scopedMember.status).toBe(200);
+    expect(scopedMember.body.json.data.localeAccess).toEqual({
+      mode: "selected",
+      localeIds: [hindiLocaleId],
+    });
+    expect(selectedLocales.body.json.data.items.map((locale: { id: string }) => locale.id)).toEqual(
+      [hindiLocaleId],
+    );
+
+    const removed = await rpc(firstAgent, "platform/projects/members/remove", {
+      membershipId: memberId,
+      version: scopedMember.body.json.data.version,
     });
     const accessAfterRemoval = await rpc(secondAgent, "platform/projects/get", { projectId });
     expect(removed.status).toBe(200);

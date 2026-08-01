@@ -38,6 +38,7 @@ const TelemetryTest = Layer.succeed(Telemetry, {
       defectRoutes.push(routeFamily);
     }),
   recordCredentialVerification: () => Effect.void,
+  recordLocaleMutation: () => Effect.void,
 });
 
 const AuthSessionTest = Layer.succeed(AuthSessionService, {

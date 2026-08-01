@@ -1,7 +1,8 @@
 import { db } from "@framerfordevs/db";
-import { and, eq, isNull, lt, or, sql } from "@framerfordevs/db/query";
+import { and, eq, inArray, isNull, lt, or, sql } from "@framerfordevs/db/query";
 import { projectInvitation, projectMembership } from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
+import { projectLocale, projectMembershipLocaleAccess } from "@framerfordevs/db/schema/locale";
 import { auditEvent, project, workspaceMembership } from "@framerfordevs/db/schema/platform";
 import { Context, Effect, Layer, Schema } from "effect";
 
@@ -22,6 +23,7 @@ import {
   projectPermissionActionValues,
   type RemoveProjectMemberInput,
   type RevokeProjectInvitationInput,
+  type UpdateProjectMemberLocaleAccessInput,
   type UpdateProjectMemberRoleInput,
 } from "../contracts/access";
 import {
@@ -35,7 +37,9 @@ import {
   ForbiddenFailure,
   InvitationConflictFailure,
   InvitationInvalidFailure,
+  InvalidStateTransitionFailure,
   LastOwnerRequiredFailure,
+  LocaleUnavailableFailure,
   NotFoundFailure,
   VersionConflictFailure,
 } from "../contracts/errors";
@@ -110,10 +114,38 @@ function invitationValue(row: typeof projectInvitation.$inferSelect, now: Date) 
   };
 }
 
-function memberValue(row: {
+interface MemberRecord {
   readonly membership: typeof projectMembership.$inferSelect;
   readonly member: typeof user.$inferSelect;
-}) {
+  readonly localeIds: ReadonlyArray<string>;
+}
+
+function localeAccessValue(mode: string, localeIds: ReadonlyArray<string>) {
+  return mode === "selected" ? { mode, localeIds } : { mode };
+}
+
+function isActionVisibleForLocaleAccess(
+  action: (typeof projectPermissionActionValues)[number],
+  role: string,
+  mode: string,
+  localeIds: ReadonlyArray<string>,
+): boolean {
+  if (!isRoleAllowed(role, action)) return false;
+  if (
+    mode !== "all" &&
+    (action === "locale.manage" ||
+      action === "project.credential.issue" ||
+      action === "project.credential.rotate")
+  ) {
+    return false;
+  }
+  if (action.startsWith("content.")) {
+    return mode === "all" || (mode === "selected" && localeIds.length > 0);
+  }
+  return true;
+}
+
+function memberValue(row: MemberRecord) {
   return {
     id: row.membership.id,
     projectId: row.membership.projectId,
@@ -121,6 +153,7 @@ function memberValue(row: {
     name: row.member.name,
     email: canonicalEmail(row.member.email),
     role: row.membership.role,
+    localeAccess: localeAccessValue(row.membership.localeAccessMode, row.localeIds),
     version: row.membership.version,
     removedAt: row.membership.removedAt ? toIso(row.membership.removedAt) : null,
     createdAt: toIso(row.membership.createdAt),
@@ -149,14 +182,59 @@ function makeAuditValues(options: {
   };
 }
 
-async function selectMemberById(executor: ApplicationExecutor, membershipId: string) {
+async function selectMemberById(
+  executor: ApplicationExecutor,
+  membershipId: string,
+): Promise<MemberRecord | undefined> {
   const [row] = await executor
     .select({ membership: projectMembership, member: user })
     .from(projectMembership)
     .innerJoin(user, eq(user.id, projectMembership.userId))
     .where(eq(projectMembership.id, membershipId))
     .limit(1);
-  return row;
+  if (!row) return undefined;
+  const localeIds =
+    row.membership.localeAccessMode === "selected"
+      ? (
+          await executor
+            .select({ localeId: projectMembershipLocaleAccess.localeId })
+            .from(projectMembershipLocaleAccess)
+            .where(eq(projectMembershipLocaleAccess.membershipId, membershipId))
+        ).map((access) => access.localeId)
+      : [];
+  return { ...row, localeIds };
+}
+
+async function attachLocaleAccess(
+  executor: ApplicationExecutor,
+  rows: ReadonlyArray<{
+    readonly membership: typeof projectMembership.$inferSelect;
+    readonly member: typeof user.$inferSelect;
+  }>,
+): Promise<ReadonlyArray<MemberRecord>> {
+  const selectedMembershipIds = rows
+    .filter((row) => row.membership.localeAccessMode === "selected")
+    .map((row) => row.membership.id);
+  const accessRows =
+    selectedMembershipIds.length === 0
+      ? []
+      : await executor
+          .select({
+            membershipId: projectMembershipLocaleAccess.membershipId,
+            localeId: projectMembershipLocaleAccess.localeId,
+          })
+          .from(projectMembershipLocaleAccess)
+          .where(inArray(projectMembershipLocaleAccess.membershipId, selectedMembershipIds));
+  const localeIdsByMembership = new Map<string, Array<string>>();
+  for (const access of accessRows) {
+    const localeIds = localeIdsByMembership.get(access.membershipId) ?? [];
+    localeIds.push(access.localeId);
+    localeIdsByMembership.set(access.membershipId, localeIds);
+  }
+  return rows.map((row) => ({
+    ...row,
+    localeIds: localeIdsByMembership.get(row.membership.id) ?? [],
+  }));
 }
 
 async function activeOwnerCount(executor: ApplicationExecutor, projectId: string) {
@@ -501,12 +579,16 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                   .update(projectMembership)
                   .set({
                     role: invitation.role,
+                    localeAccessMode: "all",
                     removedAt: null,
                     removedByUserId: null,
                     version: sql`${projectMembership.version} + 1`,
                     updatedAt: now,
                   })
                   .where(eq(projectMembership.id, existingMembership.id));
+                await transaction
+                  .delete(projectMembershipLocaleAccess)
+                  .where(eq(projectMembershipLocaleAccess.membershipId, existingMembership.id));
                 membershipAction = "project.membership.reactivated";
               }
             }
@@ -685,8 +767,17 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
       return yield* decodeDatabaseValue("access.current.get", CurrentProjectAccess, {
         projectId: input.projectId,
         role: authorization.access.role,
+        localeAccess: localeAccessValue(
+          authorization.access.localeAccessMode,
+          authorization.access.allowedLocaleIds,
+        ),
         allowedActions: projectPermissionActionValues.filter((action) =>
-          isRoleAllowed(authorization.access.role, action),
+          isActionVisibleForLocaleAccess(
+            action,
+            authorization.access.role,
+            authorization.access.localeAccessMode,
+            authorization.access.allowedLocaleIds,
+          ),
         ),
       });
     }),
@@ -735,7 +826,9 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                 sql`${projectMembership.id} desc nulls last`,
               )
               .limit(input.limit + 1);
-            return outcomeWith("success", { rows });
+            return outcomeWith("success", {
+              rows: await attachLocaleAccess(transaction, rows),
+            });
           }),
         catch: (cause) => databaseFailure("access.member.list", cause),
       });
@@ -801,6 +894,7 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
               .update(projectMembership)
               .set({
                 role: input.role,
+                ...(input.role === "owner" ? { localeAccessMode: "all" } : {}),
                 version: sql`${projectMembership.version} + 1`,
                 updatedAt: now,
               })
@@ -813,6 +907,11 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
               )
               .returning({ id: projectMembership.id });
             if (!updated) return outcome("version_conflict");
+            if (input.role === "owner") {
+              await transaction
+                .delete(projectMembershipLocaleAccess)
+                .where(eq(projectMembershipLocaleAccess.membershipId, input.membershipId));
+            }
             await transaction.insert(auditEvent).values(
               makeAuditValues({
                 workspaceId: current.membership.workspaceId,
@@ -842,6 +941,129 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
         case "success":
           return yield* decodeDatabaseValue(
             "access.member.role.update",
+            ProjectMember,
+            memberValue(result.member),
+          );
+      }
+    }),
+
+    updateMemberLocaleAccess: Effect.fn("AccessRepository.updateMemberLocaleAccess")(function* (
+      actorId: AuthUserId,
+      input: UpdateProjectMemberLocaleAccessInput,
+      now: Date,
+      requestId: string,
+    ) {
+      const result = yield* Effect.tryPromise({
+        try: () =>
+          database.transaction(async (transaction) => {
+            const initial = await selectMemberById(transaction, input.membershipId);
+            if (!initial) return outcome("not_found");
+            await transaction.execute(
+              sql`select id from project where id = ${initial.membership.projectId} for update`,
+            );
+            const authorization = await authorizeUserProject(
+              transaction,
+              actorId,
+              initial.membership.projectId,
+              "project.member.locale.update",
+            );
+            if (authorization.kind !== "allowed") return outcome(authorization.kind);
+            const current = await selectMemberById(transaction, input.membershipId);
+            if (!current || current.membership.removedAt) return outcome("not_found");
+            if (current.membership.version !== input.version) return outcome("version_conflict");
+            if (current.membership.role === "owner" && input.access.mode !== "all") {
+              return outcome("invalid_state");
+            }
+
+            const requestedLocaleIds =
+              input.access.mode === "selected" ? [...input.access.localeIds].sort() : [];
+            if (input.access.mode === "selected") {
+              const localeRows = await transaction
+                .select({ id: projectLocale.id })
+                .from(projectLocale)
+                .where(
+                  and(
+                    eq(projectLocale.workspaceId, current.membership.workspaceId),
+                    eq(projectLocale.projectId, current.membership.projectId),
+                    eq(projectLocale.status, "enabled"),
+                    inArray(projectLocale.id, requestedLocaleIds),
+                  ),
+                );
+              if (localeRows.length !== requestedLocaleIds.length) {
+                return outcome("locale_unavailable");
+              }
+            }
+
+            const currentLocaleIds = [...current.localeIds].sort();
+            if (
+              current.membership.localeAccessMode === input.access.mode &&
+              currentLocaleIds.length === requestedLocaleIds.length &&
+              currentLocaleIds.every((localeId, index) => localeId === requestedLocaleIds[index])
+            ) {
+              return outcomeWith("success", { member: current });
+            }
+
+            const [updated] = await transaction
+              .update(projectMembership)
+              .set({
+                localeAccessMode: input.access.mode,
+                version: sql`${projectMembership.version} + 1`,
+                updatedAt: now,
+              })
+              .where(
+                and(
+                  eq(projectMembership.id, input.membershipId),
+                  eq(projectMembership.version, input.version),
+                  isNull(projectMembership.removedAt),
+                ),
+              )
+              .returning({ id: projectMembership.id });
+            if (!updated) return outcome("version_conflict");
+
+            await transaction
+              .delete(projectMembershipLocaleAccess)
+              .where(eq(projectMembershipLocaleAccess.membershipId, input.membershipId));
+            if (input.access.mode === "selected") {
+              await transaction.insert(projectMembershipLocaleAccess).values(
+                requestedLocaleIds.map((localeId) => ({
+                  membershipId: input.membershipId,
+                  workspaceId: current.membership.workspaceId,
+                  projectId: current.membership.projectId,
+                  localeId,
+                })),
+              );
+            }
+            await transaction.insert(auditEvent).values(
+              makeAuditValues({
+                workspaceId: current.membership.workspaceId,
+                projectId: current.membership.projectId,
+                actorId,
+                action: "project.membership.locale_access.updated",
+                resourceType: "project_membership",
+                resourceId: current.membership.id,
+                requestId,
+              }),
+            );
+            const member = await selectMemberById(transaction, input.membershipId);
+            if (!member) throw new Error("Updated membership could not be loaded.");
+            return outcomeWith("success", { member });
+          }),
+        catch: (cause) => databaseFailure("access.member.locale.update", cause),
+      });
+      switch (result.kind) {
+        case "not_found":
+          return yield* NotFoundFailure.make({ resource: "membership" });
+        case "forbidden":
+          return yield* ForbiddenFailure.make();
+        case "version_conflict":
+          return yield* VersionConflictFailure.make();
+        case "invalid_state":
+          return yield* InvalidStateTransitionFailure.make();
+        case "locale_unavailable":
+          return yield* LocaleUnavailableFailure.make();
+        case "success":
+          return yield* decodeDatabaseValue(
+            "access.member.locale.update",
             ProjectMember,
             memberValue(result.member),
           );

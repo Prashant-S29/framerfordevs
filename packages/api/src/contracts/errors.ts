@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 
 import { ApiErrorDetail, type ApiErrorCode, type ApiFailure, apiFailure } from "./api-response";
+import { LocaleDependencySummary } from "./locales";
 
 const ValidationDetailsSchema = Schema.Array(ApiErrorDetail).pipe(
   Schema.minItems(1),
@@ -46,6 +47,21 @@ export class VersionConflictFailure extends Schema.TaggedError<VersionConflictFa
 export class InvalidStateTransitionFailure extends Schema.TaggedError<InvalidStateTransitionFailure>(
   "InvalidStateTransitionFailure",
 )("InvalidStateTransitionFailure", {}) {}
+
+export class LocaleConflictFailure extends Schema.TaggedError<LocaleConflictFailure>(
+  "LocaleConflictFailure",
+)("LocaleConflictFailure", {}) {}
+
+export class LocaleUnavailableFailure extends Schema.TaggedError<LocaleUnavailableFailure>(
+  "LocaleUnavailableFailure",
+)("LocaleUnavailableFailure", {}) {}
+
+export class LocaleDependenciesExistFailure extends Schema.TaggedError<LocaleDependenciesExistFailure>(
+  "LocaleDependenciesExistFailure",
+)("LocaleDependenciesExistFailure", {
+  requestedStatus: Schema.Literal("disabled", "removed"),
+  dependencies: LocaleDependencySummary,
+}) {}
 
 export class InvitationConflictFailure extends Schema.TaggedError<InvitationConflictFailure>(
   "InvitationConflictFailure",
@@ -98,6 +114,9 @@ export type ApplicationError =
   | ProjectKeyConflictFailure
   | VersionConflictFailure
   | InvalidStateTransitionFailure
+  | LocaleConflictFailure
+  | LocaleUnavailableFailure
+  | LocaleDependenciesExistFailure
   | InvitationConflictFailure
   | InvitationInvalidFailure
   | LastOwnerRequiredFailure
@@ -116,6 +135,9 @@ export const apiErrorHttpStatus = {
   PROJECT_KEY_CONFLICT: 409,
   VERSION_CONFLICT: 409,
   INVALID_STATE_TRANSITION: 409,
+  LOCALE_CONFLICT: 409,
+  LOCALE_UNAVAILABLE: 404,
+  LOCALE_DEPENDENCIES_EXIST: 409,
   INVITATION_CONFLICT: 409,
   INVITATION_INVALID: 404,
   LAST_OWNER_REQUIRED: 409,
@@ -124,6 +146,63 @@ export const apiErrorHttpStatus = {
   SERVICE_UNAVAILABLE: 503,
   INTERNAL_ERROR: 500,
 } satisfies Readonly<Record<ApiErrorCode, number>>;
+
+function formatDependencyCount(count: number, capped: boolean, noun: string): string {
+  const amount = capped ? `${count}+` : String(count);
+  return `${amount} ${noun}${count === 1 && !capped ? "" : "s"}`;
+}
+
+function localeDependencyDetails(
+  error: LocaleDependenciesExistFailure,
+): ReadonlyArray<ApiErrorDetail> {
+  const details: Array<ApiErrorDetail> = [];
+  if (error.dependencies.draftCount > 0) {
+    details.push(
+      ApiErrorDetail.make({
+        code: "locale_drafts_exist",
+        message: formatDependencyCount(
+          error.dependencies.draftCount,
+          error.dependencies.draftCountCapped,
+          "draft",
+        ),
+      }),
+    );
+  }
+  if (error.dependencies.currentPublicationCount > 0) {
+    details.push(
+      ApiErrorDetail.make({
+        code: "locale_current_publications_exist",
+        message: formatDependencyCount(
+          error.dependencies.currentPublicationCount,
+          error.dependencies.currentPublicationCountCapped,
+          "current publication",
+        ),
+      }),
+    );
+  }
+  return details.length > 0
+    ? details
+    : [
+        ApiErrorDetail.make({
+          code: "locale_dependencies_exist",
+          message: "The locale has dependencies.",
+        }),
+      ];
+}
+
+function localeDependencyMessage(error: LocaleDependenciesExistFailure): string {
+  const action = error.requestedStatus === "disabled" ? "Disabling" : "Removing";
+  const recovery = error.requestedStatus === "disabled" ? "re-enable" : "restore";
+  if (error.dependencies.currentPublicationCount > 0) {
+    return `${action} this locale is blocked while it has current publications. Unpublish them first.`;
+  }
+  const drafts = formatDependencyCount(
+    error.dependencies.draftCount,
+    error.dependencies.draftCountCapped,
+    "draft",
+  );
+  return `This locale has ${drafts}. ${action} it will make those drafts unavailable to editors. Nothing will be deleted; ${recovery} the locale to restore access.`;
+}
 
 interface PublicErrorDefinition {
   readonly code: ApiErrorCode;
@@ -174,7 +253,7 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
     case "VersionConflictFailure":
       return {
         code: "VERSION_CONFLICT",
-        message: "The project changed since it was loaded. Refresh and try again.",
+        message: "The resource changed since it was loaded. Refresh and try again.",
         retryable: false,
       };
     case "InvalidStateTransitionFailure":
@@ -182,6 +261,25 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
         code: "INVALID_STATE_TRANSITION",
         message: "The requested state transition is not allowed.",
         retryable: false,
+      };
+    case "LocaleConflictFailure":
+      return {
+        code: "LOCALE_CONFLICT",
+        message: "The locale conflicts with the current project locale configuration.",
+        retryable: false,
+      };
+    case "LocaleUnavailableFailure":
+      return {
+        code: "LOCALE_UNAVAILABLE",
+        message: "The requested locale is not available.",
+        retryable: false,
+      };
+    case "LocaleDependenciesExistFailure":
+      return {
+        code: "LOCALE_DEPENDENCIES_EXIST",
+        message: localeDependencyMessage(error),
+        retryable: false,
+        details: localeDependencyDetails(error),
       };
     case "InvitationConflictFailure":
       return {

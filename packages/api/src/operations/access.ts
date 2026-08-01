@@ -11,6 +11,7 @@ import {
   type ListProjectMembersInput,
   type RemoveProjectMemberInput,
   type RevokeProjectInvitationInput,
+  type UpdateProjectMemberLocaleAccessInput,
   type UpdateProjectMemberRoleInput,
 } from "../contracts/access";
 import { UnauthorizedFailure } from "../contracts/errors";
@@ -134,6 +135,20 @@ export const updateProjectMemberRole = Effect.fn("access.member.role.update")(fu
   yield* Effect.annotateCurrentSpan({ membershipId: input.membershipId, role: input.role });
   const repository = yield* AccessRepository;
   return yield* repository.updateMemberRole(actorId, input, yield* currentDate, requestId);
+});
+
+export const updateProjectMemberLocaleAccess = Effect.fn("access.member.locale.update")(function* (
+  actorUserId: string,
+  input: UpdateProjectMemberLocaleAccessInput,
+  requestId: string,
+) {
+  const actorId = yield* decodeActorId(actorUserId);
+  yield* Effect.annotateCurrentSpan({
+    membershipId: input.membershipId,
+    localeAccessMode: input.access.mode,
+  });
+  const repository = yield* AccessRepository;
+  return yield* repository.updateMemberLocaleAccess(actorId, input, yield* currentDate, requestId);
 });
 
 export const removeProjectMember = Effect.fn("access.member.remove")(function* (

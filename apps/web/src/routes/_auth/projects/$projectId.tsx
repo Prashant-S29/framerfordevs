@@ -12,13 +12,14 @@ import { Separator } from "@framerfordevs/ui/components/separator";
 import { Skeleton } from "@framerfordevs/ui/components/skeleton";
 import { Spinner } from "@framerfordevs/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, BoxesIcon, CheckIcon, DatabaseIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { ArchiveProjectDialog } from "@/components/archive-project-dialog";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
 import { ProjectAccessSettings } from "@/components/project-access-settings";
+import { ProjectLocaleSettings } from "@/components/project-locale-settings";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/_auth/projects/$projectId")({
@@ -40,7 +41,9 @@ function ProjectDetail() {
   const enableCapability = useMutation(
     orpc.platform.projects.enableCapability.mutationOptions({
       onSuccess: async (response) => {
-        await queryClient.invalidateQueries({ queryKey: orpc.platform.projects.key() });
+        await queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.key(),
+        });
         toast.success(response.message);
       },
       onError: (error) => toast.error(error.message),
@@ -58,6 +61,8 @@ function ProjectDetail() {
   const canUpdate = allowedActions.has("project.update");
   const canArchive = allowedActions.has("project.archive");
   const canManageCapability = allowedActions.has("project.capability.manage");
+  const canReadLocales = allowedActions.has("locale.read");
+  const canManageLocales = allowedActions.has("locale.manage");
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">
@@ -160,10 +165,19 @@ function ProjectDetail() {
         </Card>
       </section>
 
+      {canReadLocales ? (
+        <ProjectLocaleSettings
+          projectId={project.id}
+          canManage={canManageLocales}
+          isArchived={isArchived}
+        />
+      ) : null}
+
       <ProjectAccessSettings
         projectId={project.id}
         environmentId={project.environment.id}
         role={access.role}
+        localeAccessMode={access.localeAccess.mode}
         allowedActions={access.allowedActions}
       />
 

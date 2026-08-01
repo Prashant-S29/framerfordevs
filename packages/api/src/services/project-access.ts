@@ -1,6 +1,7 @@
 import { db } from "@framerfordevs/db";
 import { and, eq, isNull } from "@framerfordevs/db/query";
 import { projectMembership } from "@framerfordevs/db/schema/access";
+import { projectMembershipLocaleAccess } from "@framerfordevs/db/schema/locale";
 import { project, workspaceMembership } from "@framerfordevs/db/schema/platform";
 
 import type { ProjectPermissionAction } from "../contracts/access";
@@ -15,6 +16,8 @@ export interface UserProjectAccess {
   readonly project: typeof project.$inferSelect;
   readonly role: string;
   readonly projectMembershipId: string | null;
+  readonly localeAccessMode: string;
+  readonly allowedLocaleIds: ReadonlyArray<string>;
   readonly isWorkspaceOwner: boolean;
 }
 
@@ -52,12 +55,18 @@ export async function selectUserProjectAccess(
       project: projectRow,
       role: "owner",
       projectMembershipId: null,
+      localeAccessMode: "all",
+      allowedLocaleIds: [],
       isWorkspaceOwner: true,
     };
   }
 
   const [membership] = await executor
-    .select({ id: projectMembership.id, role: projectMembership.role })
+    .select({
+      id: projectMembership.id,
+      role: projectMembership.role,
+      localeAccessMode: projectMembership.localeAccessMode,
+    })
     .from(projectMembership)
     .where(
       and(
@@ -70,10 +79,28 @@ export async function selectUserProjectAccess(
     .limit(1);
   if (!membership) return undefined;
 
+  const allowedLocaleIds =
+    membership.localeAccessMode === "selected"
+      ? (
+          await executor
+            .select({ localeId: projectMembershipLocaleAccess.localeId })
+            .from(projectMembershipLocaleAccess)
+            .where(
+              and(
+                eq(projectMembershipLocaleAccess.membershipId, membership.id),
+                eq(projectMembershipLocaleAccess.workspaceId, projectRow.workspaceId),
+                eq(projectMembershipLocaleAccess.projectId, projectRow.id),
+              ),
+            )
+        ).map((row) => row.localeId)
+      : [];
+
   return {
     project: projectRow,
     role: membership.role,
     projectMembershipId: membership.id,
+    localeAccessMode: membership.localeAccessMode,
+    allowedLocaleIds,
     isWorkspaceOwner: false,
   };
 }
@@ -83,6 +110,7 @@ export async function authorizeUserProject(
   actorId: AuthUserId,
   projectId: string,
   action: ProjectPermissionAction,
+  requestedLocaleId: string | null = null,
 ): Promise<UserProjectAuthorization> {
   const access = await selectUserProjectAccess(executor, actorId, projectId);
   if (!access) return { kind: "not_found" };
@@ -94,6 +122,9 @@ export async function authorizeUserProject(
     subjectProjectId: access.project.id,
     workspaceId: access.project.workspaceId,
     projectId: access.project.id,
+    localeAccessMode: access.localeAccessMode,
+    allowedLocaleIds: access.allowedLocaleIds,
+    requestedLocaleId,
     isActive: true,
   });
   return decision.allowed ? { kind: "allowed", access } : { kind: "forbidden", access };

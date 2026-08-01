@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 3 automated criteria complete; awaiting developer manual review
-**Active milestone:** Milestone 3 — Membership, roles, policies, and API credentials
-**Last updated:** 2026-07-30
+**Overall status:** Milestone 4 automated implementation complete; awaiting developer manual review
+**Active milestone:** Milestone 4 — Project locales and strict locale contracts
+**Last updated:** 2026-08-01
 
 ## Status legend
 
@@ -20,8 +20,8 @@
 | 0   | Validate existing foundation             | `[A]`  | 26 passing      | Approved      | `7d5a312` |
 | 1   | Effect foundation, errors, observability | `[A]`  | 90 passing      | Approved      | `c28f6fa` |
 | 2   | Platform kernel                          | `[A]`  | 163 passing     | Approved      | `60adb39` |
-| 3   | Membership, policies, credentials        | `[R]`  | 381 passing     | Pending       | None      |
-| 4   | Project locales                          | `[ ]`  | Not run         | Pending       | None      |
+| 3   | Membership, policies, credentials        | `[A]`  | 381 passing     | Approved      | `a74aeb8` |
+| 4   | Project locales                          | `[R]`  | 453 passing     | Pending       | None      |
 | 5   | Versioned schema engine                  | `[ ]`  | Not run         | Pending       | None      |
 | 6   | Field system and generated forms         | `[ ]`  | Not run         | Pending       | None      |
 | 7   | Entries and multilingual drafts          | `[ ]`  | Not run         | Pending       | None      |
@@ -131,7 +131,7 @@
 - `[x]` Request developer manual review.
 - `[A]` Developer manually verified and approved Milestone 2.
 
-## Milestone 3 checklist — awaiting manual review
+## Completed Milestone 3 checklist
 
 - `[x]` Re-read the product, CMS PRD, mandatory rules, current context, milestone plan, progress, and learnings.
 - `[x]` Apply the installed Better Auth, Effect, Drizzle, PostgreSQL, Express, TanStack, shadcn/ui, React performance, and web-interface guidance relevant to M3.
@@ -156,11 +156,39 @@
 - `[x]` Add permission-aware member/invitation/credential management UI and fragment-safe invitation acceptance through authentication.
 - `[x]` Add API, PostgreSQL concurrency/isolation/index-plan, service, UI fragment-safety, and automated accessibility coverage.
 - `[x]` Run workspace readiness and read-only fixture/invariant verification.
-- `[R]` Await developer manual review and approval before commit or Milestone 4.
+- `[A]` Developer manually approved and committed Milestone 3 as `a74aeb8`.
+
+## Milestone 4 checklist — design approval gate
+
+- `[x]` Re-read product, CMS PRD, mandatory rules, active milestone, context, progress, learnings, and prior architecture decisions.
+- `[x]` Apply materially relevant Effect, Drizzle, PostgreSQL, Express, security, TanStack, shadcn/ui, React, Turborepo, and web-interface guidance.
+- `[x]` Review current platform/access schemas, contracts, policy, repositories, operations, runtime, router, tests, query composition, and project UI.
+- `[x]` Research BCP 47 canonicalization, case-insensitive identity, runtime behavior, and documented length limits.
+- `[x]` Propose the complete locale domain, lifecycle, ordering, permission, strict-contract, audit, observability, UI, threat, and test design in `knowledge_base/decisions/m4-project-locales-design.md`.
+- `[x]` Incorporate first developer review: defer database-level `en` existence enforcement to M14, specify owner-demotion locale access, make the shared version-conflict wording correction explicit/tested, document durable configured allowlists, and require draft-lockout confirmation copy.
+- `[A]` Developer approved the M4 design and authorized implementation.
+- `[x]` Add the `project_locale` and `project_membership_locale_access` Drizzle models plus membership locale-access mode, constraints, tenant foreign keys, and query-path indexes.
+- `[x]` Add canonical BCP 47, strict explicit-locale, locale management, member locale-access, and locale error contracts.
+- `[x]` Replace structural-only host canonicalization with browser/API validation against a generated official IANA registry snapshot pinned at `File-Date: 2026-06-14`; reject unknown subtags, extensions, private use, and unsafe grandfathered forms.
+- `[x]` Pass database/API type checks and 31 targeted locale/access/response contract tests without generating or applying a migration.
+- `[x]` Developer generated `0003_add_project_locales.sql`; the agent inspected the structural DDL without applying it.
+- `[x]` With explicit developer authorization, add the existing-project enabled-`en` backfill using project tenant, creator, and timestamp values.
+- `[x]` Developer reviewed and applied `0003_add_project_locales.sql`; the agent did not generate or apply it.
+- `[x]` Read-only verification confirms both tables, all intended indexes, exactly one enabled `en` for each current project, all existing memberships defaulted to `all`, and no invalid owner locale mode.
+- `[x]` Create enabled English atomically with every new project and emit a secret-free audit event.
+- `[x]` Implement locale repository lifecycle, stable ordering, optimistic concurrency, dependency guards, exact-tag resolution, tenant isolation, audits, and bounded telemetry.
+- `[x]` Implement locale-aware policy hooks, durable member allowlists, owner role-transition invariants, and restricted-member credential escalation prevention.
+- `[x]` Add locale management and member locale-access oRPC routes with standard response unions and runtime Layer wiring.
+- `[x]` Add permission-aware locale settings, BCP 47 client validation, locale ordering/lifecycle controls, membership access controls, demotion guidance, and restricted-credential UX.
+- `[x]` Add accessible stable-ID locale tabs with keyboard semantics, explicit missing-selection handling, and unsaved-change confirmation.
+- `[x]` Add contract, operation, policy, transition, repository, PostgreSQL concurrency/isolation/index, API, telemetry, validation, and accessibility tests.
+- `[x]` Permanently delete the explicitly authorized soft-removed invalid `doekdoek`, `oedll`, and `xlw` rows after verifying no membership grants referenced them.
+- `[x]` Pass workspace checks, type checks, 453 tests, coverage, production builds, and `git diff --check`.
+- `[R]` Await developer manual review of English/Hindi/Gujarati management, tabs, member restrictions, and credential restrictions.
 
 ## Current blockers
 
-None. Automated M3 criteria are complete. The agent did not generate, execute, or apply the migration.
+None. The M4 database gate is complete.
 
 ## Database migration state
 
@@ -168,7 +196,32 @@ The developer generated and applied `packages/db/src/migrations/0001_create_plat
 
 The developer generated and applied `packages/db/src/migrations/0002_add_memberships_policies_credentials.sql`. The agent inspected it and confirmed the structural tables, constraints, tenant foreign keys, lifecycle checks, indexes, and authorized owner-membership backfill match the approved design. Read-only verification reports four access tables, two projects, two active owner memberships, and zero projects without exactly one active owner.
 
+The developer generated and applied `packages/db/src/migrations/0003_add_project_locales.sql`. The agent inspected it and, with explicit authorization, added the existing-project enabled-English backfill before developer application. Read-only verification confirms both locale tables, all nine intended indexes, one enabled `en` for every project, membership defaults of `all`, and valid owner locale access. The agent did not generate or apply the migration.
+
 ## Test results
+
+### Milestone 4 complete automated gate
+
+- `pnpm run check`: pass.
+- `pnpm run check-types`: pass across all TypeScript packages.
+- `pnpm run test`: 453 tests pass across 32 files: 322 API/domain, 61 server/API integration, 65 web validation/accessibility, and 5 environment tests.
+- `pnpm run test:coverage`: pass; API/domain code is 93.58% statements and 79.24% branches; tested web helpers remain 100% statements.
+- `pnpm run build`: server and web production builds pass.
+- `git diff --check`: pass.
+- PostgreSQL coverage includes required English, canonical creation, tenant isolation, immutable identity, lifecycle transitions, dependency guards, ordering, version conflicts, durable member allowlists, owner invariants, concurrency, cleanup, and intended index plans.
+- Final read-only invariant checks report zero projects without exactly one enabled `en`, zero owners with restricted locale mode, zero configured locale grants attached to removed memberships, and zero invalid rows across all 11 persisted locale records.
+- API/server coverage includes anonymous denial, role boundaries, exact locale errors, locale lifecycle routes, member locale access, and restricted credential issue/rotation behavior.
+- Locale validation uses the generated official IANA registry snapshot pinned at `File-Date: 2026-06-14`; API/browser tests accept registered tags and aliases while rejecting the three discovered invalid tags, unknown component subtags, extensions, private use, and reserved ranges.
+- UI coverage includes registry-backed BCP 47 validation, locale creation and member-access dialog accessibility, and unsaved locale-tab switching. Manual review remains required.
+- The guarded authorized cleanup deleted exactly three soft-removed invalid locale rows, found no related membership grants, and left zero matching rows.
+- No agent command generated, applied, pushed, or executed a migration.
+
+### Milestone 4 database gate
+
+- `pnpm --filter @framerfordevs/db check-types`: pass.
+- `pnpm --filter @framerfordevs/api check-types`: pass.
+- Targeted locale, access, and API-response contracts: 31 tests pass across 3 files.
+- No agent command generated, applied, pushed, or executed a migration. The developer generated and applied it.
 
 ### Milestone 3
 
@@ -233,4 +286,4 @@ Milestone 1 was manually approved and committed by the developer as `c28f6fa` (`
 
 Milestone 2 automated criteria are complete. During manual review, the developer found Docker SSR could not load `/login`; the internal service URL was corrected and covered by URL-resolution tests plus the container health check. The developer verified the corrected Docker login flow, approved Milestone 2, and committed it as `60adb39` (`feat(m2): add workspace and project platform kernel`).
 
-Milestone 3 started after the Milestone 2 commit was confirmed. The developer approved its membership, invitation, role-policy, and credential design, then generated and applied the inspected migration/backfill. Automated implementation and readiness criteria are complete; M3 is paused for developer manual review before any commit or Milestone 4 work.
+Milestone 3 started after the Milestone 2 commit was confirmed. The developer approved its membership, invitation, role-policy, and credential design, then generated and applied the inspected migration/backfill. After automated readiness and manual review, the developer approved and committed Milestone 3 as `a74aeb8` (`feat(m3): add project access, invitations, and API credentials`).

@@ -17,6 +17,7 @@ import {
   ProjectMemberPage,
   RemoveProjectMemberInput,
   RevokeProjectInvitationInput,
+  UpdateProjectMemberLocaleAccessInput,
   UpdateProjectMemberRoleInput,
 } from "../contracts/access";
 import { AccessRepository, makeAccessRepository } from "../services/access-repository";
@@ -30,6 +31,7 @@ import {
   listProjectMembers,
   removeProjectMember,
   revokeProjectInvitation,
+  updateProjectMemberLocaleAccess,
   updateProjectMemberRole,
 } from "./access";
 
@@ -45,6 +47,7 @@ const member = Schema.decodeUnknownSync(ProjectMember)({
   name: "Test Member",
   email: "member@example.test",
   role: "owner",
+  localeAccess: { mode: "all" },
   version: 1,
   removedAt: null,
   createdAt: timestamp,
@@ -73,6 +76,7 @@ const inspected = Schema.decodeUnknownSync(InspectedProjectInvitation)({
 const currentAccess = Schema.decodeUnknownSync(CurrentProjectAccess)({
   projectId,
   role: "owner",
+  localeAccess: { mode: "all" },
   allowedActions: ["project.read", "project.member.invite"],
 });
 const memberPage = ProjectMemberPage.make({ items: [member], nextCursor: null });
@@ -89,6 +93,8 @@ const AccessRepositoryTest = Layer.succeed(AccessRepository, {
   revokeInvitation: () => Effect.sync(() => (calls.push("revokeInvitation"), invitation)),
   listMembers: () => Effect.sync(() => (calls.push("listMembers"), memberPage)),
   updateMemberRole: () => Effect.sync(() => (calls.push("updateMemberRole"), member)),
+  updateMemberLocaleAccess: () =>
+    Effect.sync(() => (calls.push("updateMemberLocaleAccess"), member)),
   removeMember: () => Effect.sync(() => (calls.push("removeMember"), member)),
 });
 
@@ -169,6 +175,15 @@ describe("access operations", () => {
             }),
             requestId,
           );
+          yield* updateProjectMemberLocaleAccess(
+            actor,
+            yield* Schema.decodeUnknown(UpdateProjectMemberLocaleAccessInput)({
+              membershipId,
+              version: 1,
+              access: { mode: "none" },
+            }),
+            requestId,
+          );
           yield* removeProjectMember(
             actor,
             yield* Schema.decodeUnknown(RemoveProjectMemberInput)({
@@ -187,6 +202,7 @@ describe("access operations", () => {
             "revokeInvitation",
             "listMembers",
             "updateMemberRole",
+            "updateMemberLocaleAccess",
             "removeMember",
           ]);
         }),

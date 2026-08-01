@@ -10,6 +10,7 @@ import {
   apiFailure,
   apiSuccess,
 } from "./api-response";
+import { LocaleDependencySummary } from "./locales";
 import {
   AuthSessionFailure,
   ConflictFailure,
@@ -20,6 +21,9 @@ import {
   InvitationConflictFailure,
   InvitationInvalidFailure,
   LastOwnerRequiredFailure,
+  LocaleConflictFailure,
+  LocaleDependenciesExistFailure,
+  LocaleUnavailableFailure,
   NotFoundFailure,
   ProjectKeyConflictFailure,
   RateLimitedFailure,
@@ -176,6 +180,17 @@ describe("application error mapping", () => {
     ProjectKeyConflictFailure.make(),
     VersionConflictFailure.make(),
     InvalidStateTransitionFailure.make(),
+    LocaleConflictFailure.make(),
+    LocaleUnavailableFailure.make(),
+    LocaleDependenciesExistFailure.make({
+      requestedStatus: "disabled",
+      dependencies: LocaleDependencySummary.make({
+        draftCount: 2,
+        currentPublicationCount: 0,
+        draftCountCapped: false,
+        currentPublicationCountCapped: false,
+      }),
+    }),
     InvitationConflictFailure.make(),
     InvitationInvalidFailure.make(),
     LastOwnerRequiredFailure.make(),
@@ -251,6 +266,24 @@ describe("application error mapping", () => {
           "tag": "InvalidStateTransitionFailure",
         },
         {
+          "code": "LOCALE_CONFLICT",
+          "retryable": false,
+          "status": 409,
+          "tag": "LocaleConflictFailure",
+        },
+        {
+          "code": "LOCALE_UNAVAILABLE",
+          "retryable": false,
+          "status": 404,
+          "tag": "LocaleUnavailableFailure",
+        },
+        {
+          "code": "LOCALE_DEPENDENCIES_EXIST",
+          "retryable": false,
+          "status": 409,
+          "tag": "LocaleDependenciesExistFailure",
+        },
+        {
           "code": "INVITATION_CONFLICT",
           "retryable": false,
           "status": 409,
@@ -308,6 +341,36 @@ describe("application error mapping", () => {
     expect(failure.error.details).toEqual(details);
   });
 
+  it("uses resource-neutral version conflict feedback", () => {
+    const failure = applicationFailure(VersionConflictFailure.make(), requestId);
+
+    expect(failure.message).toBe(
+      "The resource changed since it was loaded. Refresh and try again.",
+    );
+  });
+
+  it("returns safe locale dependency counts and draft lockout guidance", () => {
+    const failure = applicationFailure(
+      LocaleDependenciesExistFailure.make({
+        requestedStatus: "removed",
+        dependencies: LocaleDependencySummary.make({
+          draftCount: 100,
+          currentPublicationCount: 0,
+          draftCountCapped: true,
+          currentPublicationCountCapped: false,
+        }),
+      }),
+      requestId,
+    );
+
+    expect(failure.message).toBe(
+      "This locale has 100+ drafts. Removing it will make those drafts unavailable to editors. Nothing will be deleted; restore the locale to restore access.",
+    );
+    expect(failure.error.details).toEqual([
+      expect.objectContaining({ code: "locale_drafts_exist", message: "100+ drafts" }),
+    ]);
+  });
+
   it("does not expose infrastructure causes", () => {
     const secretCause = new Error("postgresql://admin:secret@database/internal");
     const failure = applicationFailure(
@@ -347,6 +410,9 @@ describe("application error mapping", () => {
           "false:null:INVITATION_CONFLICT:409",
           "false:null:INVITATION_INVALID:404",
           "false:null:LAST_OWNER_REQUIRED:409",
+          "false:null:LOCALE_CONFLICT:409",
+          "false:null:LOCALE_DEPENDENCIES_EXIST:409",
+          "false:null:LOCALE_UNAVAILABLE:404",
           "false:null:NOT_FOUND:404",
           "false:null:PROJECT_KEY_CONFLICT:409",
           "false:null:RATE_LIMITED:429",
@@ -377,6 +443,9 @@ describe("application error mapping", () => {
       "INVITATION_CONFLICT",
       "INVITATION_INVALID",
       "LAST_OWNER_REQUIRED",
+      "LOCALE_CONFLICT",
+      "LOCALE_DEPENDENCIES_EXIST",
+      "LOCALE_UNAVAILABLE",
       "NOT_FOUND",
       "PROJECT_KEY_CONFLICT",
       "RATE_LIMITED",

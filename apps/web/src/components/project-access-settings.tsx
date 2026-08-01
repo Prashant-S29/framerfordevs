@@ -2,11 +2,13 @@ import type {
   ApiCredential,
   CredentialFamily,
   CredentialScope,
+  LocaleAccessMode,
   ProjectInvitation,
   ProjectMember,
   ProjectPermissionAction,
   ProjectRole,
 } from "@framerfordevs/api/contracts/access";
+import type { ProjectLocale } from "@framerfordevs/api/contracts/locales";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,7 +59,7 @@ import { Input } from "@framerfordevs/ui/components/input";
 import { NativeSelect, NativeSelectOption } from "@framerfordevs/ui/components/native-select";
 import { Spinner } from "@framerfordevs/ui/components/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@framerfordevs/ui/components/tabs";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CopyIcon,
   KeyRoundIcon,
@@ -138,6 +140,7 @@ interface ProjectAccessSettingsProps {
   readonly projectId: string;
   readonly environmentId: string;
   readonly role: ProjectRole;
+  readonly localeAccessMode: LocaleAccessMode;
   readonly allowedActions: ReadonlyArray<ProjectPermissionAction>;
 }
 
@@ -145,6 +148,7 @@ export function ProjectAccessSettings({
   projectId,
   environmentId,
   role,
+  localeAccessMode,
   allowedActions,
 }: ProjectAccessSettingsProps) {
   const actions = new Set(allowedActions);
@@ -152,9 +156,12 @@ export function ProjectAccessSettings({
   const canInvite = actions.has("project.member.invite");
   const canMutateMembers =
     actions.has("project.member.role.update") && actions.has("project.member.remove");
+  const canUpdateLocaleAccess = actions.has("project.member.locale.update");
   const canReadCredentials = actions.has("project.credential.read");
-  const canIssueCredentials = actions.has("project.credential.issue");
-  const canRotateCredentials = actions.has("project.credential.rotate");
+  const hasRestrictedLocaleAccess = localeAccessMode !== "all";
+  const canIssueCredentials = actions.has("project.credential.issue") && !hasRestrictedLocaleAccess;
+  const canRotateCredentials =
+    actions.has("project.credential.rotate") && !hasRestrictedLocaleAccess;
   const canRevokeCredentials = actions.has("project.credential.revoke");
 
   return (
@@ -185,6 +192,7 @@ export function ProjectAccessSettings({
                   projectId={projectId}
                   canInvite={canInvite}
                   canMutate={canMutateMembers}
+                  canUpdateLocaleAccess={canUpdateLocaleAccess}
                 />
               </TabsContent>
             ) : null}
@@ -196,6 +204,7 @@ export function ProjectAccessSettings({
                   canIssue={canIssueCredentials}
                   canRotate={canRotateCredentials}
                   canRevoke={canRevokeCredentials}
+                  localeRestricted={hasRestrictedLocaleAccess}
                 />
               </TabsContent>
             ) : null}
@@ -218,10 +227,12 @@ function MembersPanel({
   projectId,
   canInvite,
   canMutate,
+  canUpdateLocaleAccess,
 }: {
   readonly projectId: string;
   readonly canInvite: boolean;
   readonly canMutate: boolean;
+  readonly canUpdateLocaleAccess: boolean;
 }) {
   const members = useInfiniteQuery(
     orpc.platform.projects.members.list.infiniteOptions({
@@ -239,20 +250,44 @@ function MembersPanel({
       maxPages: 10,
     }),
   );
+  const localeQuery = useQuery({
+    ...orpc.platform.projects.locales.list.queryOptions({
+      input: { projectId, view: "settings", includeRemoved: true },
+    }),
+    enabled: canUpdateLocaleAccess,
+  });
+  const projectLocales = localeQuery.data?.data.items ?? [];
   const memberItems = members.data?.pages.flatMap((page) => page.data.items) ?? [];
   const invitationItems = invitations.data?.pages.flatMap((page) => page.data.items) ?? [];
 
-  if (members.isPending || invitations.isPending) {
+  if (
+    members.isPending ||
+    invitations.isPending ||
+    (canUpdateLocaleAccess && localeQuery.isPending)
+  ) {
     return (
-      <div className="flex items-center gap-2" aria-label="Loading project members">
+      <div className="flex items-center gap-2" role="status" aria-label="Loading project members">
         <Spinner />
         <span className="text-muted-foreground text-sm">Loading members…</span>
       </div>
     );
   }
 
+  const canRenderLocaleAccess = canUpdateLocaleAccess && !localeQuery.isError;
+
   return (
     <div className="flex flex-col gap-6">
+      {canUpdateLocaleAccess && localeQuery.isError ? (
+        <div
+          className="flex flex-col items-start gap-2 border border-destructive/40 p-3"
+          role="alert"
+        >
+          <p className="text-sm font-medium">Member locale controls could not be loaded.</p>
+          <Button size="sm" variant="outline" onClick={() => void localeQuery.refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-sm font-medium">Project members</h3>
@@ -276,7 +311,13 @@ function MembersPanel({
       ) : (
         <div className="flex flex-col gap-3">
           {memberItems.map((member) => (
-            <MemberRow key={member.id} member={member} canMutate={canMutate} />
+            <MemberRow
+              key={member.id}
+              member={member}
+              canMutate={canMutate}
+              canUpdateLocaleAccess={canRenderLocaleAccess}
+              projectLocales={projectLocales}
+            />
           ))}
         </div>
       )}
@@ -320,9 +361,13 @@ function MembersPanel({
 function MemberRow({
   member,
   canMutate,
+  canUpdateLocaleAccess,
+  projectLocales,
 }: {
   readonly member: ProjectMember;
   readonly canMutate: boolean;
+  readonly canUpdateLocaleAccess: boolean;
+  readonly projectLocales: ReadonlyArray<ProjectLocale>;
 }) {
   return (
     <div className="flex flex-col gap-3 border p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -332,19 +377,45 @@ function MemberRow({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="secondary">{roleLabels[member.role]}</Badge>
-        {canMutate ? <MemberActions member={member} /> : null}
+        {canMutate || canUpdateLocaleAccess ? (
+          <MemberActions
+            member={member}
+            canMutate={canMutate}
+            canUpdateLocaleAccess={canUpdateLocaleAccess}
+            projectLocales={projectLocales}
+          />
+        ) : null}
       </div>
     </div>
   );
 }
 
-function MemberActions({ member }: { readonly member: ProjectMember }) {
+function MemberActions({
+  member,
+  canMutate,
+  canUpdateLocaleAccess,
+  projectLocales,
+}: {
+  readonly member: ProjectMember;
+  readonly canMutate: boolean;
+  readonly canUpdateLocaleAccess: boolean;
+  readonly projectLocales: ReadonlyArray<ProjectLocale>;
+}) {
   const queryClient = useQueryClient();
   const [role, setRole] = useState<ProjectRole>(member.role);
+  const [confirmDemotion, setConfirmDemotion] = useState(false);
   const updateRole = useMutation(
     orpc.platform.projects.members.updateRole.mutationOptions({
       onSuccess: async (response) => {
-        await queryClient.invalidateQueries({ queryKey: orpc.platform.projects.members.key() });
+        setConfirmDemotion(false);
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: orpc.platform.projects.members.key(),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: orpc.platform.projects.access.key(),
+          }),
+        ]);
         toast.success(response.message);
       },
       onError: (error) => toast.error(error.message),
@@ -354,8 +425,12 @@ function MemberActions({ member }: { readonly member: ProjectMember }) {
     orpc.platform.projects.members.remove.mutationOptions({
       onSuccess: async (response) => {
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: orpc.platform.projects.members.key() }),
-          queryClient.invalidateQueries({ queryKey: orpc.platform.projects.key() }),
+          queryClient.invalidateQueries({
+            queryKey: orpc.platform.projects.members.key(),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: orpc.platform.projects.key(),
+          }),
         ]);
         toast.success(response.message);
       },
@@ -363,59 +438,278 @@ function MemberActions({ member }: { readonly member: ProjectMember }) {
     }),
   );
 
+  function saveRole() {
+    if (member.role === "owner" && role !== "owner") {
+      setConfirmDemotion(true);
+      return;
+    }
+    updateRole.mutate({
+      membershipId: member.id,
+      version: member.version,
+      role,
+    });
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <NativeSelect
-        aria-label={`Role for ${member.name}`}
-        value={role}
-        onChange={(event) => {
-          const nextRole = parseProjectRole(event.target.value);
-          if (nextRole) setRole(nextRole);
-        }}
-      >
-        {projectRoles.map((value) => (
-          <NativeSelectOption key={value} value={value}>
-            {roleLabels[value]}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={role === member.role || updateRole.isPending}
-        onClick={() =>
-          updateRole.mutate({ membershipId: member.id, version: member.version, role })
-        }
-      >
-        {updateRole.isPending ? <Spinner data-icon="inline-start" /> : null}
-        Save role
-      </Button>
-      <AlertDialog>
-        <AlertDialogTrigger render={<Button size="sm" variant="destructive" />}>
-          <Trash2Icon data-icon="inline-start" />
-          Remove
-        </AlertDialogTrigger>
+      {canMutate ? (
+        <>
+          <NativeSelect
+            aria-label={`Role for ${member.name}`}
+            value={role}
+            onChange={(event) => {
+              const nextRole = parseProjectRole(event.target.value);
+              if (nextRole) setRole(nextRole);
+            }}
+          >
+            {projectRoles.map((value) => (
+              <NativeSelectOption key={value} value={value}>
+                {roleLabels[value]}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={role === member.role || updateRole.isPending}
+            onClick={saveRole}
+          >
+            {updateRole.isPending ? <Spinner data-icon="inline-start" /> : null}
+            Save role
+          </Button>
+        </>
+      ) : null}
+      {canUpdateLocaleAccess ? (
+        <LocaleAccessDialog member={member} projectLocales={projectLocales} />
+      ) : null}
+      {canMutate ? (
+        <AlertDialog>
+          <AlertDialogTrigger render={<Button size="sm" variant="destructive" />}>
+            <Trash2Icon data-icon="inline-start" />
+            Remove
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove {member.name}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Project access stops immediately. Audit and membership history remain available.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={remove.isPending}
+                onClick={() =>
+                  remove.mutate({
+                    membershipId: member.id,
+                    version: member.version,
+                  })
+                }
+              >
+                {remove.isPending ? <Spinner data-icon="inline-start" /> : null}
+                Remove member
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
+      <AlertDialog open={confirmDemotion} onOpenChange={setConfirmDemotion}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {member.name}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Demote {member.name} to {roleLabels[role]}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Project access stops immediately. Audit and membership history remain available.
+              Owner-only authority will be removed, but this member will retain access to all
+              locales. Use the separate locale access control afterward if narrower access is
+              intended.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              variant="destructive"
-              disabled={remove.isPending}
-              onClick={() => remove.mutate({ membershipId: member.id, version: member.version })}
+              disabled={updateRole.isPending}
+              onClick={() =>
+                updateRole.mutate({
+                  membershipId: member.id,
+                  version: member.version,
+                  role,
+                })
+              }
             >
-              {remove.isPending ? <Spinner data-icon="inline-start" /> : null}
-              Remove member
+              {updateRole.isPending ? <Spinner data-icon="inline-start" /> : null}
+              Demote and retain all locales
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export function LocaleAccessDialog({
+  member,
+  projectLocales,
+}: {
+  readonly member: ProjectMember;
+  readonly projectLocales: ReadonlyArray<ProjectLocale>;
+}) {
+  const queryClient = useQueryClient();
+  const configuredLocaleIds =
+    member.localeAccess.mode === "selected" ? member.localeAccess.localeIds : [];
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<LocaleAccessMode>(member.localeAccess.mode);
+  const [localeIds, setLocaleIds] =
+    useState<ReadonlyArray<ProjectLocale["id"]>>(configuredLocaleIds);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const update = useMutation(
+    orpc.platform.projects.members.updateLocaleAccess.mutationOptions({
+      onSuccess: async (response) => {
+        setOpen(false);
+        setAcknowledged(false);
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: orpc.platform.projects.members.key(),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: orpc.platform.projects.access.key(),
+          }),
+        ]);
+        toast.success(response.message);
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+  const reducingAccess =
+    (member.localeAccess.mode === "all" && mode !== "all") ||
+    (member.localeAccess.mode === "selected" &&
+      (mode === "none" ||
+        (mode === "selected" &&
+          configuredLocaleIds.some((localeId) => !localeIds.includes(localeId)))));
+  const accessChanged =
+    mode !== member.localeAccess.mode ||
+    (mode === "selected" &&
+      member.localeAccess.mode === "selected" &&
+      (localeIds.length !== configuredLocaleIds.length ||
+        localeIds.some((localeId) => !configuredLocaleIds.includes(localeId))));
+  const canSubmit =
+    member.role !== "owner" &&
+    accessChanged &&
+    (mode !== "selected" || localeIds.length > 0) &&
+    (!reducingAccess || acknowledged);
+
+  function toggleLocale(localeId: ProjectLocale["id"], checked: boolean) {
+    setLocaleIds((current) =>
+      checked ? [...current, localeId] : current.filter((value) => value !== localeId),
+    );
+  }
+
+  function changeOpen(nextOpen: boolean) {
+    if (nextOpen) {
+      setMode(member.localeAccess.mode);
+      setLocaleIds(configuredLocaleIds);
+      setAcknowledged(false);
+    }
+    setOpen(nextOpen);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={changeOpen}>
+      <DialogTrigger
+        render={<Button size="sm" variant="outline" disabled={member.role === "owner"} />}
+      >
+        Locale access
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Locale access for {member.name}</DialogTitle>
+          <DialogDescription>
+            Restrictions are enforced server-side for content, locale configuration, and credential
+            escalation. Owners always retain all locales.
+          </DialogDescription>
+        </DialogHeader>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor={`locale-access-mode-${member.id}`}>Access mode</FieldLabel>
+            <NativeSelect
+              id={`locale-access-mode-${member.id}`}
+              className="w-full"
+              value={mode}
+              disabled={member.role === "owner"}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value === "all" || value === "selected" || value === "none") {
+                  setMode(value);
+                  setAcknowledged(false);
+                }
+              }}
+            >
+              <NativeSelectOption value="all">All enabled locales</NativeSelectOption>
+              <NativeSelectOption value="selected">Selected enabled locales</NativeSelectOption>
+              <NativeSelectOption value="none">No locale-scoped content access</NativeSelectOption>
+            </NativeSelect>
+          </Field>
+          {mode === "selected" ? (
+            <FieldSet>
+              <FieldLegend>Project locales</FieldLegend>
+              <div data-slot="checkbox-group" className="grid gap-3 sm:grid-cols-2">
+                {projectLocales.map((locale) => (
+                  <Field key={locale.id} orientation="horizontal">
+                    <Checkbox
+                      id={`member-${member.id}-locale-${locale.id}`}
+                      checked={localeIds.includes(locale.id)}
+                      disabled={locale.status !== "enabled"}
+                      onCheckedChange={(checked) => toggleLocale(locale.id, checked)}
+                    />
+                    <FieldLabel htmlFor={`member-${member.id}-locale-${locale.id}`}>
+                      {locale.displayName} ({locale.tag})
+                      {locale.status === "enabled" ? "" : ` · ${locale.status}`}
+                    </FieldLabel>
+                  </Field>
+                ))}
+              </div>
+              {localeIds.length === 0 ? <FieldError>Select at least one locale.</FieldError> : null}
+            </FieldSet>
+          ) : null}
+          {reducingAccess ? (
+            <Field orientation="horizontal">
+              <Checkbox
+                id={`locale-access-confirm-${member.id}`}
+                checked={acknowledged}
+                onCheckedChange={setAcknowledged}
+              />
+              <FieldLabel htmlFor={`locale-access-confirm-${member.id}`}>
+                I understand this immediately reduces the member&apos;s server-side access.
+              </FieldLabel>
+            </Field>
+          ) : null}
+        </FieldGroup>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => changeOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!canSubmit || update.isPending}
+            onClick={() =>
+              update.mutate({
+                membershipId: member.id,
+                version: member.version,
+                access:
+                  mode === "selected"
+                    ? { mode, localeIds }
+                    : mode === "all"
+                      ? { mode: "all" }
+                      : { mode: "none" },
+              })
+            }
+          >
+            {update.isPending ? <Spinner data-icon="inline-start" /> : null}
+            Save locale access
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -430,7 +724,9 @@ function InvitationRow({
   const revoke = useMutation(
     orpc.platform.projects.invitations.revoke.mutationOptions({
       onSuccess: async (response) => {
-        await queryClient.invalidateQueries({ queryKey: orpc.platform.projects.invitations.key() });
+        await queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.invitations.key(),
+        });
         toast.success(response.message);
       },
       onError: (error) => toast.error(error.message),
@@ -456,7 +752,10 @@ function InvitationRow({
             variant="outline"
             disabled={revoke.isPending}
             onClick={() =>
-              revoke.mutate({ invitationId: invitation.id, version: invitation.version })
+              revoke.mutate({
+                invitationId: invitation.id,
+                version: invitation.version,
+              })
             }
           >
             Revoke
@@ -479,7 +778,9 @@ export function InviteMemberDialog({ projectId }: { readonly projectId: string }
       onSuccess: async (response) => {
         const link = buildInvitationLink(window.location.origin, response.data.token);
         setInvitationLink(link);
-        await queryClient.invalidateQueries({ queryKey: orpc.platform.projects.invitations.key() });
+        await queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.invitations.key(),
+        });
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -621,16 +922,23 @@ function CredentialsPanel({
   canIssue,
   canRotate,
   canRevoke,
+  localeRestricted,
 }: {
   readonly projectId: string;
   readonly environmentId: string;
   readonly canIssue: boolean;
   readonly canRotate: boolean;
   readonly canRevoke: boolean;
+  readonly localeRestricted: boolean;
 }) {
   const credentials = useInfiniteQuery(
     orpc.platform.projects.credentials.list.infiniteOptions({
-      input: (cursor: string | null) => ({ projectId, environmentId, cursor, limit: 20 }),
+      input: (cursor: string | null) => ({
+        projectId,
+        environmentId,
+        cursor,
+        limit: 20,
+      }),
       initialPageParam: null,
       getNextPageParam: (lastPage) => lastPage.data.nextCursor ?? undefined,
       maxPages: 10,
@@ -640,7 +948,7 @@ function CredentialsPanel({
 
   if (credentials.isPending) {
     return (
-      <div className="flex items-center gap-2" aria-label="Loading API credentials">
+      <div className="flex items-center gap-2" role="status" aria-label="Loading API credentials">
         <Spinner />
         <span className="text-muted-foreground text-sm">Loading credentials…</span>
       </div>
@@ -649,6 +957,12 @@ function CredentialsPanel({
 
   return (
     <div className="flex flex-col gap-5">
+      {localeRestricted ? (
+        <p className="border border-amber-300 bg-amber-50 p-3 text-amber-950 text-sm dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+          Issuing and rotating credentials is unavailable while your membership has restricted
+          locale access.
+        </p>
+      ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-sm font-medium">Environment credentials</h3>
@@ -715,7 +1029,9 @@ function CredentialRow({
     orpc.platform.projects.credentials.rotate.mutationOptions({
       onSuccess: async (response) => {
         setRevealedKey(response.data.key);
-        await queryClient.invalidateQueries({ queryKey: orpc.platform.projects.credentials.key() });
+        await queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.credentials.key(),
+        });
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -723,7 +1039,9 @@ function CredentialRow({
   const revoke = useMutation(
     orpc.platform.projects.credentials.revoke.mutationOptions({
       onSuccess: async (response) => {
-        await queryClient.invalidateQueries({ queryKey: orpc.platform.projects.credentials.key() });
+        await queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.credentials.key(),
+        });
         toast.success(response.message);
       },
       onError: (error) => toast.error(error.message),
@@ -774,7 +1092,10 @@ function CredentialRow({
                   <AlertDialogAction
                     disabled={rotate.isPending}
                     onClick={() =>
-                      rotate.mutate({ credentialId: credential.id, version: credential.version })
+                      rotate.mutate({
+                        credentialId: credential.id,
+                        version: credential.version,
+                      })
                     }
                   >
                     {rotate.isPending ? <Spinner data-icon="inline-start" /> : null}
@@ -803,7 +1124,10 @@ function CredentialRow({
                     variant="destructive"
                     disabled={revoke.isPending}
                     onClick={() =>
-                      revoke.mutate({ credentialId: credential.id, version: credential.version })
+                      revoke.mutate({
+                        credentialId: credential.id,
+                        version: credential.version,
+                      })
                     }
                   >
                     {revoke.isPending ? <Spinner data-icon="inline-start" /> : null}
@@ -863,7 +1187,9 @@ export function IssueCredentialDialog({
     orpc.platform.projects.credentials.issue.mutationOptions({
       onSuccess: async (response) => {
         setIssuedKey(response.data.key);
-        await queryClient.invalidateQueries({ queryKey: orpc.platform.projects.credentials.key() });
+        await queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.credentials.key(),
+        });
       },
       onError: (error) => toast.error(error.message),
     }),

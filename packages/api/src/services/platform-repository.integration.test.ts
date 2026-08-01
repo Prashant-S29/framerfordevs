@@ -5,6 +5,7 @@ import { db } from "@framerfordevs/db";
 import { and, eq, or, sql } from "@framerfordevs/db/query";
 import { projectMembership } from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
+import { projectLocale } from "@framerfordevs/db/schema/locale";
 import {
   auditEvent,
   environment,
@@ -94,6 +95,14 @@ afterAll(async () => {
       or(
         eq(environment.createdByUserId, firstUserId),
         eq(environment.createdByUserId, secondUserId),
+      ),
+    );
+  await db
+    .delete(projectLocale)
+    .where(
+      or(
+        eq(projectLocale.createdByUserId, firstUserId),
+        eq(projectLocale.createdByUserId, secondUserId),
       ),
     );
   await db
@@ -232,6 +241,9 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         const memberships = yield* Effect.promise(() =>
           db.select().from(projectMembership).where(eq(projectMembership.projectId, created.id)),
         );
+        const locales = yield* Effect.promise(() =>
+          db.select().from(projectLocale).where(eq(projectLocale.projectId, created.id)),
+        );
         const audits = yield* Effect.promise(() =>
           db.select().from(auditEvent).where(eq(auditEvent.projectId, created.id)),
         );
@@ -243,9 +255,15 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         assert.strictEqual(memberships.length, 1);
         assert.strictEqual(memberships[0]?.userId, firstUserId);
         assert.strictEqual(memberships[0]?.role, "owner");
+        assert.strictEqual(memberships[0]?.localeAccessMode, "all");
+        assert.strictEqual(locales.length, 1);
+        assert.strictEqual(locales[0]?.tag, "en");
+        assert.strictEqual(locales[0]?.status, "enabled");
+        assert.strictEqual(locales[0]?.position, 0);
         assert.deepEqual(audits.map((event) => event.action).sort(), [
           "environment.created",
           "project.created",
+          "project.locale.created",
           "project.membership.created",
         ]);
         assert.notInclude(JSON.stringify(audits), "must-not-enter-audit");
