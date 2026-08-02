@@ -36,6 +36,26 @@ import {
   UpdateProjectLocaleStatusInputSchema,
 } from "../contracts/locales";
 import {
+  CmsCollectionOutputSchema,
+  CmsCollectionPageOutputSchema,
+  CollectionDraftSchemaOutputSchema,
+  CollectionSchemaValidationOutputSchema,
+  CreateCollectionFieldInputSchema,
+  CreateCollectionInputSchema,
+  GetCollectionDraftInputSchema,
+  GetCollectionInputSchema,
+  GetLatestPublishedSchemaInputSchema,
+  GetPublishedSchemaRevisionInputSchema,
+  ListCollectionsInputSchema,
+  PublishCollectionSchemaInputSchema,
+  PublishedSchemaRevisionOutputSchema,
+  RemoveCollectionFieldInputSchema,
+  ReorderCollectionFieldsInputSchema,
+  UpdateCollectionFieldInputSchema,
+  UpdateCollectionInputSchema,
+  ValidateCollectionSchemaInputSchema,
+} from "../contracts/schemas";
+import {
   ArchiveProjectInputSchema,
   CapabilityOutputSchema,
   CreateProjectInputSchema,
@@ -76,6 +96,21 @@ import {
   updateProjectLocaleDisplayName,
   updateProjectLocaleStatus,
 } from "../operations/locales";
+import {
+  createCollection,
+  createCollectionField,
+  getCollection,
+  getCollectionDraft,
+  getLatestPublishedSchema,
+  getPublishedSchemaRevision,
+  listCollections,
+  publishCollectionSchema,
+  removeCollectionField,
+  reorderCollectionFields,
+  updateCollection,
+  updateCollectionField,
+  validateCollectionSchema,
+} from "../operations/schemas";
 import {
   archiveProject,
   createProject,
@@ -313,6 +348,163 @@ export const appRouter = {
               "Locale status updated.",
             ),
           ),
+      },
+      collections: {
+        list: protectedProcedure
+          .input(ListCollectionsInputSchema)
+          .output(CmsCollectionPageOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.schema.collection.list",
+              listCollections(context.session.user.id, input),
+              "Collections loaded.",
+            ),
+          ),
+        create: protectedProcedure
+          .input(CreateCollectionInputSchema)
+          .output(CmsCollectionOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.schema.collection.create",
+              createCollection(context.session.user.id, input, context.request.requestId),
+              "Collection created.",
+            ),
+          ),
+        get: protectedProcedure
+          .input(GetCollectionInputSchema)
+          .output(CmsCollectionOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.schema.collection.get",
+              getCollection(context.session.user.id, input),
+              "Collection loaded.",
+            ),
+          ),
+        update: protectedProcedure
+          .input(UpdateCollectionInputSchema)
+          .output(CmsCollectionOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.schema.collection.update",
+              updateCollection(context.session.user.id, input, context.request.requestId),
+              "Collection updated.",
+            ),
+          ),
+        schema: {
+          draft: {
+            get: protectedProcedure
+              .input(GetCollectionDraftInputSchema)
+              .output(CollectionDraftSchemaOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.schema.draft.get",
+                  getCollectionDraft(context.session.user.id, input),
+                  "Draft schema loaded.",
+                ),
+              ),
+          },
+          fields: {
+            create: protectedProcedure
+              .input(CreateCollectionFieldInputSchema)
+              .output(CollectionDraftSchemaOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.schema.field.create",
+                  createCollectionField(context.session.user.id, input, context.request.requestId),
+                  "Field created.",
+                ),
+              ),
+            update: protectedProcedure
+              .input(UpdateCollectionFieldInputSchema)
+              .output(CollectionDraftSchemaOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.schema.field.update",
+                  updateCollectionField(context.session.user.id, input, context.request.requestId),
+                  "Field updated.",
+                ),
+              ),
+            remove: protectedProcedure
+              .input(RemoveCollectionFieldInputSchema)
+              .output(CollectionDraftSchemaOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.schema.field.remove",
+                  removeCollectionField(context.session.user.id, input, context.request.requestId),
+                  "Field removed.",
+                ),
+              ),
+            reorder: protectedProcedure
+              .input(ReorderCollectionFieldsInputSchema)
+              .output(CollectionDraftSchemaOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.schema.field.reorder",
+                  reorderCollectionFields(
+                    context.session.user.id,
+                    input,
+                    context.request.requestId,
+                  ),
+                  "Fields reordered.",
+                ),
+              ),
+          },
+          validate: protectedProcedure
+            .input(ValidateCollectionSchemaInputSchema)
+            .output(CollectionSchemaValidationOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                "api.schema.validate",
+                validateCollectionSchema(context.session.user.id, input),
+                "Schema validation completed.",
+              ),
+            ),
+          publish: protectedProcedure
+            .input(PublishCollectionSchemaInputSchema)
+            .output(PublishedSchemaRevisionOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                "api.schema.publish",
+                publishCollectionSchema(context.session.user.id, input, context.request.requestId),
+                "Schema published.",
+              ),
+            ),
+          published: {
+            getLatest: protectedProcedure
+              .input(GetLatestPublishedSchemaInputSchema)
+              .output(PublishedSchemaRevisionOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.schema.published.get_latest",
+                  getLatestPublishedSchema(context.session.user.id, input),
+                  "Published schema loaded.",
+                ),
+              ),
+            getRevision: protectedProcedure
+              .input(GetPublishedSchemaRevisionInputSchema)
+              .output(PublishedSchemaRevisionOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.schema.published.get_revision",
+                  getPublishedSchemaRevision(context.session.user.id, input),
+                  "Published schema revision loaded.",
+                ),
+              ),
+          },
+        },
       },
       credentials: {
         issue: protectedProcedure

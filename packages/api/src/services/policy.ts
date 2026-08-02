@@ -68,6 +68,8 @@ const localeScopedContentActions = new Set<ProjectPermissionActionType>([
 ]);
 const unrestrictedLocaleActions = new Set<ProjectPermissionActionType>([
   "locale.manage",
+  "schema.write",
+  "schema.publish",
   "project.credential.issue",
   "project.credential.rotate",
 ]);

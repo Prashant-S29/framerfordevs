@@ -306,12 +306,11 @@ Let developers define stable content contracts with draft and published schema r
 - Draft schema edits do not alter the current published schema.
 - Publishing creates an immutable schema revision.
 - Adding optional fields is classified non-breaking.
-- Required-field additions and tighter validation are classified potentially breaking.
+- Required-field additions are classified potentially breaking.
 - API-key rename, incompatible type change, and deletion are classified breaking.
 - Breaking publication requires explicit developer acknowledgement.
 - Concurrent schema edits detect revision conflicts instead of silently overwriting.
 - Published revisions cannot be mutated or deleted while referenced.
-- Invalid recursive object/list definitions are bounded and rejected.
 - Collection and field authorization is enforced server-side.
 - Schema publication emits an audit event and transactional outbox record.
 - Property tests exercise arbitrary valid/invalid field definitions and change classification.
@@ -355,7 +354,9 @@ Implement the initial field vocabulary and form metadata without coupling conten
 - External asset accepts supported kinds and optional metadata without fetching the URL.
 - Rich-text decoder rejects unknown nodes, invalid marks, malformed trees, excessive depth, and excessive size.
 - Rich text cannot inject executable HTML as canonical content.
-- Objects and lists respect configured item and nesting limits.
+- Objects and lists respect configured item, depth, and serialized-size limits.
+- Invalid recursive or cyclic object/list definitions are rejected deterministically.
+- Relaxing validation and adding enum options are classified non-breaking; tightening validation is classified potentially breaking; removing enum options is classified breaking.
 - References enforce configured target collections.
 - Localized and shared field flags are represented correctly.
 - Editor layout cannot reference missing fields or expose protected fields to restricted roles.

@@ -158,6 +158,38 @@ Record a learning when an implementation or decision:
 
 ---
 
+## 2026-08-01 — Idempotency keys require persisted authority fingerprints
+
+**Context:** Milestone 5 schema publication uses a collection-local client command ID and promises that retries return the original revision while incompatible command-ID reuse fails safely.
+
+**Incorrect assumption or decision:** The first approved database outline stored only the command ID and schema hash. That was insufficient to distinguish a genuine retry from reuse with different expected versions, published baseline, acknowledgements, or schema authority after later edits.
+
+**Cost or risk:** Incompatible input could have been mistaken for a valid replay, weakening publication acknowledgement and concurrency guarantees.
+
+**Learning:** Durable idempotency needs both a unique command identity and a canonical fingerprint of every input that grants authority for the state change.
+
+**Prevention:** `cms_schema_revision` stores a SHA-256 command fingerprint over the scoped publication input, sorted acknowledgement IDs, expected versions/baseline, and schema hash. Replay tests must cover matching retries and incompatible reuse.
+
+**Status:** Resolved in the M5 foundational design and Drizzle schema before migration generation.
+
+---
+
+## 2026-08-02 — URL matching does not guarantee child-route rendering
+
+**Context:** The Milestone 5 collection builder used a directory route below the existing project-detail page route.
+
+**Incorrect assumption or decision:** A correct generated URL and route match were treated as sufficient. TanStack Router nested the builder under the project-detail component, but that page intentionally had no `Outlet`, so only the project panel rendered.
+
+**Cost or risk:** The primary schema-builder workflow was unreachable even though navigation changed to the expected URL and production builds passed.
+
+**Learning:** Route-tree composition must be verified independently from URL generation. A page-shaped route below another page-shaped path should use TanStack's non-nested trailing-underscore convention unless the parent is deliberately a layout with an `Outlet`.
+
+**Prevention:** The builder now lives under `$projectId_`, preserving the public URL while parenting it directly to the authenticated layout. A route-tree regression test asserts both its full path and non-nested parent.
+
+**Status:** Resolved during Milestone 5 manual review; web type checks, tests, and production build pass.
+
+---
+
 ## Current implementation learnings
 
-The platform authorization foundation is implemented, approved, and committed through Milestone 3. Milestone 4 locale schema, pinned-registry contracts, repository, policy, APIs, UI, observability, cleanup, and automated tests are complete and await developer manual review. The developer generated and applied the M4 migration; the agent did neither. Additional entries should be added only when a consequential decision causes drift or rework.
+The platform authorization and locale foundations are implemented, approved, and committed through Milestone 4. Milestone 5's automated versioned collection schema engine, publication lifecycle, transactional outbox, API, and builder UI are complete and awaiting manual review. The developer generated and applied the M5 migration; the agent did neither. Additional entries should be added only when a consequential decision causes drift or rework.

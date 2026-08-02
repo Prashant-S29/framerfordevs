@@ -1,6 +1,6 @@
 # Milestone 4 project locales and strict locale contracts
 
-**Status:** Implemented and automated checks complete; awaiting developer manual review
+**Status:** Implemented, manually approved, and committed as `68b6f6e`
 
 **Date:** 2026-08-01
 

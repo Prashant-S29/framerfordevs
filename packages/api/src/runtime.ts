@@ -27,6 +27,8 @@ import { Database, DatabaseLive } from "./services/database";
 import { LocaleRepository, LocaleRepositoryLive } from "./services/locale-repository";
 import { PlatformRepository, PlatformRepositoryLive } from "./services/platform-repository";
 import { PolicyService, PolicyServiceLive } from "./services/policy";
+import { SchemaEngine, SchemaEngineLive } from "./services/schema-engine";
+import { SchemaRepository, SchemaRepositoryLive } from "./services/schema-repository";
 import { SecretGenerator, SecretGeneratorLive } from "./services/secret-generator";
 
 export type ApplicationServices =
@@ -41,7 +43,9 @@ export type ApplicationServices =
   | SecretGenerator
   | CredentialAttemptLimiter
   | CredentialRepository
-  | CredentialAuthenticator;
+  | CredentialAuthenticator
+  | SchemaEngine
+  | SchemaRepository;
 
 const InfrastructureLive = Layer.mergeAll(
   ApplicationLoggerLive,
@@ -56,6 +60,8 @@ const InfrastructureLive = Layer.mergeAll(
   CredentialAttemptLimiterLive,
   CredentialRepositoryLive,
   CredentialAuthenticatorLive,
+  SchemaEngineLive,
+  SchemaRepositoryLive,
 );
 
 export const ApplicationLive = Layer.mergeAll(InfrastructureLive, OpenTelemetryLive);

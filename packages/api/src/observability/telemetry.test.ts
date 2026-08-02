@@ -5,7 +5,7 @@ import { Telemetry, TelemetryLive } from "./telemetry";
 
 describe("Effect metrics", () => {
   layer(TelemetryLive)((it) => {
-    it.effect("records request count, latency, status family, and defects", () =>
+    it.effect("records HTTP and bounded CMS schema metrics without resource labels", () =>
       Effect.gen(function* () {
         const telemetry = yield* Telemetry;
 
@@ -16,6 +16,14 @@ describe("Effect metrics", () => {
           durationMs: 12,
         });
         yield* telemetry.recordDefect("rpc");
+        yield* telemetry.recordSchemaMutation({ action: "field_update", outcome: "success" });
+        yield* telemetry.recordSchemaValidation({ outcome: "invalid" });
+        yield* telemetry.recordSchemaPublication({
+          outcome: "success",
+          severity: "breaking",
+          fieldCountBucket: "11-50",
+          durationMs: 24,
+        });
 
         assert.isTrue(true);
       }),

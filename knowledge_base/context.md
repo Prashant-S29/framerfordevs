@@ -1,8 +1,8 @@
 # Agent Session Context
 
 **Last updated:** 2026-08-01
-**Current phase:** Milestone 4 automated implementation complete; awaiting developer manual review
-**Active milestone:** Milestone 4 — Project locales and strict locale contracts
+**Current phase:** Milestone 5 automated implementation complete; awaiting developer manual review
+**Active milestone:** Milestone 5 — Versioned collection schema engine
 
 ## What this project is
 
@@ -118,7 +118,7 @@ The repository currently has:
 
 The repository does not yet have:
 
-- Schema, collection, field, entry, draft, publication, delivery, or preview workflows
+- Entry, content-draft, locale-publication, delivery, or preview workflows
 - Production telemetry backend/collector deployment
 
 ## Mandatory constraints
@@ -176,7 +176,7 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 - Read-only cleanup verification reports two expected active owner memberships, zero projects without an owner, zero invitations, zero credentials, and zero leaked test audit rows.
 - The developer approved and committed Milestone 3 as `a74aeb8` (`feat(m3): add project access, invitations, and API credentials`).
 
-## Milestone 4 implementation status
+## Milestone 4 completion
 
 - Repository, requirements, standards, security, database, Effect, API, policy, UI, and test discovery is complete.
 - The developer approved `knowledge_base/decisions/m4-project-locales-design.md`, including the first-review revisions.
@@ -191,12 +191,31 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 - The project UI now provides locale creation/editing/ordering/lifecycle controls, configured membership allowlists, owner-demotion guidance, restricted-credential UX, BCP 47 validation, and accessible stable-ID tabs with missing-selection and unsaved-change guards.
 - With explicit developer authorization, a guarded transaction permanently deleted exactly the three soft-removed invalid manual-test rows (`doekdoek`, `oedll`, and `xlw`) after confirming no membership grants referenced them.
 - Workspace checks, all package type checks, 453 tests, coverage, and production builds pass. Final read-only checks report zero missing/duplicate enabled-English project invariants, zero restricted owners, zero configured locale grants on removed memberships, and zero registry-invalid rows across all 11 persisted locale records.
+- The developer approved Milestone 4 and committed it as `68b6f6e` (`feat(m4): project locales and strict locale contracts`).
+
+## Milestone 5 implementation status
+
+- The developer approved `knowledge_base/decisions/m5-versioned-schema-engine-design.md` and authorized implementation.
+- Requirements, prior decisions, installed guidance, repository architecture, database patterns, Effect contracts, policy, API, UI, and test patterns have been reviewed.
+- `knowledge_base/decisions/m5-versioned-schema-engine-design.md` proposes environment-scoped collections, stable field IDs, one optimistic relational draft, immutable relational published revisions, deterministic hashing/change classification, exact risk acknowledgement, and an atomic generic outbox.
+- M5/M6 criteria now match the implementation boundary: recursive object/list validation and type-specific validation-change classification belong to M6. Publication updates the published baseline without incrementing draft version; concurrent publishes use the expected published revision identity.
+- The design preserves the stable Effect 3.22 and Promise-native Drizzle boundary, adds no speculative dependency change, and keeps all migration work developer-controlled.
+- Foundational contracts now cover branded identities, strict reserved API keys, collection/draft/revision models, focused mutations, publication authority, bounded validation/change contracts, collection cursors, and four centralized M5 errors.
+- The pure Effect `SchemaEngine` validates bounded drafts, hashes canonical schemas, classifies changes by stable field ID, derives deterministic change IDs, enforces exact risky-change acknowledgement, and fingerprints state-changing publication commands.
+- `packages/db/src/schema/cms.ts` defines all six approved tenant-scoped tables, restrictive foreign keys, immutable revision snapshots, schema-head pointers, and the generic transactional outbox.
+- The developer generated and applied `0004_create_versioned_collection_schemas.sql`. The agent inspected it completely and verified all six empty tables, 18 foreign keys, 33 checks, 17 primary/unique constraints, 38 valid/ready indexes, and the command-fingerprint column read-only.
+- The correct workspace generation command is `pnpm --filter @framerfordevs/db db:generate --name=create_versioned_collection_schemas`; the agent must not add the unnecessary `run ... --` form in future handoffs.
+- The first live repository/API tranche implements collection create/list/get/update with CMS capability checks, non-enumerating tenant scope, shared project locks, collection write locks, optimistic metadata/draft versions, keyset pagination, no-op semantics, and transactional audits.
+- Locale-restricted members are now denied project-global `schema.write` and `schema.publish`; `SchemaEngine` and `SchemaRepository` are composed into the shared runtime.
+- The complete repository/API lifecycle now supports draft retrieval, field create/update/remove/reorder, publication validation, immutable revision publication/retrieval, exact risk acknowledgement, fingerprinted retries, monotonic concurrent publication, transactional audits/outbox events, and bounded schema metrics.
+- PostgreSQL integration covers rollback injection after every publication artifact, restrictive revision/field deletion, stable identities, no-op behavior, environment key scope, tenant non-enumeration, archived mutation denial, and intended query plans.
+- The project collections surface and dedicated schema-builder route implement create/list/load-more, add/edit/remove/reorder, validation/change review, exact acknowledgement, publication, immutable revision summaries, permission states, targeted invalidation, conflict refetch, and accessible dialogs/controls.
+- `pnpm run ready` passes with 509 tests after the final readiness run, API/domain coverage above the configured gate, and server/web production builds. Read-only cleanup verification reports zero M5 fixtures.
 
 ## What to do next
 
-1. Developer manually creates or restores Hindi (`hi`) and Gujarati (`gu`), verifies unregistered tags such as `doekdoek` are rejected, reorders locales, edits display names, and verifies English cannot be disabled or removed.
-2. Developer checks locale tabs with keyboard navigation and reviews responsive/accessibility behavior.
-3. Developer restricts a non-owner to selected locales, verifies content/locale policy behavior and credential issue/rotation lockout, then restores all-locale access.
-4. After manual approval, the developer decides whether to commit and advance to Milestone 5.
+1. Developer manually creates a representative collection, adds/reorders/edits fields, reviews classification, and publishes it.
+2. Developer verifies exact acknowledgement for required additions, API-key changes, and removals, plus immutable published-revision display.
+3. Developer approves or reports issues. The agent must not begin Milestone 6 until explicit approval.
 
 The agent must never generate or apply migrations.

@@ -2,6 +2,7 @@ import { Schema } from "effect";
 
 import { ApiErrorDetail, type ApiErrorCode, type ApiFailure, apiFailure } from "./api-response";
 import { LocaleDependencySummary } from "./locales";
+import { SchemaChanges, SchemaValidationIssues } from "./schemas";
 
 const ValidationDetailsSchema = Schema.Array(ApiErrorDetail).pipe(
   Schema.minItems(1),
@@ -63,6 +64,26 @@ export class LocaleDependenciesExistFailure extends Schema.TaggedError<LocaleDep
   dependencies: LocaleDependencySummary,
 }) {}
 
+export class CmsCapabilityRequiredFailure extends Schema.TaggedError<CmsCapabilityRequiredFailure>(
+  "CmsCapabilityRequiredFailure",
+)("CmsCapabilityRequiredFailure", {}) {}
+
+export class CollectionKeyConflictFailure extends Schema.TaggedError<CollectionKeyConflictFailure>(
+  "CollectionKeyConflictFailure",
+)("CollectionKeyConflictFailure", {}) {}
+
+export class SchemaInvalidFailure extends Schema.TaggedError<SchemaInvalidFailure>(
+  "SchemaInvalidFailure",
+)("SchemaInvalidFailure", {
+  issues: SchemaValidationIssues,
+}) {}
+
+export class SchemaChangeAcknowledgementRequiredFailure extends Schema.TaggedError<SchemaChangeAcknowledgementRequiredFailure>(
+  "SchemaChangeAcknowledgementRequiredFailure",
+)("SchemaChangeAcknowledgementRequiredFailure", {
+  requiredChanges: SchemaChanges,
+}) {}
+
 export class InvitationConflictFailure extends Schema.TaggedError<InvitationConflictFailure>(
   "InvitationConflictFailure",
 )("InvitationConflictFailure", {}) {}
@@ -117,6 +138,10 @@ export type ApplicationError =
   | LocaleConflictFailure
   | LocaleUnavailableFailure
   | LocaleDependenciesExistFailure
+  | CmsCapabilityRequiredFailure
+  | CollectionKeyConflictFailure
+  | SchemaInvalidFailure
+  | SchemaChangeAcknowledgementRequiredFailure
   | InvitationConflictFailure
   | InvitationInvalidFailure
   | LastOwnerRequiredFailure
@@ -138,6 +163,10 @@ export const apiErrorHttpStatus = {
   LOCALE_CONFLICT: 409,
   LOCALE_UNAVAILABLE: 404,
   LOCALE_DEPENDENCIES_EXIST: 409,
+  CMS_CAPABILITY_REQUIRED: 409,
+  COLLECTION_KEY_CONFLICT: 409,
+  SCHEMA_INVALID: 422,
+  SCHEMA_CHANGE_ACKNOWLEDGEMENT_REQUIRED: 409,
   INVITATION_CONFLICT: 409,
   INVITATION_INVALID: 404,
   LAST_OWNER_REQUIRED: 409,
@@ -281,6 +310,46 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
         retryable: false,
         details: localeDependencyDetails(error),
       };
+    case "CmsCapabilityRequiredFailure":
+      return {
+        code: "CMS_CAPABILITY_REQUIRED",
+        message: "Enable the CMS capability before managing collections.",
+        retryable: false,
+      };
+    case "CollectionKeyConflictFailure":
+      return {
+        code: "COLLECTION_KEY_CONFLICT",
+        message: "A collection with this key already exists in the environment.",
+        retryable: false,
+      };
+    case "SchemaInvalidFailure":
+      return {
+        code: "SCHEMA_INVALID",
+        message: "The draft schema is not valid for publication.",
+        retryable: false,
+        details: error.issues.map((issue) =>
+          ApiErrorDetail.make({
+            path: issue.path,
+            code: issue.code,
+            message: issue.message,
+          }),
+        ),
+      };
+    case "SchemaChangeAcknowledgementRequiredFailure": {
+      const details = error.requiredChanges.slice(0, 50).map((change) =>
+        ApiErrorDetail.make({
+          path: `acknowledgedChangeIds.${change.changeId}`,
+          code: change.code,
+          message: change.summary,
+        }),
+      );
+      return {
+        code: "SCHEMA_CHANGE_ACKNOWLEDGEMENT_REQUIRED",
+        message: "Review and acknowledge the current risky schema changes before publishing.",
+        retryable: false,
+        ...(details.length === 0 ? {} : { details }),
+      };
+    }
     case "InvitationConflictFailure":
       return {
         code: "INVITATION_CONFLICT",

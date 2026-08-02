@@ -25,6 +25,28 @@ export interface LocaleMutationMetric {
   readonly outcome: "success" | "failure";
 }
 
+export interface SchemaMutationMetric {
+  readonly action:
+    | "collection_create"
+    | "collection_update"
+    | "field_create"
+    | "field_update"
+    | "field_remove"
+    | "field_reorder";
+  readonly outcome: "success" | "failure";
+}
+
+export interface SchemaValidationMetric {
+  readonly outcome: "valid" | "invalid" | "failure";
+}
+
+export interface SchemaPublicationMetric {
+  readonly outcome: "success" | "failure";
+  readonly severity: "none" | "non_breaking" | "potentially_breaking" | "breaking";
+  readonly fieldCountBucket: "1-10" | "11-50" | "51-100";
+  readonly durationMs: number;
+}
+
 const requestCount = Metric.counter("http_requests_total", {
   description: "Total inbound HTTP requests",
   incremental: true,
@@ -51,6 +73,27 @@ const localeMutationCount = Metric.counter("project_locale_mutations_total", {
   incremental: true,
 });
 
+const schemaMutationCount = Metric.counter("cms_schema_mutations_total", {
+  description: "CMS schema mutation outcomes by bounded action and result",
+  incremental: true,
+});
+
+const schemaValidationCount = Metric.counter("cms_schema_validations_total", {
+  description: "CMS schema validation outcomes",
+  incremental: true,
+});
+
+const schemaPublicationCount = Metric.counter("cms_schema_publications_total", {
+  description: "CMS schema publication outcomes by bounded severity and field-count bucket",
+  incremental: true,
+});
+
+const schemaPublicationLatency = Metric.histogram(
+  "cms_schema_publication_duration_ms",
+  MetricBoundaries.exponential({ start: 1, factor: 2, count: 16 }),
+  "CMS schema publication duration in milliseconds",
+);
+
 function withRequestLabels<Type, In, Out>(
   metric: Metric.Metric<Type, In, Out>,
   event: HttpRequestMetric,
@@ -71,6 +114,9 @@ export class Telemetry extends Context.Tag("Telemetry")<
       event: CredentialVerificationMetric,
     ) => Effect.Effect<void>;
     readonly recordLocaleMutation: (event: LocaleMutationMetric) => Effect.Effect<void>;
+    readonly recordSchemaMutation: (event: SchemaMutationMetric) => Effect.Effect<void>;
+    readonly recordSchemaValidation: (event: SchemaValidationMetric) => Effect.Effect<void>;
+    readonly recordSchemaPublication: (event: SchemaPublicationMetric) => Effect.Effect<void>;
   }
 >() {}
 
@@ -99,6 +145,40 @@ export const TelemetryLive = Layer.succeed(Telemetry, {
       ),
       1,
     ),
+  recordSchemaMutation: (event) =>
+    Metric.update(
+      Metric.tagged(
+        Metric.tagged(schemaMutationCount, "action", event.action),
+        "outcome",
+        event.outcome,
+      ),
+      1,
+    ),
+  recordSchemaValidation: (event) =>
+    Metric.update(Metric.tagged(schemaValidationCount, "outcome", event.outcome), 1),
+  recordSchemaPublication: (event) => {
+    const labels = Metric.tagged(
+      Metric.tagged(
+        Metric.tagged(schemaPublicationCount, "outcome", event.outcome),
+        "severity",
+        event.severity,
+      ),
+      "field_count",
+      event.fieldCountBucket,
+    );
+    const latency = Metric.tagged(
+      Metric.tagged(
+        Metric.tagged(schemaPublicationLatency, "outcome", event.outcome),
+        "severity",
+        event.severity,
+      ),
+      "field_count",
+      event.fieldCountBucket,
+    );
+    return Effect.all([Metric.update(labels, 1), Metric.update(latency, event.durationMs)]).pipe(
+      Effect.asVoid,
+    );
+  },
 });
 
 export function toStatusFamily(status: number): StatusFamily {

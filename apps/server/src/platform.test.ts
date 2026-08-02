@@ -256,6 +256,143 @@ describe.sequential("platform API contracts", () => {
       },
     ],
     [
+      "platform/projects/collections/list",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        cursor: null,
+        limit: 20,
+      },
+    ],
+    [
+      "platform/projects/collections/create",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        apiKey: "posts",
+        displayName: "Posts",
+        description: null,
+      },
+    ],
+    [
+      "platform/projects/collections/schema/draft/get",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+      },
+    ],
+    [
+      "platform/projects/collections/schema/fields/create",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+        draftVersion: 1,
+        apiKey: "title",
+        displayLabel: "Title",
+        kind: "short_text",
+        required: true,
+        localization: "localized",
+        deprecated: false,
+        configuration: {},
+      },
+    ],
+    [
+      "platform/projects/collections/schema/validate",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+      },
+    ],
+    [
+      "platform/projects/collections/schema/published/getLatest",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+      },
+    ],
+    [
+      "platform/projects/collections/get",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+      },
+    ],
+    [
+      "platform/projects/collections/update",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+        version: 1,
+        draftVersion: 1,
+        displayName: "Posts",
+        description: null,
+      },
+    ],
+    [
+      "platform/projects/collections/schema/fields/update",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+        fieldId: "019fae8b-1234-7000-8000-000000000004",
+        draftVersion: 1,
+        apiKey: "title",
+        displayLabel: "Title",
+        kind: "short_text",
+        required: true,
+        localization: "localized",
+        deprecated: false,
+        configuration: {},
+      },
+    ],
+    [
+      "platform/projects/collections/schema/fields/remove",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+        fieldId: "019fae8b-1234-7000-8000-000000000004",
+        draftVersion: 1,
+      },
+    ],
+    [
+      "platform/projects/collections/schema/fields/reorder",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+        draftVersion: 1,
+        fieldIds: ["019fae8b-1234-7000-8000-000000000004"],
+      },
+    ],
+    [
+      "platform/projects/collections/schema/publish",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+        draftVersion: 1,
+        expectedPublishedRevisionId: null,
+        commandId: "019fae8b-1234-7000-8000-000000000005",
+        acknowledgedChangeIds: [],
+      },
+    ],
+    [
+      "platform/projects/collections/schema/published/getRevision",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+        revisionId: "019fae8b-1234-7000-8000-000000000006",
+      },
+    ],
+    [
       "platform/projects/invitations/create",
       {
         projectId: "019fae8b-1234-7000-8000-000000000001",

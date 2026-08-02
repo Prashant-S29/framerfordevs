@@ -3,6 +3,7 @@
 import { ProjectMember } from "@framerfordevs/api/contracts/access";
 import { ProjectLocale } from "@framerfordevs/api/contracts/locales";
 import { Project } from "@framerfordevs/api/contracts/platform";
+import { CollectionDraftSchema, SchemaChange } from "@framerfordevs/api/contracts/schemas";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -22,6 +23,8 @@ import {
   LocaleAccessDialog,
 } from "./project-access-settings";
 import { AddLocaleDialog } from "./project-locale-settings";
+import { CreateCollectionDialog } from "./project-collections";
+import { FieldDialog, PublishCard } from "./schema-builder";
 
 const locale = Schema.decodeUnknownSync(ProjectLocale)({
   id: "019fae8b-1234-7000-8000-000000000004",
@@ -80,6 +83,34 @@ const project = Schema.decodeUnknownSync(Project)({
   capabilities: [],
 });
 
+const collectionDraft = Schema.decodeUnknownSync(CollectionDraftSchema)({
+  collection: {
+    id: "019fae8b-1234-7000-8000-000000000010",
+    workspaceId: project.workspaceId,
+    projectId: project.id,
+    environmentId: project.environment.id,
+    apiKey: "articles",
+    displayName: "Articles",
+    description: null,
+    version: 1,
+    draftVersion: 2,
+    draftBaseRevisionId: null,
+    currentPublishedRevisionId: null,
+    currentPublishedSequence: 0,
+    createdAt: "2026-08-01T00:00:00.000Z",
+    updatedAt: "2026-08-01T00:00:00.000Z",
+  },
+  fields: [],
+});
+
+const riskySchemaChange = Schema.decodeUnknownSync(SchemaChange)({
+  changeId: "a".repeat(64),
+  code: "field.added.required",
+  classification: "potentially_breaking",
+  fieldId: "019fae8b-1234-7000-8000-000000000011",
+  summary: "A required field was added.",
+});
+
 function renderWithQueryClient(component: ReactNode) {
   return render(<QueryClientProvider client={new QueryClient()}>{component}</QueryClientProvider>);
 }
@@ -134,6 +165,49 @@ describe("platform management accessibility", () => {
   it("has accessible locale creation semantics", async () => {
     renderWithQueryClient(<AddLocaleDialog projectId={project.id} />);
     await expectOpenDialogToHaveNoViolations(/add locale/i);
+  });
+
+  it("has accessible collection and field creation semantics", async () => {
+    renderWithQueryClient(
+      <CreateCollectionDialog projectId={project.id} environmentId={project.environment.id} />,
+    );
+    await expectOpenDialogToHaveNoViolations(/new collection/i);
+    cleanup();
+    renderWithQueryClient(
+      <FieldDialog
+        scope={{
+          projectId: project.id,
+          environmentId: project.environment.id,
+          collectionId: collectionDraft.collection.id,
+        }}
+        draft={collectionDraft}
+        onSaved={async () => undefined}
+      />,
+    );
+    await expectOpenDialogToHaveNoViolations(/add field/i);
+  });
+
+  it("requires every risky schema change acknowledgement before publication", async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(
+      <PublishCard
+        scope={{
+          projectId: project.id,
+          environmentId: project.environment.id,
+          collectionId: collectionDraft.collection.id,
+        }}
+        draft={collectionDraft}
+        changes={[riskySchemaChange]}
+        valid
+        issues={[]}
+        canPublish
+        onPublished={async () => undefined}
+      />,
+    );
+    const publish = screen.getByRole("button", { name: /publish schema/i });
+    expect(publish.hasAttribute("disabled")).toBe(true);
+    await user.click(screen.getByRole("checkbox", { name: /required field was added/i }));
+    expect(publish.hasAttribute("disabled")).toBe(false);
   });
 
   it("validates locale tags before creating a locale", async () => {

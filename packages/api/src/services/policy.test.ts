@@ -201,6 +201,8 @@ describe("PolicyService", () => {
           };
           const decisions = yield* Effect.all([
             policy.decideUser(selectedDeveloper),
+            policy.decideUser({ ...selectedDeveloper, action: "schema.write" }),
+            policy.decideUser({ ...selectedDeveloper, action: "schema.publish" }),
             policy.decideUser({ ...selectedDeveloper, action: "project.credential.issue" }),
             policy.decideUser({ ...selectedDeveloper, action: "project.credential.rotate" }),
             policy.decideUser({ ...selectedDeveloper, action: "project.credential.revoke" }),
@@ -209,7 +211,7 @@ describe("PolicyService", () => {
 
           assert.deepEqual(
             decisions.map((decision) => decision.allowed),
-            [false, false, false, true, true],
+            [false, false, false, false, false, true, true],
           );
         }),
     );

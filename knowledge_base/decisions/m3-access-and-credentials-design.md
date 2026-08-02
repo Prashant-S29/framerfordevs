@@ -1,6 +1,6 @@
 # Milestone 3 access and credential design
 
-**Status:** Implemented; automated criteria complete; awaiting developer manual review
+**Status:** Implemented, manually approved, and committed as `a74aeb8`
 
 **Date:** 2026-07-30
 

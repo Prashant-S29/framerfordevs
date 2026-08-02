@@ -13,6 +13,8 @@ import {
 import { LocaleDependencySummary } from "./locales";
 import {
   AuthSessionFailure,
+  CmsCapabilityRequiredFailure,
+  CollectionKeyConflictFailure,
   ConflictFailure,
   CredentialInvalidFailure,
   DatabaseFailure,
@@ -27,6 +29,8 @@ import {
   NotFoundFailure,
   ProjectKeyConflictFailure,
   RateLimitedFailure,
+  SchemaChangeAcknowledgementRequiredFailure,
+  SchemaInvalidFailure,
   SecurityServiceFailure,
   UnauthorizedFailure,
   ValidationFailure,
@@ -34,6 +38,7 @@ import {
   apiErrorHttpStatus,
   applicationFailure,
 } from "./errors";
+import { SchemaValidationIssue } from "./schemas";
 
 const requestId = "request.contract-1";
 const TestData = Schema.Struct({ value: Schema.Number });
@@ -191,6 +196,18 @@ describe("application error mapping", () => {
         currentPublicationCountCapped: false,
       }),
     }),
+    CmsCapabilityRequiredFailure.make(),
+    CollectionKeyConflictFailure.make(),
+    SchemaInvalidFailure.make({
+      issues: [
+        SchemaValidationIssue.make({
+          path: "fields",
+          code: "field_count_required",
+          message: "A published schema must contain at least one field.",
+        }),
+      ],
+    }),
+    SchemaChangeAcknowledgementRequiredFailure.make({ requiredChanges: [] }),
     InvitationConflictFailure.make(),
     InvitationInvalidFailure.make(),
     LastOwnerRequiredFailure.make(),
@@ -282,6 +299,30 @@ describe("application error mapping", () => {
           "retryable": false,
           "status": 409,
           "tag": "LocaleDependenciesExistFailure",
+        },
+        {
+          "code": "CMS_CAPABILITY_REQUIRED",
+          "retryable": false,
+          "status": 409,
+          "tag": "CmsCapabilityRequiredFailure",
+        },
+        {
+          "code": "COLLECTION_KEY_CONFLICT",
+          "retryable": false,
+          "status": 409,
+          "tag": "CollectionKeyConflictFailure",
+        },
+        {
+          "code": "SCHEMA_INVALID",
+          "retryable": false,
+          "status": 422,
+          "tag": "SchemaInvalidFailure",
+        },
+        {
+          "code": "SCHEMA_CHANGE_ACKNOWLEDGEMENT_REQUIRED",
+          "retryable": false,
+          "status": 409,
+          "tag": "SchemaChangeAcknowledgementRequiredFailure",
         },
         {
           "code": "INVITATION_CONFLICT",
@@ -402,6 +443,8 @@ describe("application error mapping", () => {
     }).toMatchInlineSnapshot(`
       {
         "failures": [
+          "false:null:CMS_CAPABILITY_REQUIRED:409",
+          "false:null:COLLECTION_KEY_CONFLICT:409",
           "false:null:CONFLICT:409",
           "false:null:CREDENTIAL_INVALID:401",
           "false:null:FORBIDDEN:403",
@@ -416,6 +459,8 @@ describe("application error mapping", () => {
           "false:null:NOT_FOUND:404",
           "false:null:PROJECT_KEY_CONFLICT:409",
           "false:null:RATE_LIMITED:429",
+          "false:null:SCHEMA_CHANGE_ACKNOWLEDGEMENT_REQUIRED:409",
+          "false:null:SCHEMA_INVALID:422",
           "false:null:SERVICE_UNAVAILABLE:503",
           "false:null:UNAUTHORIZED:401",
           "false:null:VALIDATION_ERROR:400",
@@ -435,6 +480,8 @@ describe("application error mapping", () => {
 
   it("covers every registered error code with an HTTP status", () => {
     expect(Object.keys(apiErrorHttpStatus).sort()).toEqual([
+      "CMS_CAPABILITY_REQUIRED",
+      "COLLECTION_KEY_CONFLICT",
       "CONFLICT",
       "CREDENTIAL_INVALID",
       "FORBIDDEN",
@@ -449,6 +496,8 @@ describe("application error mapping", () => {
       "NOT_FOUND",
       "PROJECT_KEY_CONFLICT",
       "RATE_LIMITED",
+      "SCHEMA_CHANGE_ACKNOWLEDGEMENT_REQUIRED",
+      "SCHEMA_INVALID",
       "SERVICE_UNAVAILABLE",
       "UNAUTHORIZED",
       "VALIDATION_ERROR",

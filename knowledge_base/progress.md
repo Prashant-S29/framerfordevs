@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 4 automated implementation complete; awaiting developer manual review
-**Active milestone:** Milestone 4 — Project locales and strict locale contracts
+**Overall status:** Milestone 4 approved; Milestone 5 automated implementation complete
+**Active milestone:** Milestone 5 — Versioned collection schema engine
 **Last updated:** 2026-08-01
 
 ## Status legend
@@ -21,8 +21,8 @@
 | 1   | Effect foundation, errors, observability | `[A]`  | 90 passing      | Approved      | `c28f6fa` |
 | 2   | Platform kernel                          | `[A]`  | 163 passing     | Approved      | `60adb39` |
 | 3   | Membership, policies, credentials        | `[A]`  | 381 passing     | Approved      | `a74aeb8` |
-| 4   | Project locales                          | `[R]`  | 453 passing     | Pending       | None      |
-| 5   | Versioned schema engine                  | `[ ]`  | Not run         | Pending       | None      |
+| 4   | Project locales                          | `[A]`  | 453 passing     | Approved      | `68b6f6e` |
+| 5   | Versioned schema engine                  | `[R]`  | 509 passing     | Pending       | None      |
 | 6   | Field system and generated forms         | `[ ]`  | Not run         | Pending       | None      |
 | 7   | Entries and multilingual drafts          | `[ ]`  | Not run         | Pending       | None      |
 | 8   | Per-locale publication and snapshots     | `[ ]`  | Not run         | Pending       | None      |
@@ -184,11 +184,33 @@
 - `[x]` Add contract, operation, policy, transition, repository, PostgreSQL concurrency/isolation/index, API, telemetry, validation, and accessibility tests.
 - `[x]` Permanently delete the explicitly authorized soft-removed invalid `doekdoek`, `oedll`, and `xlw` rows after verifying no membership grants referenced them.
 - `[x]` Pass workspace checks, type checks, 453 tests, coverage, production builds, and `git diff --check`.
-- `[R]` Await developer manual review of English/Hindi/Gujarati management, tabs, member restrictions, and credential restrictions.
+- `[A]` Developer approved and committed Milestone 4 as `68b6f6e` (`feat(m4): project locales and strict locale contracts`).
+
+## Milestone 5 checklist — design approval gate
+
+- `[x]` Re-read product, CMS PRD, mandatory rules, active milestone, context, progress, learnings, and prior architecture decisions.
+- `[x]` Apply materially relevant Effect, Drizzle, PostgreSQL, Express, security, TanStack, shadcn/ui, React, Turborepo, and web-interface guidance.
+- `[x]` Review the current database schema, platform/access/locale contracts, policy, repositories, operations, runtime, router, tests, query composition, and project UI.
+- `[x]` Propose the complete collection, schema-revision lifecycle, stable identity, API-key, change-classification, authorization, audit/outbox, observability, UI, threat, and test design in `knowledge_base/decisions/m5-versioned-schema-engine-design.md`.
+- `[x]` Reconcile milestone scope by moving recursive object/list and validation-configuration classification criteria to M6, and preserve draft version across publication because publication changes the baseline rather than draft content.
+- `[A]` Developer approved the M5 design and authorized implementation.
+- `[x]` Add branded collection/field/revision/command/event contracts, strict reserved API keys, M5 field definitions, mutation/publication inputs, bounded outputs, collection cursors, and centralized schema errors.
+- `[x]` Add the pure Effect `SchemaEngine` Layer with bounded validation, canonical hashing, deterministic classification/change IDs, exact acknowledgements, and persisted publication-command fingerprints.
+- `[x]` Add the six approved Drizzle tables with UUIDv7 identities, complete tenant scope, stable field identities, immutable revision snapshots, schema-head pointers, generic outbox, restrictive foreign keys, checks, and query-path indexes.
+- `[x]` Pass database/API type checks, 37 targeted contract/engine/error tests, workspace formatting/lint, and `git diff --check` without generating or applying a migration.
+- `[x]` Developer generated and applied `0004_create_versioned_collection_schemas.sql`; the agent inspected the complete DDL and verified the live schema read-only.
+- `[x]` Implement collection create/list/get/update repository workflows with CMS gating, tenant non-enumeration, project/collection locks, keyset pagination, optimistic metadata/draft versions, no-op behavior, and transactional audits.
+- `[x]` Extend locale-restricted policy for project-global schema mutation, compose schema services into the shared runtime, and expose the initial collection management procedures.
+- `[x]` Implement field create/update/remove/reorder transactions, draft retrieval, complete-set ordering, stable soft-removed identities, no-op suppression, optimistic conflicts, and transactional audits.
+- `[x]` Implement publication validation, deterministic classification/hash, exact acknowledgement, immutable snapshots, fingerprinted command retries, no-op publication, monotonic concurrent publication, head pointers, audits, and outbox events atomically.
+- `[x]` Implement latest/revision-addressable published retrieval, bounded schema metrics, complete oRPC wiring, anonymous-denial coverage, replaceable operation Layers, and OpenAPI-compatible contracts.
+- `[x]` Implement the permission-aware collection surface and dedicated accessible schema builder with targeted route loading/query invalidation, field controls, validation/change review, publication acknowledgement, immutable revision summary, and conflict refetch.
+- `[x]` Pass the complete automated readiness gate and clean read-only PostgreSQL fixture verification.
+- `[R]` Await developer manual review and approval.
 
 ## Current blockers
 
-None. The M4 database gate is complete.
+None. The developer-controlled M5 database gate is complete.
 
 ## Database migration state
 
@@ -198,7 +220,35 @@ The developer generated and applied `packages/db/src/migrations/0002_add_members
 
 The developer generated and applied `packages/db/src/migrations/0003_add_project_locales.sql`. The agent inspected it and, with explicit authorization, added the existing-project enabled-English backfill before developer application. Read-only verification confirms both locale tables, all nine intended indexes, one enabled `en` for every project, membership defaults of `all`, and valid owner locale access. The agent did not generate or apply the migration.
 
+The developer generated and applied `packages/db/src/migrations/0004_create_versioned_collection_schemas.sql` using `pnpm --filter @framerfordevs/db db:generate --name=create_versioned_collection_schemas` followed by `pnpm --filter @framerfordevs/db run db:migrate`. The agent inspected the complete generated DDL and snapshot metadata without modifying or applying them.
+
 ## Test results
+
+### Milestone 5 foundational database gate
+
+- `pnpm --filter @framerfordevs/db check-types`: pass.
+- `pnpm --filter @framerfordevs/api check-types`: pass.
+- Targeted schema contract, pure engine/classifier, and centralized error tests: 37 pass across 3 files.
+- `pnpm run check`: pass across the workspace.
+- `git diff --check`: pass.
+- Static schema review reports 56 explicitly named M5 constraints/indexes/foreign keys, no duplicate names, and no PostgreSQL identifiers over 63 characters.
+- The generated migration contains the six approved tables, 18 tenant/actor/lineage foreign keys, 33 checks, 17 primary/unique constraints, and 38 total valid/ready indexes.
+- Read-only live verification confirms all six tables and the non-null 64-character command fingerprint column exist; all six M5 tables are initially empty.
+- The developer generated and applied the migration. No agent command generated, applied, pushed, or executed it.
+- After the initial collection repository/API tranche, `pnpm run check`, `pnpm run check-types`, and `pnpm run test` pass. The full suite has 478 tests: 347 API/domain, 61 server, 65 web, and 5 environment tests.
+- PostgreSQL collection coverage proves atomic collection/head/audit creation, permanent environment key reservation, CMS capability gating, stable keyset pagination, cross-tenant non-enumeration, no-op updates, and optimistic metadata/draft version conflicts.
+- Read-only post-suite cleanup reports zero M5 collections, heads, fields, revisions, revision fields, outbox events, test audits, and test users.
+
+### Milestone 5 complete automated gate
+
+- `pnpm run ready`: pass, including formatting, lint, all package type checks, tests, coverage, and production builds.
+- `pnpm run test`: 509 tests pass across 38 files: 353 API/domain, 74 server/API integration, 77 web routing/validation/accessibility, and 5 environment tests.
+- API/domain coverage passes at 93.10% statements and 75.98% branches; tested web helpers pass at 100% statements.
+- PostgreSQL tests cover environment key scope, CMS/archived gating, tenant non-enumeration, stable field identities, no-op/version behavior, complete-set reorder, remove lifecycle, exact acknowledgements, immutable revision history, idempotent command fingerprints, no-op publication, concurrent monotonic publication, rollback after all five publication artifact stages, restrictive deletion, and intended index plans.
+- Server tests deny anonymous callers for every M5 procedure and preserve the standard response envelope.
+- UI tests cover browser/API key parity, collection and field dialog accessibility, and mandatory risky-change acknowledgement.
+- Server and web production builds pass; the schema-builder route is emitted as a separate route chunk.
+- Final read-only cleanup reports zero M5 resources and test fixtures.
 
 ### Milestone 4 complete automated gate
 
@@ -212,7 +262,7 @@ The developer generated and applied `packages/db/src/migrations/0003_add_project
 - Final read-only invariant checks report zero projects without exactly one enabled `en`, zero owners with restricted locale mode, zero configured locale grants attached to removed memberships, and zero invalid rows across all 11 persisted locale records.
 - API/server coverage includes anonymous denial, role boundaries, exact locale errors, locale lifecycle routes, member locale access, and restricted credential issue/rotation behavior.
 - Locale validation uses the generated official IANA registry snapshot pinned at `File-Date: 2026-06-14`; API/browser tests accept registered tags and aliases while rejecting the three discovered invalid tags, unknown component subtags, extensions, private use, and reserved ranges.
-- UI coverage includes registry-backed BCP 47 validation, locale creation and member-access dialog accessibility, and unsaved locale-tab switching. Manual review remains required.
+- UI coverage includes registry-backed BCP 47 validation, locale creation and member-access dialog accessibility, and unsaved locale-tab switching. Developer review is complete.
 - The guarded authorized cleanup deleted exactly three soft-removed invalid locale rows, found no related membership grants, and left zero matching rows.
 - No agent command generated, applied, pushed, or executed a migration.
 
@@ -287,3 +337,5 @@ Milestone 1 was manually approved and committed by the developer as `c28f6fa` (`
 Milestone 2 automated criteria are complete. During manual review, the developer found Docker SSR could not load `/login`; the internal service URL was corrected and covered by URL-resolution tests plus the container health check. The developer verified the corrected Docker login flow, approved Milestone 2, and committed it as `60adb39` (`feat(m2): add workspace and project platform kernel`).
 
 Milestone 3 started after the Milestone 2 commit was confirmed. The developer approved its membership, invitation, role-policy, and credential design, then generated and applied the inspected migration/backfill. After automated readiness and manual review, the developer approved and committed Milestone 3 as `a74aeb8` (`feat(m3): add project access, invitations, and API credentials`).
+
+Milestone 4 automated criteria and developer review are complete. The developer approved and committed Milestone 4 as `68b6f6e` (`feat(m4): project locales and strict locale contracts`). The developer approved the Milestone 5 design and applied its inspected migration. During Milestone 5 manual review, the developer found that the schema-builder URL rendered only the project panel because its route was nested below a page component without an outlet. The builder is now an explicit non-nested TanStack route with a route-tree regression test. Milestone 5 passes the complete automated gate and awaits continued developer manual review.

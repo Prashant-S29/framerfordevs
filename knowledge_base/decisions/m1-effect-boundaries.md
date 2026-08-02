@@ -1,6 +1,7 @@
 # Milestone 1 Effect and protocol boundaries
 
-**Status:** Implemented for developer review  
+**Status:** Implemented, manually approved, and committed as `c28f6fa`
+
 **Date:** 2026-07-29
 
 ## Runtime versions

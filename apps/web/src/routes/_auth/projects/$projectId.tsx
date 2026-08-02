@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { ArchiveProjectDialog } from "@/components/archive-project-dialog";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
 import { ProjectAccessSettings } from "@/components/project-access-settings";
+import { ProjectCollections } from "@/components/project-collections";
 import { ProjectLocaleSettings } from "@/components/project-locale-settings";
 import { orpc } from "@/utils/orpc";
 
@@ -63,6 +64,8 @@ function ProjectDetail() {
   const canManageCapability = allowedActions.has("project.capability.manage");
   const canReadLocales = allowedActions.has("locale.read");
   const canManageLocales = allowedActions.has("locale.manage");
+  const canReadSchemas = allowedActions.has("schema.read");
+  const canWriteSchemas = allowedActions.has("schema.write");
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">
@@ -164,6 +167,15 @@ function ProjectDetail() {
           ) : null}
         </Card>
       </section>
+
+      {cms?.status === "enabled" && canReadSchemas ? (
+        <ProjectCollections
+          projectId={project.id}
+          environmentId={project.environment.id}
+          canWrite={canWriteSchemas}
+          isArchived={isArchived}
+        />
+      ) : null}
 
       {canReadLocales ? (
         <ProjectLocaleSettings
