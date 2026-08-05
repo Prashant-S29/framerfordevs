@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 4 approved; Milestone 5 automated implementation complete
-**Active milestone:** Milestone 5 — Versioned collection schema engine
-**Last updated:** 2026-08-01
+**Overall status:** Milestone 5 approved and committed; Milestone 6 not started
+**Active milestone:** Milestone 6 — Field system, structured rich text, external assets, and editor layout
+**Last updated:** 2026-08-02
 
 ## Status legend
 
@@ -22,7 +22,7 @@
 | 2   | Platform kernel                          | `[A]`  | 163 passing     | Approved      | `60adb39` |
 | 3   | Membership, policies, credentials        | `[A]`  | 381 passing     | Approved      | `a74aeb8` |
 | 4   | Project locales                          | `[A]`  | 453 passing     | Approved      | `68b6f6e` |
-| 5   | Versioned schema engine                  | `[R]`  | 509 passing     | Pending       | None      |
+| 5   | Versioned schema engine                  | `[A]`  | 509 passing     | Approved      | `28ca04d` |
 | 6   | Field system and generated forms         | `[ ]`  | Not run         | Pending       | None      |
 | 7   | Entries and multilingual drafts          | `[ ]`  | Not run         | Pending       | None      |
 | 8   | Per-locale publication and snapshots     | `[ ]`  | Not run         | Pending       | None      |
@@ -48,6 +48,8 @@
 - `[x]` Defined Effect v3, central errors, and observability requirements.
 - `[x]` Created milestone plan with test-heavy success criteria.
 - `[x]` Created mandatory agent rules, session context, and product/architecture learnings log.
+- `[x]` Split mandatory rules into a discoverable `knowledge_base/rules/` index with one focused file per concern.
+- `[x]` Added mandatory Git-state verification and structured source-code comment rules.
 
 ## Tooling/research completed
 
@@ -206,11 +208,12 @@
 - `[x]` Implement latest/revision-addressable published retrieval, bounded schema metrics, complete oRPC wiring, anonymous-denial coverage, replaceable operation Layers, and OpenAPI-compatible contracts.
 - `[x]` Implement the permission-aware collection surface and dedicated accessible schema builder with targeted route loading/query invalidation, field controls, validation/change review, publication acknowledgement, immutable revision summary, and conflict refetch.
 - `[x]` Pass the complete automated readiness gate and clean read-only PostgreSQL fixture verification.
-- `[R]` Await developer manual review and approval.
+- `[x]` Fix the schema-builder route composition issue found during manual review and add a route-tree regression test.
+- `[A]` Developer manually verified the representative collection lifecycle, risky-change acknowledgement, publication, and immutable revision behavior; approved Milestone 5; and committed it as `28ca04d`.
 
 ## Current blockers
 
-None. The developer-controlled M5 database gate is complete.
+None. Milestone 5 is approved and committed; Milestone 6 design has not started.
 
 ## Database migration state
 
@@ -338,4 +341,4 @@ Milestone 2 automated criteria are complete. During manual review, the developer
 
 Milestone 3 started after the Milestone 2 commit was confirmed. The developer approved its membership, invitation, role-policy, and credential design, then generated and applied the inspected migration/backfill. After automated readiness and manual review, the developer approved and committed Milestone 3 as `a74aeb8` (`feat(m3): add project access, invitations, and API credentials`).
 
-Milestone 4 automated criteria and developer review are complete. The developer approved and committed Milestone 4 as `68b6f6e` (`feat(m4): project locales and strict locale contracts`). The developer approved the Milestone 5 design and applied its inspected migration. During Milestone 5 manual review, the developer found that the schema-builder URL rendered only the project panel because its route was nested below a page component without an outlet. The builder is now an explicit non-nested TanStack route with a route-tree regression test. Milestone 5 passes the complete automated gate and awaits continued developer manual review.
+Milestone 4 automated criteria and developer review are complete. The developer approved and committed Milestone 4 as `68b6f6e` (`feat(m4): project locales and strict locale contracts`). The developer approved the Milestone 5 design and applied its inspected migration. During Milestone 5 manual review, the developer found that the schema-builder URL rendered only the project panel because its route was nested below a page component without an outlet. The builder is now an explicit non-nested TanStack route with a route-tree regression test. The developer then verified the representative collection lifecycle, risky-change acknowledgement, publication, and immutable revision behavior; approved Milestone 5; and committed it as `28ca04d` (`feat(m5): versioned collection schema engine`).

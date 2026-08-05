@@ -11,7 +11,7 @@ This document defines what the CMS layer is, how it behaves, and the contracts f
 
 The CMS is the content foundation of Framer for Devs. It lets developers define structured content once, gives clients a safe generated editing experience, and delivers validated published content to developer-owned frontends. Future visual sites, renderers, hosting, and integrations must build on the same projects, schemas, stable IDs, permissions, locales, entries, and publications without content migration.
 
-Implementation planning lives in `../milestone.md`. Current execution state lives in `../progress.md`. Mandatory engineering rules live in `../rules.md`.
+Implementation planning lives in `../milestone.md`. Current execution state lives in `../progress.md`. Mandatory engineering rules are indexed in `../rules/index.md`.
 
 ## 2. Product statement
 

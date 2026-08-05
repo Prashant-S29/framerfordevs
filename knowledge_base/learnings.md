@@ -190,6 +190,22 @@ Record a learning when an implementation or decision:
 
 ---
 
+## 2026-08-02 — Status summaries must reconcile knowledge documents with Git
+
+**Context:** Milestone 5 had been manually verified and committed, while `context.md` and `progress.md` still described it as awaiting review.
+
+**Incorrect assumption or decision:** The status summary repeated the stale review state instead of fully reconciling it with the recent Git log and asking only about any genuinely unresolved approval ambiguity.
+
+**Cost or risk:** The developer received an incorrect next-step recommendation and had to repeat completed review and commit information.
+
+**Learning:** Progress documents describe intended execution state, while Git is authoritative for repository and commit state. A reliable handoff must inspect both and explicitly reconcile differences.
+
+**Prevention:** `knowledge_base/rules/session-rules.md` now requires `git status` and recent `git log` inspection before status reporting and milestone handoffs. Approved milestone records must use the actual commit hash when present.
+
+**Status:** Resolved. Milestone 5 is recorded as approved and committed at `28ca04d`.
+
+---
+
 ## Current implementation learnings
 
-The platform authorization and locale foundations are implemented, approved, and committed through Milestone 4. Milestone 5's automated versioned collection schema engine, publication lifecycle, transactional outbox, API, and builder UI are complete and awaiting manual review. The developer generated and applied the M5 migration; the agent did neither. Additional entries should be added only when a consequential decision causes drift or rework.
+The platform authorization, locale foundations, and versioned collection schema engine are implemented, approved, and committed through Milestone 5. The developer generated and applied the M5 migration; the agent did neither. Milestone 6 design is next. Additional entries should be added only when a consequential decision causes drift or rework.

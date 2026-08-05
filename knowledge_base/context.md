@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-08-01
-**Current phase:** Milestone 5 automated implementation complete; awaiting developer manual review
-**Active milestone:** Milestone 5 — Versioned collection schema engine
+**Last updated:** 2026-08-02
+**Current phase:** Milestone 5 approved and committed; preparing Milestone 6 design
+**Active milestone:** Milestone 6 — Field system, structured rich text, external assets, and editor layout
 
 ## What this project is
 
@@ -12,7 +12,7 @@ Framer for Devs is a backend-agnostic visual frontend and website-operations pla
 
 1. `knowledge_base/product.md`
 2. `knowledge_base/prd/cms.md`
-3. `knowledge_base/rules.md`
+3. Every rule linked by `knowledge_base/rules/index.md`
 4. This file
 5. `knowledge_base/progress.md`
 6. The active section in `knowledge_base/milestone.md`
@@ -123,6 +123,9 @@ The repository does not yet have:
 
 ## Mandatory constraints
 
+- Read and follow every rule linked by `knowledge_base/rules/index.md`.
+- Inspect current Git status and recent history before reporting repository, milestone, approval, or commit state.
+- Apply the structured source-comment standard in `knowledge_base/rules/comment-rules.md` to new and materially modified hand-authored code.
 - Never generate, push, apply, or run a migration.
 - For schema changes, provide migration name and exact commands to the developer, then wait.
 - Never commit; the developer manually reviews and commits.
@@ -193,7 +196,7 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 - Workspace checks, all package type checks, 453 tests, coverage, and production builds pass. Final read-only checks report zero missing/duplicate enabled-English project invariants, zero restricted owners, zero configured locale grants on removed memberships, and zero registry-invalid rows across all 11 persisted locale records.
 - The developer approved Milestone 4 and committed it as `68b6f6e` (`feat(m4): project locales and strict locale contracts`).
 
-## Milestone 5 implementation status
+## Milestone 5 completion
 
 - The developer approved `knowledge_base/decisions/m5-versioned-schema-engine-design.md` and authorized implementation.
 - Requirements, prior decisions, installed guidance, repository architecture, database patterns, Effect contracts, policy, API, UI, and test patterns have been reviewed.
@@ -211,11 +214,14 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 - PostgreSQL integration covers rollback injection after every publication artifact, restrictive revision/field deletion, stable identities, no-op behavior, environment key scope, tenant non-enumeration, archived mutation denial, and intended query plans.
 - The project collections surface and dedicated schema-builder route implement create/list/load-more, add/edit/remove/reorder, validation/change review, exact acknowledgement, publication, immutable revision summaries, permission states, targeted invalidation, conflict refetch, and accessible dialogs/controls.
 - `pnpm run ready` passes with 509 tests after the final readiness run, API/domain coverage above the configured gate, and server/web production builds. Read-only cleanup verification reports zero M5 fixtures.
+- During manual review, the developer found that the schema-builder URL matched but rendered only the project panel because a page-shaped route was nested under a component without an outlet. The builder now uses TanStack Router's non-nested trailing-underscore convention and has a route-tree regression test.
+- The developer manually verified the representative collection lifecycle, change acknowledgement, publication, and immutable revision behavior; approved Milestone 5; and had already committed it as `28ca04d` (`feat(m5): versioned collection schema engine`).
 
 ## What to do next
 
-1. Developer manually creates a representative collection, adds/reorders/edits fields, reviews classification, and publishes it.
-2. Developer verifies exact acknowledgement for required additions, API-key changes, and removals, plus immutable published-revision display.
-3. Developer approves or reports issues. The agent must not begin Milestone 6 until explicit approval.
+1. Re-read the Milestone 6 criteria and relevant decision, field-validation, security, Effect, database, TanStack, React, shadcn/ui, and accessibility guidance.
+2. Inspect the M5 schema contracts, engine, repository, API, builder, and test seams that M6 will extend.
+3. Propose the Milestone 6 field vocabulary, validation, structured-rich-text, external-asset, recursion-limit, reference, editor-layout, generated-form, security, observability, and test design for developer approval before implementation.
+4. Preserve the developer-controlled migration gate if the approved M6 design requires schema changes.
 
 The agent must never generate or apply migrations.

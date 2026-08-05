@@ -26,7 +26,7 @@ The engine remains independent of entries, generated forms, delivery, and visual
 
 ## Source hierarchy and compatibility constraints
 
-This design follows `product.md`, `prd/cms.md`, `rules.md`, and the Milestone 5 acceptance criteria before skill defaults.
+This design follows `product.md`, `prd/cms.md`, every rule linked by `knowledge_base/rules/index.md`, and the Milestone 5 acceptance criteria before skill defaults.
 
 Materially relevant installed guidance was reviewed for Effect, Drizzle, PostgreSQL, Express, security hardening, TanStack Start/Router/Query, Turborepo, shadcn/ui, React performance/composition, Better Auth boundaries, and web-interface accessibility.
 
