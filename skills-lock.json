@@ -25,6 +25,12 @@
       "skillPath": "express-typescript/SKILL.md",
       "computedHash": "356f5459a3ec3cddc3500f4c00039d61c8f950fb367d6f11495d7f5d41ea57e9"
     },
+    "portable-text-serialization": {
+      "source": "sanity-io/agent-toolkit",
+      "sourceType": "github",
+      "skillPath": "skills/portable-text-serialization/SKILL.md",
+      "computedHash": "a4cec92378298c8ef502bf9698112f054d86fc03e814257fa07d6aaac12b9376"
+    },
     "security-and-hardening": {
       "source": "addyosmani/agent-skills",
       "sourceType": "github",

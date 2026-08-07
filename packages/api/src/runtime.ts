@@ -24,6 +24,7 @@ import {
 } from "./services/credential-authenticator";
 import { CredentialRepository, CredentialRepositoryLive } from "./services/credential-repository";
 import { Database, DatabaseLive } from "./services/database";
+import { FieldEngine, FieldEngineLive } from "./services/field-engine";
 import { LocaleRepository, LocaleRepositoryLive } from "./services/locale-repository";
 import { PlatformRepository, PlatformRepositoryLive } from "./services/platform-repository";
 import { PolicyService, PolicyServiceLive } from "./services/policy";
@@ -44,6 +45,7 @@ export type ApplicationServices =
   | CredentialAttemptLimiter
   | CredentialRepository
   | CredentialAuthenticator
+  | FieldEngine
   | SchemaEngine
   | SchemaRepository;
 
@@ -60,6 +62,7 @@ const InfrastructureLive = Layer.mergeAll(
   CredentialAttemptLimiterLive,
   CredentialRepositoryLive,
   CredentialAuthenticatorLive,
+  FieldEngineLive,
   SchemaEngineLive,
   SchemaRepositoryLive,
 );

@@ -190,7 +190,9 @@ Change classification includes:
 - Short text
 - Long text
 - Structured rich text
-- Number
+- Number (integer or approximate floating-point JSON number)
+- Exact decimal (canonical base-10 string)
+- Money (exact amount plus currency)
 - Boolean
 - Date
 - Date and time
@@ -203,6 +205,8 @@ Change classification includes:
 - List
 - Reference to another entry
 - External asset reference
+
+Exact decimal values use a canonical base-10 string and must never pass through binary floating-point conversion. Money values contain an exact canonical amount and a revision-compatible ISO 4217 currency code. The CMS validates configured precision, scale, allowed currencies, and currency minor units without silently rounding, performing currency conversion, or claiming payment-processing semantics.
 
 Fields may define required state, defaults, uniqueness, localization, bounds, patterns, allowed values, help text, placeholder, role visibility, role editability, search/filter/sort capability, deprecation, reference target, and list-item rules.
 
@@ -245,10 +249,12 @@ Editor layout is independent of the API schema. It controls field order, groups,
 
 ### 9.2 Localized and shared fields
 
-Fields are either:
+Atomic field values are either:
 
 - **Localized:** one value per locale.
 - **Shared:** authored once but captured into each locale publication snapshot.
+
+Objects may be mixed structural containers with independently shared and localized child fields. Shared and locale object fragments merge deterministically by stable schema path. Lists are atomic localization boundaries: the list and its complete item subtree are either localized or shared, and arrays are never deep-merged across partitions. This supports mixed localized/shared object data without introducing ambiguous index-based list-item correlation.
 
 A single entry owns all locale variants; translations are not unrelated entries.
 

@@ -27,7 +27,7 @@ const cmsId = (name: string) =>
 const cmsTimestamp = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
 
 const persistedFieldKindSql = sql.raw(
-  "('short_text', 'long_text', 'rich_text', 'number', 'boolean', 'date', 'date_time', 'enum', 'url', 'email', 'slug', 'json', 'object', 'list', 'reference', 'external_asset')",
+  "('short_text', 'long_text', 'rich_text', 'number', 'decimal', 'money', 'boolean', 'date', 'date_time', 'enum', 'url', 'email', 'slug', 'json', 'object', 'list', 'reference', 'external_asset')",
 );
 
 export const cmsCollection = pgTable(
@@ -94,13 +94,20 @@ export const cmsCollectionField = pgTable(
     projectId: uuid("project_id").notNull(),
     environmentId: uuid("environment_id").notNull(),
     collectionId: uuid("collection_id").notNull(),
-    apiKey: varchar("api_key", { length: 63 }).notNull(),
-    displayLabel: varchar("display_label", { length: 100 }).notNull(),
+    parentFieldId: uuid("parent_field_id"),
+    nodeRole: varchar("node_role", { length: 32 }).default("root").notNull(),
+    referenceCollectionId: uuid("reference_collection_id"),
+    apiKey: varchar("api_key", { length: 63 }),
+    displayLabel: varchar("display_label", { length: 100 }),
     kind: varchar("kind", { length: 32 }).notNull(),
-    required: boolean("required").default(false).notNull(),
-    localization: varchar("localization", { length: 16 }).notNull(),
+    required: boolean("required").default(false),
+    localization: varchar("localization", { length: 16 }),
     deprecated: boolean("deprecated").default(false).notNull(),
     position: integer("position"),
+    editorMetadata: jsonb("editor_metadata")
+      .$type<Readonly<Record<string, unknown>>>()
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
     configuration: jsonb("configuration")
       .$type<Readonly<Record<string, unknown>>>()
       .default(sql`'{}'::jsonb`)
@@ -129,6 +136,38 @@ export const cmsCollectionField = pgTable(
         cmsCollection.workspaceId,
       ],
     }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_field_parent_tenant_fk",
+      columns: [
+        table.parentFieldId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        table.id,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_field_reference_collection_tenant_fk",
+      columns: [
+        table.referenceCollectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsCollection.id,
+        cmsCollection.environmentId,
+        cmsCollection.projectId,
+        cmsCollection.workspaceId,
+      ],
+    }).onDelete("restrict"),
     unique("cms_field_id_collection_tenant_unique").on(
       table.id,
       table.collectionId,
@@ -136,33 +175,75 @@ export const cmsCollectionField = pgTable(
       table.projectId,
       table.workspaceId,
     ),
-    uniqueIndex("cms_field_collection_active_key_unique")
+    uniqueIndex("cms_field_collection_active_root_key_unique")
       .on(table.collectionId, table.apiKey)
-      .where(sql`${table.removedAt} is null`),
-    uniqueIndex("cms_field_collection_active_position_unique")
+      .where(sql`${table.removedAt} is null and ${table.nodeRole} = 'root'`),
+    uniqueIndex("cms_field_collection_active_child_key_unique")
+      .on(table.collectionId, table.parentFieldId, table.apiKey)
+      .where(sql`${table.removedAt} is null and ${table.nodeRole} = 'object_property'`),
+    uniqueIndex("cms_field_collection_active_root_position_unique")
       .on(table.collectionId, table.position)
-      .where(sql`${table.removedAt} is null`),
+      .where(sql`${table.removedAt} is null and ${table.nodeRole} = 'root'`),
+    uniqueIndex("cms_field_collection_active_child_position_unique")
+      .on(table.collectionId, table.parentFieldId, table.position)
+      .where(sql`${table.removedAt} is null and ${table.nodeRole} = 'object_property'`),
+    uniqueIndex("cms_field_collection_active_list_item_unique")
+      .on(table.collectionId, table.parentFieldId)
+      .where(sql`${table.removedAt} is null and ${table.nodeRole} = 'list_item'`),
+    check(
+      "cms_field_node_role_valid",
+      sql`${table.nodeRole} in ('root', 'object_property', 'list_item') and ((${table.nodeRole} = 'root' and ${table.parentFieldId} is null) or (${table.nodeRole} <> 'root' and ${table.parentFieldId} is not null))`,
+    ),
+    check(
+      "cms_field_not_self_parented",
+      sql`${table.parentFieldId} is null or ${table.parentFieldId} <> ${table.id}`,
+    ),
     check(
       "cms_field_api_key_valid",
-      sql`${table.apiKey} ~ '^[a-z][a-z0-9_]{0,62}$' and ${table.apiKey} !~ '__' and right(${table.apiKey}, 1) <> '_'`,
+      sql`(${table.nodeRole} = 'list_item' and ${table.apiKey} is null) or (${table.nodeRole} <> 'list_item' and ${table.apiKey} ~ '^[a-z][a-z0-9_]{0,62}$' and ${table.apiKey} !~ '__' and right(${table.apiKey}, 1) <> '_')`,
     ),
     check(
       "cms_field_display_label_valid",
-      sql`char_length(${table.displayLabel}) between 1 and 100 and ${table.displayLabel} = btrim(${table.displayLabel}) and ${table.displayLabel} !~ '[[:cntrl:]]'`,
+      sql`(${table.nodeRole} = 'list_item' and ${table.displayLabel} is null) or (${table.nodeRole} <> 'list_item' and char_length(${table.displayLabel}) between 1 and 100 and ${table.displayLabel} = btrim(${table.displayLabel}) and ${table.displayLabel} !~ '[[:cntrl:]]')`,
     ),
     check("cms_field_kind_valid", sql`${table.kind} in ${persistedFieldKindSql}`),
-    check("cms_field_localization_valid", sql`${table.localization} in ('localized', 'shared')`),
+    check(
+      "cms_field_localization_valid",
+      sql`(${table.nodeRole} = 'root' and ${table.localization} in ('localized', 'shared', 'mixed')) or (${table.nodeRole} = 'object_property' and (${table.localization} is null or ${table.localization} in ('localized', 'shared', 'mixed'))) or (${table.nodeRole} = 'list_item' and ${table.localization} is null)`,
+    ),
+    check(
+      "cms_field_mixed_object_valid",
+      sql`${table.localization} is distinct from 'mixed' or (${table.kind} = 'object' and ${table.required} is null and not (${table.configuration} ? 'default'))`,
+    ),
+    check(
+      "cms_field_required_valid",
+      sql`(${table.nodeRole} = 'list_item' and ${table.required} is null) or (${table.nodeRole} <> 'list_item' and ((${table.localization} = 'mixed' and ${table.required} is null) or (${table.localization} is distinct from 'mixed' and ${table.required} is not null)))`,
+    ),
+    check(
+      "cms_field_reference_target_valid",
+      sql`(${table.kind} = 'reference' and ${table.referenceCollectionId} is not null) or (${table.kind} <> 'reference' and ${table.referenceCollectionId} is null)`,
+    ),
+    check(
+      "cms_field_editor_metadata_valid",
+      sql`jsonb_typeof(${table.editorMetadata}) = 'object' and octet_length(${table.editorMetadata}::text) <= 8192`,
+    ),
     check(
       "cms_field_configuration_valid",
-      sql`jsonb_typeof(${table.configuration}) = 'object' and octet_length(${table.configuration}::text) <= 8192`,
+      sql`jsonb_typeof(${table.configuration}) = 'object' and octet_length(${table.configuration}::text) <= 327680`,
     ),
     check(
       "cms_field_lifecycle_consistent",
-      sql`(${table.removedAt} is null and ${table.removedByUserId} is null and ${table.position} between 0 and 99) or (${table.removedAt} is not null and ${table.removedByUserId} is not null and ${table.position} is null)`,
+      sql`(${table.removedAt} is null and ${table.removedByUserId} is null and ((${table.nodeRole} = 'list_item' and ${table.position} = 0) or (${table.nodeRole} <> 'list_item' and ${table.position} between 0 and 99))) or (${table.removedAt} is not null and ${table.removedByUserId} is not null and ${table.position} is null)`,
     ),
-    index("cms_field_collection_active_position_id_idx")
-      .on(table.collectionId, table.position, table.id)
+    index("cms_field_collection_parent_position_id_idx")
+      .on(table.collectionId, table.parentFieldId, table.position, table.id)
       .where(sql`${table.removedAt} is null`),
+    index("cms_field_parent_idx")
+      .on(table.parentFieldId)
+      .where(sql`${table.parentFieldId} is not null`),
+    index("cms_field_reference_collection_idx")
+      .on(table.referenceCollectionId)
+      .where(sql`${table.referenceCollectionId} is not null`),
     index("cms_field_collection_idx").on(table.collectionId),
     index("cms_field_created_by_user_idx").on(table.createdByUserId),
     index("cms_field_changed_by_user_idx").on(table.changedByUserId),
@@ -185,6 +266,10 @@ export const cmsSchemaRevision = pgTable(
     collectionApiKey: varchar("collection_api_key", { length: 63 }).notNull(),
     collectionDisplayName: varchar("collection_display_name", { length: 100 }).notNull(),
     collectionDescription: varchar("collection_description", { length: 500 }),
+    formatVersion: integer("format_version").default(1).notNull(),
+    validationProfile: varchar("validation_profile", { length: 64 }).default("legacy-m5").notNull(),
+    currencyRegistryProfile: varchar("currency_registry_profile", { length: 64 }),
+    editorLayout: jsonb("editor_layout").$type<Readonly<Record<string, unknown>>>(),
     schemaHash: char("schema_hash", { length: 64 }).notNull(),
     commandId: uuid("command_id").notNull(),
     commandFingerprint: char("command_fingerprint", { length: 64 }).notNull(),
@@ -266,6 +351,19 @@ export const cmsSchemaRevision = pgTable(
       "cms_revision_collection_description_valid",
       sql`${table.collectionDescription} is null or (char_length(${table.collectionDescription}) <= 500 and ${table.collectionDescription} = btrim(${table.collectionDescription}) and ${table.collectionDescription} !~ '[[:cntrl:]]')`,
     ),
+    check("cms_revision_format_version_valid", sql`${table.formatVersion} in (1, 2)`),
+    check(
+      "cms_revision_validation_profile_valid",
+      sql`${table.validationProfile} ~ '^[a-z0-9][a-z0-9@._-]{0,63}$'`,
+    ),
+    check(
+      "cms_revision_currency_profile_valid",
+      sql`${table.currencyRegistryProfile} is null or ${table.currencyRegistryProfile} ~ '^iso-4217@[0-9]{4}-[0-9]{2}-[0-9]{2}$'`,
+    ),
+    check(
+      "cms_revision_editor_layout_valid",
+      sql`${table.editorLayout} is null or (jsonb_typeof(${table.editorLayout}) = 'object' and octet_length(${table.editorLayout}::text) <= 32768)`,
+    ),
     check("cms_revision_schema_hash_valid", sql`${table.schemaHash} ~ '^[0-9a-f]{64}$'`),
     check(
       "cms_revision_command_fingerprint_valid",
@@ -295,13 +393,20 @@ export const cmsSchemaRevisionField = pgTable(
     projectId: uuid("project_id").notNull(),
     environmentId: uuid("environment_id").notNull(),
     collectionId: uuid("collection_id").notNull(),
-    apiKey: varchar("api_key", { length: 63 }).notNull(),
-    displayLabel: varchar("display_label", { length: 100 }).notNull(),
+    parentFieldId: uuid("parent_field_id"),
+    nodeRole: varchar("node_role", { length: 32 }).default("root").notNull(),
+    referenceCollectionId: uuid("reference_collection_id"),
+    apiKey: varchar("api_key", { length: 63 }),
+    displayLabel: varchar("display_label", { length: 100 }),
     kind: varchar("kind", { length: 32 }).notNull(),
-    required: boolean("required").notNull(),
-    localization: varchar("localization", { length: 16 }).notNull(),
+    required: boolean("required"),
+    localization: varchar("localization", { length: 16 }),
     deprecated: boolean("deprecated").notNull(),
     position: integer("position").notNull(),
+    editorMetadata: jsonb("editor_metadata")
+      .$type<Readonly<Record<string, unknown>>>()
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
     configuration: jsonb("configuration").$type<Readonly<Record<string, unknown>>>().notNull(),
   },
   (table) => [
@@ -327,6 +432,26 @@ export const cmsSchemaRevisionField = pgTable(
       ],
     }).onDelete("restrict"),
     foreignKey({
+      name: "cms_revision_field_parent_fk",
+      columns: [table.revisionId, table.parentFieldId],
+      foreignColumns: [table.revisionId, table.fieldId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_revision_field_reference_collection_tenant_fk",
+      columns: [
+        table.referenceCollectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsCollection.id,
+        cmsCollection.environmentId,
+        cmsCollection.projectId,
+        cmsCollection.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
       name: "cms_revision_field_stable_field_tenant_fk",
       columns: [
         table.fieldId,
@@ -343,31 +468,78 @@ export const cmsSchemaRevisionField = pgTable(
         cmsCollectionField.workspaceId,
       ],
     }).onDelete("restrict"),
-    unique("cms_revision_field_revision_key_unique").on(table.revisionId, table.apiKey),
-    unique("cms_revision_field_revision_position_unique").on(table.revisionId, table.position),
+    uniqueIndex("cms_revision_field_root_key_unique")
+      .on(table.revisionId, table.apiKey)
+      .where(sql`${table.nodeRole} = 'root'`),
+    uniqueIndex("cms_revision_field_child_key_unique")
+      .on(table.revisionId, table.parentFieldId, table.apiKey)
+      .where(sql`${table.nodeRole} = 'object_property'`),
+    uniqueIndex("cms_revision_field_root_position_unique")
+      .on(table.revisionId, table.position)
+      .where(sql`${table.nodeRole} = 'root'`),
+    uniqueIndex("cms_revision_field_child_position_unique")
+      .on(table.revisionId, table.parentFieldId, table.position)
+      .where(sql`${table.nodeRole} = 'object_property'`),
+    uniqueIndex("cms_revision_field_list_item_unique")
+      .on(table.revisionId, table.parentFieldId)
+      .where(sql`${table.nodeRole} = 'list_item'`),
+    check(
+      "cms_revision_field_node_role_valid",
+      sql`${table.nodeRole} in ('root', 'object_property', 'list_item') and ((${table.nodeRole} = 'root' and ${table.parentFieldId} is null) or (${table.nodeRole} <> 'root' and ${table.parentFieldId} is not null))`,
+    ),
+    check(
+      "cms_revision_field_not_self_parented",
+      sql`${table.parentFieldId} is null or ${table.parentFieldId} <> ${table.fieldId}`,
+    ),
     check(
       "cms_revision_field_api_key_valid",
-      sql`${table.apiKey} ~ '^[a-z][a-z0-9_]{0,62}$' and ${table.apiKey} !~ '__' and right(${table.apiKey}, 1) <> '_'`,
+      sql`(${table.nodeRole} = 'list_item' and ${table.apiKey} is null) or (${table.nodeRole} <> 'list_item' and ${table.apiKey} ~ '^[a-z][a-z0-9_]{0,62}$' and ${table.apiKey} !~ '__' and right(${table.apiKey}, 1) <> '_')`,
     ),
     check(
       "cms_revision_field_label_valid",
-      sql`char_length(${table.displayLabel}) between 1 and 100 and ${table.displayLabel} = btrim(${table.displayLabel}) and ${table.displayLabel} !~ '[[:cntrl:]]'`,
+      sql`(${table.nodeRole} = 'list_item' and ${table.displayLabel} is null) or (${table.nodeRole} <> 'list_item' and char_length(${table.displayLabel}) between 1 and 100 and ${table.displayLabel} = btrim(${table.displayLabel}) and ${table.displayLabel} !~ '[[:cntrl:]]')`,
     ),
     check("cms_revision_field_kind_valid", sql`${table.kind} in ${persistedFieldKindSql}`),
     check(
       "cms_revision_field_localization_valid",
-      sql`${table.localization} in ('localized', 'shared')`,
+      sql`(${table.nodeRole} = 'root' and ${table.localization} in ('localized', 'shared', 'mixed')) or (${table.nodeRole} = 'object_property' and (${table.localization} is null or ${table.localization} in ('localized', 'shared', 'mixed'))) or (${table.nodeRole} = 'list_item' and ${table.localization} is null)`,
     ),
-    check("cms_revision_field_position_valid", sql`${table.position} between 0 and 99`),
+    check(
+      "cms_revision_field_mixed_object_valid",
+      sql`${table.localization} is distinct from 'mixed' or (${table.kind} = 'object' and ${table.required} is null and not (${table.configuration} ? 'default'))`,
+    ),
+    check(
+      "cms_revision_field_required_valid",
+      sql`(${table.nodeRole} = 'list_item' and ${table.required} is null) or (${table.nodeRole} <> 'list_item' and ((${table.localization} = 'mixed' and ${table.required} is null) or (${table.localization} is distinct from 'mixed' and ${table.required} is not null)))`,
+    ),
+    check(
+      "cms_revision_field_reference_target_valid",
+      sql`(${table.kind} = 'reference' and ${table.referenceCollectionId} is not null) or (${table.kind} <> 'reference' and ${table.referenceCollectionId} is null)`,
+    ),
+    check(
+      "cms_revision_field_position_valid",
+      sql`(${table.nodeRole} = 'list_item' and ${table.position} = 0) or (${table.nodeRole} <> 'list_item' and ${table.position} between 0 and 99)`,
+    ),
+    check(
+      "cms_revision_field_editor_metadata_valid",
+      sql`jsonb_typeof(${table.editorMetadata}) = 'object' and octet_length(${table.editorMetadata}::text) <= 8192`,
+    ),
     check(
       "cms_revision_field_configuration_valid",
-      sql`jsonb_typeof(${table.configuration}) = 'object' and octet_length(${table.configuration}::text) <= 8192`,
+      sql`jsonb_typeof(${table.configuration}) = 'object' and octet_length(${table.configuration}::text) <= 327680`,
     ),
-    index("cms_revision_field_revision_position_idx").on(
+    index("cms_revision_field_parent_position_idx").on(
       table.revisionId,
+      table.parentFieldId,
       table.position,
       table.fieldId,
     ),
+    index("cms_revision_field_parent_idx")
+      .on(table.parentFieldId)
+      .where(sql`${table.parentFieldId} is not null`),
+    index("cms_revision_field_reference_collection_idx")
+      .on(table.referenceCollectionId)
+      .where(sql`${table.referenceCollectionId} is not null`),
     index("cms_revision_field_stable_field_idx").on(table.fieldId),
   ],
 );
@@ -383,6 +555,11 @@ export const cmsCollectionSchemaHead = pgTable(
     draftBaseRevisionId: uuid("draft_base_revision_id"),
     currentPublishedRevisionId: uuid("current_published_revision_id"),
     currentPublishedSequence: integer("current_published_sequence").default(0).notNull(),
+    validationProfile: varchar("validation_profile", { length: 64 })
+      .default("ffd-fields@1")
+      .notNull(),
+    currencyRegistryProfile: varchar("currency_registry_profile", { length: 64 }),
+    editorLayout: jsonb("editor_layout").$type<Readonly<Record<string, unknown>>>(),
     changedByUserId: text("changed_by_user_id")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
@@ -436,6 +613,18 @@ export const cmsCollectionSchemaHead = pgTable(
       ],
     }).onDelete("restrict"),
     check("cms_head_draft_version_positive", sql`${table.draftVersion} > 0`),
+    check(
+      "cms_head_validation_profile_valid",
+      sql`${table.validationProfile} ~ '^[a-z0-9][a-z0-9@._-]{0,63}$'`,
+    ),
+    check(
+      "cms_head_currency_profile_valid",
+      sql`${table.currencyRegistryProfile} is null or ${table.currencyRegistryProfile} ~ '^iso-4217@[0-9]{4}-[0-9]{2}-[0-9]{2}$'`,
+    ),
+    check(
+      "cms_head_editor_layout_valid",
+      sql`${table.editorLayout} is null or (jsonb_typeof(${table.editorLayout}) = 'object' and octet_length(${table.editorLayout}::text) <= 32768)`,
+    ),
     check(
       "cms_head_publication_consistent",
       sql`(${table.draftBaseRevisionId} is null and ${table.currentPublishedRevisionId} is null and ${table.currentPublishedSequence} = 0) or (${table.draftBaseRevisionId} is not null and ${table.currentPublishedRevisionId} is not null and ${table.currentPublishedSequence} > 0)`,
@@ -539,6 +728,12 @@ export const cmsCollectionRelations = relations(cmsCollection, ({ one, many }) =
     references: [user.id],
   }),
   fields: many(cmsCollectionField),
+  referencingFields: many(cmsCollectionField, {
+    relationName: "cmsCollectionFieldReferenceTarget",
+  }),
+  revisionReferencingFields: many(cmsSchemaRevisionField, {
+    relationName: "cmsRevisionFieldReferenceTarget",
+  }),
   revisions: many(cmsSchemaRevision),
   schemaHead: one(cmsCollectionSchemaHead),
 }));
@@ -557,6 +752,19 @@ export const cmsCollectionFieldRelations = relations(cmsCollectionField, ({ one,
       cmsCollection.projectId,
       cmsCollection.workspaceId,
     ],
+  }),
+  parent: one(cmsCollectionField, {
+    relationName: "cmsCollectionFieldTree",
+    fields: [cmsCollectionField.parentFieldId],
+    references: [cmsCollectionField.id],
+  }),
+  children: many(cmsCollectionField, {
+    relationName: "cmsCollectionFieldTree",
+  }),
+  referenceCollection: one(cmsCollection, {
+    relationName: "cmsCollectionFieldReferenceTarget",
+    fields: [cmsCollectionField.referenceCollectionId],
+    references: [cmsCollection.id],
   }),
   creator: one(user, {
     relationName: "cmsCollectionFieldCreator",
@@ -620,40 +828,56 @@ export const cmsSchemaRevisionRelations = relations(cmsSchemaRevision, ({ one, m
   outboxEvents: many(outboxEvent),
 }));
 
-export const cmsSchemaRevisionFieldRelations = relations(cmsSchemaRevisionField, ({ one }) => ({
-  revision: one(cmsSchemaRevision, {
-    fields: [
-      cmsSchemaRevisionField.revisionId,
-      cmsSchemaRevisionField.collectionId,
-      cmsSchemaRevisionField.environmentId,
-      cmsSchemaRevisionField.projectId,
-      cmsSchemaRevisionField.workspaceId,
-    ],
-    references: [
-      cmsSchemaRevision.id,
-      cmsSchemaRevision.collectionId,
-      cmsSchemaRevision.environmentId,
-      cmsSchemaRevision.projectId,
-      cmsSchemaRevision.workspaceId,
-    ],
+export const cmsSchemaRevisionFieldRelations = relations(
+  cmsSchemaRevisionField,
+  ({ one, many }) => ({
+    revision: one(cmsSchemaRevision, {
+      fields: [
+        cmsSchemaRevisionField.revisionId,
+        cmsSchemaRevisionField.collectionId,
+        cmsSchemaRevisionField.environmentId,
+        cmsSchemaRevisionField.projectId,
+        cmsSchemaRevisionField.workspaceId,
+      ],
+      references: [
+        cmsSchemaRevision.id,
+        cmsSchemaRevision.collectionId,
+        cmsSchemaRevision.environmentId,
+        cmsSchemaRevision.projectId,
+        cmsSchemaRevision.workspaceId,
+      ],
+    }),
+    stableField: one(cmsCollectionField, {
+      fields: [
+        cmsSchemaRevisionField.fieldId,
+        cmsSchemaRevisionField.collectionId,
+        cmsSchemaRevisionField.environmentId,
+        cmsSchemaRevisionField.projectId,
+        cmsSchemaRevisionField.workspaceId,
+      ],
+      references: [
+        cmsCollectionField.id,
+        cmsCollectionField.collectionId,
+        cmsCollectionField.environmentId,
+        cmsCollectionField.projectId,
+        cmsCollectionField.workspaceId,
+      ],
+    }),
+    parent: one(cmsSchemaRevisionField, {
+      relationName: "cmsSchemaRevisionFieldTree",
+      fields: [cmsSchemaRevisionField.revisionId, cmsSchemaRevisionField.parentFieldId],
+      references: [cmsSchemaRevisionField.revisionId, cmsSchemaRevisionField.fieldId],
+    }),
+    children: many(cmsSchemaRevisionField, {
+      relationName: "cmsSchemaRevisionFieldTree",
+    }),
+    referenceCollection: one(cmsCollection, {
+      relationName: "cmsRevisionFieldReferenceTarget",
+      fields: [cmsSchemaRevisionField.referenceCollectionId],
+      references: [cmsCollection.id],
+    }),
   }),
-  stableField: one(cmsCollectionField, {
-    fields: [
-      cmsSchemaRevisionField.fieldId,
-      cmsSchemaRevisionField.collectionId,
-      cmsSchemaRevisionField.environmentId,
-      cmsSchemaRevisionField.projectId,
-      cmsSchemaRevisionField.workspaceId,
-    ],
-    references: [
-      cmsCollectionField.id,
-      cmsCollectionField.collectionId,
-      cmsCollectionField.environmentId,
-      cmsCollectionField.projectId,
-      cmsCollectionField.workspaceId,
-    ],
-  }),
-}));
+);
 
 export const cmsCollectionSchemaHeadRelations = relations(cmsCollectionSchemaHead, ({ one }) => ({
   collection: one(cmsCollection, {

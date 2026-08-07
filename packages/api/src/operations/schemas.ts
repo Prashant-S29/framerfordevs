@@ -6,14 +6,18 @@ import type {
   CreateCollectionInput,
   GetCollectionDraftInput,
   GetCollectionInput,
+  GetDraftGeneratedFormInput,
   GetLatestPublishedSchemaInput,
+  GetPublishedGeneratedFormInput,
   GetPublishedSchemaRevisionInput,
   ListCollectionsInput,
   PublishCollectionSchemaInput,
   RemoveCollectionFieldInput,
+  ReplaceCollectionDraftFieldsInput,
   ReorderCollectionFieldsInput,
   UpdateCollectionFieldInput,
   UpdateCollectionInput,
+  UpdateEditorLayoutInput,
   ValidateCollectionSchemaInput,
 } from "../contracts/schemas";
 import { AuthUserId } from "../contracts/platform";
@@ -140,6 +144,30 @@ export const updateCollectionField = Effect.fn("schema.field.update")(function* 
   );
 });
 
+export const replaceCollectionDraftFields = Effect.fn("schema.field.replace")(function* (
+  actorUserId: string,
+  input: ReplaceCollectionDraftFieldsInput,
+  requestId: string,
+) {
+  const actorId = yield* decodeActorId(actorUserId);
+  yield* Effect.annotateCurrentSpan({
+    projectId: input.projectId,
+    environmentId: input.environmentId,
+    collectionId: input.collectionId,
+    fieldCount: input.fields.length,
+  });
+  const repository = yield* SchemaRepository;
+  const telemetry = yield* Telemetry;
+  return yield* repository.replaceFields(actorId, input, yield* currentDate, requestId).pipe(
+    Effect.onExit((exit) =>
+      telemetry.recordSchemaMutation({
+        action: "field_replace",
+        outcome: Exit.isSuccess(exit) ? "success" : "failure",
+      }),
+    ),
+  );
+});
+
 export const removeCollectionField = Effect.fn("schema.field.remove")(function* (
   actorUserId: string,
   input: RemoveCollectionFieldInput,
@@ -182,6 +210,29 @@ export const reorderCollectionFields = Effect.fn("schema.field.reorder")(functio
     Effect.onExit((exit) =>
       telemetry.recordSchemaMutation({
         action: "field_reorder",
+        outcome: Exit.isSuccess(exit) ? "success" : "failure",
+      }),
+    ),
+  );
+});
+
+export const updateEditorLayout = Effect.fn("schema.layout.update")(function* (
+  actorUserId: string,
+  input: UpdateEditorLayoutInput,
+  requestId: string,
+) {
+  const actorId = yield* decodeActorId(actorUserId);
+  yield* Effect.annotateCurrentSpan({
+    projectId: input.projectId,
+    environmentId: input.environmentId,
+    collectionId: input.collectionId,
+  });
+  const repository = yield* SchemaRepository;
+  const telemetry = yield* Telemetry;
+  return yield* repository.updateEditorLayout(actorId, input, yield* currentDate, requestId).pipe(
+    Effect.onExit((exit) =>
+      telemetry.recordSchemaMutation({
+        action: "layout_update",
         outcome: Exit.isSuccess(exit) ? "success" : "failure",
       }),
     ),
@@ -281,6 +332,33 @@ export const getPublishedSchemaRevision = Effect.fn("schema.published.get_revisi
     revisionId: input.revisionId,
   });
   return yield* (yield* SchemaRepository).getPublishedRevision(actorId, input);
+});
+
+export const getDraftGeneratedForm = Effect.fn("schema.form.get_draft")(function* (
+  actorUserId: string,
+  input: GetDraftGeneratedFormInput,
+) {
+  const actorId = yield* decodeActorId(actorUserId);
+  yield* Effect.annotateCurrentSpan({
+    projectId: input.projectId,
+    environmentId: input.environmentId,
+    collectionId: input.collectionId,
+  });
+  return yield* (yield* SchemaRepository).getDraftForm(actorId, input);
+});
+
+export const getPublishedGeneratedForm = Effect.fn("schema.form.get_published")(function* (
+  actorUserId: string,
+  input: GetPublishedGeneratedFormInput,
+) {
+  const actorId = yield* decodeActorId(actorUserId);
+  yield* Effect.annotateCurrentSpan({
+    projectId: input.projectId,
+    environmentId: input.environmentId,
+    collectionId: input.collectionId,
+    revisionId: input.revisionId ?? "latest",
+  });
+  return yield* (yield* SchemaRepository).getPublishedForm(actorId, input);
 });
 
 export const updateCollection = Effect.fn("schema.collection.update")(function* (

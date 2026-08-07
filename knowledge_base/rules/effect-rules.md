@@ -14,6 +14,6 @@
 - Prefer scoped resource management for resources requiring cleanup.
 - Never use `any`, unsafe assertions, or `orDie` merely to silence type errors.
 - Use `@effect/vitest` patterns for Effect tests.
-- Before Effect work, inspect `.pi/skills/effect-ts/` and relevant stable-v3 source under `.repos/effect/`.
+- Before Effect work, inspect `.agents/skills/effect-ts/` and relevant stable-v3 source under `.repos/effect/`.
 
 Third-party protocols may remain Promise-native at their boundary when required for compatibility, but internal application adapters must expose typed Effects.

@@ -283,6 +283,33 @@ describe.sequential("platform API contracts", () => {
       },
     ],
     [
+      "platform/projects/collections/schema/layout/update",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+        draftVersion: 1,
+        editorLayout: { version: 1, tabs: [], sidebarGroups: [] },
+      },
+    ],
+    [
+      "platform/projects/collections/schema/form/getDraft",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+      },
+    ],
+    [
+      "platform/projects/collections/schema/form/getPublished",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+        revisionId: null,
+      },
+    ],
+    [
       "platform/projects/collections/schema/fields/create",
       {
         projectId: "019fae8b-1234-7000-8000-000000000001",
@@ -296,6 +323,17 @@ describe.sequential("platform API contracts", () => {
         localization: "localized",
         deprecated: false,
         configuration: {},
+      },
+    ],
+    [
+      "platform/projects/collections/schema/fields/replace",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+        draftVersion: 1,
+        authoringVersion: 1,
+        fields: [],
       },
     ],
     [

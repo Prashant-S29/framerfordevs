@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 5 approved and committed; Milestone 6 not started
+**Overall status:** Milestone 6 automated gate complete; awaiting developer/client manual review
 **Active milestone:** Milestone 6 — Field system, structured rich text, external assets, and editor layout
-**Last updated:** 2026-08-02
+**Last updated:** 2026-08-05
 
 ## Status legend
 
@@ -23,7 +23,7 @@
 | 3   | Membership, policies, credentials        | `[A]`  | 381 passing     | Approved      | `a74aeb8` |
 | 4   | Project locales                          | `[A]`  | 453 passing     | Approved      | `68b6f6e` |
 | 5   | Versioned schema engine                  | `[A]`  | 509 passing     | Approved      | `28ca04d` |
-| 6   | Field system and generated forms         | `[ ]`  | Not run         | Pending       | None      |
+| 6   | Field system and generated forms         | `[R]`  | 551 passing     | Pending       | None      |
 | 7   | Entries and multilingual drafts          | `[ ]`  | Not run         | Pending       | None      |
 | 8   | Per-locale publication and snapshots     | `[ ]`  | Not run         | Pending       | None      |
 | 9   | Delivery API                             | `[ ]`  | Not run         | Pending       | None      |
@@ -211,9 +211,49 @@
 - `[x]` Fix the schema-builder route composition issue found during manual review and add a route-tree regression test.
 - `[A]` Developer manually verified the representative collection lifecycle, risky-change acknowledgement, publication, and immutable revision behavior; approved Milestone 5; and committed it as `28ca04d`.
 
+## Milestone 6 checklist — design approval gate
+
+- `[x]` Re-read the product vision, CMS PRD, every mandatory rule, active milestone, context, progress, learnings, and relevant M1/M3/M4/M5 decisions.
+- `[x]` Inspect current Git state and reconcile the completed M5 state with the repository history.
+- `[x]` Load and apply materially relevant Effect, Drizzle, PostgreSQL, Express, security, TanStack, shadcn/ui, React, Turborepo, Better Auth-boundary, and web-interface guidance.
+- `[x]` Inspect the M5 schema contracts, pure engine, repository transactions, policy, operations, runtime, router, builder, browser validation, and automated test seams that M6 extends.
+- `[x]` Research Portable Text, ProseMirror/Tiptap/Lexical trade-offs, safe RE2-compatible patterns, URL/date/email/slug standards, structured rich-text safety, and current package compatibility.
+- `[x]` Inspect shadcn Base UI project context and installed components; no component or dependency was changed.
+- `[x]` Use the required skill-discovery workflow for the uncovered rich-text domain and review candidate source quality, adoption, and security audits.
+- `[x]` Propose the complete M6 field vocabulary, recursive relational model, value validation, rich-text profile, external assets, references, editor layout, role-aware generated forms, security, observability, migration compatibility, and test matrix in `knowledge_base/decisions/m6-field-system-and-generated-forms-design.md`.
+- `[x]` Incorporate developer-approved review changes: centrally profiled depth 8, a 1 MiB aggregate canonical schema limit, and rejection of direct list-of-list definitions in favor of an object boundary.
+- `[x]` Resolve the remaining product decisions: mixed localization is supported through object-only fragment merging with atomic list subtrees; exact decimal and dedicated money fields are included in M6.
+- `[x]` Update the CMS PRD and M6 success criteria to make the approved localization, decimal, and money behavior authoritative.
+- `[x]` Developer approved the complete M6 design and explicitly authorized implementation.
+- `[x]` Developer installed `sanity-io/agent-toolkit@portable-text-serialization`; the agent read the complete skill and React rule.
+- `[x]` Add approved `re2js` and `@portabletext/editor` dependencies with pnpm and review their lockfile impact.
+- `[x]` Generate and pin the browser-safe official SIX ISO 4217 profile `iso-4217@2026-01-01` with 165 currencies and no runtime fetch.
+- `[x]` Implement strict Effect contracts for all 18 field kinds, exact decimal, money, Portable Text, external assets, editor metadata, editor layout, and central validation profiles.
+- `[x]` Implement dependency-light value/tree/layout/aggregate validators, RE2 patterns, depth 8, direct list-of-list rejection, mixed-object/atomic-list localization, and the 1 MiB schema limit.
+- `[x]` Add the replaceable named Effect `FieldEngine` to the shared production runtime.
+- `[x]` Add 19 targeted contract, pure-kernel, layout, aggregate-limit, and Effect service tests.
+- `[x]` Update only the approved Drizzle schema for recursive field nodes, immutable snapshots, editor metadata/layout, reference targets, validation/currency profiles, and decimal/money kinds.
+- `[x]` `@framerfordevs/db` and `@framerfordevs/api` type checks pass after the Drizzle-schema update; no migration command was run.
+- `[x]` Developer generated and applied migration `add_field_system_and_editor_layout`; the agent did neither.
+- `[x]` Agent inspected the complete generated SQL and version-7 snapshot and verified the live schema read-only: all 15 expected columns, 35 new validated constraints, and 16 valid/ready indexes exist; 3 stable fields, 6 revision fields, 3 revisions, and 1 head satisfy legacy backfill invariants.
+- `[x]` Rename project-owned agent skills from `.pi/skills/` to vendor-neutral `.agents/skills/` and add root `AGENTS.md` with repository-specific rules.
+- `[x]` Integrate recursive fields, pinned profiles, independent schema/contract hashing, classification, layouts, references, and generated-form projection through the repository, operations, router, and runtime.
+- `[x]` Implement transactional recursive field/layout mutation and immutable publication snapshots with aggregate bounds, currency pinning, tenant-safe references, no-op behavior, rollback, and role projection.
+- `[x]` Implement all 18 generated control kinds, nested object/list authoring, exact decimal/money controls, external asset metadata, timezone-explicit date-time handling, and the lazy official Portable Text adapter.
+- `[x]` Add property, contract, pure-kernel, Effect service, PostgreSQL, API authorization, browser validation, generated-form, accessibility, aggregate, hashing, classification, and bundle coverage.
+- `[x]` Complete the workspace readiness gate, read-only PostgreSQL invariant/fixture verification, and production bundle boundary review.
+- `[x]` Remediate every `pnpm audit --prod` finding after M6 testing; both production-only and full audits now report no known vulnerabilities.
+- `[x]` Fix the production-only React hook-order crash found during cold Docker manual review; make the reorder mutation hook unconditional and enforce `react-hooks/rules-of-hooks` workspace-wide.
+- `[x]` Replace the route's dialog-only workflow with a visual field tree, persistent inspector, explicit local save/discard state, and guarded navigation while preserving the existing granular APIs as compatibility surfaces.
+- `[x]` Expose every kind-specific configuration plus help, placeholder, visibility roles, and editable roles; suggest unique sibling API keys and render duplicate-key/server validation feedback inline and in an accessible summary.
+- `[x]` Add a versioned synchronized schema-definition JSON view and a separate bounded sample-content JSON inference flow with preview, warnings, explicit local replacement, and no sample-value persistence or server transfer.
+- `[x]` Add the optimistic atomic `fields.replace` contract, operation, telemetry, router, repository transaction, layout reconciliation, audit, OpenAPI, PostgreSQL rollback/identity, UI, pure inference, and accessibility coverage without changing the database schema or migration artifacts.
+- `[x]` Pass the refreshed complete readiness gate with 551 tests and preserve the lazy Portable Text/boundary-reviewed production bundle.
+- `[R]` Continue developer/client manual review of the schema-authoring UX, role-aware generated forms, and keyboard/screen-reader basics before any commit or Milestone 7 work.
+
 ## Current blockers
 
-None. Milestone 5 is approved and committed; Milestone 6 design has not started.
+No technical blocker. Milestone 6 is awaiting the required developer/client manual review; the agent must not commit or advance to Milestone 7.
 
 ## Database migration state
 
@@ -225,7 +265,36 @@ The developer generated and applied `packages/db/src/migrations/0003_add_project
 
 The developer generated and applied `packages/db/src/migrations/0004_create_versioned_collection_schemas.sql` using `pnpm --filter @framerfordevs/db db:generate --name=create_versioned_collection_schemas` followed by `pnpm --filter @framerfordevs/db run db:migrate`. The agent inspected the complete generated DDL and snapshot metadata without modifying or applying them.
 
+The developer generated and applied `packages/db/src/migrations/0005_add_field_system_and_editor_layout.sql` using the approved migration name. The agent inspected the complete SQL and snapshot metadata and verified the applied catalog read-only. The agent did not generate, apply, execute, or modify the migration.
+
 ## Test results
+
+### Milestone 6 complete automated gate
+
+- `pnpm run ready`: pass after the schema-authoring UX extension, including formatting, lint, all package type checks, tests, coverage, and server/web production builds.
+- `pnpm run test`: 551 tests pass: 380 API/domain, 78 server/API integration, 88 web validation/UI/accessibility, and 5 environment tests.
+- API/domain coverage passes at 89.73% statements and 72.15% branches; configured tested web helpers pass at 100% statements and 91.89% branches.
+- PostgreSQL integration covers recursive fields, reference targets, pinned money profiles, independent hashes, layout mutation, draft/published role projection, immutable snapshots, aggregate rollback, tenant isolation, restrictive lifecycle behavior, and intended index paths.
+- Property coverage exercises rich-text trees, nested object/list definitions and values, mixed localization, exact decimal/money, Unicode-safe slugs, external assets, and the depth profile.
+- Server tests deny anonymous callers for the three new layout/form procedures as well as the complete M5/M6 schema surface.
+- Generated-form and platform accessibility tests pass with no detected Axe violations; all 18 field kinds are exhaustively mapped through the typed control registry.
+- Production builds preserve the official Portable Text editor as a lazy client chunk; M6 client route chunks contain no database/server imports. The schema-authoring collection chunk is 235.80 kB raw/68.25 kB gzip; the lazy editor remains 622.84 kB raw/193.43 kB gzip and triggers Vite's informational 500 kB chunk warning without entering the initial route chunk.
+- Read-only live checks report zero unvalidated M6 constraints, zero invalid/unready M6 indexes, zero invalid recursive/reference rows, zero money heads/revisions missing required currency profiles, and zero leaked M5/M6 integration users.
+- `pnpm audit --prod` and the full `pnpm audit` both report no known vulnerabilities after aligned OpenTelemetry/Better Auth/shadcn patch updates, moving the shadcn CLI to development-only dependencies, and package-manager-generated patched transitive overrides.
+- Cold Docker review exposed React error 310 because the builder's loading path skipped a mutation hook; the hook now executes before every conditional return, React Hooks linting is mandatory, focused web checks pass, and rebuilt containers are healthy.
+- The refreshed production Docker images containing the schema-authoring workbench build successfully; PostgreSQL, server, and web report healthy, server root and web login return HTTP 200, and recent server/web logs contain no relevant errors.
+- Manual review found the reference-collection query requesting 100 items against the API's maximum page limit of 50; both the query and matching invalidation key now use 50, all 88 web tests and the production build pass, and the corrected Docker image is healthy.
+- `git diff --check`: pass. The agent did not generate, apply, execute, or modify migration `0005`.
+
+### Milestone 6 pre-migration gate
+
+- New field-system contract, value/tree, editor-layout, aggregate-document, and Effect service tests: 19 targeted passing.
+- `pnpm --filter @framerfordevs/db check-types`: pass after the M6 Drizzle-schema update.
+- `pnpm --filter @framerfordevs/api check-types`: pass after the M6 Drizzle-schema update.
+- Existing API suite plus the first M6 tests reached 366 passing before the final layout/aggregate test additions; the complete readiness suite is deferred until after the developer migration.
+- `git diff --check` and changed-file formatting checks pass at the migration handoff.
+- No migration file was generated or applied by the agent.
+- Post-application read-only verification confirms migration journal count 6, all 35 M6 constraints validated, all 16 M6 indexes valid/ready, and all historical rows satisfy root/profile backfill invariants.
 
 ### Milestone 5 foundational database gate
 

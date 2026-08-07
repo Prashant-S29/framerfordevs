@@ -14,9 +14,12 @@ import {
   CreateCollectionFieldInput,
   CreateCollectionFieldInputSchema,
   CreateCollectionInputSchema,
+  defaultFieldEditorMetadata,
   OutboxEventId,
   PublishCollectionSchemaInputSchema,
   PublishedSchemaRevisionOutputSchema,
+  ReplaceCollectionDraftFieldsInput,
+  ReplaceCollectionDraftFieldsInputSchema,
   SchemaPublicationCommandId,
   SchemaRevisionId,
 } from "./schemas";
@@ -61,23 +64,43 @@ describe("collection schema contracts", () => {
     }),
   );
 
-  it.effect("limits M5 fields to the foundational kinds and an empty configuration", () =>
+  it.effect("exposes all M6 kinds and strict type-specific configuration", () =>
     Effect.gen(function* () {
-      for (const kind of ["short_text", "number", "boolean"]) {
+      const kinds = [
+        "short_text",
+        "long_text",
+        "rich_text",
+        "number",
+        "decimal",
+        "money",
+        "boolean",
+        "date",
+        "date_time",
+        "enum",
+        "url",
+        "email",
+        "slug",
+        "json",
+        "object",
+        "list",
+        "reference",
+        "external_asset",
+      ] as const;
+      for (const kind of kinds) {
         assert.strictEqual(yield* Schema.decodeUnknown(CollectionFieldKind)(kind), kind);
       }
 
       const unsupportedKind = yield* Effect.exit(
-        Schema.decodeUnknown(CollectionFieldKind)("object"),
+        Schema.decodeUnknown(CollectionFieldKind)("markdown"),
       );
       const emptyConfiguration = yield* Schema.decodeUnknown(CollectionFieldConfiguration)({});
-      const configured = yield* Effect.exit(
-        Schema.decodeUnknown(CollectionFieldConfiguration)({ minLength: 1 }),
-      );
+      const configured = yield* Schema.decodeUnknown(CollectionFieldConfiguration)({
+        minLength: 1,
+      });
 
       assert.isTrue(Exit.isFailure(unsupportedKind));
       assert.deepEqual(emptyConfiguration, {});
-      assert.isTrue(Exit.isFailure(configured));
+      assert.deepEqual(configured, { minLength: 1 });
     }),
   );
 
@@ -88,19 +111,66 @@ describe("collection schema contracts", () => {
         environmentId,
         collectionId,
         draftVersion: 1,
-        apiKey: "title",
-        displayLabel: "Title",
-        kind: "short_text",
-        required: true,
-        localization: "localized",
-        deprecated: false,
-        configuration: {},
+        parentFieldId: null,
+        field: {
+          apiKey: "title",
+          displayLabel: "Title",
+          kind: "short_text",
+          required: true,
+          localization: "localized",
+          deprecated: false,
+          editor: defaultFieldEditorMetadata,
+          configuration: {},
+        },
         id: firstFieldId,
         position: 99,
       });
 
       assert.isFalse("id" in decoded);
       assert.isFalse("position" in decoded);
+    }),
+  );
+
+  it.effect("accepts a recursive authoring tree with nullable identities", () =>
+    Effect.gen(function* () {
+      const decoded = yield* Schema.decodeUnknown(ReplaceCollectionDraftFieldsInput)({
+        projectId,
+        environmentId,
+        collectionId,
+        draftVersion: 1,
+        authoringVersion: 1,
+        fields: [
+          {
+            id: firstFieldId,
+            apiKey: "details",
+            displayLabel: "Details",
+            kind: "object",
+            required: false,
+            localization: "localized",
+            deprecated: false,
+            editor: defaultFieldEditorMetadata,
+            configuration: {},
+            children: [
+              {
+                id: null,
+                apiKey: "summary",
+                displayLabel: "Summary",
+                kind: "long_text",
+                required: false,
+                localization: null,
+                deprecated: false,
+                editor: defaultFieldEditorMetadata,
+                configuration: { maxLength: 5000 },
+                children: [],
+              },
+            ],
+          },
+        ],
+      });
+
+      assert.strictEqual(decoded.fields[0]?.id, firstFieldId);
+      assert.strictEqual(decoded.fields[0]?.children[0]?.id, null);
+      assert.strictEqual(decoded.fields[0]?.children[0]?.kind, "long_text");
     }),
   );
 
@@ -149,6 +219,7 @@ describe("collection schema contracts", () => {
     const schemas = await Promise.all([
       converter.convert(CreateCollectionInputSchema, { strategy: "input" }),
       converter.convert(CreateCollectionFieldInputSchema, { strategy: "input" }),
+      converter.convert(ReplaceCollectionDraftFieldsInputSchema, { strategy: "input" }),
       converter.convert(PublishCollectionSchemaInputSchema, { strategy: "input" }),
       converter.convert(PublishedSchemaRevisionOutputSchema, { strategy: "output" }),
     ]);

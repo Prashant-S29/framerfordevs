@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, it } from "@effect/vitest";
 import { db } from "@framerfordevs/db";
-import { eq, or, sql } from "@framerfordevs/db/query";
+import { and, eq, isNull, or, sql } from "@framerfordevs/db/query";
 import { projectMembership } from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
 import {
@@ -35,16 +35,21 @@ import {
 import {
   CreateCollectionFieldInput,
   CreateCollectionInput,
+  defaultFieldEditorMetadata,
   GetCollectionDraftInput,
   GetCollectionInput,
+  GetDraftGeneratedFormInput,
   GetLatestPublishedSchemaInput,
+  GetPublishedGeneratedFormInput,
   GetPublishedSchemaRevisionInput,
   ListCollectionsInput,
   PublishCollectionSchemaInput,
   RemoveCollectionFieldInput,
   ReorderCollectionFieldsInput,
+  ReplaceCollectionDraftFieldsInput,
   UpdateCollectionFieldInput,
   UpdateCollectionInput,
+  UpdateEditorLayoutInput,
   ValidateCollectionSchemaInput,
   type CmsCollection as CmsCollectionModel,
 } from "../contracts/schemas";
@@ -54,8 +59,10 @@ import { makeSchemaRepository } from "./schema-repository";
 const suffix = randomUUID();
 const ownerId = `m5-schema-owner-${suffix}`;
 const foreignId = `m5-schema-foreign-${suffix}`;
+const readerId = `m6-schema-reader-${suffix}`;
 const ownerActor = Schema.decodeUnknownSync(AuthUserId)(ownerId);
 const foreignActor = Schema.decodeUnknownSync(AuthUserId)(foreignId);
+const readerActor = Schema.decodeUnknownSync(AuthUserId)(readerId);
 const platform = makePlatformRepository();
 const schemas = makeSchemaRepository();
 
@@ -80,6 +87,18 @@ function failureTag(exit: Exit.Exit<unknown, unknown>): string | undefined {
   return undefined;
 }
 
+function failureIssueCodes(exit: Exit.Exit<unknown, unknown>): ReadonlyArray<string> {
+  if (Exit.isSuccess(exit)) return [];
+  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  if (typeof failure !== "object" || failure === null || !("issues" in failure)) return [];
+  if (!Array.isArray(failure.issues)) return [];
+  return failure.issues.flatMap((issue) =>
+    typeof issue === "object" && issue !== null && "code" in issue && typeof issue.code === "string"
+      ? [issue.code]
+      : [],
+  );
+}
+
 beforeAll(async () => {
   await db.insert(user).values([
     {
@@ -92,6 +111,12 @@ beforeAll(async () => {
       id: foreignId,
       name: "M5 Schema Foreign",
       email: `m5-schema-foreign-${suffix}@example.test`,
+      emailVerified: true,
+    },
+    {
+      id: readerId,
+      name: "M6 Schema Reader",
+      email: `m6-schema-reader-${suffix}@example.test`,
       emailVerified: true,
     },
   ]);
@@ -114,6 +139,18 @@ beforeAll(async () => {
       "request-m5-schema-project",
     ),
   );
+  await db.insert(workspaceMembership).values({
+    workspaceId: required(workspaceModel, "workspace").id,
+    userId: readerId,
+    role: "collaborator",
+  });
+  await db.insert(projectMembership).values({
+    workspaceId: required(workspaceModel, "workspace").id,
+    projectId: required(projectModel, "project").id,
+    userId: readerId,
+    role: "read_only",
+    createdByUserId: ownerId,
+  });
   await Effect.runPromise(
     platform.enableCapability(
       ownerActor,
@@ -168,7 +205,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const actorIds = [ownerId, foreignId];
+  const actorIds = [ownerId, foreignId, readerId];
   const ownedCollections = sql`select id from cms_collection where created_by_user_id in (${ownerId}, ${foreignId})`;
   await db.delete(outboxEvent).where(sql`${outboxEvent.subjectId} in (${ownedCollections})`);
   await db
@@ -434,13 +471,17 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             environmentId: collection.environmentId,
             collectionId: collection.id,
             draftVersion: current.draftVersion,
-            apiKey: "title",
-            displayLabel: "Title",
-            kind: "short_text",
-            required: true,
-            localization: "localized",
-            deprecated: false,
-            configuration: {},
+            parentFieldId: null,
+            field: {
+              apiKey: "title",
+              displayLabel: "Title",
+              kind: "short_text",
+              required: true,
+              localization: "localized",
+              deprecated: false,
+              editor: defaultFieldEditorMetadata,
+              configuration: {},
+            },
           }),
           new Date("2026-08-01T13:00:00.000Z"),
           "request-m5-field-title",
@@ -455,13 +496,16 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             collectionId: collection.id,
             fieldId: title.id,
             draftVersion: titleDraft.collection.draftVersion,
-            apiKey: title.apiKey,
-            displayLabel: title.displayLabel,
-            kind: title.kind,
-            required: title.required,
-            localization: title.localization,
-            deprecated: title.deprecated,
-            configuration: title.configuration,
+            field: {
+              apiKey: title.apiKey,
+              displayLabel: title.displayLabel,
+              kind: title.kind,
+              required: title.required,
+              localization: title.localization,
+              deprecated: title.deprecated,
+              editor: title.editor,
+              configuration: title.configuration,
+            },
           }),
           new Date(),
           "request-m5-field-noop",
@@ -473,13 +517,17 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             environmentId: collection.environmentId,
             collectionId: collection.id,
             draftVersion: noOp.collection.draftVersion,
-            apiKey: "summary",
-            displayLabel: "Summary",
-            kind: "short_text",
-            required: false,
-            localization: "localized",
-            deprecated: false,
-            configuration: {},
+            parentFieldId: null,
+            field: {
+              apiKey: "summary",
+              displayLabel: "Summary",
+              kind: "short_text",
+              required: false,
+              localization: "localized",
+              deprecated: false,
+              editor: defaultFieldEditorMetadata,
+              configuration: {},
+            },
           }),
           new Date("2026-08-01T13:01:00.000Z"),
           "request-m5-field-summary",
@@ -493,6 +541,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             environmentId: collection.environmentId,
             collectionId: collection.id,
             draftVersion: summaryDraft.collection.draftVersion,
+            parentFieldId: null,
             fieldIds: [summary.id, title.id],
           }),
           new Date("2026-08-01T13:02:00.000Z"),
@@ -505,6 +554,446 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         assert.strictEqual(
           reordered.collection.draftVersion,
           summaryDraft.collection.draftVersion + 1,
+        );
+      }),
+  );
+
+  it.effect("atomically replaces authoring fields while preserving active identities", () =>
+    Effect.gen(function* () {
+      const project = required(projectModel, "project");
+      const collection = yield* schemas.createCollection(
+        ownerActor,
+        yield* Schema.decodeUnknown(CreateCollectionInput)({
+          projectId: project.id,
+          environmentId: project.environment.id,
+          apiKey: `bulk_${suffix.replaceAll("-", "").slice(0, 20)}`,
+          displayName: "Bulk authoring",
+          description: null,
+        }),
+        new Date("2026-08-01T13:02:30.000Z"),
+        "request-m6-bulk-collection",
+      );
+      const scope = {
+        projectId: collection.projectId,
+        environmentId: collection.environmentId,
+        collectionId: collection.id,
+      };
+      const duplicate = yield* Effect.exit(
+        schemas.replaceFields(
+          ownerActor,
+          yield* Schema.decodeUnknown(ReplaceCollectionDraftFieldsInput)({
+            ...scope,
+            draftVersion: collection.draftVersion,
+            authoringVersion: 1,
+            fields: [
+              {
+                id: null,
+                apiKey: "title",
+                displayLabel: "Title",
+                kind: "short_text",
+                required: true,
+                localization: "localized",
+                deprecated: false,
+                editor: defaultFieldEditorMetadata,
+                configuration: {},
+                children: [],
+              },
+              {
+                id: null,
+                apiKey: "title",
+                displayLabel: "Duplicate title",
+                kind: "short_text",
+                required: false,
+                localization: "localized",
+                deprecated: false,
+                editor: defaultFieldEditorMetadata,
+                configuration: {},
+                children: [],
+              },
+            ],
+          }),
+          new Date("2026-08-01T13:02:31.000Z"),
+          "request-m6-bulk-duplicate",
+        ),
+      );
+      const afterFailure = yield* schemas.getDraft(
+        ownerActor,
+        yield* Schema.decodeUnknown(GetCollectionDraftInput)(scope),
+      );
+      assert.strictEqual(failureTag(duplicate), "SchemaInvalidFailure");
+      assert.include(failureIssueCodes(duplicate), "field_api_key_duplicate");
+      assert.strictEqual(afterFailure.fields.length, 0);
+
+      const created = yield* schemas.replaceFields(
+        ownerActor,
+        yield* Schema.decodeUnknown(ReplaceCollectionDraftFieldsInput)({
+          ...scope,
+          draftVersion: afterFailure.collection.draftVersion,
+          authoringVersion: 1,
+          fields: [
+            {
+              id: null,
+              apiKey: "title",
+              displayLabel: "Title",
+              kind: "short_text",
+              required: true,
+              localization: "localized",
+              deprecated: false,
+              editor: defaultFieldEditorMetadata,
+              configuration: { maxLength: 200 },
+              children: [],
+            },
+          ],
+        }),
+        new Date("2026-08-01T13:02:32.000Z"),
+        "request-m6-bulk-create",
+      );
+      const title = required(created.fields[0], "bulk title");
+      const updated = yield* schemas.replaceFields(
+        ownerActor,
+        yield* Schema.decodeUnknown(ReplaceCollectionDraftFieldsInput)({
+          ...scope,
+          draftVersion: created.collection.draftVersion,
+          authoringVersion: 1,
+          fields: [
+            {
+              id: title.id,
+              apiKey: title.apiKey,
+              displayLabel: "Heading",
+              kind: title.kind,
+              required: title.required,
+              localization: title.localization,
+              deprecated: title.deprecated,
+              editor: title.editor,
+              configuration: title.configuration,
+              children: [],
+            },
+            {
+              id: null,
+              apiKey: "summary",
+              displayLabel: "Heading",
+              kind: "long_text",
+              required: false,
+              localization: "localized",
+              deprecated: false,
+              editor: defaultFieldEditorMetadata,
+              configuration: {},
+              children: [],
+            },
+          ],
+        }),
+        new Date("2026-08-01T13:02:33.000Z"),
+        "request-m6-bulk-update",
+      );
+
+      assert.strictEqual(updated.fields[0]?.id, title.id);
+      assert.strictEqual(updated.fields[0]?.displayLabel, "Heading");
+      assert.strictEqual(updated.fields[1]?.displayLabel, "Heading");
+      assert.notStrictEqual(updated.fields[1]?.id, title.id);
+      assert.strictEqual(updated.editorLayout.tabs[0]?.groups[0]?.fields.length, 2);
+    }),
+  );
+
+  it.effect("persists recursive M6 fields, pinned money, layout, and role-projected forms", () =>
+    Effect.gen(function* () {
+      const collection = required(firstCollection, "collection");
+      const scope = {
+        projectId: collection.projectId,
+        environmentId: collection.environmentId,
+        collectionId: collection.id,
+      };
+      let draft = yield* schemas.getDraft(
+        ownerActor,
+        yield* Schema.decodeUnknown(GetCollectionDraftInput)(scope),
+      );
+      draft = yield* schemas.createField(
+        ownerActor,
+        yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+          ...scope,
+          draftVersion: draft.collection.draftVersion,
+          parentFieldId: null,
+          field: {
+            apiKey: "product",
+            displayLabel: "Product",
+            kind: "object",
+            required: null,
+            localization: "mixed",
+            deprecated: false,
+            editor: defaultFieldEditorMetadata,
+            configuration: {},
+          },
+        }),
+        new Date("2026-08-01T13:03:00.000Z"),
+        "request-m6-object",
+      );
+      const product = draft.fields.find((field) => field.apiKey === "product");
+      if (!product) throw new Error("Product object was not created.");
+      draft = yield* schemas.createField(
+        ownerActor,
+        yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+          ...scope,
+          draftVersion: draft.collection.draftVersion,
+          parentFieldId: product.id,
+          field: {
+            apiKey: "sku",
+            displayLabel: "SKU",
+            kind: "short_text",
+            required: true,
+            localization: "shared",
+            deprecated: false,
+            editor: defaultFieldEditorMetadata,
+            configuration: { minLength: 1, maxLength: 50 },
+          },
+        }),
+        new Date("2026-08-01T13:04:00.000Z"),
+        "request-m6-object-child",
+      );
+      draft = yield* schemas.createField(
+        ownerActor,
+        yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+          ...scope,
+          draftVersion: draft.collection.draftVersion,
+          parentFieldId: null,
+          field: {
+            apiKey: "prices",
+            displayLabel: "Prices",
+            kind: "list",
+            required: false,
+            localization: "shared",
+            deprecated: false,
+            editor: defaultFieldEditorMetadata,
+            configuration: { maxItems: 10 },
+          },
+        }),
+        new Date("2026-08-01T13:05:00.000Z"),
+        "request-m6-list",
+      );
+      const prices = draft.fields.find((field) => field.apiKey === "prices");
+      if (!prices) throw new Error("Prices list was not created.");
+      draft = yield* schemas.createField(
+        ownerActor,
+        yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+          ...scope,
+          draftVersion: draft.collection.draftVersion,
+          parentFieldId: prices.id,
+          field: {
+            apiKey: null,
+            displayLabel: null,
+            kind: "decimal",
+            required: null,
+            localization: null,
+            deprecated: false,
+            editor: prices.editor,
+            configuration: { precision: 10, scale: 2 },
+          },
+        }),
+        new Date("2026-08-01T13:06:00.000Z"),
+        "request-m6-list-item",
+      );
+      draft = yield* schemas.createField(
+        ownerActor,
+        yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+          ...scope,
+          draftVersion: draft.collection.draftVersion,
+          parentFieldId: null,
+          field: {
+            apiKey: "amount",
+            displayLabel: "Amount",
+            kind: "money",
+            required: false,
+            localization: "shared",
+            deprecated: false,
+            editor: defaultFieldEditorMetadata,
+            configuration: { currencies: ["USD", "JPY"] },
+          },
+        }),
+        new Date("2026-08-01T13:07:00.000Z"),
+        "request-m6-money",
+      );
+      draft = yield* schemas.createField(
+        ownerActor,
+        yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+          ...scope,
+          draftVersion: draft.collection.draftVersion,
+          parentFieldId: null,
+          field: {
+            apiKey: "related",
+            displayLabel: "Related",
+            kind: "reference",
+            required: false,
+            localization: "shared",
+            deprecated: false,
+            editor: defaultFieldEditorMetadata,
+            configuration: { targetCollectionId: collection.id },
+          },
+        }),
+        new Date("2026-08-01T13:08:00.000Z"),
+        "request-m6-reference",
+      );
+
+      const reloadedProduct = draft.fields.find((field) => field.id === product.id);
+      const reloadedPrices = draft.fields.find((field) => field.id === prices.id);
+      const form = yield* schemas.getDraftForm(
+        ownerActor,
+        yield* Schema.decodeUnknown(GetDraftGeneratedFormInput)(scope),
+      );
+      const firstTab = draft.editorLayout.tabs[0];
+      const firstGroup = firstTab?.groups[0];
+      if (!firstTab || !firstGroup) throw new Error("Synthetic editor layout was not created.");
+      const updatedLayout = {
+        ...draft.editorLayout,
+        tabs: draft.editorLayout.tabs.map((tab) => ({
+          ...tab,
+          groups: tab.groups.map((group) =>
+            group.id === firstGroup.id ? { ...group, columns: 2 } : group,
+          ),
+        })),
+      };
+      draft = yield* schemas.updateEditorLayout(
+        ownerActor,
+        yield* Schema.decodeUnknown(UpdateEditorLayoutInput)({
+          ...scope,
+          draftVersion: draft.collection.draftVersion,
+          editorLayout: updatedLayout,
+        }),
+        new Date("2026-08-01T13:09:00.000Z"),
+        "request-m6-layout",
+      );
+      const [head] = yield* Effect.promise(() =>
+        db
+          .select()
+          .from(cmsCollectionSchemaHead)
+          .where(eq(cmsCollectionSchemaHead.collectionId, collection.id)),
+      );
+
+      assert.strictEqual(reloadedProduct?.children[0]?.apiKey, "sku");
+      assert.strictEqual(reloadedPrices?.children[0]?.nodeRole, "list_item");
+      assert.strictEqual(draft.currencyRegistryProfile, "iso-4217@2026-01-01");
+      assert.strictEqual(head?.currencyRegistryProfile, "iso-4217@2026-01-01");
+      assert.strictEqual(draft.editorLayout.tabs[0]?.groups[0]?.columns, 2);
+      assert.strictEqual(form.role, "owner");
+      assert.isTrue(form.canEdit);
+      assert.isTrue(form.currencyMinorUnits["USD"] === 2);
+
+      const temporaryIds = draft.fields
+        .filter((field) => ["product", "prices", "amount", "related"].includes(field.apiKey ?? ""))
+        .map((field) => field.id);
+      for (const fieldId of temporaryIds) {
+        draft = yield* schemas.removeField(
+          ownerActor,
+          yield* Schema.decodeUnknown(RemoveCollectionFieldInput)({
+            ...scope,
+            fieldId,
+            draftVersion: draft.collection.draftVersion,
+          }),
+          new Date("2026-08-01T13:10:00.000Z"),
+          `request-m6-cleanup-${fieldId}`,
+        );
+      }
+      assert.strictEqual(draft.fields.length, 2);
+      assert.isNull(draft.currencyRegistryProfile);
+    }),
+  );
+
+  it.effect(
+    "rejects aggregate schema overflow without partial field, version, or audit writes",
+    () =>
+      Effect.gen(function* () {
+        const currentProject = required(projectModel, "project");
+        const collection = yield* schemas.createCollection(
+          ownerActor,
+          yield* Schema.decodeUnknown(CreateCollectionInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            apiKey: `aggregate_${suffix.slice(0, 8)}`,
+            displayName: "Aggregate bound",
+            description: null,
+          }),
+          new Date("2026-08-01T13:20:00.000Z"),
+          "request-m6-aggregate-collection",
+        );
+        let draft = yield* schemas.getDraft(
+          ownerActor,
+          yield* Schema.decodeUnknown(GetCollectionDraftInput)({
+            projectId: collection.projectId,
+            environmentId: collection.environmentId,
+            collectionId: collection.id,
+          }),
+        );
+        let accepted = 0;
+        let rejected = false;
+        for (let index = 0; index < 20; index += 1) {
+          const exit = yield* Effect.exit(
+            schemas.createField(
+              ownerActor,
+              yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+                projectId: collection.projectId,
+                environmentId: collection.environmentId,
+                collectionId: collection.id,
+                draftVersion: draft.collection.draftVersion,
+                parentFieldId: null,
+                field: {
+                  apiKey: `payload_${index}`,
+                  displayLabel: `Payload ${index}`,
+                  kind: "json",
+                  required: false,
+                  localization: "shared",
+                  deprecated: false,
+                  editor: defaultFieldEditorMetadata,
+                  configuration: { default: "x".repeat(64_000) },
+                },
+              }),
+              new Date("2026-08-01T13:21:00.000Z"),
+              `request-m6-aggregate-${index}`,
+            ),
+          );
+          if (Exit.isFailure(exit)) {
+            assert.strictEqual(failureTag(exit), "SchemaInvalidFailure");
+            rejected = true;
+            break;
+          }
+          draft = exit.value;
+          accepted += 1;
+        }
+        const activeRows = yield* Effect.promise(() =>
+          db
+            .select()
+            .from(cmsCollectionField)
+            .where(
+              and(
+                eq(cmsCollectionField.collectionId, collection.id),
+                isNull(cmsCollectionField.removedAt),
+              ),
+            ),
+        );
+        const current = yield* schemas.getCollection(
+          ownerActor,
+          yield* Schema.decodeUnknown(GetCollectionInput)({
+            projectId: collection.projectId,
+            environmentId: collection.environmentId,
+            collectionId: collection.id,
+          }),
+        );
+        const audits = yield* Effect.promise(() =>
+          db
+            .select()
+            .from(auditEvent)
+            .where(
+              and(
+                eq(auditEvent.resourceType, "cms_collection_field"),
+                eq(auditEvent.projectId, collection.projectId),
+                eq(auditEvent.environmentId, collection.environmentId),
+              ),
+            ),
+        );
+
+        assert.isTrue(rejected);
+        assert.strictEqual(activeRows.length, accepted);
+        assert.strictEqual(current.draftVersion, 1 + accepted);
+        assert.strictEqual(
+          audits.filter((audit) => activeRows.some((field) => field.id === audit.resourceId))
+            .length,
+          accepted,
         );
       }),
   );
@@ -643,6 +1132,13 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             revisionId: published.id,
           }),
         );
+        const readerForm = yield* schemas.getPublishedForm(
+          readerActor,
+          yield* Schema.decodeUnknown(GetPublishedGeneratedFormInput)({
+            ...scope,
+            revisionId: null,
+          }),
+        );
         const events = yield* Effect.promise(() =>
           db.select().from(outboxEvent).where(eq(outboxEvent.subjectId, collection.id)),
         );
@@ -654,6 +1150,10 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         assert.strictEqual(replay.id, published.id);
         assert.strictEqual(latest.id, published.id);
         assert.deepStrictEqual(original, published);
+        assert.strictEqual(readerForm.role, "read_only");
+        assert.isFalse(readerForm.canEdit);
+        assert.deepEqual(readerForm.editableFieldIds, []);
+        assert.strictEqual(readerForm.fields.length, published.fields.length);
         assert.strictEqual(events.length, 1);
         assert.strictEqual(audits.filter((audit) => audit.resourceId === collection.id).length, 1);
         assert.strictEqual(events[0]?.schemaRevisionId, published.id);
@@ -685,13 +1185,16 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             ...scope,
             fieldId: title.id,
             draftVersion: draft.collection.draftVersion,
-            apiKey: "headline",
-            displayLabel: "Headline",
-            kind: title.kind,
-            required: title.required,
-            localization: title.localization,
-            deprecated: title.deprecated,
-            configuration: title.configuration,
+            field: {
+              apiKey: "headline",
+              displayLabel: "Headline",
+              kind: title.kind,
+              required: title.required,
+              localization: title.localization,
+              deprecated: title.deprecated,
+              editor: title.editor,
+              configuration: title.configuration,
+            },
           }),
           new Date("2026-08-01T14:02:00.000Z"),
           "request-m5-title-rename",
@@ -741,13 +1244,16 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             ...scope,
             fieldId: summary.id,
             draftVersion: renamedDraft.collection.draftVersion,
-            apiKey: summary.apiKey,
-            displayLabel: "Excerpt",
-            kind: summary.kind,
-            required: summary.required,
-            localization: summary.localization,
-            deprecated: summary.deprecated,
-            configuration: summary.configuration,
+            field: {
+              apiKey: summary.apiKey,
+              displayLabel: "Excerpt",
+              kind: summary.kind,
+              required: summary.required,
+              localization: summary.localization,
+              deprecated: summary.deprecated,
+              editor: summary.editor,
+              configuration: summary.configuration,
+            },
           }),
           new Date("2026-08-01T14:04:00.000Z"),
           "request-m5-concurrent-draft",
@@ -812,7 +1318,12 @@ describe.sequential("schema repository PostgreSQL integration", () => {
           db
             .select()
             .from(cmsCollectionField)
-            .where(eq(cmsCollectionField.collectionId, collection.id))
+            .where(
+              and(
+                eq(cmsCollectionField.collectionId, collection.id),
+                isNull(cmsCollectionField.removedAt),
+              ),
+            )
             .limit(1),
         );
         if (!field) throw new Error("Stable field was not found.");
@@ -836,7 +1347,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
               sql`explain (format json) select id from cms_collection where environment_id = ${collection.environmentId} order by created_at desc, id desc limit 20`,
             );
             const fieldPlan = await transaction.execute(
-              sql`explain (format json) select id from cms_collection_field where collection_id = ${collection.id} and removed_at is null order by position, id`,
+              sql`explain (format json) select id from cms_collection_field where collection_id = ${collection.id} and removed_at is null and node_role = 'root' order by position`,
             );
             const revisionPlan = await transaction.execute(
               sql`explain (format json) select id from cms_schema_revision where collection_id = ${collection.id} order by sequence desc limit 1`,
@@ -844,16 +1355,20 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             const outboxPlan = await transaction.execute(
               sql`explain (format json) select id from outbox_event where processed_at is null order by available_at, id limit 20`,
             );
+            const fieldIndex = await transaction.execute(
+              sql`select to_regclass('public.cms_field_collection_active_root_position_unique')::text as name`,
+            );
             return JSON.stringify([
               collectionPlan.rows,
               fieldPlan.rows,
               revisionPlan.rows,
               outboxPlan.rows,
+              fieldIndex.rows,
             ]);
           }),
         );
         assert.include(plans, "cms_collection_environment_created_id_idx");
-        assert.include(plans, "cms_field_collection_active_position_id_idx");
+        assert.include(plans, "cms_field_collection_active_root_position_unique");
         assert.match(plans, /cms_revision_collection_(sequence_desc_idx|sequence_unique)/u);
         assert.include(plans, "outbox_event_pending_available_id_idx");
 
@@ -919,13 +1434,17 @@ describe.sequential("schema repository PostgreSQL integration", () => {
               environmentId: collection.environmentId,
               collectionId: collection.id,
               draftVersion: currentDraft.collection.draftVersion,
-              apiKey: "archived_field",
-              displayLabel: "Archived field",
-              kind: "boolean",
-              required: false,
-              localization: "shared",
-              deprecated: false,
-              configuration: {},
+              parentFieldId: null,
+              field: {
+                apiKey: "archived_field",
+                displayLabel: "Archived field",
+                kind: "boolean",
+                required: false,
+                localization: "shared",
+                deprecated: false,
+                editor: defaultFieldEditorMetadata,
+                configuration: {},
+              },
             }),
             new Date(),
             "request-m5-archived-mutation",

@@ -10,6 +10,7 @@ import {
   GetPublishedSchemaRevisionInput,
   PublishCollectionSchemaInput,
   PublishedSchemaRevision,
+  ReplaceCollectionDraftFieldsInput,
   ValidateCollectionSchemaInput,
 } from "../contracts/schemas";
 import { TelemetryLive } from "../observability/telemetry";
@@ -19,6 +20,7 @@ import {
   getLatestPublishedSchema,
   getPublishedSchemaRevision,
   publishCollectionSchema,
+  replaceCollectionDraftFields,
   validateCollectionSchema,
 } from "./schemas";
 
@@ -30,8 +32,59 @@ const commandId = "019fae8b-1234-7000-8000-000000000005";
 const fieldId = "019fae8b-1234-7000-8000-000000000006";
 const workspaceId = "019fae8b-1234-7000-8000-000000000007";
 const timestamp = "2026-08-01T12:00:00.000Z";
+const editor = {
+  helpText: null,
+  placeholder: null,
+  visibleToRoles: [
+    "owner",
+    "developer",
+    "content_admin",
+    "editor",
+    "reviewer",
+    "client_editor",
+    "read_only",
+  ],
+  editableByRoles: ["owner", "developer", "content_admin", "editor", "client_editor"],
+};
+const editorLayout = {
+  version: 1,
+  tabs: [
+    {
+      id: "00000000-0000-4000-8000-000000000021",
+      title: "Content",
+      description: null,
+      position: 0,
+      visibleToRoles: editor.visibleToRoles,
+      groups: [
+        {
+          id: "00000000-0000-4000-8000-000000000022",
+          title: "Main",
+          description: null,
+          position: 0,
+          columns: 1,
+          visibleToRoles: editor.visibleToRoles,
+          fields: [
+            {
+              id: fieldId,
+              fieldId,
+              position: 0,
+              helpTextOverride: null,
+              visibleToRoles: editor.visibleToRoles,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  sidebarGroups: [],
+};
 
 const draft = Schema.decodeUnknownSync(CollectionDraftSchema)({
+  formatVersion: 2,
+  validationProfile: "ffd-fields@1",
+  currencyRegistryProfile: null,
+  contractHash: "b".repeat(64),
+  editorLayout,
   collection: {
     id: collectionId,
     workspaceId,
@@ -51,6 +104,8 @@ const draft = Schema.decodeUnknownSync(CollectionDraftSchema)({
   fields: [
     {
       id: fieldId,
+      parentFieldId: null,
+      nodeRole: "root",
       apiKey: "title",
       displayLabel: "Title",
       kind: "short_text",
@@ -58,7 +113,9 @@ const draft = Schema.decodeUnknownSync(CollectionDraftSchema)({
       localization: "localized",
       deprecated: false,
       position: 0,
+      editor,
       configuration: {},
+      children: [],
     },
   ],
 });
@@ -71,10 +128,14 @@ const revision = Schema.decodeUnknownSync(PublishedSchemaRevision)({
   collectionId,
   sequence: 1,
   previousRevisionId: null,
+  formatVersion: 2,
+  validationProfile: "ffd-fields@1",
+  currencyRegistryProfile: null,
   collectionApiKey: "articles",
   collectionDisplayName: "Articles",
   collectionDescription: null,
   schemaHash: "a".repeat(64),
+  contractHash: "b".repeat(64),
   commandId,
   nonBreakingChangeCount: 0,
   potentiallyBreakingChangeCount: 1,
@@ -82,12 +143,14 @@ const revision = Schema.decodeUnknownSync(PublishedSchemaRevision)({
   publishedByUserId: "user-1",
   publishedAt: timestamp,
   fields: draft.fields,
+  editorLayout,
 });
 
 const validation = CollectionSchemaValidation.make({
   valid: true,
   issues: [],
   schemaHash: revision.schemaHash,
+  contractHash: revision.contractHash,
   changes: SchemaChangeSet.make({
     items: [],
     nonBreakingCount: 0,
@@ -103,6 +166,7 @@ const RepositoryTest = Layer.succeed(SchemaRepository, {
   getDraft: () => Effect.sync(() => (calls.push("getDraft"), draft)),
   validateSchema: () => Effect.sync(() => (calls.push("validateSchema"), validation)),
   publishSchema: () => Effect.sync(() => (calls.push("publishSchema"), revision)),
+  replaceFields: () => Effect.sync(() => (calls.push("replaceFields"), draft)),
   getLatestPublished: () => Effect.sync(() => (calls.push("getLatestPublished"), revision)),
   getPublishedRevision: () => Effect.sync(() => (calls.push("getPublishedRevision"), revision)),
 });
@@ -121,6 +185,16 @@ describe("schema operations", () => {
         yield* validateCollectionSchema(
           "user-1",
           yield* Schema.decodeUnknown(ValidateCollectionSchemaInput)(scope),
+        );
+        yield* replaceCollectionDraftFields(
+          "user-1",
+          yield* Schema.decodeUnknown(ReplaceCollectionDraftFieldsInput)({
+            ...scope,
+            draftVersion: 2,
+            authoringVersion: 1,
+            fields: [],
+          }),
+          "request-schema-replace",
         );
         yield* publishCollectionSchema(
           "user-1",
@@ -145,6 +219,7 @@ describe("schema operations", () => {
         assert.deepEqual(calls, [
           "getDraft",
           "validateSchema",
+          "replaceFields",
           "publishSchema",
           "getLatestPublished",
           "getPublishedRevision",

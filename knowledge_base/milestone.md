@@ -335,20 +335,23 @@ Implement the initial field vocabulary and form metadata without coupling conten
 
 ### Deliverables
 
-- Initial field types from the PRD
+- Initial field types from the PRD, including exact decimal and money
 - Field-level validation engine
 - Structured rich-text document schema
 - External asset reference schema
 - Object/list nesting limits
 - Entry-reference configuration
 - Editor groups, ordering, help text, and role visibility
+- Visual field-tree inspector plus versioned schema JSON and sample-JSON inference authoring
+- Atomic complete-tree authoring save with precise validation details
 - Generated form component registry
 
 ### Automated success criteria
 
 - Each field type accepts valid values and rejects wrong primitive/structural values.
 - Required, default, min/max, length, regex, enum, URL, email, and slug rules behave correctly at boundaries.
-- Numeric boundaries cover integers, decimals, negatives, zero, overflow, and non-finite input.
+- Numeric boundaries cover safe integers, approximate floating-point values, exact canonical decimals, negatives, zero, overflow, non-finite input, precision, and scale.
+- Money validates exact amounts, allowed ISO 4217 currencies, currency minor units, and negative-value policy without floating-point conversion or silent rounding.
 - Date/time behavior is timezone-explicit and rejects invalid calendar values.
 - URL validation rejects unsafe protocols and malformed URLs.
 - External asset accepts supported kinds and optional metadata without fetching the URL.
@@ -358,14 +361,18 @@ Implement the initial field vocabulary and form metadata without coupling conten
 - Invalid recursive or cyclic object/list definitions are rejected deterministically.
 - Relaxing validation and adding enum options are classified non-breaking; tightening validation is classified potentially breaking; removing enum options is classified breaking.
 - References enforce configured target collections.
-- Localized and shared field flags are represented correctly.
+- Localized/shared atomic fields and mixed object localization are represented correctly; list subtrees remain atomic and arrays are never merged across locale partitions.
 - Editor layout cannot reference missing fields or expose protected fields to restricted roles.
 - Layout changes do not alter schema API output.
 - Generated fields have accessible labels, descriptions, and error associations.
-- Property tests cover rich-text trees, nested objects/lists, slugs, and external assets.
+- Visual and schema-JSON views synchronize through one bounded local authoring document; sample inference never persists or transmits sample values.
+- Complete-tree save is atomic, optimistic-versioned, stable-ID preserving, reparent-safe, audited, and leaves no partial writes after validation failure.
+- Duplicate sibling API keys and authoritative server issues produce actionable path-specific accessible feedback.
+- Property tests cover rich-text trees, nested objects/lists, mixed localization, exact decimals, money, slugs, and external assets.
 
 ### Manual review
 
+- Developer reviews visual/JSON synchronization, sample inference, every type setting, duplicate-key feedback, save/discard, and unsaved-navigation behavior.
 - Developer and client accounts inspect the same generated form and verify role-aware differences.
 - Developer tests keyboard and screen-reader basics for all form controls.
 

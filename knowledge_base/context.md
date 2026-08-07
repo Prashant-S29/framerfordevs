@@ -1,7 +1,7 @@
 # Agent Session Context
 
-**Last updated:** 2026-08-02
-**Current phase:** Milestone 5 approved and committed; preparing Milestone 6 design
+**Last updated:** 2026-08-05
+**Current phase:** Milestone 6 automated gate complete; awaiting developer/client manual review
 **Active milestone:** Milestone 6 — Field system, structured rich text, external assets, and editor layout
 
 ## What this project is
@@ -58,7 +58,7 @@ The repository is not using Next.js. Better Auth is the correct auth product nam
 
 The official Effect skill is installed at:
 
-- `.pi/skills/effect-ts/`
+- `.agents/skills/effect-ts/`
 
 A complete ignored Effect repository checkout is available at:
 
@@ -108,6 +108,12 @@ The repository currently has:
 - Branded Effect platform contracts, opaque keyset cursors, typed conflicts, and Effect-backed oRPC/OpenAPI procedures
 - Transactional Drizzle repository workflows with tenant non-enumeration, optimistic concurrency, rollback guarantees, and audit persistence
 - TanStack/shadcn workspace and project management UI with create/edit/archive/CMS-enable flows
+- Approved and fully implemented M6 design at `knowledge_base/decisions/m6-field-system-and-generated-forms-design.md`: all 18 fields, recursive trees, exact decimal/money, mixed localization, strict Portable Text, external assets, references, editor layouts, independent hashes, role-aware form projections, generated controls, and bounded validation
+- The developer generated and applied `0005_add_field_system_and_editor_layout.sql`; the agent inspected the complete SQL and snapshot and verified the live catalog read-only: 15 expected columns, 35 validated constraints, 16 valid/ready indexes, and valid legacy backfills
+- Complete M6 repository/API/UI/property/PostgreSQL/accessibility/bundle coverage with 551 passing tests and a clean production/full pnpm audit
+- Cold Docker manual review found and fixed a schema-builder hook-order crash during query hydration; hooks are now unconditional and `react-hooks/rules-of-hooks` is enforced workspace-wide
+- The collection route now uses a visual field tree plus persistent inspector, a synchronized versioned field-schema JSON view, and a separate bounded sample-JSON inference flow; every field configuration and editor role setting is exposed without adopting code or architecture from the UX reference repository
+- One optimistic `fields.replace` operation atomically validates and replaces the complete active tree, preserves active stable IDs, generates IDs for new nodes, rejects identity reparenting, reconciles layout placements, and exposes precise validation details without any database schema or migration change
 - Property, Effect service, PostgreSQL concurrency/isolation/index-plan, API, UI validation, and automated accessibility tests
 - First-party project memberships, fixed default-deny role policies, invitations, and last-owner protection
 - Environment-bound management/delivery/preview credentials with one-time keys, immediate revocation, rotation, bounded attempt limiting, and security telemetry
@@ -219,9 +225,11 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 
 ## What to do next
 
-1. Re-read the Milestone 6 criteria and relevant decision, field-validation, security, Effect, database, TanStack, React, shadcn/ui, and accessibility guidance.
-2. Inspect the M5 schema contracts, engine, repository, API, builder, and test seams that M6 will extend.
-3. Propose the Milestone 6 field vocabulary, validation, structured-rich-text, external-asset, recursion-limit, reference, editor-layout, generated-form, security, observability, and test design for developer approval before implementation.
-4. Preserve the developer-controlled migration gate if the approved M6 design requires schema changes.
+1. Stop for developer/client manual review; do not commit and do not begin Milestone 7.
+2. Developer reviews visual field-tree/inspector editing, duplicate-key feedback, every type configuration, visual/JSON synchronization, sample inference, atomic save/discard, and unsaved-navigation protection.
+3. Developer and client accounts inspect the same generated draft/published form and verify expected role visibility/editability differences.
+4. Developer checks keyboard traversal, focus visibility, labels/descriptions/errors, nested list/object controls, money/date-time handling, and basic screen-reader output.
+5. Developer reviews the lazy Portable Text chunk-size warning, dependency overrides, migration artifact, and complete working-tree diff.
+6. After explicit approval, the developer—not the agent—decides whether to commit and advance the milestone.
 
 The agent must never generate or apply migrations.

@@ -31,8 +31,10 @@ export interface SchemaMutationMetric {
     | "collection_update"
     | "field_create"
     | "field_update"
+    | "field_replace"
     | "field_remove"
-    | "field_reorder";
+    | "field_reorder"
+    | "layout_update";
   readonly outcome: "success" | "failure";
 }
 

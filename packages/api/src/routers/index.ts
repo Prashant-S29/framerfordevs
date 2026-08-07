@@ -44,15 +44,20 @@ import {
   CreateCollectionInputSchema,
   GetCollectionDraftInputSchema,
   GetCollectionInputSchema,
+  GetDraftGeneratedFormInputSchema,
+  GeneratedFormDefinitionOutputSchema,
   GetLatestPublishedSchemaInputSchema,
+  GetPublishedGeneratedFormInputSchema,
   GetPublishedSchemaRevisionInputSchema,
   ListCollectionsInputSchema,
   PublishCollectionSchemaInputSchema,
   PublishedSchemaRevisionOutputSchema,
   RemoveCollectionFieldInputSchema,
+  ReplaceCollectionDraftFieldsInputSchema,
   ReorderCollectionFieldsInputSchema,
   UpdateCollectionFieldInputSchema,
   UpdateCollectionInputSchema,
+  UpdateEditorLayoutInputSchema,
   ValidateCollectionSchemaInputSchema,
 } from "../contracts/schemas";
 import {
@@ -101,14 +106,18 @@ import {
   createCollectionField,
   getCollection,
   getCollectionDraft,
+  getDraftGeneratedForm,
   getLatestPublishedSchema,
+  getPublishedGeneratedForm,
   getPublishedSchemaRevision,
   listCollections,
   publishCollectionSchema,
   removeCollectionField,
+  replaceCollectionDraftFields,
   reorderCollectionFields,
   updateCollection,
   updateCollectionField,
+  updateEditorLayout,
   validateCollectionSchema,
 } from "../operations/schemas";
 import {
@@ -431,6 +440,21 @@ export const appRouter = {
                   "Field updated.",
                 ),
               ),
+            replace: protectedProcedure
+              .input(ReplaceCollectionDraftFieldsInputSchema)
+              .output(CollectionDraftSchemaOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.schema.field.replace",
+                  replaceCollectionDraftFields(
+                    context.session.user.id,
+                    input,
+                    context.request.requestId,
+                  ),
+                  "Schema fields saved.",
+                ),
+              ),
             remove: protectedProcedure
               .input(RemoveCollectionFieldInputSchema)
               .output(CollectionDraftSchemaOutputSchema)
@@ -455,6 +479,43 @@ export const appRouter = {
                     context.request.requestId,
                   ),
                   "Fields reordered.",
+                ),
+              ),
+          },
+          layout: {
+            update: protectedProcedure
+              .input(UpdateEditorLayoutInputSchema)
+              .output(CollectionDraftSchemaOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.schema.layout.update",
+                  updateEditorLayout(context.session.user.id, input, context.request.requestId),
+                  "Editor layout updated.",
+                ),
+              ),
+          },
+          form: {
+            getDraft: protectedProcedure
+              .input(GetDraftGeneratedFormInputSchema)
+              .output(GeneratedFormDefinitionOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.schema.form.get_draft",
+                  getDraftGeneratedForm(context.session.user.id, input),
+                  "Draft form definition loaded.",
+                ),
+              ),
+            getPublished: protectedProcedure
+              .input(GetPublishedGeneratedFormInputSchema)
+              .output(GeneratedFormDefinitionOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.schema.form.get_published",
+                  getPublishedGeneratedForm(context.session.user.id, input),
+                  "Published form definition loaded.",
                 ),
               ),
           },

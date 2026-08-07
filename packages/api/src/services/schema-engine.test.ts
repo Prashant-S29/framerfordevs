@@ -15,15 +15,15 @@ import {
   CollectionApiKey,
   CollectionDescription,
   CollectionDisplayName,
-  CollectionDraftSchema,
   CollectionFieldApiKey,
   CollectionFieldDefinition,
   CollectionFieldDisplayLabel,
+  ContractHash,
+  defaultFieldEditorMetadata,
   CollectionFieldId,
   type CollectionFieldKind,
   type CollectionFieldLocalization,
   CollectionId,
-  PublishedSchemaField,
   PublishedSchemaRevision,
   PublishCollectionSchemaInput,
   SchemaChangeId,
@@ -31,14 +31,17 @@ import {
   SchemaPublicationCommandId,
   SchemaRevisionId,
 } from "../contracts/schemas";
+import { EditorLayout } from "../contracts/field-system";
 import {
   SchemaEngine,
   SchemaEngineLive,
   classifyCollectionSchemaChanges,
   fingerprintSchemaPublication,
+  hashCollectionContract,
   hashCollectionDraft,
   requiredAcknowledgementChanges,
   validateCollectionDraft,
+  type SchemaDraftState,
 } from "./schema-engine";
 
 const workspaceId = WorkspaceId.make("019fae8b-1234-7000-8000-000000000001");
@@ -62,12 +65,14 @@ interface FieldOptions {
   readonly localization?: CollectionFieldLocalization;
   readonly deprecated?: boolean;
   readonly position?: number;
-  readonly configuration?: Readonly<Record<string, unknown>>;
+  readonly configuration?: unknown;
 }
 
 function makeField(options: FieldOptions): CollectionFieldDefinition {
-  return CollectionFieldDefinition.make({
+  return Schema.decodeUnknownSync(CollectionFieldDefinition)({
     id: options.id,
+    parentFieldId: null,
+    nodeRole: "root",
     apiKey: CollectionFieldApiKey.make(options.apiKey ?? "title"),
     displayLabel: CollectionFieldDisplayLabel.make(options.displayLabel ?? "Title"),
     kind: options.kind ?? "short_text",
@@ -75,7 +80,9 @@ function makeField(options: FieldOptions): CollectionFieldDefinition {
     localization: options.localization ?? "localized",
     deprecated: options.deprecated ?? false,
     position: options.position ?? 0,
+    editor: defaultFieldEditorMetadata,
     configuration: options.configuration ?? {},
+    children: [],
   });
 }
 
@@ -107,25 +114,53 @@ function makeCollection(options?: {
   });
 }
 
+function makeLayout(fields: ReadonlyArray<CollectionFieldDefinition>) {
+  return Schema.decodeUnknownSync(EditorLayout)({
+    version: 1,
+    tabs: [
+      {
+        id: "00000000-0000-4000-8000-000000000011",
+        title: "Content",
+        description: null,
+        position: 0,
+        visibleToRoles: defaultFieldEditorMetadata.visibleToRoles,
+        groups: [
+          {
+            id: "00000000-0000-4000-8000-000000000012",
+            title: "Main",
+            description: null,
+            position: 0,
+            columns: 1,
+            visibleToRoles: defaultFieldEditorMetadata.visibleToRoles,
+            fields: [...fields]
+              .sort((left, right) => left.position - right.position)
+              .map((field, position) => ({
+                id: field.id,
+                fieldId: field.id,
+                position,
+                helpTextOverride: null,
+                visibleToRoles: field.editor.visibleToRoles,
+              })),
+          },
+        ],
+      },
+    ],
+    sidebarGroups: [],
+  });
+}
+
 function makeDraft(
   fields: ReadonlyArray<CollectionFieldDefinition>,
   collection = makeCollection(),
-): CollectionDraftSchema {
-  return CollectionDraftSchema.make({ collection, fields });
-}
-
-function toPublishedField(field: CollectionFieldDefinition): PublishedSchemaField {
-  return PublishedSchemaField.make({
-    id: field.id,
-    apiKey: field.apiKey,
-    displayLabel: field.displayLabel,
-    kind: field.kind,
-    required: field.required,
-    localization: field.localization,
-    deprecated: field.deprecated,
-    position: field.position,
-    configuration: field.configuration,
-  });
+): SchemaDraftState {
+  return {
+    formatVersion: 2,
+    validationProfile: "ffd-fields@1",
+    currencyRegistryProfile: null,
+    collection,
+    fields,
+    editorLayout: makeLayout(fields),
+  };
 }
 
 function makePublished(fields: ReadonlyArray<CollectionFieldDefinition>): PublishedSchemaRevision {
@@ -137,17 +172,22 @@ function makePublished(fields: ReadonlyArray<CollectionFieldDefinition>): Publis
     collectionId,
     sequence: 1,
     previousRevisionId: null,
+    formatVersion: 2,
+    validationProfile: "ffd-fields@1",
+    currencyRegistryProfile: null,
     collectionApiKey: CollectionApiKey.make("blog_posts"),
     collectionDisplayName: CollectionDisplayName.make("Blog posts"),
     collectionDescription: CollectionDescription.make("Editorial posts"),
     schemaHash: SchemaHash.make("a".repeat(64)),
+    contractHash: ContractHash.make("b".repeat(64)),
     commandId,
     nonBreakingChangeCount: 0,
     potentiallyBreakingChangeCount: 0,
     breakingChangeCount: 0,
     publishedByUserId: actorId,
     publishedAt: timestamp,
-    fields: fields.map(toPublishedField),
+    fields,
+    editorLayout: makeLayout(fields),
   });
 }
 
@@ -174,22 +214,17 @@ describe("schema draft validation", () => {
   });
 
   it("reports duplicate identities, keys, positions, sparse ordering, and M6 configuration", () => {
-    const configuredField = {
-      ...makeField({
-        id: firstFieldId,
-        apiKey: "title",
-        position: 0,
-      }),
-      configuration: { minLength: 1 },
-    };
-    const invalid = {
-      collection: makeCollection(),
-      fields: [
-        makeField({ id: firstFieldId, position: 0 }),
-        configuredField,
-        makeField({ id: thirdFieldId, apiKey: "other", position: 2 }),
-      ],
-    };
+    const configuredField = makeField({
+      id: firstFieldId,
+      apiKey: "title",
+      position: 0,
+      configuration: { minLength: 10, maxLength: 1 },
+    });
+    const invalid = makeDraft([
+      makeField({ id: firstFieldId, position: 0 }),
+      configuredField,
+      makeField({ id: thirdFieldId, apiKey: "other", position: 2 }),
+    ]);
     const result = validateCollectionDraft(invalid, "publication");
     const codes = new Set(result.issues.map((validationIssue) => validationIssue.code));
 
@@ -198,12 +233,12 @@ describe("schema draft validation", () => {
     assert.isTrue(codes.has("field_api_key_duplicate"));
     assert.isTrue(codes.has("field_position_duplicate"));
     assert.isTrue(codes.has("field_position_not_dense"));
-    assert.isTrue(codes.has("field_configuration_unsupported"));
+    assert.isTrue(codes.has("configuration_range_invalid"));
   });
 
   it("bounds active fields before publication work", () => {
     const oversized = {
-      collection: makeCollection(),
+      ...makeDraft([]),
       fields: Array.from({ length: 101 }, () => optionalTitle),
     };
     const result = validateCollectionDraft(oversized, "publication");
@@ -217,6 +252,33 @@ describe("schema draft validation", () => {
     const reversed = makeDraft([requiredSummary, optionalTitle]);
 
     assert.strictEqual(hashCollectionDraft(ordered), hashCollectionDraft(reversed));
+  });
+
+  it("keeps the contract hash stable for layout-only management changes", () => {
+    const draft = makeDraft([optionalTitle, requiredSummary]);
+    const changed: SchemaDraftState = {
+      ...draft,
+      editorLayout: Schema.decodeUnknownSync(EditorLayout)({
+        ...draft.editorLayout,
+        tabs: draft.editorLayout.tabs.map((tab) => ({
+          ...tab,
+          groups: tab.groups.map((group) => ({ ...group, columns: 2 })),
+        })),
+      }),
+    };
+
+    assert.notStrictEqual(hashCollectionDraft(draft), hashCollectionDraft(changed));
+    assert.strictEqual(hashCollectionContract(draft), hashCollectionContract(changed));
+    const changes = classifyCollectionSchemaChanges(
+      makePublished([optionalTitle, requiredSummary]),
+      changed,
+    );
+    assert.isTrue(
+      changes.items.some(
+        (change) =>
+          change.code === "editor_layout.updated" && change.classification === "non_breaking",
+      ),
+    );
   });
 
   it("fingerprints exact publication authority independently of acknowledgement order", () => {
@@ -321,6 +383,73 @@ describe("schema change classification", () => {
     );
   });
 
+  it("classifies money currency removal and enum value removal as breaking", () => {
+    const moneyId = firstFieldId;
+    const enumId = secondFieldId;
+    const publishedMoney = makeField({
+      id: moneyId,
+      apiKey: "price",
+      kind: "money",
+      configuration: { currencies: ["USD", "EUR"] },
+    });
+    const publishedEnum = makeField({
+      id: enumId,
+      apiKey: "status",
+      kind: "enum",
+      position: 1,
+      configuration: {
+        options: [
+          {
+            id: "019fae8b-1234-7000-8000-000000000021",
+            value: "draft",
+            label: "Draft",
+            position: 0,
+          },
+          {
+            id: "019fae8b-1234-7000-8000-000000000022",
+            value: "published",
+            label: "Published",
+            position: 1,
+          },
+        ],
+      },
+    });
+    const draft = makeDraft([
+      makeField({
+        id: moneyId,
+        apiKey: "price",
+        kind: "money",
+        configuration: { currencies: ["USD"] },
+      }),
+      makeField({
+        id: enumId,
+        apiKey: "status",
+        kind: "enum",
+        position: 1,
+        configuration: {
+          options: [
+            {
+              id: "019fae8b-1234-7000-8000-000000000021",
+              value: "draft",
+              label: "Draft state",
+              position: 0,
+            },
+          ],
+        },
+      }),
+    ]);
+    const changes = classifyCollectionSchemaChanges(
+      makePublished([publishedMoney, publishedEnum]),
+      draft,
+    );
+    const configurationChanges = changes.items.filter(
+      (change) => change.code === "field.configuration.updated",
+    );
+
+    assert.strictEqual(configurationChanges.length, 2);
+    assert.isTrue(configurationChanges.every((change) => change.classification === "breaking"));
+  });
+
   it("treats required-to-optional, label, order, and deprecation changes as non-breaking", () => {
     const publishedField = makeField({ id: firstFieldId, required: true, deprecated: true });
     const published = makePublished([publishedField]);
@@ -383,6 +512,7 @@ describe("schema change classification", () => {
           ),
         );
       }),
+    10_000,
   );
 });
 

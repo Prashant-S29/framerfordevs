@@ -206,6 +206,70 @@ Record a learning when an implementation or decision:
 
 ---
 
+## 2026-08-05 — Development CLIs do not belong in the production dependency graph
+
+**Context:** The requested post-M6 production audit traced multiple advisories through the `shadcn` component-management CLI declared as a production dependency of the shared UI package.
+
+**Incorrect assumption or decision:** A tool used to add or inspect source components was classified as runtime application code merely because it is associated with the UI package.
+
+**Cost or risk:** Production audit scope included an unnecessary MCP server, environment/configuration tooling, AST tooling, and their transitive vulnerabilities, increasing supply-chain surface and obscuring the actual runtime dependency posture.
+
+**Learning:** Source-generation and component-management CLIs are development tooling even when they live beside runtime components. Production dependency classification must be based on runtime imports and deployment needs, not package ownership.
+
+**Prevention:** Keep `shadcn` in `devDependencies`, verify there are no runtime imports before moving a package, run both `pnpm audit --prod` and full `pnpm audit`, and use exact patched transitive overrides only when an upstream dependency range cannot resolve a fix itself.
+
+**Status:** Resolved. shadcn is development-only; OpenTelemetry and Better Auth are patch-aligned; patched audit overrides are explicit; production-only and full audits report no known vulnerabilities.
+
+---
+
+## 2026-08-05 — Hydration transitions must preserve React hook order
+
+**Context:** Manual review opened the production Docker schema-builder route after a fresh stack restart and React reported minified error 310.
+
+**Incorrect assumption or decision:** `SchemaBuilder` returned its loading state before calling its reorder mutation hook. Loader-prefetched tests usually began with query data available, but a real hydration/refetch transition rendered first without the hook and then with it.
+
+**Cost or risk:** The primary collection editor crashed during a normal production loading transition even though static builds, preloaded tests, and accessibility checks passed.
+
+**Learning:** Route-loader prefetch is an optimization, not a guarantee that client query hooks are immediately resolved. Every render path in a component must execute hooks in identical order.
+
+**Prevention:** Keep all hooks above loading/error returns, enforce `react-hooks/rules-of-hooks` in the workspace linter, and include cold-loading transitions when reviewing query-backed routes.
+
+**Status:** Resolved. The mutation hook is unconditional, the React Hooks lint rule is enabled, web checks/tests/build pass, and the rebuilt Docker stack is healthy.
+
+---
+
+## 2026-08-05 — Synchronized schema editors require one atomic authoring boundary
+
+**Context:** The initial M6 collection UI persisted each field immediately through separate create/update/remove/reorder dialogs. The requested visual and JSON schema views needed one shared unsaved draft and a reliable apply/save action.
+
+**Incorrect assumption or decision:** Treating granular field mutations as a sufficient editing architecture would require the JSON view to execute a sequence of optimistic mutations. A failure or version conflict in the middle could leave only part of the user's schema applied, while visual and JSON state could diverge.
+
+**Cost or risk:** Partial schema replacement could silently remove or update some fields before failing, make retry behavior ambiguous, break stable identity handling, and force the UI to emulate server transaction logic.
+
+**Learning:** Granular resource APIs and an authoring-document boundary solve different problems. Multi-view editors should share a bounded versioned local document and submit it through one server-authoritative atomic operation; granular APIs can remain for focused compatibility use.
+
+**Prevention:** `fields.replace` validates the complete prospective tree under the existing lock/version/authorization order, preserves only active supplied IDs, generates new IDs server-side, rejects reparenting, reconciles root layout placements, and commits fields/head/version/audit together. PostgreSQL integration verifies duplicate-key failure leaves the draft unchanged. Browser parsing and sample inference are bounded but remain advisory.
+
+**Status:** Resolved without a database schema change. Visual, schema-JSON, and sample-inference flows now converge on one atomic save and expose precise validation details.
+
+---
+
+## 2026-08-05 — UI query limits must stay inside the shared pagination contract
+
+**Context:** The schema workbench loaded reference-target collections with `limit: 100`, while the platform `PageLimit` contract accepts only 1 through 50.
+
+**Incorrect assumption or decision:** The reference selector treated a larger first-page request as a harmless way to obtain more options instead of respecting the existing bounded paginated API.
+
+**Cost or risk:** The collection route issued a deterministic `VALIDATION_ERROR` during manual review and could not load its reference options.
+
+**Learning:** Every client query must use the server contract's current page bounds. Wanting more records requires explicit pagination, not a larger undocumented limit.
+
+**Prevention:** The initial reference collection request and its matching invalidation key now use the maximum valid limit of 50. Web type checks, all 88 web tests, the production build, and rebuilt Docker health pass; the workspace no longer contains a web request with `limit: 100`.
+
+**Status:** Resolved during M6 manual review.
+
+---
+
 ## Current implementation learnings
 
-The platform authorization, locale foundations, and versioned collection schema engine are implemented, approved, and committed through Milestone 5. The developer generated and applied the M5 migration; the agent did neither. Milestone 6 design is next. Additional entries should be added only when a consequential decision causes drift or rework.
+The platform authorization, locale foundations, and versioned collection schema engine are implemented, approved, and committed through Milestone 5. The developer generated and applied the M6 migration; the agent did neither and did not modify the generated artifact. Milestone 6 implementation and its refreshed automated gate are complete with 551 passing tests and clean production/full dependency audits; required developer/client manual review remains pending. Additional entries should be added only when a consequential decision causes drift or rework.

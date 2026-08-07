@@ -24,7 +24,8 @@ import {
 } from "./project-access-settings";
 import { AddLocaleDialog } from "./project-locale-settings";
 import { CreateCollectionDialog } from "./project-collections";
-import { FieldDialog, PublishCard } from "./schema-builder";
+import { PublishCard } from "./schema-builder";
+import { SchemaWorkbench } from "./schema-workbench";
 
 const locale = Schema.decodeUnknownSync(ProjectLocale)({
   id: "019fae8b-1234-7000-8000-000000000004",
@@ -84,6 +85,34 @@ const project = Schema.decodeUnknownSync(Project)({
 });
 
 const collectionDraft = Schema.decodeUnknownSync(CollectionDraftSchema)({
+  formatVersion: 2,
+  validationProfile: "ffd-fields@1",
+  currencyRegistryProfile: null,
+  contractHash: "b".repeat(64),
+  editorLayout: {
+    version: 1,
+    tabs: [
+      {
+        id: "00000000-0000-4000-8000-000000000031",
+        title: "Content",
+        description: null,
+        position: 0,
+        visibleToRoles: ["owner", "developer"],
+        groups: [
+          {
+            id: "00000000-0000-4000-8000-000000000032",
+            title: "Main",
+            description: null,
+            position: 0,
+            columns: 1,
+            visibleToRoles: ["owner", "developer"],
+            fields: [],
+          },
+        ],
+      },
+    ],
+    sidebarGroups: [],
+  },
   collection: {
     id: "019fae8b-1234-7000-8000-000000000010",
     workspaceId: project.workspaceId,
@@ -167,24 +196,34 @@ describe("platform management accessibility", () => {
     await expectOpenDialogToHaveNoViolations(/add locale/i);
   });
 
-  it("has accessible collection and field creation semantics", async () => {
+  it("has accessible collection and schema-building semantics", async () => {
+    const user = userEvent.setup();
     renderWithQueryClient(
       <CreateCollectionDialog projectId={project.id} environmentId={project.environment.id} />,
     );
     await expectOpenDialogToHaveNoViolations(/new collection/i);
     cleanup();
-    renderWithQueryClient(
-      <FieldDialog
+    const { container } = renderWithQueryClient(
+      <SchemaWorkbench
         scope={{
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collectionDraft.collection.id,
         }}
         draft={collectionDraft}
+        collections={[
+          {
+            id: collectionDraft.collection.id,
+            displayName: collectionDraft.collection.displayName,
+          },
+        ]}
+        canWrite
         onSaved={async () => undefined}
+        onDirtyChange={() => undefined}
       />,
     );
-    await expectOpenDialogToHaveNoViolations(/add field/i);
+    await user.click(screen.getByRole("button", { name: "Add Field" }));
+    expect((await axe.run(container)).violations).toEqual([]);
   });
 
   it("requires every risky schema change acknowledgement before publication", async () => {

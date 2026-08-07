@@ -1,3 +1,5 @@
+// Owns aggregate M6 schema validation, canonical dual hashes, change classification, and publication authority.
+
 import { createHash } from "node:crypto";
 
 import { Context, Effect, Layer } from "effect";
@@ -6,10 +8,14 @@ import {
   SchemaChangeAcknowledgementRequiredFailure,
   SchemaInvalidFailure,
 } from "../contracts/errors";
+import type { FieldLocalization } from "../contracts/field-system";
 import {
   type AcknowledgedSchemaChangeIds,
   type CmsCollection,
   type CollectionFieldDefinition,
+  ContractHash,
+  currentCurrencyRegistryProfile,
+  type CurrencyRegistryProfile,
   type PublishedSchemaRevision,
   type PublishCollectionSchemaInput,
   SchemaChange,
@@ -22,12 +28,28 @@ import {
   SchemaPublicationFingerprint,
   SchemaValidationIssue,
 } from "../contracts/schemas";
+import { validateEditorLayout } from "../lib/editor-layout";
+import {
+  canonicalizeSchemaDocument,
+  validateAggregateSchemaDocument,
+} from "../lib/field-system-document";
+import { fieldSystemLimits, fieldSystemValidationProfile } from "../lib/field-system-profile";
+import { flattenFieldTree } from "../lib/field-tree";
+import {
+  compareExactDecimals,
+  parseExactDecimal,
+  validateDefinitionTree,
+} from "../lib/field-validation";
 
 export type SchemaValidationPurpose = "draft" | "publication";
 
 export interface SchemaDraftState {
+  readonly formatVersion: 2;
+  readonly validationProfile: typeof fieldSystemValidationProfile;
+  readonly currencyRegistryProfile: CurrencyRegistryProfile | null;
   readonly collection: CmsCollection;
   readonly fields: ReadonlyArray<CollectionFieldDefinition>;
+  readonly editorLayout: PublishedSchemaRevision["editorLayout"];
 }
 
 export interface SchemaValidationResult {
@@ -46,155 +68,231 @@ const classificationRank: Readonly<Record<SchemaChangeClassification, number>> =
   non_breaking: 2,
 };
 
-function canonicalizeUnknown(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalizeUnknown);
-  if (typeof value !== "object" || value === null) return value;
-
-  const canonical: Record<string, unknown> = {};
-  for (const key of Object.keys(value).sort()) {
-    canonical[key] = canonicalizeUnknown(Reflect.get(value, key));
-  }
-  return canonical;
-}
-
-function canonicalStringify(value: object): string {
-  return JSON.stringify(canonicalizeUnknown(value)) ?? "";
-}
-
+/** Hashes canonical UTF-8 text with SHA-256. */
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-function canonicalDraftDocument(draft: SchemaDraftState): object {
+/** Returns deterministic JSON text after the aggregate preflight has rejected unsafe values. */
+function canonicalStringify(value: unknown): string {
+  return canonicalizeSchemaDocument(value);
+}
+
+/** Orders field definitions by authoring position and stable identity. */
+function compareFields(left: CollectionFieldDefinition, right: CollectionFieldDefinition): number {
+  return left.position - right.position || left.id.localeCompare(right.id);
+}
+
+/** Copies decoded schema classes into plain JSON data without invoking serializers. */
+function plainJsonData(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(plainJsonData);
+  if (typeof value !== "object" || value === null) return value;
+  const output: Record<string, unknown> = {};
+  for (const key of Object.keys(value)) output[key] = plainJsonData(Reflect.get(value, key));
+  return output;
+}
+
+/** Produces the complete management document used for the schema hash and aggregate limit. */
+function canonicalManagementDocument(draft: SchemaDraftState): object {
   return {
-    formatVersion: 1,
+    formatVersion: 2,
+    validationProfile: draft.validationProfile,
+    currencyRegistryProfile: draft.currencyRegistryProfile,
     collection: {
       apiKey: draft.collection.apiKey,
       displayName: draft.collection.displayName,
       description: draft.collection.description,
     },
-    fields: [...draft.fields]
-      .sort((left, right) => left.position - right.position || left.id.localeCompare(right.id))
-      .map((field) => ({
-        id: field.id,
-        apiKey: field.apiKey,
-        displayLabel: field.displayLabel,
-        kind: field.kind,
-        required: field.required,
-        localization: field.localization,
-        deprecated: field.deprecated,
-        position: field.position,
-        configuration: canonicalizeUnknown(field.configuration),
-      })),
+    fields: plainJsonData([...draft.fields].sort(compareFields)),
+    editorLayout: plainJsonData(draft.editorLayout),
   };
 }
 
-function issue(options: {
+/** Normalizes configuration metadata that is presentation-only out of the API contract. */
+function contractConfiguration(field: CollectionFieldDefinition): unknown {
+  switch (field.kind) {
+    case "enum":
+      return {
+        options: field.configuration.options.map((option) => option.value).sort(),
+        default: field.configuration.default,
+      };
+    case "money":
+      return {
+        currencies: [...field.configuration.currencies].sort(),
+        allowNegative: field.configuration.allowNegative ?? false,
+        default: field.configuration.default,
+      };
+    case "rich_text":
+      return {
+        ...field.configuration,
+        styles:
+          field.configuration.styles === undefined
+            ? undefined
+            : [...field.configuration.styles].sort(),
+        decorators:
+          field.configuration.decorators === undefined
+            ? undefined
+            : [...field.configuration.decorators].sort(),
+        lists:
+          field.configuration.lists === undefined
+            ? undefined
+            : [...field.configuration.lists].sort(),
+      };
+    default:
+      return field.configuration;
+  }
+}
+
+/** Compiles one recursive API/value-contract field with effective localization. */
+function contractField(
+  field: CollectionFieldDefinition,
+  inheritedLocalization: Exclude<FieldLocalization, "mixed"> | null,
+): object {
+  const effectiveLocalization = inheritedLocalization ?? field.localization;
+  const childInheritance =
+    field.kind === "list" || effectiveLocalization !== "mixed"
+      ? effectiveLocalization === "mixed"
+        ? null
+        : effectiveLocalization
+      : null;
+  const children = field.children
+    .map((child) => contractField(child, childInheritance))
+    .sort((left, right) => canonicalStringify(left).localeCompare(canonicalStringify(right)));
+  return {
+    id: field.id,
+    apiKey: field.apiKey,
+    kind: field.kind,
+    required: field.required,
+    localization: effectiveLocalization,
+    configuration: contractConfiguration(field),
+    children,
+  };
+}
+
+export interface SchemaContractState {
+  readonly formatVersion: number;
+  readonly validationProfile: string;
+  readonly currencyRegistryProfile: string | null;
+  readonly collectionApiKey: string;
+  readonly fields: ReadonlyArray<CollectionFieldDefinition>;
+}
+
+/** Produces the renderer-independent content contract excluded from layout/editor changes. */
+export function compileCollectionContract(state: SchemaContractState): object {
+  return {
+    formatVersion: state.formatVersion,
+    validationProfile: state.validationProfile,
+    currencyRegistryProfile: state.currencyRegistryProfile,
+    collectionApiKey: state.collectionApiKey,
+    fields: state.fields
+      .map((field) => contractField(field, null))
+      .sort((left, right) => canonicalStringify(left).localeCompare(canonicalStringify(right))),
+  };
+}
+
+/** Computes the full management schema hash. */
+export function hashCollectionDraft(draft: SchemaDraftState): SchemaHash {
+  return SchemaHash.make(sha256(canonicalStringify(canonicalManagementDocument(draft))));
+}
+
+/** Computes one value/API contract hash independently from editor presentation. */
+export function hashSchemaContract(state: SchemaContractState): ContractHash {
+  return ContractHash.make(sha256(canonicalStringify(compileCollectionContract(state))));
+}
+
+/** Computes the current draft value/API contract hash. */
+export function hashCollectionContract(draft: SchemaDraftState): ContractHash {
+  return hashSchemaContract({
+    formatVersion: draft.formatVersion,
+    validationProfile: draft.validationProfile,
+    currencyRegistryProfile: draft.currencyRegistryProfile,
+    collectionApiKey: draft.collection.apiKey,
+    fields: draft.fields,
+  });
+}
+
+/** Converts a bounded field-kernel issue into the public schema validation contract. */
+function schemaIssue(options: {
   readonly path: string;
-  readonly code: SchemaValidationIssue["code"];
+  readonly code: string;
   readonly message: string;
 }): SchemaValidationIssue {
   return SchemaValidationIssue.make(options);
 }
 
+/** Validates recursive definitions, profiles, layout, publication completeness, and aggregate size. */
 export function validateCollectionDraft(
   draft: SchemaDraftState,
   purpose: SchemaValidationPurpose,
 ): SchemaValidationResult {
   const issues: Array<SchemaValidationIssue> = [];
-  const pushIssue = (value: SchemaValidationIssue) => {
-    if (issues.length < 50) issues.push(value);
+  const push = (value: {
+    readonly path: string;
+    readonly code: string;
+    readonly message: string;
+  }) => {
+    if (issues.length < fieldSystemLimits.issues) issues.push(schemaIssue(value));
   };
+  const flattened = flattenFieldTree(draft.fields);
 
   if (purpose === "publication" && draft.fields.length === 0) {
-    pushIssue(
-      issue({
-        path: "fields",
-        code: "field_count_required",
-        message: "A published schema must contain at least one field.",
-      }),
-    );
+    push({
+      path: "fields",
+      code: "field_count_required",
+      message: "A published schema must contain at least one root field.",
+    });
   }
-  if (draft.fields.length > 100) {
-    pushIssue(
-      issue({
-        path: "fields",
-        code: "field_count_exceeded",
-        message: "A collection schema can contain at most 100 active fields.",
-      }),
-    );
-  }
+  const definitions = validateDefinitionTree(draft.fields);
+  for (const value of definitions.issues) push(value);
 
-  const fieldIds = new Set<string>();
-  const apiKeys = new Set<string>();
-  const positions = new Set<number>();
-
-  for (const [index, field] of draft.fields.entries()) {
-    if (fieldIds.has(field.id)) {
-      pushIssue(
-        issue({
-          path: `fields.${index}.id`,
-          code: "field_id_duplicate",
-          message: "Active field IDs must be unique within a collection.",
-        }),
-      );
-    }
-    fieldIds.add(field.id);
-
-    if (apiKeys.has(field.apiKey)) {
-      pushIssue(
-        issue({
-          path: `fields.${index}.apiKey`,
-          code: "field_api_key_duplicate",
-          message: "Active field API keys must be unique within a collection.",
-        }),
-      );
-    }
-    apiKeys.add(field.apiKey);
-
-    if (positions.has(field.position)) {
-      pushIssue(
-        issue({
-          path: `fields.${index}.position`,
-          code: "field_position_duplicate",
-          message: "Active field positions must be unique within a collection.",
-        }),
-      );
-    }
-    positions.add(field.position);
-
-    if (Object.keys(field.configuration).length > 0) {
-      pushIssue(
-        issue({
-          path: `fields.${index}.configuration`,
-          code: "field_configuration_unsupported",
-          message: "Field configuration is not available until Milestone 6.",
-        }),
-      );
+  if (purpose === "publication") {
+    for (const field of flattened) {
+      if (field.kind === "object" && field.children.length === 0)
+        push({
+          path: `fields.${field.id}`,
+          code: "object_property_required",
+          message: "A published object requires at least one property.",
+        });
+      if (field.kind === "list" && field.children.length !== 1)
+        push({
+          path: `fields.${field.id}`,
+          code: "list_item_required",
+          message: "A published list requires exactly one item definition.",
+        });
     }
   }
 
-  const sortedPositions = [...positions].sort((left, right) => left - right);
-  for (const [expected, actual] of sortedPositions.entries()) {
-    if (actual !== expected) {
-      pushIssue(
-        issue({
-          path: "fields",
-          code: "field_position_not_dense",
-          message: "Active field positions must be dense and begin at zero.",
-        }),
-      );
-      break;
-    }
-  }
+  const hasMoney = flattened.some((field) => field.kind === "money");
+  if (hasMoney && draft.currencyRegistryProfile !== currentCurrencyRegistryProfile)
+    push({
+      path: "currencyRegistryProfile",
+      code: "currency_profile_required",
+      message: "Money fields require the current supported pinned currency profile.",
+    });
+  if (!hasMoney && draft.currencyRegistryProfile !== null)
+    push({
+      path: "currencyRegistryProfile",
+      code: "currency_profile_unused",
+      message: "A currency profile is only stored while the schema contains money fields.",
+    });
+
+  const layout = validateEditorLayout(
+    draft.editorLayout,
+    flattened.map((field) => ({
+      id: field.id,
+      nodeRole: field.nodeRole,
+      editor: field.editor,
+    })),
+  );
+  for (const value of layout.issues) push(value);
+
+  const aggregate = validateAggregateSchemaDocument(canonicalManagementDocument(draft));
+  for (const value of aggregate.issues) push(value);
 
   return { valid: issues.length === 0, issues };
 }
 
-export function hashCollectionDraft(draft: SchemaDraftState): SchemaHash {
-  return SchemaHash.make(sha256(canonicalStringify(canonicalDraftDocument(draft))));
-}
-
+/** Fingerprints exact publication authority and acknowledgement input. */
 export function fingerprintSchemaPublication(
   input: PublishCollectionSchemaInput,
   schemaHash: SchemaHash,
@@ -202,7 +300,7 @@ export function fingerprintSchemaPublication(
   return SchemaPublicationFingerprint.make(
     sha256(
       canonicalStringify({
-        formatVersion: 1,
+        formatVersion: 2,
         projectId: input.projectId,
         environmentId: input.environmentId,
         collectionId: input.collectionId,
@@ -216,6 +314,7 @@ export function fingerprintSchemaPublication(
   );
 }
 
+/** Creates one deterministic bounded schema change. */
 function makeChange(options: {
   readonly code: SchemaChangeCode;
   readonly classification: SchemaChangeClassification;
@@ -228,15 +327,14 @@ function makeChange(options: {
   const changeId = SchemaChangeId.make(
     sha256(
       canonicalStringify({
-        formatVersion: 1,
+        formatVersion: 2,
         code: options.code,
         fieldId: options.fieldId,
-        before: canonicalizeUnknown(options.before),
-        after: canonicalizeUnknown(options.after),
+        before: options.before,
+        after: options.after,
       }),
     ),
   );
-
   return {
     position: options.position,
     change: SchemaChange.make({
@@ -249,117 +347,370 @@ function makeChange(options: {
   };
 }
 
+/** Returns the strictest classification from one coalesced configuration change. */
+function strictest(values: ReadonlyArray<SchemaChangeClassification>): SchemaChangeClassification {
+  return values.reduce<SchemaChangeClassification>(
+    (current, value) => (classificationRank[value] < classificationRank[current] ? value : current),
+    "non_breaking",
+  );
+}
+
+/** Compares optional minimum/maximum constraints where a tighter bound is riskier. */
+function classifyBounds(
+  beforeMinimum: number | string | undefined,
+  afterMinimum: number | string | undefined,
+  beforeMaximum: number | string | undefined,
+  afterMaximum: number | string | undefined,
+): SchemaChangeClassification {
+  const compare = (left: number | string, right: number | string) =>
+    typeof left === "number" && typeof right === "number"
+      ? left - right
+      : String(left).localeCompare(String(right));
+  const minimumTightened =
+    afterMinimum !== undefined &&
+    (beforeMinimum === undefined || compare(afterMinimum, beforeMinimum) > 0);
+  const maximumTightened =
+    afterMaximum !== undefined &&
+    (beforeMaximum === undefined || compare(afterMaximum, beforeMaximum) < 0);
+  return minimumTightened || maximumTightened ? "potentially_breaking" : "non_breaking";
+}
+
+/** Coalesces one kind-preserving configuration mutation into a conservative classification. */
+function classifyConfiguration(
+  before: CollectionFieldDefinition,
+  after: CollectionFieldDefinition,
+): SchemaChangeClassification {
+  if (canonicalStringify(before.configuration) === canonicalStringify(after.configuration))
+    return "non_breaking";
+
+  const beforeDefault = Reflect.get(before.configuration, "default");
+  const afterDefault = Reflect.get(after.configuration, "default");
+  const classifications: Array<SchemaChangeClassification> = [];
+  if (beforeDefault !== undefined && afterDefault === undefined && after.required === true)
+    classifications.push("potentially_breaking");
+
+  if (before.kind !== after.kind) return "breaking";
+  switch (after.kind) {
+    case "enum": {
+      if (before.kind !== "enum") return "breaking";
+      const previous = new Set(before.configuration.options.map((option) => option.value));
+      const next = new Set(after.configuration.options.map((option) => option.value));
+      if ([...previous].some((value) => !next.has(value))) classifications.push("breaking");
+      break;
+    }
+    case "reference":
+      if (
+        before.kind !== "reference" ||
+        before.configuration.targetCollectionId !== after.configuration.targetCollectionId
+      )
+        classifications.push("breaking");
+      break;
+    case "money": {
+      if (before.kind !== "money") return "breaking";
+      const next = new Set(after.configuration.currencies);
+      if (before.configuration.currencies.some((currency) => !next.has(currency)))
+        classifications.push("breaking");
+      if (before.configuration.allowNegative === true && after.configuration.allowNegative !== true)
+        classifications.push("potentially_breaking");
+      break;
+    }
+    case "list":
+      if (before.kind !== "list") return "breaking";
+      classifications.push(
+        classifyBounds(
+          before.configuration.minItems,
+          after.configuration.minItems,
+          before.configuration.maxItems,
+          after.configuration.maxItems,
+        ),
+      );
+      if (before.configuration.uniqueItems !== true && after.configuration.uniqueItems === true)
+        classifications.push("potentially_breaking");
+      break;
+    case "decimal": {
+      if (before.kind !== "decimal") return "breaking";
+      if (
+        (after.configuration.precision ?? 38) < (before.configuration.precision ?? 38) ||
+        (after.configuration.scale ?? 18) < (before.configuration.scale ?? 18)
+      )
+        classifications.push("potentially_breaking");
+      const beforeMinimum = before.configuration.minimum
+        ? parseExactDecimal(before.configuration.minimum)
+        : null;
+      const afterMinimum = after.configuration.minimum
+        ? parseExactDecimal(after.configuration.minimum)
+        : null;
+      const beforeMaximum = before.configuration.maximum
+        ? parseExactDecimal(before.configuration.maximum)
+        : null;
+      const afterMaximum = after.configuration.maximum
+        ? parseExactDecimal(after.configuration.maximum)
+        : null;
+      if (
+        (afterMinimum &&
+          (!beforeMinimum || compareExactDecimals(afterMinimum, beforeMinimum) > 0)) ||
+        (afterMaximum && (!beforeMaximum || compareExactDecimals(afterMaximum, beforeMaximum) < 0))
+      )
+        classifications.push("potentially_breaking");
+      break;
+    }
+    case "short_text":
+    case "long_text":
+    case "slug": {
+      if (before.kind !== after.kind) return "breaking";
+      classifications.push(
+        classifyBounds(
+          before.configuration.minLength,
+          after.configuration.minLength,
+          before.configuration.maxLength,
+          after.configuration.maxLength,
+        ),
+      );
+      if (
+        after.configuration.pattern !== undefined &&
+        after.configuration.pattern !== before.configuration.pattern
+      )
+        classifications.push("potentially_breaking");
+      break;
+    }
+    case "number":
+      if (before.kind !== "number") return "breaking";
+      classifications.push(
+        classifyBounds(
+          before.configuration.minimum,
+          after.configuration.minimum,
+          before.configuration.maximum,
+          after.configuration.maximum,
+        ),
+      );
+      if (before.configuration.mode !== "integer" && after.configuration.mode === "integer")
+        classifications.push("potentially_breaking");
+      break;
+    case "date":
+    case "date_time": {
+      if (before.kind !== after.kind) return "breaking";
+      classifications.push(
+        classifyBounds(
+          before.configuration.minimum,
+          after.configuration.minimum,
+          before.configuration.maximum,
+          after.configuration.maximum,
+        ),
+      );
+      break;
+    }
+    case "rich_text":
+      if (before.kind !== "rich_text") return "breaking";
+      classifications.push(
+        classifyBounds(
+          before.configuration.minLength,
+          after.configuration.minLength,
+          before.configuration.maxLength,
+          after.configuration.maxLength,
+        ),
+      );
+      if (before.configuration.links !== false && after.configuration.links === false)
+        classifications.push("potentially_breaking");
+      break;
+    case "json":
+      if (before.kind !== "json") return "breaking";
+      if (
+        (after.configuration.maxBytes ?? 65_536) < (before.configuration.maxBytes ?? 65_536) ||
+        (after.configuration.maxDepth ?? 10) < (before.configuration.maxDepth ?? 10)
+      )
+        classifications.push("potentially_breaking");
+      break;
+    case "boolean":
+    case "email":
+    case "url":
+    case "object":
+    case "external_asset":
+      break;
+  }
+  return strictest(classifications);
+}
+
+/** Maps every field identity to its effective inherited localization. */
+function effectiveLocalizations(
+  roots: ReadonlyArray<CollectionFieldDefinition>,
+): ReadonlyMap<string, FieldLocalization | null> {
+  const values = new Map<string, FieldLocalization | null>();
+  const stack: Array<{
+    readonly field: CollectionFieldDefinition;
+    readonly inherited: Exclude<FieldLocalization, "mixed"> | null;
+  }> = roots.map((field) => ({ field, inherited: null }));
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) break;
+    const effective = current.inherited ?? current.field.localization;
+    values.set(current.field.id, effective);
+    const inherited =
+      current.field.kind === "list" || effective !== "mixed"
+        ? effective === "mixed"
+          ? null
+          : effective
+        : null;
+    for (const child of current.field.children) stack.push({ field: child, inherited });
+  }
+  return values;
+}
+
+/** Compares one stable field identity across published and draft contracts. */
 function compareField(
-  published: PublishedSchemaRevision["fields"][number],
+  published: CollectionFieldDefinition,
   draft: CollectionFieldDefinition,
+  publishedLocalization: FieldLocalization | null,
+  draftLocalization: FieldLocalization | null,
 ): ReadonlyArray<PendingChange> {
   const changes: Array<PendingChange> = [];
-  const base = {
-    fieldId: draft.id,
-    position: draft.position,
-  };
+  const base = { fieldId: draft.id, position: draft.position };
+  const add = (
+    code: SchemaChangeCode,
+    classification: SchemaChangeClassification,
+    summary: string,
+    before: unknown,
+    after: unknown,
+  ) => changes.push(makeChange({ ...base, code, classification, summary, before, after }));
 
-  if (published.apiKey !== draft.apiKey) {
-    changes.push(
-      makeChange({
-        ...base,
-        code: "field.api_key.updated",
-        classification: "breaking",
-        summary: "A published field API key changed.",
-        before: published.apiKey,
-        after: draft.apiKey,
-      }),
+  if (published.parentFieldId !== draft.parentFieldId || published.nodeRole !== draft.nodeRole)
+    add(
+      "field.structure.updated",
+      "breaking",
+      "A published field's structural parent changed.",
+      { parentFieldId: published.parentFieldId, nodeRole: published.nodeRole },
+      { parentFieldId: draft.parentFieldId, nodeRole: draft.nodeRole },
     );
-  }
-  if (published.displayLabel !== draft.displayLabel) {
-    changes.push(
-      makeChange({
-        ...base,
-        code: "field.label.updated",
-        classification: "non_breaking",
-        summary: "A field display label changed.",
-        before: published.displayLabel,
-        after: draft.displayLabel,
-      }),
+  if (published.apiKey !== draft.apiKey)
+    add(
+      "field.api_key.updated",
+      "breaking",
+      "A published field API key changed.",
+      published.apiKey,
+      draft.apiKey,
     );
-  }
-  if (published.kind !== draft.kind) {
-    changes.push(
-      makeChange({
-        ...base,
-        code: "field.kind.updated",
-        classification: "breaking",
-        summary: "A published field kind changed.",
-        before: published.kind,
-        after: draft.kind,
-      }),
+  if (published.displayLabel !== draft.displayLabel)
+    add(
+      "field.label.updated",
+      "non_breaking",
+      "A field display label changed.",
+      published.displayLabel,
+      draft.displayLabel,
     );
-  }
-  if (published.required !== draft.required) {
-    changes.push(
-      makeChange({
-        ...base,
-        code: draft.required ? "field.required.enabled" : "field.required.disabled",
-        classification: draft.required ? "potentially_breaking" : "non_breaking",
-        summary: draft.required
-          ? "An optional published field became required."
-          : "A required published field became optional.",
-        before: published.required,
-        after: draft.required,
-      }),
+  if (published.kind !== draft.kind)
+    add(
+      "field.kind.updated",
+      "breaking",
+      "A published field kind changed.",
+      published.kind,
+      draft.kind,
     );
-  }
-  if (published.localization !== draft.localization) {
-    changes.push(
-      makeChange({
-        ...base,
-        code: "field.localization.updated",
-        classification: "breaking",
-        summary: "A published field localization mode changed.",
-        before: published.localization,
-        after: draft.localization,
-      }),
+  if (published.required !== draft.required)
+    add(
+      draft.required === true ? "field.required.enabled" : "field.required.disabled",
+      draft.required === true ? "potentially_breaking" : "non_breaking",
+      draft.required === true
+        ? "An optional published field became required."
+        : "A published field no longer requires independent presence.",
+      published.required,
+      draft.required,
     );
-  }
-  if (published.deprecated !== draft.deprecated) {
-    changes.push(
-      makeChange({
-        ...base,
-        code: draft.deprecated ? "field.deprecated" : "field.undeprecated",
-        classification: "non_breaking",
-        summary: draft.deprecated ? "A field was deprecated." : "A field is no longer deprecated.",
-        before: published.deprecated,
-        after: draft.deprecated,
-      }),
+  if (publishedLocalization !== draftLocalization)
+    add(
+      "field.localization.updated",
+      "breaking",
+      "A published field's effective localization changed.",
+      publishedLocalization,
+      draftLocalization,
     );
-  }
-  if (published.position !== draft.position) {
-    changes.push(
-      makeChange({
-        ...base,
-        code: "field.position.updated",
-        classification: "non_breaking",
-        summary: "A field's authoring order changed.",
-        before: published.position,
-        after: draft.position,
-      }),
+  if (published.deprecated !== draft.deprecated)
+    add(
+      draft.deprecated ? "field.deprecated" : "field.undeprecated",
+      "non_breaking",
+      draft.deprecated ? "A field was deprecated." : "A field is no longer deprecated.",
+      published.deprecated,
+      draft.deprecated,
     );
-  }
+  if (published.position !== draft.position)
+    add(
+      "field.position.updated",
+      "non_breaking",
+      "A field's authoring order changed.",
+      published.position,
+      draft.position,
+    );
+  if (canonicalStringify(published.editor) !== canonicalStringify(draft.editor))
+    add(
+      "field.editor.updated",
+      "non_breaking",
+      "A field's editor presentation changed.",
+      published.editor,
+      draft.editor,
+    );
+  if (
+    published.kind === draft.kind &&
+    canonicalStringify(published.configuration) !== canonicalStringify(draft.configuration)
+  )
+    add(
+      "field.configuration.updated",
+      classifyConfiguration(published, draft),
+      "A field's validation or default configuration changed.",
+      published.configuration,
+      draft.configuration,
+    );
 
   return changes;
 }
 
+/** Classifies all deterministic M6 management-schema changes by stable identity. */
 export function classifyCollectionSchemaChanges(
   published: PublishedSchemaRevision | null,
   draft: SchemaDraftState,
 ): SchemaChangeSet {
   const pending: Array<PendingChange> = [];
-
+  if (published?.formatVersion === 1)
+    pending.push(
+      makeChange({
+        code: "schema.format.upgraded",
+        classification: "non_breaking",
+        fieldId: null,
+        summary: "The schema document format upgraded to version 2.",
+        position: -3,
+        before: 1,
+        after: 2,
+      }),
+    );
+  if (published && published.currencyRegistryProfile !== draft.currencyRegistryProfile)
+    pending.push(
+      makeChange({
+        code: "schema.currency_profile.updated",
+        classification: "potentially_breaking",
+        fieldId: null,
+        summary: "The pinned currency registry profile changed.",
+        position: -2,
+        before: published.currencyRegistryProfile,
+        after: draft.currencyRegistryProfile,
+      }),
+    );
   if (
-    published !== null &&
+    published &&
+    canonicalStringify(published.editorLayout) !== canonicalStringify(draft.editorLayout)
+  )
+    pending.push(
+      makeChange({
+        code: "editor_layout.updated",
+        classification: "non_breaking",
+        fieldId: null,
+        summary: "The editor layout changed.",
+        position: -1,
+        before: published.editorLayout,
+        after: draft.editorLayout,
+      }),
+    );
+  if (
+    published &&
     (published.collectionDisplayName !== draft.collection.displayName ||
       published.collectionDescription !== draft.collection.description)
-  ) {
+  )
     pending.push(
       makeChange({
         code: "collection.metadata.updated",
@@ -377,20 +728,26 @@ export function classifyCollectionSchemaChanges(
         },
       }),
     );
-  }
 
-  const publishedById = new Map(published?.fields.map((field) => [field.id, field] as const) ?? []);
-  const draftById = new Map(draft.fields.map((field) => [field.id, field] as const));
+  const publishedFields = published ? flattenFieldTree(published.fields) : [];
+  const draftFields = flattenFieldTree(draft.fields);
+  const publishedById = new Map(publishedFields.map((field) => [field.id, field]));
+  const draftById = new Map(draftFields.map((field) => [field.id, field]));
+  const publishedLocalization = effectiveLocalizations(published?.fields ?? []);
+  const draftLocalization = effectiveLocalizations(draft.fields);
 
-  for (const field of draft.fields) {
+  for (const field of draftFields) {
     const previous = publishedById.get(field.id);
-    if (previous === undefined) {
+    if (!previous) {
       pending.push(
         makeChange({
-          code: field.required ? "field.added.required" : "field.added.optional",
-          classification: field.required ? "potentially_breaking" : "non_breaking",
+          code: field.required === true ? "field.added.required" : "field.added.optional",
+          classification: field.required === true ? "potentially_breaking" : "non_breaking",
           fieldId: field.id,
-          summary: field.required ? "A required field was added." : "An optional field was added.",
+          summary:
+            field.required === true
+              ? "A required field was added."
+              : "An optional field was added.",
           position: field.position,
           before: null,
           after: field,
@@ -398,11 +755,17 @@ export function classifyCollectionSchemaChanges(
       );
       continue;
     }
-    pending.push(...compareField(previous, field));
+    pending.push(
+      ...compareField(
+        previous,
+        field,
+        publishedLocalization.get(field.id) ?? null,
+        draftLocalization.get(field.id) ?? null,
+      ),
+    );
   }
-
-  for (const field of published?.fields ?? []) {
-    if (!draftById.has(field.id)) {
+  for (const field of publishedFields) {
+    if (!draftById.has(field.id))
       pending.push(
         makeChange({
           code: "field.removed",
@@ -414,21 +777,17 @@ export function classifyCollectionSchemaChanges(
           after: null,
         }),
       );
-    }
   }
 
   pending.sort((left, right) => {
-    const classificationDifference =
+    const severity =
       classificationRank[left.change.classification] -
       classificationRank[right.change.classification];
-    if (classificationDifference !== 0) return classificationDifference;
+    if (severity !== 0) return severity;
     if (left.position !== right.position) return left.position - right.position;
-    const fieldDifference = (left.change.fieldId ?? "").localeCompare(right.change.fieldId ?? "");
-    return fieldDifference !== 0
-      ? fieldDifference
-      : left.change.code.localeCompare(right.change.code);
+    const identity = (left.change.fieldId ?? "").localeCompare(right.change.fieldId ?? "");
+    return identity !== 0 ? identity : left.change.code.localeCompare(right.change.code);
   });
-
   const items: SchemaChanges = pending.map(({ change }) => change);
   const nonBreakingCount = items.filter(
     (change) => change.classification === "non_breaking",
@@ -437,7 +796,6 @@ export function classifyCollectionSchemaChanges(
     (change) => change.classification === "potentially_breaking",
   ).length;
   const breakingCount = items.filter((change) => change.classification === "breaking").length;
-
   return SchemaChangeSet.make({
     items,
     nonBreakingCount,
@@ -447,10 +805,12 @@ export function classifyCollectionSchemaChanges(
   });
 }
 
+/** Returns only the exact risky changes requiring publication acknowledgement. */
 export function requiredAcknowledgementChanges(changes: SchemaChangeSet): SchemaChanges {
   return changes.items.filter((change) => change.classification !== "non_breaking");
 }
 
+/** Constructs the replaceable aggregate schema service. */
 export function makeSchemaEngine() {
   return {
     validateDraft: Effect.fn("SchemaEngine.validateDraft")(
@@ -461,15 +821,14 @@ export function makeSchemaEngine() {
       draft: SchemaDraftState,
     ) {
       const result = validateCollectionDraft(draft, "publication");
-      if (!result.valid) {
-        return yield* SchemaInvalidFailure.make({
-          issues: result.issues,
-        });
-      }
+      if (!result.valid) return yield* SchemaInvalidFailure.make({ issues: result.issues });
       return result;
     }),
     hashDraft: Effect.fn("SchemaEngine.hashDraft")((draft: SchemaDraftState) =>
       Effect.succeed(hashCollectionDraft(draft)),
+    ),
+    hashContract: Effect.fn("SchemaEngine.hashContract")((draft: SchemaDraftState) =>
+      Effect.succeed(hashCollectionContract(draft)),
     ),
     classifyChanges: Effect.fn("SchemaEngine.classifyChanges")(
       (published: PublishedSchemaRevision | null, draft: SchemaDraftState) =>
@@ -485,14 +844,13 @@ export function makeSchemaEngine() {
     ) {
       const required = requiredAcknowledgementChanges(changes);
       const acknowledged = new Set<string>(acknowledgedChangeIds);
-      const isExact =
+      const exact =
         required.length === acknowledged.size &&
         required.every((change) => acknowledged.has(change.changeId));
-      if (!isExact) {
+      if (!exact)
         return yield* SchemaChangeAcknowledgementRequiredFailure.make({
           requiredChanges: required,
         });
-      }
       return { accepted: true };
     }),
   };

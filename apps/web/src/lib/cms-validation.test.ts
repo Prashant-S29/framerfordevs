@@ -31,15 +31,18 @@ describe("CMS browser validation", () => {
     expect(cmsKeyFromName("A".repeat(100))).toHaveLength(63);
   });
 
-  it("accepts only the M5 field vocabulary", () => {
+  it("accepts all M6 field kinds and rejects unknown kinds", () => {
     const definition = {
       displayLabel: "Title",
       apiKey: "title",
       localization: "localized",
+      helpText: "",
+      placeholder: "",
       required: true,
       deprecated: false,
     };
     expect(fieldFormSchema.safeParse({ ...definition, kind: "short_text" }).success).toBe(true);
-    expect(fieldFormSchema.safeParse({ ...definition, kind: "object" }).success).toBe(false);
+    expect(fieldFormSchema.safeParse({ ...definition, kind: "object" }).success).toBe(true);
+    expect(fieldFormSchema.safeParse({ ...definition, kind: "markdown" }).success).toBe(false);
   });
 });
