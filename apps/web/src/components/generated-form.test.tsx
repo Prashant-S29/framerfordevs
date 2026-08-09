@@ -7,9 +7,15 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { Schema } from "effect";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GeneratedForm } from "./generated-form";
+
+vi.mock("./portable-text-field", () => ({
+  default: ({ value }: { readonly value: unknown }) => (
+    <output aria-label="Rich text value">{JSON.stringify(value)}</output>
+  ),
+}));
 
 const editor = {
   helpText: "Generated from the schema contract.",
@@ -74,6 +80,21 @@ const fields = [
     localization: "shared",
     deprecated: false,
     position: 3,
+    editor,
+    configuration: {},
+    children: [],
+  },
+  {
+    id: "019fae8b-1234-7000-8000-000000000045",
+    parentFieldId: null,
+    nodeRole: "root",
+    apiKey: "body",
+    displayLabel: "Body",
+    kind: "rich_text",
+    required: false,
+    localization: "localized",
+    deprecated: false,
+    position: 4,
     editor,
     configuration: {},
     children: [],
@@ -146,5 +167,48 @@ describe("generated form", () => {
     expect(screen.getByText(/review the highlighted preview fields/i)).toBeTruthy();
     expect(screen.getByText(/this field is required/i)).toBeTruthy();
     expect(screen.getByText(/never saved/i)).toBeTruthy();
+  });
+
+  it("hydrates saved rich text into the lazy controlled editor", async () => {
+    const document = {
+      version: 1,
+      profile: "ffd-portable-text",
+      blocks: [
+        {
+          _key: "block-1",
+          _type: "block",
+          style: "normal",
+          children: [{ _key: "span-1", _type: "span", text: "Saved body", marks: [] }],
+          markDefs: [],
+        },
+      ],
+    };
+    render(
+      <GeneratedForm definition={definition} values={{ [fields[4]?.id ?? "missing"]: document }} />,
+    );
+
+    expect((await screen.findByLabelText(/rich text value/i)).textContent).toContain("Saved body");
+  });
+
+  it("emits controlled values under stable field IDs and exposes save status", async () => {
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+    const onSubmit = vi.fn();
+    render(
+      <GeneratedForm
+        definition={definition}
+        values={{}}
+        onValuesChange={onValuesChange}
+        onSubmit={onSubmit}
+        submitLabel="Save draft"
+        statusMessage="Unsaved changes."
+      />,
+    );
+
+    await user.type(screen.getByLabelText(/title/i), "A");
+    expect(onValuesChange).toHaveBeenCalledWith({ [fields[0]?.id ?? "missing"]: "A" });
+    await user.click(screen.getByRole("button", { name: /save draft/i }));
+    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(screen.getByText(/unsaved changes/i)).toBeTruthy();
   });
 });

@@ -6,33 +6,37 @@ import {
   PortableTextEditable,
   useEditor,
 } from "@portabletext/editor";
-import type { RenderDecoratorFunction, RenderStyleFunction } from "@portabletext/editor";
+import type {
+  PortableTextBlock as EditorPortableTextBlock,
+  RenderDecoratorFunction,
+  RenderStyleFunction,
+} from "@portabletext/editor";
 import { EventListenerPlugin } from "@portabletext/editor/plugins";
 
+import {
+  PortableTextDocument,
+  type RichTextConfiguration,
+} from "@framerfordevs/api/contracts/field-system";
 import { Button } from "@framerfordevs/ui/components/button";
+import { Option, Schema } from "effect";
 
-const schemaDefinition = defineSchema({
-  decorators: [
-    { name: "strong" },
-    { name: "em" },
-    { name: "underline" },
-    { name: "strike-through" },
-    { name: "code" },
-  ],
-  styles: [
-    { name: "normal" },
-    { name: "h2" },
-    { name: "h3" },
-    { name: "h4" },
-    { name: "h5" },
-    { name: "h6" },
-    { name: "blockquote" },
-  ],
-  annotations: [{ name: "link", fields: [{ name: "href", type: "string" }] }],
-  lists: [{ name: "bullet" }, { name: "number" }],
-  inlineObjects: [],
-  blockObjects: [],
-});
+const defaultDecorators = ["strong", "em", "underline", "strike-through", "code"] as const;
+const defaultStyles = ["normal", "h2", "h3", "h4", "h5", "h6", "blockquote"] as const;
+const defaultLists = ["bullet", "number"] as const;
+
+function makeSchemaDefinition(configuration?: RichTextConfiguration) {
+  return defineSchema({
+    decorators: (configuration?.decorators ?? defaultDecorators).map((name) => ({ name })),
+    styles: (configuration?.styles ?? defaultStyles).map((name) => ({ name })),
+    annotations:
+      configuration?.links === false
+        ? []
+        : [{ name: "link", fields: [{ name: "href", type: "string" }] }],
+    lists: (configuration?.lists ?? defaultLists).map((name) => ({ name })),
+    inlineObjects: [],
+    blockObjects: [],
+  });
+}
 
 const renderStyle: RenderStyleFunction = ({ children, schemaType }) => {
   switch (schemaType.value) {
@@ -68,7 +72,13 @@ const renderDecorator: RenderDecoratorFunction = ({ children, value }) => {
   }
 };
 
-function Toolbar() {
+function Toolbar({
+  disabled,
+  schemaDefinition,
+}: {
+  readonly disabled: boolean;
+  readonly schemaDefinition: ReturnType<typeof makeSchemaDefinition>;
+}) {
   const editor = useEditor();
   return (
     <div className="flex flex-wrap gap-1 border-b p-2" role="toolbar" aria-label="Text formatting">
@@ -78,6 +88,7 @@ function Toolbar() {
           type="button"
           size="sm"
           variant="ghost"
+          disabled={disabled}
           onClick={() => {
             editor.send({ type: "decorator.toggle", decorator: decorator.name });
             editor.send({ type: "focus" });
@@ -92,6 +103,7 @@ function Toolbar() {
           type="button"
           size="sm"
           variant="ghost"
+          disabled={disabled}
           onClick={() => {
             editor.send({ type: "style.toggle", style: style.name });
             editor.send({ type: "focus" });
@@ -100,23 +112,58 @@ function Toolbar() {
           {style.name}
         </Button>
       ))}
+      {schemaDefinition.lists.map((list) => (
+        <Button
+          key={list.name}
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={disabled}
+          onClick={() => {
+            editor.send({ type: "list item.toggle", listItem: list.name });
+            editor.send({ type: "focus" });
+          }}
+        >
+          {list.name}
+        </Button>
+      ))}
     </div>
   );
 }
 
 export default function PortableTextField({
   label,
+  value,
   disabled,
+  configuration,
   onChange,
 }: {
   readonly label: string;
+  readonly value: unknown;
   readonly disabled: boolean;
+  readonly configuration?: RichTextConfiguration;
   readonly onChange: (value: unknown) => void;
 }) {
+  const decoded = Schema.decodeUnknownOption(PortableTextDocument)(value);
+  const initialValue: Array<EditorPortableTextBlock> | undefined = Option.isSome(decoded)
+    ? decoded.value.blocks.map((block) => ({
+        ...block,
+        children: block.children.map((child) => ({ ...child, marks: [...child.marks] })),
+        markDefs: block.markDefs.map((mark) => ({ ...mark })),
+      }))
+    : undefined;
+  const schemaDefinition = makeSchemaDefinition(configuration);
+  const schemaKey = JSON.stringify({
+    decorators: schemaDefinition.decorators.map(({ name }) => name),
+    styles: schemaDefinition.styles.map(({ name }) => name),
+    lists: schemaDefinition.lists.map(({ name }) => name),
+    links: schemaDefinition.annotations.length > 0,
+  });
   return (
     <div className="overflow-hidden rounded-md border">
       <EditorProvider
-        initialConfig={{ schemaDefinition, initialValue: undefined, readOnly: disabled }}
+        key={schemaKey}
+        initialConfig={{ schemaDefinition, initialValue, readOnly: disabled }}
       >
         <EventListenerPlugin
           on={(event) => {
@@ -125,7 +172,7 @@ export default function PortableTextField({
             }
           }}
         />
-        <Toolbar />
+        <Toolbar disabled={disabled} schemaDefinition={schemaDefinition} />
         <PortableTextEditable
           aria-label={label}
           className="min-h-32 p-3 focus:outline-none"

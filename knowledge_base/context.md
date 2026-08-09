@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-08-05
-**Current phase:** Milestone 6 automated gate complete; awaiting developer/client manual review
-**Active milestone:** Milestone 6 — Field system, structured rich text, external assets, and editor layout
+**Last updated:** 2026-08-09
+**Current phase:** Milestone 7 manual-review corrections implemented and automated gates complete; awaiting resumed developer review
+**Active milestone:** Milestone 7 — Entries, multilingual drafts, and revision history
 
 ## What this project is
 
@@ -109,6 +109,18 @@ The repository currently has:
 - Transactional Drizzle repository workflows with tenant non-enumeration, optimistic concurrency, rollback guarantees, and audit persistence
 - TanStack/shadcn workspace and project management UI with create/edit/archive/CMS-enable flows
 - Approved and fully implemented M6 design at `knowledge_base/decisions/m6-field-system-and-generated-forms-design.md`: all 18 fields, recursive trees, exact decimal/money, mixed localization, strict Portable Text, external assets, references, editor layouts, independent hashes, role-aware form projections, generated controls, and bounded validation
+- Developer-approved M7 design at `knowledge_base/decisions/m7-entries-multilingual-drafts-and-revisions-design.md`: stable entries, published-schema authoring, stable-ID sparse fragments, independent shared/locale heads, durable idempotency receipts, permissive bounded drafts, immutable revisions, restore, field policy, pagination, and entry-editor UX
+- The developer generated and applied `0006_create_entries_and_locale_revisions.sql`; the agent inspected the complete SQL/snapshot and verified the live catalog read-only: six empty tables, 82 columns, 26 foreign keys, 25 checks, 16 primary/unique constraints, 38 valid/ready indexes including constraint indexes, and zero unvalidated constraints
+- Complete M7 management workflows: stable idempotent entry creation, scope-bound cursor lists, published-contract authority, independent shared/exact-locale heads, bounded stable-ID mutations, permissive draft issues, batched tenant-safe references, optimistic conflict details, durable receipts, immutable revision metadata, restore-as-new-revision, field projection/authorization, partition audits, and zero draft outbox events
+- M7 collection entries and generated multilingual editor UI with shared/read-only authority, exact-locale tabs, explicit save states, dirty-locale guards, preserved conflict edits, authoritative reload, separate histories, restore confirmation, and route-prefetched TanStack Query data
+- Developer-approved M7 manual-review amendment for user-controlled CMS-only entry names, locale-neutral entry lists, URL-driven locale tabs, version-0 defaults, saved rich-text hydration, and hiding mixed-object localization from ineligible kinds
+- The developer generated and applied `0007_add_entry_display_names.sql`; the agent inspected the complete SQL/snapshot and verified the live catalog read-only: nullable bounded `display_name`, positive defaulted `name_version`, three validated name constraints, eight migration records, four preserved legacy null names, and zero invalid/unready M7 constraints or indexes
+- The M7 manual-review corrections are implemented: required names on new entries, optimistic CMS-only rename with no-op/conflict/rollback behavior, locale-neutral lists, URL-driven exact-locale tabs, version-0-only default projection, saved Portable Text hydration, object-only mixed-localization controls, error-free unpublished-schema entry-list empty states, and type-appropriate schema-default editors
+- The entry workspace now reads collection publication metadata first, skips published-form and entry-page queries when no schema is published, keeps direct missing-resource 404 semantics for genuine callers, and allows locale-neutral management lists to return an empty page without requiring a published value contract
+- Rich-text defaults now use the lazy official Portable Text editor instead of raw JSON, honor configured styles/decorators/lists, and expose list controls; long-text defaults use a multiline control, date-time defaults use a local date-time picker with canonical instant storage, exact decimals declare decimal input mode, and object/list JSON controls enforce their root shape immediately
+- Class-backed rich-text, money, and external-asset defaults are copied to inert JSON data before value validation, preventing valid decoded Effect Schema values from being rejected as non-plain objects
+- Entry-editor diffs retain atomic root mutations for ordinary fields but descend through mixed-object containers to exact shared/localized child paths, matching server partition authority without weakening its default-deny checks
+- The refreshed M7 automated gate passes with 603 tests, API coverage at 89.72% statements and 71.07% branches, clean production/full audits, production builds, rebuilt healthy Docker services, HTTP 200 liveness/readiness/API-reference/SSR-login checks, and `git diff --check`
 - The developer generated and applied `0005_add_field_system_and_editor_layout.sql`; the agent inspected the complete SQL and snapshot and verified the live catalog read-only: 15 expected columns, 35 validated constraints, 16 valid/ready indexes, and valid legacy backfills
 - Complete M6 repository/API/UI/property/PostgreSQL/accessibility/bundle coverage with 551 passing tests and a clean production/full pnpm audit
 - Cold Docker manual review found and fixed a schema-builder hook-order crash during query hydration; hooks are now unconditional and `react-hooks/rules-of-hooks` is enforced workspace-wide
@@ -124,7 +136,7 @@ The repository currently has:
 
 The repository does not yet have:
 
-- Entry, content-draft, locale-publication, delivery, or preview workflows
+- Locale publication/delivery snapshots (M8), Delivery API querying (M9), or Preview API workflows (M10)
 - Production telemetry backend/collector deployment
 
 ## Mandatory constraints
@@ -223,13 +235,18 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 - During manual review, the developer found that the schema-builder URL matched but rendered only the project panel because a page-shaped route was nested under a component without an outlet. The builder now uses TanStack Router's non-nested trailing-underscore convention and has a route-tree regression test.
 - The developer manually verified the representative collection lifecycle, change acknowledgement, publication, and immutable revision behavior; approved Milestone 5; and had already committed it as `28ca04d` (`feat(m5): versioned collection schema engine`).
 
+## Milestone 6 completion
+
+- The approved field-system design is fully implemented across contracts, validation kernels, Effect services, PostgreSQL repositories, management APIs, schema-authoring UI, generated-form controls, and accessibility coverage.
+- The developer generated and applied `0005_add_field_system_and_editor_layout.sql`; the agent inspected the migration and live catalog read-only and did not generate, apply, execute, or modify it.
+- The refreshed automated gate passed with 551 tests, production builds, clean production/full pnpm audits, Docker health, read-only database invariants, and `git diff --check`.
+- Manual review found and resolved the cold-hydration React hook-order crash and the out-of-contract reference-collection page limit.
+- The developer completed manual review, approved Milestone 6, and committed it as `fbb4767` (`feat(m6): field system, structured rich text, external assets, and editor layout`).
+
 ## What to do next
 
-1. Stop for developer/client manual review; do not commit and do not begin Milestone 7.
-2. Developer reviews visual field-tree/inspector editing, duplicate-key feedback, every type configuration, visual/JSON synchronization, sample inference, atomic save/discard, and unsaved-navigation protection.
-3. Developer and client accounts inspect the same generated draft/published form and verify expected role visibility/editability differences.
-4. Developer checks keyboard traversal, focus visibility, labels/descriptions/errors, nested list/object controls, money/date-time handling, and basic screen-reader output.
-5. Developer reviews the lazy Portable Text chunk-size warning, dependency overrides, migration artifact, and complete working-tree diff.
-6. After explicit approval, the developer—not the agent—decides whether to commit and advance the milestone.
+1. Developer resumes manual English/Hindi/Gujarati create/name/rename/save/conflict/restore review against the corrected M7 implementation.
+2. Address any review findings within M7 and repeat the applicable gates.
+3. After explicit developer approval and manual commit, mark M7 approved and begin M8 design discovery; do not start M8 before that approval.
 
 The agent must never generate or apply migrations.

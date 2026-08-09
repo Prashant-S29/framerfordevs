@@ -1,5 +1,6 @@
 import { db } from "@framerfordevs/db";
 import { and, eq, inArray, sql } from "@framerfordevs/db/query";
+import { cmsEntryLocaleDraft } from "@framerfordevs/db/schema/cms";
 import { projectLocale } from "@framerfordevs/db/schema/locale";
 import { auditEvent } from "@framerfordevs/db/schema/platform";
 import { Context, Effect, Layer, Schema } from "effect";
@@ -138,12 +139,29 @@ async function selectLocaleById(executor: ApplicationExecutor, localeId: string)
   return row;
 }
 
-const emptyDependencies = LocaleDependencySummary.make({
-  draftCount: 0,
-  currentPublicationCount: 0,
-  draftCountCapped: false,
-  currentPublicationCountCapped: false,
-});
+/** Counts exact-locale draft heads under the project lock without scanning unbounded history. */
+async function selectLocaleDependencies(
+  executor: ApplicationExecutor,
+  locale: typeof projectLocale.$inferSelect,
+) {
+  const drafts = await executor
+    .select({ entryId: cmsEntryLocaleDraft.entryId })
+    .from(cmsEntryLocaleDraft)
+    .where(
+      and(
+        eq(cmsEntryLocaleDraft.workspaceId, locale.workspaceId),
+        eq(cmsEntryLocaleDraft.projectId, locale.projectId),
+        eq(cmsEntryLocaleDraft.localeId, locale.id),
+      ),
+    )
+    .limit(101);
+  return LocaleDependencySummary.make({
+    draftCount: Math.min(drafts.length, 100),
+    currentPublicationCount: 0,
+    draftCountCapped: drafts.length > 100,
+    currentPublicationCountCapped: false,
+  });
+}
 
 interface RepositoryOptions {
   readonly database?: ApplicationDb;
@@ -495,18 +513,21 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
             }
             if (authorization.access.project.archivedAt) return outcome("invalid_state");
             if (current.version !== input.version) return outcome("version_conflict");
+            const dependencies = await selectLocaleDependencies(transaction, current);
             const transition = decideLocaleTransition({
               currentStatus: decodeLocaleStatus(current.status),
               requestedStatus: input.status,
               isEnglish: current.tag.toLowerCase() === "en",
               confirmDraftImpact: input.confirmDraftImpact,
-              dependencies: emptyDependencies,
+              dependencies,
             });
             if (transition.kind === "no_change") {
               return outcomeWith("success", { row: current });
             }
             if (transition.kind === "invalid") return outcome("invalid_state");
-            if (transition.kind === "dependencies") return outcome("dependencies");
+            if (transition.kind === "dependencies") {
+              return outcomeWith("dependencies", { dependencies });
+            }
 
             const nextPosition =
               current.status === "removed" && input.status === "enabled"
@@ -574,7 +595,7 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
         }
         return yield* LocaleDependenciesExistFailure.make({
           requestedStatus: input.status,
-          dependencies: emptyDependencies,
+          dependencies: result.dependencies,
         });
       }
       return yield* decodeDatabaseValue(

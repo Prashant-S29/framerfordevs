@@ -27,6 +27,20 @@ import {
   UpdateProjectMemberRoleInputSchema,
 } from "../contracts/access";
 import {
+  CmsEntryDraftOutputSchema,
+  CmsEntryOutputSchema,
+  CmsEntryPageOutputSchema,
+  CreateEntryInputSchema,
+  EntryRevisionPageOutputSchema,
+  GetEntryDraftInputSchema,
+  ListEntriesInputSchema,
+  ListEntryRevisionsInputSchema,
+  RenameEntryInputSchema,
+  RestoreEntryRevisionInputSchema,
+  SaveEntryDraftInputSchema,
+  SaveEntryDraftResultOutputSchema,
+} from "../contracts/entries";
+import {
   CreateProjectLocaleInputSchema,
   ListProjectLocalesInputSchema,
   ProjectLocaleListOutputSchema,
@@ -88,6 +102,15 @@ import {
   updateProjectMemberLocaleAccess,
   updateProjectMemberRole,
 } from "../operations/access";
+import {
+  createEntry,
+  getEntryDraft,
+  listEntries,
+  listEntryRevisions,
+  renameEntry,
+  restoreEntryRevision,
+  saveEntryDraft,
+} from "../operations/entries";
 import {
   issueApiCredential,
   listApiCredentials,
@@ -403,6 +426,85 @@ export const appRouter = {
               "Collection updated.",
             ),
           ),
+        entries: {
+          list: protectedProcedure
+            .input(ListEntriesInputSchema)
+            .output(CmsEntryPageOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                "api.entry.list",
+                listEntries(context.session.user.id, input),
+                "Entries loaded.",
+              ),
+            ),
+          create: protectedProcedure
+            .input(CreateEntryInputSchema)
+            .output(CmsEntryOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                "api.entry.create",
+                createEntry(context.session.user.id, input, context.request.requestId),
+                "Entry created.",
+              ),
+            ),
+          rename: protectedProcedure
+            .input(RenameEntryInputSchema)
+            .output(CmsEntryOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                "api.entry.rename",
+                renameEntry(context.session.user.id, input, context.request.requestId),
+                "Entry renamed.",
+              ),
+            ),
+          getDraft: protectedProcedure
+            .input(GetEntryDraftInputSchema)
+            .output(CmsEntryDraftOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                "api.entry.draft.get",
+                getEntryDraft(context.session.user.id, input),
+                "Entry draft loaded.",
+              ),
+            ),
+          saveDraft: protectedProcedure
+            .input(SaveEntryDraftInputSchema)
+            .output(SaveEntryDraftResultOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                "api.entry.draft.save",
+                saveEntryDraft(context.session.user.id, input, context.request.requestId),
+                "Entry draft saved.",
+              ),
+            ),
+          listRevisions: protectedProcedure
+            .input(ListEntryRevisionsInputSchema)
+            .output(EntryRevisionPageOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                "api.entry.revision.list",
+                listEntryRevisions(context.session.user.id, input),
+                "Entry revisions loaded.",
+              ),
+            ),
+          restoreRevision: protectedProcedure
+            .input(RestoreEntryRevisionInputSchema)
+            .output(SaveEntryDraftResultOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                "api.entry.revision.restore",
+                restoreEntryRevision(context.session.user.id, input, context.request.requestId),
+                "Entry revision restored.",
+              ),
+            ),
+        },
         schema: {
           draft: {
             get: protectedProcedure

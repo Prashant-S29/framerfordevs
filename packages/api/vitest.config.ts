@@ -1,3 +1,5 @@
+// Configures API tests and coverage for contracts, Effect boundaries, and explicitly owned pure kernels.
+
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -8,6 +10,7 @@ export default defineConfig({
     coverage: {
       include: [
         "src/contracts/**/*.ts",
+        "src/lib/entry-values.ts",
         "src/observability/**/*.ts",
         "src/operations/**/*.ts",
         "src/services/**/*.ts",

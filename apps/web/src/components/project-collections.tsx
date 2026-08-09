@@ -145,20 +145,34 @@ export function ProjectCollections({
                   </p>
                 ) : null}
               </div>
-              {canWrite && !isArchived ? (
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   render={
                     <Link
-                      to="/projects/$projectId/collections/$collectionId"
+                      to="/projects/$projectId/collections/$collectionId/entries"
                       params={{ projectId, collectionId: collection.id }}
                     />
                   }
                 >
-                  Open builder <ArrowRightIcon data-icon="inline-end" />
+                  Entries <ArrowRightIcon data-icon="inline-end" />
                 </Button>
-              ) : null}
+                {canWrite && !isArchived ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    render={
+                      <Link
+                        to="/projects/$projectId/collections/$collectionId"
+                        params={{ projectId, collectionId: collection.id }}
+                      />
+                    }
+                  >
+                    Schema
+                  </Button>
+                ) : null}
+              </div>
             </div>
           ))
         )}

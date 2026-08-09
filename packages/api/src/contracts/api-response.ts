@@ -1,3 +1,5 @@
+// Defines the standard application response envelope, public error details, and transport-safe helpers.
+
 import { Schema } from "effect";
 
 export const ApiErrorCodeSchema = Schema.Literal(
@@ -16,6 +18,10 @@ export const ApiErrorCodeSchema = Schema.Literal(
   "COLLECTION_KEY_CONFLICT",
   "SCHEMA_INVALID",
   "SCHEMA_CHANGE_ACKNOWLEDGEMENT_REQUIRED",
+  "PUBLISHED_SCHEMA_REQUIRED",
+  "ENTRY_DRAFT_CONFLICT",
+  "ENTRY_COMMAND_CONFLICT",
+  "ENTRY_REVISION_INCOMPATIBLE",
   "INVITATION_CONFLICT",
   "INVITATION_INVALID",
   "LAST_OWNER_REQUIRED",
@@ -37,6 +43,16 @@ export class ApiErrorDetail extends Schema.Class<ApiErrorDetail>("ApiErrorDetail
   path: Schema.optionalWith(Schema.String.pipe(Schema.maxLength(256)), { exact: true }),
   code: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
   message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  scope: Schema.optionalWith(Schema.Literal("shared", "localized"), { exact: true }),
+  expectedVersion: Schema.optionalWith(
+    Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
+    { exact: true },
+  ),
+  currentVersion: Schema.optionalWith(
+    Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
+    { exact: true },
+  ),
+  currentRevisionId: Schema.optionalWith(Schema.NullOr(Schema.UUID), { exact: true }),
 }) {}
 
 const ApiErrorDetailsSchema = Schema.Array(ApiErrorDetail).pipe(

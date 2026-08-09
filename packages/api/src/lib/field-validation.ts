@@ -93,6 +93,15 @@ function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown
   return prototype === Object.prototype || prototype === null;
 }
 
+/** Copies a known decoded Effect Schema class into inert JSON data for value validation. */
+function copyDecodedSchemaClass(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(copyDecodedSchemaClass);
+  if (typeof value !== "object" || value === null) return value;
+  return Object.fromEntries(
+    Object.keys(value).map((key) => [key, copyDecodedSchemaClass(Reflect.get(value, key))]),
+  );
+}
+
 /** Returns whether an object contains only the exact approved own keys. */
 function hasOnlyKeys(
   value: Readonly<Record<string, unknown>>,
@@ -1379,8 +1388,17 @@ function validateConfigurationSemantics(
   }
 
   const configuredDefault = Reflect.get(definition.configuration, "default");
-  if (configuredDefault !== undefined)
-    validatePresentValue(definition, configuredDefault, collector, `${path}.configuration.default`);
+  if (configuredDefault !== undefined) {
+    const classBackedDefault =
+      definition.kind === "money" ||
+      definition.kind === "external_asset" ||
+      definition.kind === "rich_text";
+    const value =
+      classBackedDefault && !isPlainRecord(configuredDefault)
+        ? copyDecodedSchemaClass(configuredDefault)
+        : configuredDefault;
+    validatePresentValue(definition, value, collector, `${path}.configuration.default`);
+  }
 }
 
 /** Validates recursive shape, localization, depth, and direct-list invariants. */

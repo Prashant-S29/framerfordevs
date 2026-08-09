@@ -1,3 +1,5 @@
+// Composes the shared application Layer/ManagedRuntime and maps Effect exits at framework boundaries.
+
 import * as OtelTracer from "@effect/opentelemetry/Tracer";
 import { Cause, Chunk, Clock, Effect, Exit, Layer, ManagedRuntime, Option } from "effect";
 
@@ -24,6 +26,8 @@ import {
 } from "./services/credential-authenticator";
 import { CredentialRepository, CredentialRepositoryLive } from "./services/credential-repository";
 import { Database, DatabaseLive } from "./services/database";
+import { EntryEngine, EntryEngineLive } from "./services/entry-engine";
+import { EntryRepository, EntryRepositoryLive } from "./services/entry-repository";
 import { FieldEngine, FieldEngineLive } from "./services/field-engine";
 import { LocaleRepository, LocaleRepositoryLive } from "./services/locale-repository";
 import { PlatformRepository, PlatformRepositoryLive } from "./services/platform-repository";
@@ -45,6 +49,8 @@ export type ApplicationServices =
   | CredentialAttemptLimiter
   | CredentialRepository
   | CredentialAuthenticator
+  | EntryEngine
+  | EntryRepository
   | FieldEngine
   | SchemaEngine
   | SchemaRepository;
@@ -62,6 +68,8 @@ const InfrastructureLive = Layer.mergeAll(
   CredentialAttemptLimiterLive,
   CredentialRepositoryLive,
   CredentialAuthenticatorLive,
+  EntryEngineLive,
+  EntryRepositoryLive,
   FieldEngineLive,
   SchemaEngineLive,
   SchemaRepositoryLive,

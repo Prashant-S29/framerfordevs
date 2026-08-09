@@ -1,3 +1,5 @@
+// Defines typed application failures and their centralized public HTTP/error-envelope mapping.
+
 import { Schema } from "effect";
 
 import { ApiErrorDetail, type ApiErrorCode, type ApiFailure, apiFailure } from "./api-response";
@@ -84,6 +86,24 @@ export class SchemaChangeAcknowledgementRequiredFailure extends Schema.TaggedErr
   requiredChanges: SchemaChanges,
 }) {}
 
+export class PublishedSchemaRequiredFailure extends Schema.TaggedError<PublishedSchemaRequiredFailure>(
+  "PublishedSchemaRequiredFailure",
+)("PublishedSchemaRequiredFailure", {}) {}
+
+export class EntryDraftConflictFailure extends Schema.TaggedError<EntryDraftConflictFailure>(
+  "EntryDraftConflictFailure",
+)("EntryDraftConflictFailure", {
+  details: Schema.Array(ApiErrorDetail).pipe(Schema.minItems(1), Schema.maxItems(2)),
+}) {}
+
+export class EntryCommandConflictFailure extends Schema.TaggedError<EntryCommandConflictFailure>(
+  "EntryCommandConflictFailure",
+)("EntryCommandConflictFailure", {}) {}
+
+export class EntryRevisionIncompatibleFailure extends Schema.TaggedError<EntryRevisionIncompatibleFailure>(
+  "EntryRevisionIncompatibleFailure",
+)("EntryRevisionIncompatibleFailure", {}) {}
+
 export class InvitationConflictFailure extends Schema.TaggedError<InvitationConflictFailure>(
   "InvitationConflictFailure",
 )("InvitationConflictFailure", {}) {}
@@ -142,6 +162,10 @@ export type ApplicationError =
   | CollectionKeyConflictFailure
   | SchemaInvalidFailure
   | SchemaChangeAcknowledgementRequiredFailure
+  | PublishedSchemaRequiredFailure
+  | EntryDraftConflictFailure
+  | EntryCommandConflictFailure
+  | EntryRevisionIncompatibleFailure
   | InvitationConflictFailure
   | InvitationInvalidFailure
   | LastOwnerRequiredFailure
@@ -167,6 +191,10 @@ export const apiErrorHttpStatus = {
   COLLECTION_KEY_CONFLICT: 409,
   SCHEMA_INVALID: 422,
   SCHEMA_CHANGE_ACKNOWLEDGEMENT_REQUIRED: 409,
+  PUBLISHED_SCHEMA_REQUIRED: 409,
+  ENTRY_DRAFT_CONFLICT: 409,
+  ENTRY_COMMAND_CONFLICT: 409,
+  ENTRY_REVISION_INCOMPATIBLE: 409,
   INVITATION_CONFLICT: 409,
   INVITATION_INVALID: 404,
   LAST_OWNER_REQUIRED: 409,
@@ -325,7 +353,7 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
     case "SchemaInvalidFailure":
       return {
         code: "SCHEMA_INVALID",
-        message: "The draft schema is not valid for publication.",
+        message: "The draft schema is invalid.",
         retryable: false,
         details: error.issues.map((issue) =>
           ApiErrorDetail.make({
@@ -350,6 +378,31 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
         ...(details.length === 0 ? {} : { details }),
       };
     }
+    case "PublishedSchemaRequiredFailure":
+      return {
+        code: "PUBLISHED_SCHEMA_REQUIRED",
+        message: "Publish the collection schema before creating or editing entries.",
+        retryable: false,
+      };
+    case "EntryDraftConflictFailure":
+      return {
+        code: "ENTRY_DRAFT_CONFLICT",
+        message: "The draft changed since it was loaded. Review the latest values and try again.",
+        retryable: false,
+        details: error.details,
+      };
+    case "EntryCommandConflictFailure":
+      return {
+        code: "ENTRY_COMMAND_CONFLICT",
+        message: "The command identifier was already used for a different entry operation.",
+        retryable: false,
+      };
+    case "EntryRevisionIncompatibleFailure":
+      return {
+        code: "ENTRY_REVISION_INCOMPATIBLE",
+        message: "This revision cannot be restored under the current published schema.",
+        retryable: false,
+      };
     case "InvitationConflictFailure":
       return {
         code: "INVITATION_CONFLICT",

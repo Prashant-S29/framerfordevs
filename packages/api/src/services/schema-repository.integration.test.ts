@@ -643,6 +643,39 @@ describe.sequential("schema repository PostgreSQL integration", () => {
               configuration: { maxLength: 200 },
               children: [],
             },
+            {
+              id: null,
+              apiKey: "body",
+              displayLabel: "Body",
+              kind: "rich_text",
+              required: false,
+              localization: "localized",
+              deprecated: false,
+              editor: defaultFieldEditorMetadata,
+              configuration: {
+                default: {
+                  version: 1,
+                  profile: "ffd-portable-text",
+                  blocks: [
+                    {
+                      _key: "block1",
+                      _type: "block",
+                      style: "normal",
+                      children: [
+                        {
+                          _key: "span1",
+                          _type: "span",
+                          text: "Default body",
+                          marks: ["strong"],
+                        },
+                      ],
+                      markDefs: [],
+                    },
+                  ],
+                },
+              },
+              children: [],
+            },
           ],
         }),
         new Date("2026-08-01T13:02:32.000Z"),

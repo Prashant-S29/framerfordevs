@@ -1,3 +1,4 @@
+import type { RichTextConfiguration } from "@framerfordevs/api/contracts/field-system";
 import type { CollectionFieldKind } from "@framerfordevs/api/contracts/schemas";
 import { iso4217MinorUnits } from "@framerfordevs/api/registry/iso-4217.generated";
 import { Button } from "@framerfordevs/ui/components/button";
@@ -15,7 +16,7 @@ import { Input } from "@framerfordevs/ui/components/input";
 import { NativeSelect, NativeSelectOption } from "@framerfordevs/ui/components/native-select";
 import { Textarea } from "@framerfordevs/ui/components/textarea";
 import { PlusIcon, Trash2Icon } from "lucide-react";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 
 import {
   defaultFieldConfiguration,
@@ -23,6 +24,29 @@ import {
   type SchemaEditorField,
   type SchemaEditorIssue,
 } from "@/lib/schema-authoring";
+
+const PortableTextField = lazy(() => import("./portable-text-field"));
+
+const richTextStyleOptions = [
+  ["normal", "Paragraph"],
+  ["h2", "Heading 2"],
+  ["h3", "Heading 3"],
+  ["h4", "Heading 4"],
+  ["h5", "Heading 5"],
+  ["h6", "Heading 6"],
+  ["blockquote", "Blockquote"],
+] as const;
+const richTextDecoratorOptions = [
+  ["strong", "Bold"],
+  ["em", "Italic"],
+  ["underline", "Underline"],
+  ["strike-through", "Strikethrough"],
+  ["code", "Code"],
+] as const;
+const richTextListOptions = [
+  ["bullet", "Bulleted"],
+  ["number", "Numbered"],
+] as const;
 
 const roleOptions = [
   ["owner", "Owner"],
@@ -90,6 +114,7 @@ function OptionalTextSetting({
   description,
   value,
   type = "text",
+  inputMode,
   onChange,
 }: {
   readonly id: string;
@@ -97,6 +122,7 @@ function OptionalTextSetting({
   readonly description?: string;
   readonly value: string;
   readonly type?: "text" | "url" | "email" | "date" | "datetime-local";
+  readonly inputMode?: "decimal";
   readonly onChange: (value: string | undefined) => void;
 }) {
   return (
@@ -106,11 +132,79 @@ function OptionalTextSetting({
         id={id}
         name={id}
         type={type}
+        inputMode={inputMode}
         value={value}
         autoComplete="off"
         onChange={(event) => onChange(event.target.value || undefined)}
       />
       {description ? <FieldDescription>{description}</FieldDescription> : null}
+    </Field>
+  );
+}
+
+function OptionalLongTextSetting({
+  id,
+  label,
+  description,
+  value,
+  onChange,
+}: {
+  readonly id: string;
+  readonly label: string;
+  readonly description?: string;
+  readonly value: string;
+  readonly onChange: (value: string | undefined) => void;
+}) {
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <Textarea
+        id={id}
+        name={id}
+        value={value}
+        rows={5}
+        autoComplete="off"
+        onChange={(event) => onChange(event.target.value || undefined)}
+      />
+      {description ? <FieldDescription>{description}</FieldDescription> : null}
+    </Field>
+  );
+}
+
+function OptionalDateTimeSetting({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  readonly id: string;
+  readonly label: string;
+  readonly value: string;
+  readonly onChange: (value: string | undefined) => void;
+}) {
+  const instant = value ? new Date(value) : null;
+  const displayed =
+    instant && Number.isFinite(instant.getTime())
+      ? new Date(instant.getTime() - instant.getTimezoneOffset() * 60_000)
+          .toISOString()
+          .slice(0, 16)
+      : value;
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <Input
+        id={id}
+        name={id}
+        type="datetime-local"
+        value={displayed}
+        autoComplete="off"
+        onChange={(event) => {
+          if (!event.target.value) return onChange(undefined);
+          const next = new Date(event.target.value);
+          onChange(Number.isFinite(next.getTime()) ? next.toISOString() : event.target.value);
+        }}
+      />
+      <FieldDescription>Browser-local input; stored as an RFC 3339 instant.</FieldDescription>
     </Field>
   );
 }
@@ -192,11 +286,13 @@ function JsonSetting({
   id,
   label,
   value,
+  expectedRoot = "any",
   onChange,
 }: {
   readonly id: string;
   readonly label: string;
   readonly value: unknown;
+  readonly expectedRoot?: "any" | "object" | "array";
   readonly onChange: (value: unknown) => void;
 }) {
   const [source, setSource] = useState(() =>
@@ -211,6 +307,14 @@ function JsonSetting({
     }
     try {
       const parsed: unknown = JSON.parse(source);
+      if (expectedRoot === "object" && !isRecord(parsed)) {
+        setError("Enter a JSON object.");
+        return;
+      }
+      if (expectedRoot === "array" && !Array.isArray(parsed)) {
+        setError("Enter a JSON array.");
+        return;
+      }
       setError(undefined);
       onChange(parsed);
     } catch (cause) {
@@ -232,7 +336,9 @@ function JsonSetting({
         onBlur={apply}
       />
       <FieldDescription>
-        Leave empty for no default. JSON is validated when focus leaves the editor.
+        Leave empty for no default.{" "}
+        {expectedRoot === "object" ? "Object" : expectedRoot === "array" ? "Array" : "JSON"} syntax
+        is validated when focus leaves the editor.
       </FieldDescription>
       <FieldError>{error}</FieldError>
     </Field>
@@ -275,6 +381,80 @@ function CheckboxOptions({
         })}
       </FieldGroup>
     </FieldSet>
+  );
+}
+
+function configuredRichTextValues<Value extends string>(
+  record: Record<string, unknown>,
+  key: string,
+  options: ReadonlyArray<readonly [Value, string]>,
+): ReadonlyArray<Value> {
+  const configured = Reflect.get(record, key);
+  if (configured === undefined) return options.map(([value]) => value);
+  if (!Array.isArray(configured)) return [];
+  const allowed = new Set<string>(options.map(([value]) => value));
+  return configured.filter(
+    (value): value is Value => typeof value === "string" && allowed.has(value),
+  );
+}
+
+function richTextEditorConfiguration(record: Record<string, unknown>): RichTextConfiguration {
+  return {
+    styles: configuredRichTextValues(record, "styles", richTextStyleOptions),
+    decorators: configuredRichTextValues(record, "decorators", richTextDecoratorOptions),
+    lists: configuredRichTextValues(record, "lists", richTextListOptions),
+    links: optionalBoolean(record, "links") ?? true,
+  };
+}
+
+function RichTextDefaultSetting({
+  field,
+  record,
+  onChange,
+}: {
+  readonly field: SchemaEditorField;
+  readonly record: Record<string, unknown>;
+  readonly onChange: (configuration: unknown) => void;
+}) {
+  const enabled = record.default !== undefined;
+  const setDefault = (value: unknown) => onChange(setRecordValue(record, "default", value));
+  return (
+    <FieldGroup>
+      <Field orientation="horizontal">
+        <Checkbox
+          id="config-rich-default-enabled"
+          checked={enabled}
+          onCheckedChange={(checked) =>
+            setDefault(
+              checked === true
+                ? { version: 1, profile: "ffd-portable-text", blocks: [] }
+                : undefined,
+            )
+          }
+        />
+        <FieldLabel htmlFor="config-rich-default-enabled">Configure a Default Document</FieldLabel>
+      </Field>
+      {enabled ? (
+        <FieldSet>
+          <FieldLegend variant="label">Default Rich Text Content</FieldLegend>
+          <Suspense
+            fallback={<p className="text-muted-foreground text-sm">Loading rich-text editor…</p>}
+          >
+            <PortableTextField
+              key={`${field.localId}-rich-default`}
+              label="Default rich text content"
+              value={record.default}
+              disabled={false}
+              configuration={richTextEditorConfiguration(record)}
+              onChange={setDefault}
+            />
+          </Suspense>
+          <FieldDescription>
+            Leave disabled for no default. Content is stored as the approved Portable Text document.
+          </FieldDescription>
+        </FieldSet>
+      ) : null}
+    </FieldGroup>
   );
 }
 
@@ -426,10 +606,12 @@ function EnumConfiguration({
 function CommonStringConfiguration({
   record,
   defaultMaximum,
+  multilineDefault = false,
   onChange,
 }: {
   readonly record: Record<string, unknown>;
   readonly defaultMaximum: number;
+  readonly multilineDefault?: boolean;
   readonly onChange: (configuration: unknown) => void;
 }) {
   const set = (key: string, value: unknown) => onChange(setRecordValue(record, key, value));
@@ -456,13 +638,23 @@ function CommonStringConfiguration({
         value={optionalString(record, "pattern")}
         onChange={(value) => set("pattern", value)}
       />
-      <OptionalTextSetting
-        id="config-default"
-        label="Default Value"
-        description={`Optional default, up to ${defaultMaximum.toLocaleString()} characters.`}
-        value={optionalString(record, "default")}
-        onChange={(value) => set("default", value)}
-      />
+      {multilineDefault ? (
+        <OptionalLongTextSetting
+          id="config-default"
+          label="Default Value"
+          description={`Optional default, up to ${defaultMaximum.toLocaleString()} characters.`}
+          value={optionalString(record, "default")}
+          onChange={(value) => set("default", value)}
+        />
+      ) : (
+        <OptionalTextSetting
+          id="config-default"
+          label="Default Value"
+          description={`Optional default, up to ${defaultMaximum.toLocaleString()} characters.`}
+          value={optionalString(record, "default")}
+          onChange={(value) => set("default", value)}
+        />
+      )}
     </FieldGroup>
   );
 }
@@ -485,7 +677,12 @@ function TypeConfiguration({
       return <CommonStringConfiguration record={record} defaultMaximum={500} onChange={onChange} />;
     case "long_text":
       return (
-        <CommonStringConfiguration record={record} defaultMaximum={50_000} onChange={onChange} />
+        <CommonStringConfiguration
+          record={record}
+          defaultMaximum={50_000}
+          multilineDefault
+          onChange={onChange}
+        />
       );
     case "slug":
       return <CommonStringConfiguration record={record} defaultMaximum={200} onChange={onChange} />;
@@ -574,18 +771,21 @@ function TypeConfiguration({
             id="config-decimal-minimum"
             label="Minimum"
             description="Stored as an exact base-10 string."
+            inputMode="decimal"
             value={optionalString(record, "minimum")}
             onChange={(value) => set("minimum", value)}
           />
           <OptionalTextSetting
             id="config-decimal-maximum"
             label="Maximum"
+            inputMode="decimal"
             value={optionalString(record, "maximum")}
             onChange={(value) => set("maximum", value)}
           />
           <OptionalTextSetting
             id="config-decimal-default"
             label="Default"
+            inputMode="decimal"
             value={optionalString(record, "default")}
             onChange={(value) => set("default", value)}
           />
@@ -632,6 +832,7 @@ function TypeConfiguration({
             id="config-money-default-amount"
             label="Default Amount"
             description="Exact base-10 value; no rounding is applied."
+            inputMode="decimal"
             value={optionalString(defaultValue, "amount")}
             onChange={(value) =>
               set(
@@ -707,20 +908,19 @@ function TypeConfiguration({
     case "date_time":
       return (
         <FieldGroup>
-          <OptionalTextSetting
+          <OptionalDateTimeSetting
             id="config-datetime-minimum"
             label="Earliest Date & Time"
-            description="Use an ISO 8601 value with an explicit offset, such as 2026-08-05T09:00:00Z."
             value={optionalString(record, "minimum")}
             onChange={(value) => set("minimum", value)}
           />
-          <OptionalTextSetting
+          <OptionalDateTimeSetting
             id="config-datetime-maximum"
             label="Latest Date & Time"
             value={optionalString(record, "maximum")}
             onChange={(value) => set("maximum", value)}
           />
-          <OptionalTextSetting
+          <OptionalDateTimeSetting
             id="config-datetime-default"
             label="Default Date & Time"
             value={optionalString(record, "default")}
@@ -763,6 +963,7 @@ function TypeConfiguration({
           id="config-object-default"
           label="Default Object"
           value={record.default}
+          expectedRoot="object"
           onChange={(value) => set("default", value)}
         />
       );
@@ -796,6 +997,7 @@ function TypeConfiguration({
             id="config-list-default"
             label="Default List"
             value={record.default}
+            expectedRoot="array"
             onChange={(value) => set("default", value)}
           />
         </FieldGroup>
@@ -920,43 +1122,26 @@ function TypeConfiguration({
         <FieldGroup>
           <CheckboxOptions
             legend="Block Styles"
-            values={stringArray(record, "styles")}
-            options={[
-              ["normal", "Paragraph"],
-              ["h2", "Heading 2"],
-              ["h3", "Heading 3"],
-              ["h4", "Heading 4"],
-              ["h5", "Heading 5"],
-              ["h6", "Heading 6"],
-              ["blockquote", "Blockquote"],
-            ]}
+            values={configuredRichTextValues(record, "styles", richTextStyleOptions)}
+            options={richTextStyleOptions}
             onChange={(value) => set("styles", value)}
           />
           <CheckboxOptions
             legend="Decorators"
-            values={stringArray(record, "decorators")}
-            options={[
-              ["strong", "Bold"],
-              ["em", "Italic"],
-              ["underline", "Underline"],
-              ["strike-through", "Strikethrough"],
-              ["code", "Code"],
-            ]}
+            values={configuredRichTextValues(record, "decorators", richTextDecoratorOptions)}
+            options={richTextDecoratorOptions}
             onChange={(value) => set("decorators", value)}
           />
           <CheckboxOptions
             legend="List Types"
-            values={stringArray(record, "lists")}
-            options={[
-              ["bullet", "Bulleted"],
-              ["number", "Numbered"],
-            ]}
+            values={configuredRichTextValues(record, "lists", richTextListOptions)}
+            options={richTextListOptions}
             onChange={(value) => set("lists", value)}
           />
           <Field orientation="horizontal">
             <Checkbox
               id="config-rich-links"
-              checked={optionalBoolean(record, "links") ?? false}
+              checked={optionalBoolean(record, "links") ?? true}
               onCheckedChange={(checked) => set("links", checked === true)}
             />
             <FieldLabel htmlFor="config-rich-links">Allow Links</FieldLabel>
@@ -975,13 +1160,7 @@ function TypeConfiguration({
             value={optionalNumber(record, "maxLength")}
             onChange={(value) => set("maxLength", value)}
           />
-          <JsonSetting
-            key={`${field.localId}-rich-default`}
-            id="config-rich-default"
-            label="Default Portable Text Document"
-            value={record.default}
-            onChange={(value) => set("default", value)}
-          />
+          <RichTextDefaultSetting field={field} record={record} onChange={onChange} />
         </FieldGroup>
       );
   }
@@ -1116,9 +1295,9 @@ export function SchemaFieldInspector({
           >
             <NativeSelectOption value="localized">Localized</NativeSelectOption>
             <NativeSelectOption value="shared">Shared</NativeSelectOption>
-            <NativeSelectOption value="mixed" disabled={field.kind !== "object"}>
-              Mixed Object
-            </NativeSelectOption>
+            {field.kind === "object" ? (
+              <NativeSelectOption value="mixed">Mixed Object</NativeSelectOption>
+            ) : null}
           </NativeSelect>
         </Field>
       ) : null}

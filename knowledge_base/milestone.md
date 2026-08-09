@@ -386,7 +386,7 @@ Allow editors to create one logical entry with shared values and independent loc
 
 ### Deliverables
 
-- Stable entries
+- Stable entries with user-controlled CMS-only names
 - Shared draft values
 - Per-locale draft revisions
 - Draft save and optimistic concurrency
@@ -397,7 +397,8 @@ Allow editors to create one logical entry with shared values and independent loc
 
 ### Automated success criteria
 
-- Creating an entry produces one stable identity across all locales.
+- Creating an entry produces one stable identity and bounded management name across all locales.
+- Renaming uses optimistic concurrency, is audited, and never changes content revisions or Delivery values.
 - Localized values remain isolated by locale.
 - Shared fields are authored once and appear consistently in each locale editor.
 - Saving Hindi never overwrites English or Gujarati localized values.

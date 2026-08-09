@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 6 automated gate complete; awaiting developer/client manual review
-**Active milestone:** Milestone 6 — Field system, structured rich text, external assets, and editor layout
-**Last updated:** 2026-08-05
+**Overall status:** Milestone 7 automated corrections complete; awaiting resumed developer manual review
+**Active milestone:** Milestone 7 — Entries, multilingual drafts, and revision history
+**Last updated:** 2026-08-09
 
 ## Status legend
 
@@ -23,8 +23,8 @@
 | 3   | Membership, policies, credentials        | `[A]`  | 381 passing     | Approved      | `a74aeb8` |
 | 4   | Project locales                          | `[A]`  | 453 passing     | Approved      | `68b6f6e` |
 | 5   | Versioned schema engine                  | `[A]`  | 509 passing     | Approved      | `28ca04d` |
-| 6   | Field system and generated forms         | `[R]`  | 551 passing     | Pending       | None      |
-| 7   | Entries and multilingual drafts          | `[ ]`  | Not run         | Pending       | None      |
+| 6   | Field system and generated forms         | `[A]`  | 551 passing     | Approved      | `fbb4767` |
+| 7   | Entries and multilingual drafts          | `[R]`  | 603 passing     | In progress   | None      |
 | 8   | Per-locale publication and snapshots     | `[ ]`  | Not run         | Pending       | None      |
 | 9   | Delivery API                             | `[ ]`  | Not run         | Pending       | None      |
 | 10  | Preview API                              | `[ ]`  | Not run         | Pending       | None      |
@@ -249,11 +249,49 @@
 - `[x]` Add a versioned synchronized schema-definition JSON view and a separate bounded sample-content JSON inference flow with preview, warnings, explicit local replacement, and no sample-value persistence or server transfer.
 - `[x]` Add the optimistic atomic `fields.replace` contract, operation, telemetry, router, repository transaction, layout reconciliation, audit, OpenAPI, PostgreSQL rollback/identity, UI, pure inference, and accessibility coverage without changing the database schema or migration artifacts.
 - `[x]` Pass the refreshed complete readiness gate with 551 tests and preserve the lazy Portable Text/boundary-reviewed production bundle.
-- `[R]` Continue developer/client manual review of the schema-authoring UX, role-aware generated forms, and keyboard/screen-reader basics before any commit or Milestone 7 work.
+- `[A]` Developer completed manual review, approved Milestone 6, and committed it as `fbb4767` (`feat(m6): field system, structured rich text, external assets, and editor layout`).
+
+## Milestone 7 checklist — design approval gate
+
+- `[x]` Re-read the product vision, CMS PRD, every mandatory rule, active milestone, context, progress, learnings, and prior M1–M6 decisions.
+- `[x]` Verify Git state and preserve the uncommitted M6 approval-documentation changes.
+- `[x]` Apply materially relevant Effect, Drizzle, PostgreSQL, Express, security, TanStack, shadcn/ui, React, Portable Text, Turborepo, and web-interface guidance.
+- `[x]` Inspect the implemented M4–M6 locale, schema, field, policy, repository, API, UI, migration-gate, and test seams.
+- `[x]` Reconcile stable entry identity, mixed shared/localized fragments, locale-independent concurrency, permissive draft validation, field permissions, references, revisions, restore, pagination, and delivery isolation.
+- `[x]` Propose the complete design in `knowledge_base/decisions/m7-entries-multilingual-drafts-and-revisions-design.md`.
+- `[A]` Developer reviewed the corrected proposal, explicitly approved the complete M7 design, and authorized implementation.
+- `[x]` Add the six approved Drizzle tables for stable entries, immutable shared/locale revisions, shared/locale heads, and durable save/restore command receipts.
+- `[x]` Add complete tenant/schema/locale/history foreign keys, optimistic head-version correlation, value/fingerprint bounds, changed-field arrays, and list/revision/dependency indexes.
+- `[x]` Add Drizzle relations and pass targeted formatting, lint, database type-check, and `git diff --check` without generating or applying a migration.
+- `[x]` Developer generated and applied `0006_create_entries_and_locale_revisions.sql`; the agent generated/applied neither operation.
+- `[x]` Inspect all 185 generated SQL lines and version-7 snapshot; confirm only the six approved new tables, their foreign keys, checks, indexes, and journal entry were generated with no destructive/backfill SQL.
+- `[x]` Verify the live catalog read-only: six empty tables, 82 columns, 26 foreign keys, 25 checks, 16 primary/unique constraints, 38 valid/ready indexes including constraint indexes, zero unvalidated constraints, and seven applied migrations.
+- `[x]` Add schema-backed entry/draft/mutation/revision contracts, shared `PageLimit` pagination, scope-bound entry/revision cursors, structured conflict metadata, and four centralized M7 errors.
+- `[x]` Add the dependency-light stable-ID entry-value kernel for bounded JSON preflight, atomic set/unset/list mutations, canonical no-op detection, changed-field IDs, and disjoint sparse-fragment merging.
+- `[x]` Add the replaceable named `EntryEngine` Effect service to the shared `ManagedRuntime` and focused contract/kernel/service/cursor/error tests.
+- `[x]` Replace the M4 zero-draft locale dependency placeholder with a project-locked, tenant-scoped, capped `cms_entry_locale_draft` query; existing transition/integration tests pass.
+- `[x]` Implement tenant-scoped create/list/get/save/revision/restore transactions with project → collection → entry lock order, command-scoped create serialization, independent partition versions, canonical no-op suppression, durable replay receipts, immutable revision lineage, restore append, and partition audits.
+- `[x]` Enforce current published-contract authority, exact enabled-locale access, all-locale shared authority, recursive field visibility/editability, wrong-partition rejection, hidden-value projection, bounded storage safety, permissive content issues, and grouped tenant-safe reference availability checks.
+- `[x]` Add all six named entry operations, shared runtime repository Layer, protected oRPC procedures, standardized outputs/errors, scoped cursors, and locale dependency integration.
+- `[x]` Add stable-cursor collection entry lists and generated multilingual editor routes with shared/read-only controls, exact locale tabs, dirty-switch confirmation, explicit save states, preserved conflict edits, authoritative reload, separate histories, restore confirmation, and targeted query invalidation.
+- `[x]` Add contract/kernel/service/operation/PostgreSQL tests for create/save idempotency and command conflicts, malformed hard gates, permissive issues, reference availability, locale concurrency/isolation, shared conflicts, selected-locale denial, rollback, no-op receipts, immutable restore history, delivery isolation, and intended query plans.
+- `[x]` Pass the complete automated readiness, coverage, production/full audit, production build, rebuilt Docker health, read-only PostgreSQL fixture/invariant, and `git diff --check` gates.
+- `[x]` Begin developer manual review and verify mixed-object nesting/publication behavior against live schema draft v5.
+- `[x]` Approve the M7 manual-review amendment: CMS-only entry names, locale-neutral lists, URL-driven locale tabs, version-0 defaults, saved Portable Text hydration, and eligible-only mixed-object options.
+- `[x]` Add only the approved nullable `cms_entry.display_name`, positive defaulted `name_version`, and bounded Drizzle checks; database package type-check and `git diff --check` pass without running a migration command.
+- `[x]` Developer generated and applied `0007_add_entry_display_names.sql`; inspect the complete SQL/snapshot and verify the live catalog read-only without modifying or applying the migration.
+- `[x]` Require bounded CMS-only names for new entries and implement optimistic rename, no-op suppression, command conflicts, transactional audits, rollback, standard oRPC responses, and accessible create/rename workflows.
+- `[x]` Make entry lists locale-neutral, drive editor locale from validated URL search state, project defaults only for version-0 partitions, hydrate saved Portable Text documents, and hide mixed localization for every ineligible non-object kind.
+- `[x]` Add contract, operation, PostgreSQL, API, defaults, rich-text, route, generated-form, schema-workbench, and accessibility regression coverage.
+- `[x]` Pass the refreshed readiness, coverage, audit, build, read-only PostgreSQL invariant, and `git diff --check` gates.
+- `[x]` Treat an unpublished schema as an expected entry-workspace state: read collection publication metadata first, skip unavailable form/list prefetches, return an empty locale-neutral management list without requiring a value contract, and preserve direct 404 semantics for genuinely missing resources.
+- `[x]` Replace the raw-JSON rich-text default control with the configured lazy Portable Text editor and audit every other field kind’s default-entry method; correct long-text, date-time, exact-decimal, and structured root-shape controls, then normalize class-backed rich-text/money/asset defaults before server value validation.
+- `[x]` Emit entry-editor mutations at exact descendant paths beneath mixed objects while retaining atomic root mutations elsewhere, so generated default values respect server-enforced shared/localized partition authority.
+- `[R]` Resume developer manual English/Hindi/Gujarati create/name/rename/save/conflict/restore review.
 
 ## Current blockers
 
-No technical blocker. Milestone 6 is awaiting the required developer/client manual review; the agent must not commit or advance to Milestone 7.
+None. Milestone 7 is awaiting resumed developer manual review and explicit approval.
 
 ## Database migration state
 
@@ -267,7 +305,52 @@ The developer generated and applied `packages/db/src/migrations/0004_create_vers
 
 The developer generated and applied `packages/db/src/migrations/0005_add_field_system_and_editor_layout.sql` using the approved migration name. The agent inspected the complete SQL and snapshot metadata and verified the applied catalog read-only. The agent did not generate, apply, execute, or modify the migration.
 
+The developer generated and applied `packages/db/src/migrations/0006_create_entries_and_locale_revisions.sql`. The agent inspected all 185 SQL lines and the version-7 snapshot without modifying either artifact, then verified the six empty live tables, constraints, indexes, and migration count read-only. The agent did not generate or apply the migration.
+
+The developer generated and applied `packages/db/src/migrations/0007_add_entry_display_names.sql`. The agent inspected the complete SQL and snapshot without modification and verified the live catalog read-only: `display_name` is nullable `varchar(100)`, `name_version` is non-null with default `1`, all three name constraints are validated, eight migrations are recorded, four legacy entries remain null-named at valid version `1`, and no M7 constraint or index is invalid/unready. The agent did not generate, apply, execute, or modify the migration.
+
 ## Test results
+
+### Milestone 7 refreshed complete gate after manual-review corrections
+
+- `pnpm run ready`: pass, including format/lint, all package type checks, 603 tests, measured coverage, and server/web production builds.
+- Test distribution: 412 API/domain/PostgreSQL, 85 server/API integration, 101 web validation/UI/accessibility/route, and 5 environment tests.
+- API coverage passes at 89.72% statements and 71.07% branches; entry contracts, operations, and engine reach 100% statements.
+- API/domain coverage proves class-backed rich-text, money, and external-asset defaults become inert JSON before value validation; PostgreSQL replacement coverage persists a decoded rich-text default.
+- New PostgreSQL coverage proves named-create replay/conflict behavior, optimistic rename/no-op/conflict, rename rollback after an injected audit failure, and a successful empty management list before schema publication alongside the existing multilingual draft/history invariants.
+- Web coverage proves locale-neutral named rows, accessible create/rename dialogs, validated locale search state, version-0-only recursive defaults without clear-value resurrection, partition-safe mixed-object mutation paths, saved Portable Text hydration, configured Portable Text default editing, type-appropriate scalar/temporal default controls, structured object/list root checks, and object-only mixed localization controls.
+- `pnpm audit --prod` and full `pnpm audit`: no known vulnerabilities after resolving `nanoid` to patched `3.3.17` through the workspace transitive override.
+- Read-only PostgreSQL verification reports eight migration records, four valid legacy null names, zero invalid name versions, zero unvalidated M7 constraints, and zero invalid/unready M7 indexes.
+- Rebuilt Docker images contain the corrected M7 implementation; PostgreSQL, server, and web are healthy, root liveness, readiness, API reference, and SSR login return HTTP 200, and recent server/web logs contain no relevant errors.
+- `git diff --check`: pass. The agent did not generate, apply, execute, or modify migrations `0006` or `0007`.
+
+### Milestone 7 entry-name amendment pre-migration gate
+
+- `pnpm --filter @framerfordevs/db check-types`: pass.
+- Changed decision/PRD/milestone/schema files format successfully.
+- `git diff --check`: pass.
+- No migration command or PostgreSQL write was run.
+
+### Milestone 7 complete automated gate before manual-review amendment
+
+- `pnpm run ready`: pass, including workspace format/lint, all package type checks, all tests, measured coverage, and server/web production builds.
+- 582 tests pass: 410 API/domain/PostgreSQL, 78 server/API integration, 89 web validation/UI/accessibility/route, and 5 environment tests.
+- API coverage passes at 89.16% statements and 70.17% branches; `entry-repository.ts` reports 82.62% statements, entry operations/engine report 100%, and `entry-values.ts` reports 94.11% statements and 87.17% branches.
+- Measured web coverage passes with 100% statements for configured libraries, 77.52% statements for locale tabs, and generated-form interaction coverage across controlled stable-ID values and accessibility checks.
+- PostgreSQL integration proves concurrent idempotent create, independent English/Hindi saves, command mismatch rejection, stale shared conflict, malformed hard rejection, permissive issues, unavailable-reference feedback, rollback after revision insertion, field/locale authorization, no-op receipts, restore append/no-op replay, zero draft outbox writes, and intended entry/revision indexes.
+- Final read-only verification reports zero M7 fixture users/audits/resources, zero unvalidated M7 constraints, and zero invalid/unready M7 indexes.
+- Production-only and full `pnpm audit` report no known vulnerabilities after pinning patched `js-yaml@4.3.1` through the workspace transitive override.
+- Rebuilt server/web Docker images include M7; PostgreSQL, server, and web are healthy, and liveness, readiness, API reference, and SSR login return HTTP 200.
+- `git diff --check`: pass. The agent did not generate, apply, execute, or modify migration `0006`.
+
+### Milestone 7 pre-migration gate
+
+- `pnpm run check`: pass across all 245 formatted/linted files.
+- `pnpm run check-types`: pass across all seven TypeScript packages.
+- `pnpm --filter @framerfordevs/db check-types`: pass after the six-table M7 Drizzle schema and relations.
+- Explicit PostgreSQL constraint/index identifiers are unique where required and remain within the 63-byte identifier ceiling.
+- `git diff --check`: pass.
+- No migration command or PostgreSQL write was run. Database integration tests begin only after the developer-generated migration is reviewed and applied.
 
 ### Milestone 6 complete automated gate
 
@@ -411,3 +494,7 @@ Milestone 2 automated criteria are complete. During manual review, the developer
 Milestone 3 started after the Milestone 2 commit was confirmed. The developer approved its membership, invitation, role-policy, and credential design, then generated and applied the inspected migration/backfill. After automated readiness and manual review, the developer approved and committed Milestone 3 as `a74aeb8` (`feat(m3): add project access, invitations, and API credentials`).
 
 Milestone 4 automated criteria and developer review are complete. The developer approved and committed Milestone 4 as `68b6f6e` (`feat(m4): project locales and strict locale contracts`). The developer approved the Milestone 5 design and applied its inspected migration. During Milestone 5 manual review, the developer found that the schema-builder URL rendered only the project panel because its route was nested below a page component without an outlet. The builder is now an explicit non-nested TanStack route with a route-tree regression test. The developer then verified the representative collection lifecycle, risky-change acknowledgement, publication, and immutable revision behavior; approved Milestone 5; and committed it as `28ca04d` (`feat(m5): versioned collection schema engine`).
+
+Milestone 6 automated criteria and developer/client review are complete. Manual review found and resolved the cold-hydration React hook-order crash and the invalid reference-collection page limit. The developer approved Milestone 6 and committed it as `fbb4767` (`feat(m6): field system, structured rich text, external assets, and editor layout`).
+
+Milestone 7 manual review found locale-dependent list presentation, missing CMS-only names, non-URL locale state, absent version-0 defaults, missing Portable Text hydration, a raw-JSON editor for rich-text defaults, other mismatched default controls, mixed-localization controls on ineligible kinds, and expected unpublished-schema absence surfacing as three global query-error toasts. The developer approved the amendment and generated/applied the inspected `0007_add_entry_display_names.sql` migration. The workspace now derives schema availability from collection metadata and avoids unavailable dependent queries while retaining genuine error semantics. The corrections and refreshed automated gate are complete; manual English/Hindi/Gujarati review now resumes before explicit approval and commit.

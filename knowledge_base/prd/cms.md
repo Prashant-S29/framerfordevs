@@ -296,6 +296,7 @@ Every content request to the Delivery API must specify a locale. The API returns
 An entry is a stable identity containing:
 
 - Entry ID
+- A bounded user-controlled CMS-only entry name, shared across management locales and excluded from delivered content
 - Project, environment, and collection IDs
 - Shared draft state
 - Per-locale draft pointers

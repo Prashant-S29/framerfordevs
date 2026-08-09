@@ -116,6 +116,9 @@ export function SchemaBuilder({
     const referenceCollectionsKey = orpc.platform.projects.collections.list.queryOptions({
       input: { projectId, environmentId: scope.environmentId, cursor: null, limit: 50 },
     }).queryKey;
+    const collectionKey = orpc.platform.projects.collections.get.queryOptions({
+      input: scope,
+    }).queryKey;
     const draftKey = orpc.platform.projects.collections.schema.draft.get.queryOptions({
       input: scope,
     }).queryKey;
@@ -128,6 +131,7 @@ export function SchemaBuilder({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: listKey }),
       queryClient.invalidateQueries({ queryKey: referenceCollectionsKey }),
+      queryClient.invalidateQueries({ queryKey: collectionKey }),
       queryClient.invalidateQueries({ queryKey: draftKey }),
       queryClient.invalidateQueries({ queryKey: validationKey }),
       queryClient.invalidateQueries({ queryKey: formKey }),
@@ -215,6 +219,24 @@ export function SchemaBuilder({
           {draftModel.collection.description ?? "No collection description."}
         </p>
       </header>
+
+      <nav aria-label="Collection sections" className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          render={
+            <Link
+              to="/projects/$projectId/collections/$collectionId/entries"
+              params={{ projectId, collectionId }}
+            />
+          }
+        >
+          Entries
+        </Button>
+        <Button variant="default" size="sm">
+          Schema
+        </Button>
+      </nav>
 
       <SchemaWorkbench
         scope={scope}

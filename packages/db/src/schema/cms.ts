@@ -1,3 +1,5 @@
+// Defines tenant-scoped CMS schemas, immutable schema/content history, draft heads, and outbox persistence.
+
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
@@ -18,6 +20,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
+import { projectLocale } from "./locale";
 import { environment, project, workspace } from "./platform";
 
 const cmsId = (name: string) =>
@@ -639,6 +642,660 @@ export const cmsCollectionSchemaHead = pgTable(
   ],
 );
 
+export const cmsEntry = pgTable(
+  "cms_entry",
+  {
+    id: cmsId("id").primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    collectionId: uuid("collection_id").notNull(),
+    displayName: varchar("display_name", { length: 100 }),
+    nameVersion: integer("name_version").default(1).notNull(),
+    createCommandId: uuid("create_command_id").notNull(),
+    createCommandFingerprint: char("create_command_fingerprint", { length: 64 }).notNull(),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    changedByUserId: text("changed_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    createdAt: cmsTimestamp("created_at").defaultNow().notNull(),
+    updatedAt: cmsTimestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "cms_entry_collection_tenant_fk",
+      columns: [table.collectionId, table.environmentId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        cmsCollection.id,
+        cmsCollection.environmentId,
+        cmsCollection.projectId,
+        cmsCollection.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    unique("cms_entry_id_collection_tenant_unique").on(
+      table.id,
+      table.collectionId,
+      table.environmentId,
+      table.projectId,
+      table.workspaceId,
+    ),
+    unique("cms_entry_collection_create_command_unique").on(
+      table.collectionId,
+      table.createCommandId,
+    ),
+    check(
+      "cms_entry_display_name_valid",
+      sql`${table.displayName} is null or (char_length(${table.displayName}) between 1 and 100 and ${table.displayName} = btrim(${table.displayName}) and ${table.displayName} !~ '[[:cntrl:]]')`,
+    ),
+    check("cms_entry_name_version_positive", sql`${table.nameVersion} > 0`),
+    check(
+      "cms_entry_create_fingerprint_valid",
+      sql`${table.createCommandFingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check("cms_entry_timestamps_valid", sql`${table.updatedAt} >= ${table.createdAt}`),
+    index("cms_entry_collection_created_id_idx").on(
+      table.collectionId,
+      table.createdAt.desc(),
+      table.id.desc(),
+    ),
+    index("cms_entry_created_by_user_idx").on(table.createdByUserId),
+    index("cms_entry_changed_by_user_idx").on(table.changedByUserId),
+  ],
+);
+
+export const cmsEntrySharedRevision = pgTable(
+  "cms_entry_shared_revision",
+  {
+    id: cmsId("id").primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    collectionId: uuid("collection_id").notNull(),
+    entryId: uuid("entry_id").notNull(),
+    sequence: integer("sequence").notNull(),
+    previousRevisionId: uuid("previous_revision_id"),
+    schemaRevisionId: uuid("schema_revision_id").notNull(),
+    contractHash: char("contract_hash", { length: 64 }).notNull(),
+    values: jsonb("values").$type<Readonly<Record<string, unknown>>>().notNull(),
+    valuesHash: char("values_hash", { length: 64 }).notNull(),
+    changedFieldIds: uuid("changed_field_ids").array().notNull(),
+    commandId: uuid("command_id").notNull(),
+    commandFingerprint: char("command_fingerprint", { length: 64 }).notNull(),
+    restoredFromRevisionId: uuid("restored_from_revision_id"),
+    authoredByUserId: text("authored_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    authoredAt: cmsTimestamp("authored_at").defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "cms_entry_shared_revision_entry_tenant_fk",
+      columns: [
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntry.id,
+        cmsEntry.collectionId,
+        cmsEntry.environmentId,
+        cmsEntry.projectId,
+        cmsEntry.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_shared_revision_schema_tenant_fk",
+      columns: [
+        table.schemaRevisionId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsSchemaRevision.id,
+        cmsSchemaRevision.collectionId,
+        cmsSchemaRevision.environmentId,
+        cmsSchemaRevision.projectId,
+        cmsSchemaRevision.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_shared_revision_previous_tenant_fk",
+      columns: [
+        table.previousRevisionId,
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        table.id,
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_shared_revision_restore_tenant_fk",
+      columns: [
+        table.restoredFromRevisionId,
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        table.id,
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    unique("cms_entry_shared_revision_entry_sequence_unique").on(table.entryId, table.sequence),
+    unique("cms_entry_shared_revision_entry_command_unique").on(table.entryId, table.commandId),
+    unique("cms_entry_shared_revision_id_entry_scope_unique").on(
+      table.id,
+      table.entryId,
+      table.collectionId,
+      table.environmentId,
+      table.projectId,
+      table.workspaceId,
+    ),
+    unique("cms_entry_shared_revision_id_entry_sequence_unique").on(
+      table.id,
+      table.entryId,
+      table.collectionId,
+      table.environmentId,
+      table.projectId,
+      table.workspaceId,
+      table.sequence,
+    ),
+    check("cms_entry_shared_revision_sequence_positive", sql`${table.sequence} > 0`),
+    check(
+      "cms_entry_shared_revision_previous_consistent",
+      sql`(${table.sequence} = 1 and ${table.previousRevisionId} is null) or (${table.sequence} > 1 and ${table.previousRevisionId} is not null)`,
+    ),
+    check(
+      "cms_entry_shared_revision_restore_not_self",
+      sql`${table.restoredFromRevisionId} is null or ${table.restoredFromRevisionId} <> ${table.id}`,
+    ),
+    check(
+      "cms_entry_shared_revision_contract_hash_valid",
+      sql`${table.contractHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "cms_entry_shared_revision_values_valid",
+      sql`jsonb_typeof(${table.values}) = 'object' and octet_length(${table.values}::text) <= 1048576`,
+    ),
+    check(
+      "cms_entry_shared_revision_values_hash_valid",
+      sql`${table.valuesHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "cms_entry_shared_revision_changed_fields_valid",
+      sql`array_ndims(${table.changedFieldIds}) = 1 and cardinality(${table.changedFieldIds}) between 1 and 100 and array_position(${table.changedFieldIds}, null) is null`,
+    ),
+    check(
+      "cms_entry_shared_revision_command_fingerprint_valid",
+      sql`${table.commandFingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
+    index("cms_entry_shared_revision_entry_sequence_idx").on(table.entryId, table.sequence.desc()),
+    index("cms_entry_shared_revision_schema_idx").on(table.schemaRevisionId),
+    index("cms_entry_shared_revision_previous_idx")
+      .on(table.previousRevisionId)
+      .where(sql`${table.previousRevisionId} is not null`),
+    index("cms_entry_shared_revision_restored_from_idx")
+      .on(table.restoredFromRevisionId)
+      .where(sql`${table.restoredFromRevisionId} is not null`),
+    index("cms_entry_shared_revision_author_idx").on(table.authoredByUserId),
+  ],
+);
+
+export const cmsEntryLocaleRevision = pgTable(
+  "cms_entry_locale_revision",
+  {
+    id: cmsId("id").primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    collectionId: uuid("collection_id").notNull(),
+    entryId: uuid("entry_id").notNull(),
+    localeId: uuid("locale_id").notNull(),
+    sequence: integer("sequence").notNull(),
+    previousRevisionId: uuid("previous_revision_id"),
+    schemaRevisionId: uuid("schema_revision_id").notNull(),
+    contractHash: char("contract_hash", { length: 64 }).notNull(),
+    values: jsonb("values").$type<Readonly<Record<string, unknown>>>().notNull(),
+    valuesHash: char("values_hash", { length: 64 }).notNull(),
+    changedFieldIds: uuid("changed_field_ids").array().notNull(),
+    commandId: uuid("command_id").notNull(),
+    commandFingerprint: char("command_fingerprint", { length: 64 }).notNull(),
+    restoredFromRevisionId: uuid("restored_from_revision_id"),
+    authoredByUserId: text("authored_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    authoredAt: cmsTimestamp("authored_at").defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "cms_entry_locale_revision_entry_tenant_fk",
+      columns: [
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntry.id,
+        cmsEntry.collectionId,
+        cmsEntry.environmentId,
+        cmsEntry.projectId,
+        cmsEntry.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_locale_revision_locale_tenant_fk",
+      columns: [table.localeId, table.projectId, table.workspaceId],
+      foreignColumns: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_locale_revision_schema_tenant_fk",
+      columns: [
+        table.schemaRevisionId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsSchemaRevision.id,
+        cmsSchemaRevision.collectionId,
+        cmsSchemaRevision.environmentId,
+        cmsSchemaRevision.projectId,
+        cmsSchemaRevision.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_locale_revision_previous_tenant_fk",
+      columns: [
+        table.previousRevisionId,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        table.id,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_locale_revision_restore_tenant_fk",
+      columns: [
+        table.restoredFromRevisionId,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        table.id,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    unique("cms_entry_locale_revision_entry_locale_sequence_unique").on(
+      table.entryId,
+      table.localeId,
+      table.sequence,
+    ),
+    unique("cms_entry_locale_revision_entry_locale_command_unique").on(
+      table.entryId,
+      table.localeId,
+      table.commandId,
+    ),
+    unique("cms_entry_locale_revision_id_entry_scope_unique").on(
+      table.id,
+      table.entryId,
+      table.localeId,
+      table.collectionId,
+      table.environmentId,
+      table.projectId,
+      table.workspaceId,
+    ),
+    unique("cms_entry_locale_revision_id_entry_sequence_unique").on(
+      table.id,
+      table.entryId,
+      table.localeId,
+      table.collectionId,
+      table.environmentId,
+      table.projectId,
+      table.workspaceId,
+      table.sequence,
+    ),
+    check("cms_entry_locale_revision_sequence_positive", sql`${table.sequence} > 0`),
+    check(
+      "cms_entry_locale_revision_previous_consistent",
+      sql`(${table.sequence} = 1 and ${table.previousRevisionId} is null) or (${table.sequence} > 1 and ${table.previousRevisionId} is not null)`,
+    ),
+    check(
+      "cms_entry_locale_revision_restore_not_self",
+      sql`${table.restoredFromRevisionId} is null or ${table.restoredFromRevisionId} <> ${table.id}`,
+    ),
+    check(
+      "cms_entry_locale_revision_contract_hash_valid",
+      sql`${table.contractHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "cms_entry_locale_revision_values_valid",
+      sql`jsonb_typeof(${table.values}) = 'object' and octet_length(${table.values}::text) <= 1048576`,
+    ),
+    check(
+      "cms_entry_locale_revision_values_hash_valid",
+      sql`${table.valuesHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "cms_entry_locale_revision_changed_fields_valid",
+      sql`array_ndims(${table.changedFieldIds}) = 1 and cardinality(${table.changedFieldIds}) between 1 and 100 and array_position(${table.changedFieldIds}, null) is null`,
+    ),
+    check(
+      "cms_entry_locale_revision_command_fingerprint_valid",
+      sql`${table.commandFingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
+    index("cms_entry_locale_revision_entry_locale_sequence_idx").on(
+      table.entryId,
+      table.localeId,
+      table.sequence.desc(),
+    ),
+    index("cms_entry_locale_revision_locale_idx").on(table.localeId),
+    index("cms_entry_locale_revision_schema_idx").on(table.schemaRevisionId),
+    index("cms_entry_locale_revision_previous_idx")
+      .on(table.previousRevisionId)
+      .where(sql`${table.previousRevisionId} is not null`),
+    index("cms_entry_locale_revision_restored_from_idx")
+      .on(table.restoredFromRevisionId)
+      .where(sql`${table.restoredFromRevisionId} is not null`),
+    index("cms_entry_locale_revision_author_idx").on(table.authoredByUserId),
+  ],
+);
+
+export const cmsEntrySharedDraft = pgTable(
+  "cms_entry_shared_draft",
+  {
+    entryId: uuid("entry_id").primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    collectionId: uuid("collection_id").notNull(),
+    version: integer("version").notNull(),
+    currentRevisionId: uuid("current_revision_id").notNull(),
+    changedByUserId: text("changed_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    updatedAt: cmsTimestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "cms_entry_shared_draft_entry_tenant_fk",
+      columns: [
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntry.id,
+        cmsEntry.collectionId,
+        cmsEntry.environmentId,
+        cmsEntry.projectId,
+        cmsEntry.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_shared_draft_current_revision_fk",
+      columns: [
+        table.currentRevisionId,
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+        table.version,
+      ],
+      foreignColumns: [
+        cmsEntrySharedRevision.id,
+        cmsEntrySharedRevision.entryId,
+        cmsEntrySharedRevision.collectionId,
+        cmsEntrySharedRevision.environmentId,
+        cmsEntrySharedRevision.projectId,
+        cmsEntrySharedRevision.workspaceId,
+        cmsEntrySharedRevision.sequence,
+      ],
+    }).onDelete("restrict"),
+    check("cms_entry_shared_draft_version_positive", sql`${table.version} > 0`),
+    index("cms_entry_shared_draft_current_revision_idx").on(table.currentRevisionId),
+    index("cms_entry_shared_draft_changed_by_user_idx").on(table.changedByUserId),
+  ],
+);
+
+export const cmsEntryLocaleDraft = pgTable(
+  "cms_entry_locale_draft",
+  {
+    entryId: uuid("entry_id").notNull(),
+    localeId: uuid("locale_id").notNull(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    collectionId: uuid("collection_id").notNull(),
+    version: integer("version").notNull(),
+    currentRevisionId: uuid("current_revision_id").notNull(),
+    changedByUserId: text("changed_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    updatedAt: cmsTimestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "cms_entry_locale_draft_entry_locale_pk",
+      columns: [table.entryId, table.localeId],
+    }),
+    foreignKey({
+      name: "cms_entry_locale_draft_entry_tenant_fk",
+      columns: [
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntry.id,
+        cmsEntry.collectionId,
+        cmsEntry.environmentId,
+        cmsEntry.projectId,
+        cmsEntry.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_locale_draft_locale_tenant_fk",
+      columns: [table.localeId, table.projectId, table.workspaceId],
+      foreignColumns: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_locale_draft_current_revision_fk",
+      columns: [
+        table.currentRevisionId,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+        table.version,
+      ],
+      foreignColumns: [
+        cmsEntryLocaleRevision.id,
+        cmsEntryLocaleRevision.entryId,
+        cmsEntryLocaleRevision.localeId,
+        cmsEntryLocaleRevision.collectionId,
+        cmsEntryLocaleRevision.environmentId,
+        cmsEntryLocaleRevision.projectId,
+        cmsEntryLocaleRevision.workspaceId,
+        cmsEntryLocaleRevision.sequence,
+      ],
+    }).onDelete("restrict"),
+    check("cms_entry_locale_draft_version_positive", sql`${table.version} > 0`),
+    index("cms_entry_locale_draft_locale_entry_idx").on(table.localeId, table.entryId),
+    index("cms_entry_locale_draft_current_revision_idx").on(table.currentRevisionId),
+    index("cms_entry_locale_draft_changed_by_user_idx").on(table.changedByUserId),
+  ],
+);
+
+export const cmsEntryDraftCommand = pgTable(
+  "cms_entry_draft_command",
+  {
+    entryId: uuid("entry_id").notNull(),
+    commandId: uuid("command_id").notNull(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    collectionId: uuid("collection_id").notNull(),
+    localeId: uuid("locale_id").notNull(),
+    operation: varchar("operation", { length: 16 }).notNull(),
+    commandFingerprint: char("command_fingerprint", { length: 64 }).notNull(),
+    resultKind: varchar("result_kind", { length: 16 }).notNull(),
+    resultSharedVersion: integer("result_shared_version").notNull(),
+    resultSharedRevisionId: uuid("result_shared_revision_id"),
+    resultLocaleVersion: integer("result_locale_version").notNull(),
+    resultLocaleRevisionId: uuid("result_locale_revision_id"),
+    completedByUserId: text("completed_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    completedAt: cmsTimestamp("completed_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "cms_entry_draft_command_entry_command_pk",
+      columns: [table.entryId, table.commandId],
+    }),
+    foreignKey({
+      name: "cms_entry_draft_command_entry_tenant_fk",
+      columns: [
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntry.id,
+        cmsEntry.collectionId,
+        cmsEntry.environmentId,
+        cmsEntry.projectId,
+        cmsEntry.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_draft_command_locale_tenant_fk",
+      columns: [table.localeId, table.projectId, table.workspaceId],
+      foreignColumns: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_draft_command_shared_revision_fk",
+      columns: [
+        table.resultSharedRevisionId,
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntrySharedRevision.id,
+        cmsEntrySharedRevision.entryId,
+        cmsEntrySharedRevision.collectionId,
+        cmsEntrySharedRevision.environmentId,
+        cmsEntrySharedRevision.projectId,
+        cmsEntrySharedRevision.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_draft_command_locale_revision_fk",
+      columns: [
+        table.resultLocaleRevisionId,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntryLocaleRevision.id,
+        cmsEntryLocaleRevision.entryId,
+        cmsEntryLocaleRevision.localeId,
+        cmsEntryLocaleRevision.collectionId,
+        cmsEntryLocaleRevision.environmentId,
+        cmsEntryLocaleRevision.projectId,
+        cmsEntryLocaleRevision.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "cms_entry_draft_command_operation_valid",
+      sql`${table.operation} in ('save', 'restore')`,
+    ),
+    check(
+      "cms_entry_draft_command_fingerprint_valid",
+      sql`${table.commandFingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "cms_entry_draft_command_result_kind_valid",
+      sql`${table.resultKind} in ('changed', 'no_op')`,
+    ),
+    check(
+      "cms_entry_draft_command_shared_result_valid",
+      sql`(${table.resultSharedVersion} = 0 and ${table.resultSharedRevisionId} is null) or (${table.resultSharedVersion} > 0 and ${table.resultSharedRevisionId} is not null)`,
+    ),
+    check(
+      "cms_entry_draft_command_locale_result_valid",
+      sql`(${table.resultLocaleVersion} = 0 and ${table.resultLocaleRevisionId} is null) or (${table.resultLocaleVersion} > 0 and ${table.resultLocaleRevisionId} is not null)`,
+    ),
+    index("cms_entry_draft_command_entry_completed_idx").on(
+      table.entryId,
+      table.completedAt.desc(),
+      table.commandId.desc(),
+    ),
+    index("cms_entry_draft_command_locale_idx").on(table.localeId),
+    index("cms_entry_draft_command_completed_by_user_idx").on(table.completedByUserId),
+  ],
+);
+
 export const outboxEvent = pgTable(
   "outbox_event",
   {
@@ -736,6 +1393,7 @@ export const cmsCollectionRelations = relations(cmsCollection, ({ one, many }) =
   }),
   revisions: many(cmsSchemaRevision),
   schemaHead: one(cmsCollectionSchemaHead),
+  entries: many(cmsEntry),
 }));
 
 export const cmsCollectionFieldRelations = relations(cmsCollectionField, ({ one, many }) => ({
@@ -825,6 +1483,8 @@ export const cmsSchemaRevisionRelations = relations(cmsSchemaRevision, ({ one, m
     references: [user.id],
   }),
   fields: many(cmsSchemaRevisionField),
+  entrySharedRevisions: many(cmsEntrySharedRevision),
+  entryLocaleRevisions: many(cmsEntryLocaleRevision),
   outboxEvents: many(outboxEvent),
 }));
 
@@ -933,6 +1593,404 @@ export const cmsCollectionSchemaHeadRelations = relations(cmsCollectionSchemaHea
   changedBy: one(user, {
     relationName: "cmsSchemaHeadChanger",
     fields: [cmsCollectionSchemaHead.changedByUserId],
+    references: [user.id],
+  }),
+}));
+
+export const cmsEntryRelations = relations(cmsEntry, ({ one, many }) => ({
+  workspace: one(workspace, {
+    fields: [cmsEntry.workspaceId],
+    references: [workspace.id],
+  }),
+  project: one(project, {
+    fields: [cmsEntry.projectId, cmsEntry.workspaceId],
+    references: [project.id, project.workspaceId],
+  }),
+  environment: one(environment, {
+    fields: [cmsEntry.environmentId, cmsEntry.projectId, cmsEntry.workspaceId],
+    references: [environment.id, environment.projectId, environment.workspaceId],
+  }),
+  collection: one(cmsCollection, {
+    fields: [
+      cmsEntry.collectionId,
+      cmsEntry.environmentId,
+      cmsEntry.projectId,
+      cmsEntry.workspaceId,
+    ],
+    references: [
+      cmsCollection.id,
+      cmsCollection.environmentId,
+      cmsCollection.projectId,
+      cmsCollection.workspaceId,
+    ],
+  }),
+  creator: one(user, {
+    relationName: "cmsEntryCreator",
+    fields: [cmsEntry.createdByUserId],
+    references: [user.id],
+  }),
+  changedBy: one(user, {
+    relationName: "cmsEntryChanger",
+    fields: [cmsEntry.changedByUserId],
+    references: [user.id],
+  }),
+  sharedDraft: one(cmsEntrySharedDraft),
+  localeDrafts: many(cmsEntryLocaleDraft),
+  sharedRevisions: many(cmsEntrySharedRevision),
+  localeRevisions: many(cmsEntryLocaleRevision),
+  commands: many(cmsEntryDraftCommand),
+}));
+
+export const cmsEntrySharedRevisionRelations = relations(
+  cmsEntrySharedRevision,
+  ({ one, many }) => ({
+    entry: one(cmsEntry, {
+      fields: [
+        cmsEntrySharedRevision.entryId,
+        cmsEntrySharedRevision.collectionId,
+        cmsEntrySharedRevision.environmentId,
+        cmsEntrySharedRevision.projectId,
+        cmsEntrySharedRevision.workspaceId,
+      ],
+      references: [
+        cmsEntry.id,
+        cmsEntry.collectionId,
+        cmsEntry.environmentId,
+        cmsEntry.projectId,
+        cmsEntry.workspaceId,
+      ],
+    }),
+    schemaRevision: one(cmsSchemaRevision, {
+      fields: [
+        cmsEntrySharedRevision.schemaRevisionId,
+        cmsEntrySharedRevision.collectionId,
+        cmsEntrySharedRevision.environmentId,
+        cmsEntrySharedRevision.projectId,
+        cmsEntrySharedRevision.workspaceId,
+      ],
+      references: [
+        cmsSchemaRevision.id,
+        cmsSchemaRevision.collectionId,
+        cmsSchemaRevision.environmentId,
+        cmsSchemaRevision.projectId,
+        cmsSchemaRevision.workspaceId,
+      ],
+    }),
+    previousRevision: one(cmsEntrySharedRevision, {
+      relationName: "cmsEntrySharedRevisionLineage",
+      fields: [
+        cmsEntrySharedRevision.previousRevisionId,
+        cmsEntrySharedRevision.entryId,
+        cmsEntrySharedRevision.collectionId,
+        cmsEntrySharedRevision.environmentId,
+        cmsEntrySharedRevision.projectId,
+        cmsEntrySharedRevision.workspaceId,
+      ],
+      references: [
+        cmsEntrySharedRevision.id,
+        cmsEntrySharedRevision.entryId,
+        cmsEntrySharedRevision.collectionId,
+        cmsEntrySharedRevision.environmentId,
+        cmsEntrySharedRevision.projectId,
+        cmsEntrySharedRevision.workspaceId,
+      ],
+    }),
+    nextRevisions: many(cmsEntrySharedRevision, {
+      relationName: "cmsEntrySharedRevisionLineage",
+    }),
+    restoredFromRevision: one(cmsEntrySharedRevision, {
+      relationName: "cmsEntrySharedRevisionRestore",
+      fields: [
+        cmsEntrySharedRevision.restoredFromRevisionId,
+        cmsEntrySharedRevision.entryId,
+        cmsEntrySharedRevision.collectionId,
+        cmsEntrySharedRevision.environmentId,
+        cmsEntrySharedRevision.projectId,
+        cmsEntrySharedRevision.workspaceId,
+      ],
+      references: [
+        cmsEntrySharedRevision.id,
+        cmsEntrySharedRevision.entryId,
+        cmsEntrySharedRevision.collectionId,
+        cmsEntrySharedRevision.environmentId,
+        cmsEntrySharedRevision.projectId,
+        cmsEntrySharedRevision.workspaceId,
+      ],
+    }),
+    restoreRevisions: many(cmsEntrySharedRevision, {
+      relationName: "cmsEntrySharedRevisionRestore",
+    }),
+    author: one(user, {
+      relationName: "cmsEntrySharedRevisionAuthor",
+      fields: [cmsEntrySharedRevision.authoredByUserId],
+      references: [user.id],
+    }),
+  }),
+);
+
+export const cmsEntryLocaleRevisionRelations = relations(
+  cmsEntryLocaleRevision,
+  ({ one, many }) => ({
+    entry: one(cmsEntry, {
+      fields: [
+        cmsEntryLocaleRevision.entryId,
+        cmsEntryLocaleRevision.collectionId,
+        cmsEntryLocaleRevision.environmentId,
+        cmsEntryLocaleRevision.projectId,
+        cmsEntryLocaleRevision.workspaceId,
+      ],
+      references: [
+        cmsEntry.id,
+        cmsEntry.collectionId,
+        cmsEntry.environmentId,
+        cmsEntry.projectId,
+        cmsEntry.workspaceId,
+      ],
+    }),
+    locale: one(projectLocale, {
+      fields: [
+        cmsEntryLocaleRevision.localeId,
+        cmsEntryLocaleRevision.projectId,
+        cmsEntryLocaleRevision.workspaceId,
+      ],
+      references: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }),
+    schemaRevision: one(cmsSchemaRevision, {
+      fields: [
+        cmsEntryLocaleRevision.schemaRevisionId,
+        cmsEntryLocaleRevision.collectionId,
+        cmsEntryLocaleRevision.environmentId,
+        cmsEntryLocaleRevision.projectId,
+        cmsEntryLocaleRevision.workspaceId,
+      ],
+      references: [
+        cmsSchemaRevision.id,
+        cmsSchemaRevision.collectionId,
+        cmsSchemaRevision.environmentId,
+        cmsSchemaRevision.projectId,
+        cmsSchemaRevision.workspaceId,
+      ],
+    }),
+    previousRevision: one(cmsEntryLocaleRevision, {
+      relationName: "cmsEntryLocaleRevisionLineage",
+      fields: [
+        cmsEntryLocaleRevision.previousRevisionId,
+        cmsEntryLocaleRevision.entryId,
+        cmsEntryLocaleRevision.localeId,
+        cmsEntryLocaleRevision.collectionId,
+        cmsEntryLocaleRevision.environmentId,
+        cmsEntryLocaleRevision.projectId,
+        cmsEntryLocaleRevision.workspaceId,
+      ],
+      references: [
+        cmsEntryLocaleRevision.id,
+        cmsEntryLocaleRevision.entryId,
+        cmsEntryLocaleRevision.localeId,
+        cmsEntryLocaleRevision.collectionId,
+        cmsEntryLocaleRevision.environmentId,
+        cmsEntryLocaleRevision.projectId,
+        cmsEntryLocaleRevision.workspaceId,
+      ],
+    }),
+    nextRevisions: many(cmsEntryLocaleRevision, {
+      relationName: "cmsEntryLocaleRevisionLineage",
+    }),
+    restoredFromRevision: one(cmsEntryLocaleRevision, {
+      relationName: "cmsEntryLocaleRevisionRestore",
+      fields: [
+        cmsEntryLocaleRevision.restoredFromRevisionId,
+        cmsEntryLocaleRevision.entryId,
+        cmsEntryLocaleRevision.localeId,
+        cmsEntryLocaleRevision.collectionId,
+        cmsEntryLocaleRevision.environmentId,
+        cmsEntryLocaleRevision.projectId,
+        cmsEntryLocaleRevision.workspaceId,
+      ],
+      references: [
+        cmsEntryLocaleRevision.id,
+        cmsEntryLocaleRevision.entryId,
+        cmsEntryLocaleRevision.localeId,
+        cmsEntryLocaleRevision.collectionId,
+        cmsEntryLocaleRevision.environmentId,
+        cmsEntryLocaleRevision.projectId,
+        cmsEntryLocaleRevision.workspaceId,
+      ],
+    }),
+    restoreRevisions: many(cmsEntryLocaleRevision, {
+      relationName: "cmsEntryLocaleRevisionRestore",
+    }),
+    author: one(user, {
+      relationName: "cmsEntryLocaleRevisionAuthor",
+      fields: [cmsEntryLocaleRevision.authoredByUserId],
+      references: [user.id],
+    }),
+  }),
+);
+
+export const cmsEntrySharedDraftRelations = relations(cmsEntrySharedDraft, ({ one }) => ({
+  entry: one(cmsEntry, {
+    fields: [
+      cmsEntrySharedDraft.entryId,
+      cmsEntrySharedDraft.collectionId,
+      cmsEntrySharedDraft.environmentId,
+      cmsEntrySharedDraft.projectId,
+      cmsEntrySharedDraft.workspaceId,
+    ],
+    references: [
+      cmsEntry.id,
+      cmsEntry.collectionId,
+      cmsEntry.environmentId,
+      cmsEntry.projectId,
+      cmsEntry.workspaceId,
+    ],
+  }),
+  currentRevision: one(cmsEntrySharedRevision, {
+    fields: [
+      cmsEntrySharedDraft.currentRevisionId,
+      cmsEntrySharedDraft.entryId,
+      cmsEntrySharedDraft.collectionId,
+      cmsEntrySharedDraft.environmentId,
+      cmsEntrySharedDraft.projectId,
+      cmsEntrySharedDraft.workspaceId,
+      cmsEntrySharedDraft.version,
+    ],
+    references: [
+      cmsEntrySharedRevision.id,
+      cmsEntrySharedRevision.entryId,
+      cmsEntrySharedRevision.collectionId,
+      cmsEntrySharedRevision.environmentId,
+      cmsEntrySharedRevision.projectId,
+      cmsEntrySharedRevision.workspaceId,
+      cmsEntrySharedRevision.sequence,
+    ],
+  }),
+  changedBy: one(user, {
+    relationName: "cmsEntrySharedDraftChanger",
+    fields: [cmsEntrySharedDraft.changedByUserId],
+    references: [user.id],
+  }),
+}));
+
+export const cmsEntryLocaleDraftRelations = relations(cmsEntryLocaleDraft, ({ one }) => ({
+  entry: one(cmsEntry, {
+    fields: [
+      cmsEntryLocaleDraft.entryId,
+      cmsEntryLocaleDraft.collectionId,
+      cmsEntryLocaleDraft.environmentId,
+      cmsEntryLocaleDraft.projectId,
+      cmsEntryLocaleDraft.workspaceId,
+    ],
+    references: [
+      cmsEntry.id,
+      cmsEntry.collectionId,
+      cmsEntry.environmentId,
+      cmsEntry.projectId,
+      cmsEntry.workspaceId,
+    ],
+  }),
+  locale: one(projectLocale, {
+    fields: [
+      cmsEntryLocaleDraft.localeId,
+      cmsEntryLocaleDraft.projectId,
+      cmsEntryLocaleDraft.workspaceId,
+    ],
+    references: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+  }),
+  currentRevision: one(cmsEntryLocaleRevision, {
+    fields: [
+      cmsEntryLocaleDraft.currentRevisionId,
+      cmsEntryLocaleDraft.entryId,
+      cmsEntryLocaleDraft.localeId,
+      cmsEntryLocaleDraft.collectionId,
+      cmsEntryLocaleDraft.environmentId,
+      cmsEntryLocaleDraft.projectId,
+      cmsEntryLocaleDraft.workspaceId,
+      cmsEntryLocaleDraft.version,
+    ],
+    references: [
+      cmsEntryLocaleRevision.id,
+      cmsEntryLocaleRevision.entryId,
+      cmsEntryLocaleRevision.localeId,
+      cmsEntryLocaleRevision.collectionId,
+      cmsEntryLocaleRevision.environmentId,
+      cmsEntryLocaleRevision.projectId,
+      cmsEntryLocaleRevision.workspaceId,
+      cmsEntryLocaleRevision.sequence,
+    ],
+  }),
+  changedBy: one(user, {
+    relationName: "cmsEntryLocaleDraftChanger",
+    fields: [cmsEntryLocaleDraft.changedByUserId],
+    references: [user.id],
+  }),
+}));
+
+export const cmsEntryDraftCommandRelations = relations(cmsEntryDraftCommand, ({ one }) => ({
+  entry: one(cmsEntry, {
+    fields: [
+      cmsEntryDraftCommand.entryId,
+      cmsEntryDraftCommand.collectionId,
+      cmsEntryDraftCommand.environmentId,
+      cmsEntryDraftCommand.projectId,
+      cmsEntryDraftCommand.workspaceId,
+    ],
+    references: [
+      cmsEntry.id,
+      cmsEntry.collectionId,
+      cmsEntry.environmentId,
+      cmsEntry.projectId,
+      cmsEntry.workspaceId,
+    ],
+  }),
+  locale: one(projectLocale, {
+    fields: [
+      cmsEntryDraftCommand.localeId,
+      cmsEntryDraftCommand.projectId,
+      cmsEntryDraftCommand.workspaceId,
+    ],
+    references: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+  }),
+  resultSharedRevision: one(cmsEntrySharedRevision, {
+    fields: [
+      cmsEntryDraftCommand.resultSharedRevisionId,
+      cmsEntryDraftCommand.entryId,
+      cmsEntryDraftCommand.collectionId,
+      cmsEntryDraftCommand.environmentId,
+      cmsEntryDraftCommand.projectId,
+      cmsEntryDraftCommand.workspaceId,
+    ],
+    references: [
+      cmsEntrySharedRevision.id,
+      cmsEntrySharedRevision.entryId,
+      cmsEntrySharedRevision.collectionId,
+      cmsEntrySharedRevision.environmentId,
+      cmsEntrySharedRevision.projectId,
+      cmsEntrySharedRevision.workspaceId,
+    ],
+  }),
+  resultLocaleRevision: one(cmsEntryLocaleRevision, {
+    fields: [
+      cmsEntryDraftCommand.resultLocaleRevisionId,
+      cmsEntryDraftCommand.entryId,
+      cmsEntryDraftCommand.localeId,
+      cmsEntryDraftCommand.collectionId,
+      cmsEntryDraftCommand.environmentId,
+      cmsEntryDraftCommand.projectId,
+      cmsEntryDraftCommand.workspaceId,
+    ],
+    references: [
+      cmsEntryLocaleRevision.id,
+      cmsEntryLocaleRevision.entryId,
+      cmsEntryLocaleRevision.localeId,
+      cmsEntryLocaleRevision.collectionId,
+      cmsEntryLocaleRevision.environmentId,
+      cmsEntryLocaleRevision.projectId,
+      cmsEntryLocaleRevision.workspaceId,
+    ],
+  }),
+  completedBy: one(user, {
+    relationName: "cmsEntryDraftCommandCompleter",
+    fields: [cmsEntryDraftCommand.completedByUserId],
     references: [user.id],
   }),
 }));

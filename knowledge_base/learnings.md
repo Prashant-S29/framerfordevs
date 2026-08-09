@@ -270,6 +270,118 @@ Record a learning when an implementation or decision:
 
 ---
 
+## 2026-08-08 — Schema class instances must be normalized before canonical command fingerprinting
+
+**Context:** M7 save inputs decode bounded mutations into Effect `Schema.Class` instances before durable command fingerprinting.
+
+**Incorrect assumption or decision:** The first fingerprint implementation passed those class instances directly to a canonical JSON function that intentionally treats non-plain objects as invalid. Distinct mutation payloads therefore canonicalized to the same placeholder.
+
+**Cost or risk:** Reusing a no-op command ID with different mutations could be accepted as a replay instead of returning `ENTRY_COMMAND_CONFLICT`, weakening durable idempotency authority.
+
+**Learning:** Command fingerprints must canonicalize the transport/document representation, not runtime wrapper identity. Decoded class instances require deterministic conversion to plain JSON before hashing.
+
+**Prevention:** Entry create/save/restore fingerprints now JSON-normalize their schema-decoded input before canonical hashing. PostgreSQL integration reuses command IDs with changed locale and mutation authority and requires `EntryCommandConflictFailure`.
+
+**Status:** Resolved and covered.
+
+---
+
+## 2026-08-08 — Page-shaped editor routes must not be nested under pages without outlets
+
+**Context:** The first M7 entry editor file was nested under the entry-list route directory.
+
+**Incorrect assumption or decision:** Matching URL hierarchy was treated as sufficient route composition even though the entry-list page does not render an `Outlet`.
+
+**Cost or risk:** The editor URL existed in the generated route tree but would render through a parent that could not display the child, repeating the M5 schema-builder routing failure.
+
+**Learning:** TanStack route URL hierarchy and component nesting are separate decisions. Dedicated page workspaces need the trailing-underscore non-nested convention whenever their URL parent is another page rather than a layout.
+
+**Prevention:** The editor uses `entries_/$entryId.tsx`, preserving `/entries/$entryId` while parenting it directly under the authenticated layout. The route-tree regression test asserts schema, entry list, and editor parent/full-path behavior.
+
+**Status:** Resolved before manual review; SSR/client production builds pass.
+
+---
+
+## 2026-08-09 — Internal stable identities need an explicit validation projection
+
+**Context:** M7 persists nested entry objects by stable field ID, while the reusable M6 value validator traverses schema-shaped values by API key.
+
+**Incorrect assumption or decision:** Passing stable-ID-shaped nested values directly to the API-key-shaped validator worked for scalar roots but treated valid object children as unknown or missing.
+
+**Cost or risk:** Eligible mixed objects could be authored and published at the schema level but fail or misreport entry-draft validation, undermining the stable-identity design exactly where it mattered most.
+
+**Learning:** Stable persistence identity and user-facing/schema validation shape are separate representations. Their boundary must be an explicit recursive projection, not an implicit shared object convention.
+
+**Prevention:** Entry validation now recursively projects stable field-ID objects to current API-key-shaped values before applying the existing validator, while storage, mutations, authorization, and revision history remain stable-ID-based. PostgreSQL integration covers shared and localized children inside one mixed object.
+
+**Status:** Resolved during M7 manual review.
+
+---
+
+## 2026-08-09 — Editor defaults and hydration must follow persisted partition state
+
+**Context:** Manual entry review found configured defaults absent on new drafts, intentionally cleared values at risk of reappearing, and saved Portable Text not visibly hydrating into the official editor.
+
+**Incorrect assumption or decision:** Generic form-default projection and React state updates were treated as sufficient without tying defaults to head version or seeding the rich-text editor's own history state.
+
+**Cost or risk:** New-entry UX omitted schema defaults, reapplying defaults could erase a deliberate clear, and persisted rich text could appear empty after reload or locale changes.
+
+**Learning:** Defaulting is a versioned persistence-boundary rule, not a generic missing-value rule. Controlled third-party editors may also require explicit initialization of their internal state rather than only an external value prop.
+
+**Prevention:** Defaults project only when the relevant shared or exact-locale partition is version `0`; any persisted version suppresses reapplication. Portable Text initializes editor history from the saved document and remounts at the draft boundary. Focused tests cover recursive mixed-object defaults, clear-value preservation, and saved-document hydration.
+
+**Status:** Resolved during M7 manual review.
+
+---
+
+## 2026-08-09 — Expected optional-resource absence should not be fetched as an error
+
+**Context:** The entry workspace correctly rendered “Publish the schema first,” but its route and component still requested the missing published form and schema-dependent entry list.
+
+**Incorrect assumption or decision:** A handled 404/409 response was treated as harmless because the final empty state was correct. The global query error handler nevertheless surfaced three alarming retry toasts for an expected collection lifecycle state.
+
+**Cost or risk:** The UI contradicted itself, browser diagnostics showed avoidable failed requests, retries could never succeed until publication, and genuine query failures became harder to distinguish from expected absence.
+
+**Learning:** When parent metadata already exposes optional child availability, route/query planning should use that state and avoid requesting a child known not to exist. Direct child endpoints may retain correct 404 semantics for genuine callers.
+
+**Prevention:** The entry workspace reads the collection’s `currentPublishedRevisionId` first and enables/prefetches the published form and entry page only when present. The locale-neutral list no longer loads an unused value contract and returns an empty page before publication. Publication invalidates collection metadata so the gate cannot remain stale.
+
+**Status:** Resolved during M7 manual review with PostgreSQL and complete readiness coverage.
+
+---
+
+## 2026-08-09 — Configuration defaults need the same semantic editor as field values
+
+**Context:** The schema inspector exposed a raw JSON textarea for a rich-text default even though entry values already used the official Portable Text editor. After the control was corrected, the server still rejected its valid document because Effect decoding materialized the structured default as a `Schema.Class` instance.
+
+**Incorrect assumption or decision:** Treating every structured default as generic JSON made implementation convenient but required users to know internal document syntax and surfaced JSON parser failures for ordinary prose. Separately, passing decoded class-backed defaults directly to a validator that intentionally accepts only inert plain JSON confused a trusted runtime wrapper with invalid content. The same audit found single-line long-text defaults, plain-text date-time defaults, and untyped object/list root JSON.
+
+**Cost or risk:** Valid user intent failed before or during domain validation, schema authors could create mismatched or malformed defaults, configured rich-text allowlists were not reflected in the editor, and the generated-entry experience diverged from schema authoring. Money and external-asset defaults shared the latent class-wrapper rejection.
+
+**Learning:** A field’s configuration default is still a value of that field. Its authoring control should reuse or match the semantic value editor; raw JSON is appropriate only where JSON itself or an arbitrary structured boundary is the product contract.
+
+**Prevention:** Rich-text defaults now opt into the lazy official editor and store canonical Portable Text directly; its styles, decorators, and lists follow configured allowlists. Long text is multiline, date-time uses native local input with canonical instant conversion, exact decimals declare decimal input mode, and object/list JSON controls reject the wrong root shape immediately. Known class-backed rich-text, money, and external-asset defaults are copied into inert JSON before strict value validation without relaxing validation for arbitrary inputs. Interaction, pure-kernel, and PostgreSQL replacement tests cover the editor and decoded-default boundary, while the exhaustive control registry remains type-checked.
+
+**Status:** Resolved during M7 manual review.
+
+---
+
+## 2026-08-09 — Mutation granularity must stop at localization authority boundaries
+
+**Context:** The generated editor correctly projected a mixed Object into localized children, but its diff builder emitted one `set` mutation for the mixed root containing those child values.
+
+**Incorrect assumption or decision:** Treating every displayed root as an atomic mutation target ignored that a mixed Object is only a structural container. It has no independent shared or localized authority; its children own that authority.
+
+**Cost or risk:** The server correctly rejected valid editing intent with `entry_path_unavailable`. Allowing the root mutation instead would risk replacing sibling values from the other partition or fields hidden from the actor.
+
+**Learning:** Form projection and mutation projection are related but distinct. Atomic fields may use root-level replacement, while mixed containers must be traversed until each mutation path ends at a field with exact shared or localized authority.
+
+**Prevention:** The web diff kernel recursively traverses mixed Object containers and emits stable descendant paths, including nested mixed objects and scoped unsets; all other fields retain atomic root mutations. The server remains default-deny and continues to reject a mutation whose terminal field does not match its partition. Focused tests assert both behaviors.
+
+**Status:** Resolved during M7 manual review.
+
+---
+
 ## Current implementation learnings
 
-The platform authorization, locale foundations, and versioned collection schema engine are implemented, approved, and committed through Milestone 5. The developer generated and applied the M6 migration; the agent did neither and did not modify the generated artifact. Milestone 6 implementation and its refreshed automated gate are complete with 551 passing tests and clean production/full dependency audits; required developer/client manual review remains pending. Additional entries should be added only when a consequential decision causes drift or rework.
+The platform authorization, locale foundations, versioned schema engine, field system, and schema-authoring workbench are approved and committed through Milestone 6 at `fbb4767`. Milestone 7 implementation and refreshed automated readiness are complete with CMS-only entry names, locale-neutral lists, URL-driven locale editing, stable multilingual drafts, revision history, corrected type-appropriate defaults and Portable Text hydration, error-free unpublished-schema empty states, 603 passing tests, clean audits, and clean read-only database invariants. M7 remains active until the developer completes resumed English/Hindi/Gujarati review and explicitly approves it. Additional entries should be added only when consequential drift or rework occurs.

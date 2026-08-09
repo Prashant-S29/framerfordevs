@@ -23,6 +23,8 @@ import {
   LocaleAccessDialog,
 } from "./project-access-settings";
 import { AddLocaleDialog } from "./project-locale-settings";
+import { CreateEntryDialog } from "./collection-entries";
+import { RenameEntryDialog } from "./entry-editor";
 import { CreateCollectionDialog } from "./project-collections";
 import { PublishCard } from "./schema-builder";
 import { SchemaWorkbench } from "./schema-workbench";
@@ -194,6 +196,33 @@ describe("platform management accessibility", () => {
   it("has accessible locale creation semantics", async () => {
     renderWithQueryClient(<AddLocaleDialog projectId={project.id} />);
     await expectOpenDialogToHaveNoViolations(/add locale/i);
+  });
+
+  it("has accessible entry creation and rename semantics", async () => {
+    renderWithQueryClient(
+      <CreateEntryDialog
+        projectId={project.id}
+        environmentId={project.environment.id}
+        collectionId={collectionDraft.collection.id}
+        locale="en"
+        schemaRevisionId="019fae8b-1234-7000-8000-000000000020"
+        contractHash={"c".repeat(64)}
+      />,
+    );
+    await expectOpenDialogToHaveNoViolations(/new entry/i);
+    cleanup();
+    renderWithQueryClient(
+      <RenameEntryDialog
+        projectId={project.id}
+        environmentId={project.environment.id}
+        collectionId={collectionDraft.collection.id}
+        entryId="019fae8b-1234-7000-8000-000000000021"
+        locale="en"
+        displayName="Homepage"
+        nameVersion={1}
+      />,
+    );
+    await expectOpenDialogToHaveNoViolations(/rename entry/i);
   });
 
   it("has accessible collection and schema-building semantics", async () => {

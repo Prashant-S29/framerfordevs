@@ -2,7 +2,7 @@
 
 import { CollectionDraftSchema } from "@framerfordevs/api/contracts/schemas";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Schema } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -113,6 +113,63 @@ describe("schema workbench", () => {
     expect(screen.getByLabelText("Allowed Currencies")).toBeTruthy();
     expect(screen.getByLabelText("Default Amount")).toBeTruthy();
     expect(screen.getByLabelText("Default Currency")).toBeTruthy();
+  });
+
+  it("uses type-appropriate default editors for text, temporal, structured, and rich values", async () => {
+    const user = userEvent.setup();
+    renderWorkbench();
+    await user.click(screen.getByRole("button", { name: "Add Field" }));
+    const fieldType = screen.getByLabelText("Field Type");
+
+    await user.selectOptions(fieldType, "long_text");
+    expect(screen.getByLabelText("Default Value").tagName).toBe("TEXTAREA");
+
+    await user.selectOptions(fieldType, "url");
+    expect(screen.getByLabelText("Default URL").getAttribute("type")).toBe("url");
+
+    await user.selectOptions(fieldType, "number");
+    expect(screen.getByLabelText("Default").getAttribute("type")).toBe("number");
+
+    await user.selectOptions(fieldType, "date");
+    expect(screen.getByLabelText("Default Date").getAttribute("type")).toBe("date");
+
+    await user.selectOptions(fieldType, "date_time");
+    expect(screen.getByLabelText("Default Date & Time").getAttribute("type")).toBe(
+      "datetime-local",
+    );
+
+    await user.selectOptions(fieldType, "object");
+    const objectDefault = screen.getByLabelText("Default Object");
+    await user.click(objectDefault);
+    await user.paste("[]");
+    await user.tab();
+    expect(screen.getByText("Enter a JSON object.")).toBeTruthy();
+
+    await user.selectOptions(fieldType, "list");
+    const listDefault = screen.getByLabelText("Default List");
+    await user.click(listDefault);
+    await user.paste("{}");
+    await user.tab();
+    expect(screen.getByText("Enter a JSON array.")).toBeTruthy();
+
+    await user.selectOptions(fieldType, "rich_text");
+    expect(screen.queryByLabelText("Default Portable Text Document")).toBeNull();
+    expect(screen.getByRole("checkbox", { name: "Bold" }).getAttribute("aria-checked")).toBe(
+      "true",
+    );
+    await user.click(screen.getByRole("checkbox", { name: "Configure a Default Document" }));
+    expect(await screen.findByRole("textbox", { name: "Default rich text content" })).toBeTruthy();
+  });
+
+  it("shows mixed localization only for object fields", async () => {
+    const user = userEvent.setup();
+    renderWorkbench();
+    await user.click(screen.getByRole("button", { name: "Add Field" }));
+
+    const localization = screen.getByLabelText("Localization");
+    expect(within(localization).queryByRole("option", { name: "Mixed Object" })).toBeNull();
+    await user.selectOptions(screen.getByLabelText("Field Type"), "object");
+    expect(within(localization).getByRole("option", { name: "Mixed Object" })).toBeTruthy();
   });
 
   it("provides synchronized schema JSON and sample-inference entry points", async () => {

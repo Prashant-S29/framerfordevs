@@ -1,0 +1,4 @@
+ALTER TABLE "cms_entry" ADD COLUMN "display_name" varchar(100);--> statement-breakpoint
+ALTER TABLE "cms_entry" ADD COLUMN "name_version" integer DEFAULT 1 NOT NULL;--> statement-breakpoint
+ALTER TABLE "cms_entry" ADD CONSTRAINT "cms_entry_display_name_valid" CHECK ("cms_entry"."display_name" is null or (char_length("cms_entry"."display_name") between 1 and 100 and "cms_entry"."display_name" = btrim("cms_entry"."display_name") and "cms_entry"."display_name" !~ '[[:cntrl:]]'));--> statement-breakpoint
+ALTER TABLE "cms_entry" ADD CONSTRAINT "cms_entry_name_version_positive" CHECK ("cms_entry"."name_version" > 0);

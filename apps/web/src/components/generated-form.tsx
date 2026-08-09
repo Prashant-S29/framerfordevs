@@ -22,6 +22,8 @@ import { NativeSelect, NativeSelectOption } from "@framerfordevs/ui/components/n
 import { Textarea } from "@framerfordevs/ui/components/textarea";
 import { lazy, Suspense, useState, type ComponentType } from "react";
 
+import { applyGeneratedFormDefaults } from "@/lib/entry-defaults";
+
 const PortableTextField = lazy(() => import("./portable-text-field"));
 const assetKinds: ReadonlyArray<"image" | "video" | "audio" | "document" | "archive" | "other"> = [
   "image",
@@ -312,12 +314,10 @@ function ObjectControl(props: ControlProps) {
           <GeneratedControl
             key={child.id}
             field={child}
-            value={child.apiKey === null ? undefined : Reflect.get(value, child.apiKey)}
+            value={Reflect.get(value, child.id)}
             disabled={props.disabled}
             issue={undefined}
-            onChange={(next) => {
-              if (child.apiKey !== null) props.onChange({ ...value, [child.apiKey]: next });
-            }}
+            onChange={(next) => props.onChange({ ...value, [child.id]: next })}
           />
         ))}
       </FieldGroup>
@@ -403,9 +403,15 @@ function ReferenceControl(props: ControlProps) {
     <FieldShell field={props.field} issue={props.issue}>
       <Input
         id={`preview-${props.field.id}`}
-        value="Entry options become available in Milestone 7"
-        disabled
+        value={typeof props.value === "string" ? props.value : ""}
+        placeholder="Entry ID"
+        disabled={props.disabled}
+        aria-invalid={Boolean(props.issue)}
+        spellCheck={false}
+        autoComplete="off"
+        onChange={(event) => props.onChange(event.target.value || undefined)}
       />
+      <FieldDescription>Use a stable entry ID from the configured collection.</FieldDescription>
     </FieldShell>
   );
 }
@@ -488,6 +494,7 @@ function AssetControl(props: ControlProps) {
 }
 
 function RichTextControl(props: ControlProps) {
+  if (props.field.kind !== "rich_text") return null;
   return (
     <FieldShell field={props.field} issue={props.issue}>
       <Suspense
@@ -495,7 +502,9 @@ function RichTextControl(props: ControlProps) {
       >
         <PortableTextField
           label={fieldLabel(props.field)}
+          value={props.value}
           disabled={props.disabled}
+          configuration={props.field.configuration}
           onChange={props.onChange}
         />
       </Suspense>
@@ -529,9 +538,40 @@ function GeneratedControl(props: ControlProps) {
   return <Control {...props} />;
 }
 
-export function GeneratedForm({ definition }: { readonly definition: GeneratedFormDefinition }) {
-  const [values, setValues] = useState<Readonly<Record<string, unknown>>>({});
-  const [issues, setIssues] = useState<Readonly<Record<string, string>>>({});
+interface GeneratedFormProps {
+  readonly definition: GeneratedFormDefinition;
+  readonly values?: Readonly<Record<string, unknown>>;
+  readonly onValuesChange?: (values: Readonly<Record<string, unknown>>) => void;
+  readonly onSubmit?: () => void;
+  readonly submitLabel?: string;
+  readonly statusMessage?: string;
+  readonly serverIssues?: Readonly<Record<string, string>>;
+  readonly submitting?: boolean;
+}
+
+export function GeneratedForm({
+  definition,
+  values: controlledValues,
+  onValuesChange,
+  onSubmit,
+  submitLabel = "Validate preview",
+  statusMessage = "Preview values are local and are never saved.",
+  serverIssues,
+  submitting = false,
+}: GeneratedFormProps) {
+  const [localValues, setLocalValues] = useState<Readonly<Record<string, unknown>>>(() =>
+    applyGeneratedFormDefaults(definition.fields, {}),
+  );
+  const [localIssues, setLocalIssues] = useState<Readonly<Record<string, string>>>({});
+  const values = controlledValues ?? localValues;
+  const issues = serverIssues ?? localIssues;
+  const setValues = (
+    update: (current: Readonly<Record<string, unknown>>) => Readonly<Record<string, unknown>>,
+  ) => {
+    const next = update(values);
+    if (onValuesChange) onValuesChange(next);
+    else setLocalValues(next);
+  };
   const fields = new Map<string, CollectionFieldDefinition>(
     definition.fields.map((field) => [field.id, field]),
   );
@@ -548,9 +588,10 @@ export function GeneratedForm({ definition }: { readonly definition: GeneratedFo
           const first = result.issues[0];
           if (first) nextIssues[field.id] = first.message;
         }
-        setIssues(nextIssues);
+        setLocalIssues(nextIssues);
         const firstId = Object.keys(nextIssues)[0];
         if (firstId) document.querySelector<HTMLElement>(`#field-${firstId}`)?.focus();
+        if (onSubmit) onSubmit();
       }}
     >
       {Object.keys(issues).length > 0 ? (
@@ -597,9 +638,11 @@ export function GeneratedForm({ definition }: { readonly definition: GeneratedFo
         </section>
       ))}
       <div className="flex items-center gap-3">
-        <Button type="submit">Validate preview</Button>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? "Saving…" : submitLabel}
+        </Button>
         <p className="text-muted-foreground text-sm" aria-live="polite">
-          Preview values are local and are never saved.
+          {statusMessage}
         </p>
       </div>
     </form>

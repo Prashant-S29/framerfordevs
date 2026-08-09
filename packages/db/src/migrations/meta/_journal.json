@@ -43,6 +43,20 @@
       "when": 1785916984810,
       "tag": "0005_add_field_system_and_editor_layout",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786126384455,
+      "tag": "0006_create_entries_and_locale_revisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786247682687,
+      "tag": "0007_add_entry_display_names",
+      "breakpoints": true
     }
   ]
 }

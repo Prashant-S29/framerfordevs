@@ -38,6 +38,22 @@ const displayName = z
   .min(1, "Enter a display name.")
   .max(100, "Display names can contain at most 100 characters.");
 
+export const entryNameSchema = z
+  .string()
+  .trim()
+  .min(1, "Enter an entry name.")
+  .max(100, "Entry names can contain at most 100 characters.")
+  .refine(
+    (value) =>
+      ![...value].some((character) => {
+        const codePoint = character.codePointAt(0);
+        return (
+          codePoint !== undefined && (codePoint <= 31 || (codePoint >= 127 && codePoint <= 159))
+        );
+      }),
+    "Entry names cannot contain control characters.",
+  );
+
 export const collectionFormSchema = z.object({
   displayName,
   apiKey,

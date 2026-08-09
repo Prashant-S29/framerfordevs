@@ -236,6 +236,69 @@ describe("recursive definition policy", () => {
     assert.isFalse(result.valid);
     assert.isTrue(result.issues.some((issue) => issue.code === "localization_list_mixed"));
   });
+
+  it("validates structured defaults decoded as Effect Schema classes", () => {
+    const base = {
+      required: false,
+      localization: "shared" as const,
+      nodeRole: "root" as const,
+      children: [],
+    };
+    const richText: ValueFieldDefinition = {
+      ...base,
+      id: "body",
+      apiKey: "body",
+      position: 0,
+      kind: "rich_text",
+      configuration: Schema.decodeUnknownSync(RichTextConfiguration)({
+        default: {
+          version: 1,
+          profile: "ffd-portable-text",
+          blocks: [
+            {
+              _key: "block1",
+              _type: "block",
+              style: "normal",
+              children: [{ _key: "span1", _type: "span", text: "Hello", marks: ["strong"] }],
+              markDefs: [],
+            },
+          ],
+        },
+      }),
+    };
+    const money: ValueFieldDefinition = {
+      ...base,
+      id: "price",
+      apiKey: "price",
+      position: 1,
+      kind: "money",
+      configuration: Schema.decodeUnknownSync(MoneyConfiguration)({
+        currencies: ["USD"],
+        default: { amount: "19.99", currency: "USD" },
+      }),
+    };
+    const asset: ValueFieldDefinition = {
+      ...base,
+      id: "image",
+      apiKey: "image",
+      position: 2,
+      kind: "external_asset",
+      configuration: Schema.decodeUnknownSync(ExternalAssetConfiguration)({
+        default: {
+          source: "external",
+          url: "https://example.com/image.jpg",
+          kind: "image",
+          title: null,
+          alt: null,
+          width: null,
+          height: null,
+        },
+      }),
+    };
+
+    const result = validateDefinitionTree([richText, money, asset]);
+    assert.isTrue(result.valid, JSON.stringify(result.issues));
+  });
 });
 
 describe("structured and untrusted values", () => {

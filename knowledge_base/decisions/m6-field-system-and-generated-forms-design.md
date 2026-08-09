@@ -1,6 +1,6 @@
 # Milestone 6 field system, structured rich text, external assets, editor layout, and generated forms
 
-**Status:** Approved; implementation authorized subject to the developer-controlled migration gate
+**Status:** Approved, implemented, manually reviewed, and committed as `fbb4767`
 
 **Date:** 2026-08-05
 
@@ -1132,7 +1132,8 @@ The developer subsequently requested a non-dialog schema-building workflow and a
 - The schema JSON uses a versioned authoring document, not the relational persistence shape. It omits derived parent IDs, node roles, positions, hashes, collection metadata, and layout. Existing field IDs are retained; new fields use `null` and receive server-generated stable IDs.
 - A separate sample-JSON import parses bounded untrusted content locally, reports inference warnings, previews the inferred tree, and replaces only the unsaved local field draft after explicit confirmation. It never stores sample values or sends them to the server.
 - One authorized, optimistic-versioned repository operation atomically replaces the complete active field tree in the existing transaction and reconciles root layout placements. It preserves active IDs, rejects unknown or duplicate supplied IDs, rejects reparenting or node-role changes for existing IDs, generates IDs for new nodes, validates the complete prospective draft, and writes one audit event. Existing granular field operations remain valid API compatibility surfaces.
-- Every kind-specific configuration is editable. Exact decimal and money values stay textual; structured defaults use bounded JSON controls; reference targets come from authorized environment collections; enum and currency option lists remain bounded and duplicate-free.
+- Every kind-specific configuration is editable. Exact decimal and money values stay textual; arbitrary JSON plus object/list defaults use bounded root-shape-aware JSON controls; rich-text defaults use the same lazy official Portable Text editor as entry values; reference targets come from authorized environment collections; enum and currency option lists remain bounded and duplicate-free.
+- Default-entry controls match their contracts: long text is multiline, dates and date-times use native temporal inputs with canonical instant conversion, exact decimals advertise decimal input mode, booleans/enums use selects, money/assets use structured controls, references intentionally have no default, and rich-text toolbar options follow the configured allowlists. Known structured defaults decoded into Effect Schema classes are converted to inert JSON data before strict value validation; arbitrary input does not receive this normalization.
 - Client validation is advisory and browser-safe. Effect Schema, field-tree, authorization, aggregate-size, currency, reference-target, and publication validation remain authoritative on the server.
 - Server validation details are rendered as an accessible summary and mapped to the relevant selected field/control where possible. Sibling API-key collisions are also detected before submission, while duplicate display labels remain allowed.
 
