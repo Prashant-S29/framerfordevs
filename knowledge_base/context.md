@@ -1,8 +1,8 @@
 # Agent Session Context
 
 **Last updated:** 2026-08-09
-**Current phase:** Milestone 7 manual-review corrections implemented and automated gates complete; awaiting resumed developer review
-**Active milestone:** Milestone 7 — Entries, multilingual drafts, and revision history
+**Current phase:** Milestone 7 developer-approved and committed; Milestone 8 design discovery is next
+**Active milestone:** Milestone 8 — Independent locale publication and immutable snapshots
 
 ## What this project is
 
@@ -121,6 +121,8 @@ The repository currently has:
 - Class-backed rich-text, money, and external-asset defaults are copied to inert JSON data before value validation, preventing valid decoded Effect Schema values from being rejected as non-plain objects
 - Entry-editor diffs retain atomic root mutations for ordinary fields but descend through mixed-object containers to exact shared/localized child paths, matching server partition authority without weakening its default-deny checks
 - The refreshed M7 automated gate passes with 603 tests, API coverage at 89.72% statements and 71.07% branches, clean production/full audits, production builds, rebuilt healthy Docker services, HTTP 200 liveness/readiness/API-reference/SSR-login checks, and `git diff --check`
+- The developer completed manual review, approved Milestone 7, and committed it as `60bd96f` (`feat(m7): entries, multilingual drafts, and revision history`)
+- Milestone 8 is active for design discovery only; no M8 decision has been approved and no M8 implementation has begun
 - The developer generated and applied `0005_add_field_system_and_editor_layout.sql`; the agent inspected the complete SQL and snapshot and verified the live catalog read-only: 15 expected columns, 35 validated constraints, 16 valid/ready indexes, and valid legacy backfills
 - Complete M6 repository/API/UI/property/PostgreSQL/accessibility/bundle coverage with 551 passing tests and a clean production/full pnpm audit
 - Cold Docker manual review found and fixed a schema-builder hook-order crash during query hydration; hooks are now unconditional and `react-hooks/rules-of-hooks` is enforced workspace-wide

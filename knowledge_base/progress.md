@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 7 automated corrections complete; awaiting resumed developer manual review
-**Active milestone:** Milestone 7 — Entries, multilingual drafts, and revision history
+**Overall status:** Milestone 7 approved and committed; Milestone 8 design discovery pending
+**Active milestone:** Milestone 8 — Independent locale publication and immutable snapshots
 **Last updated:** 2026-08-09
 
 ## Status legend
@@ -24,8 +24,8 @@
 | 4   | Project locales                          | `[A]`  | 453 passing     | Approved      | `68b6f6e` |
 | 5   | Versioned schema engine                  | `[A]`  | 509 passing     | Approved      | `28ca04d` |
 | 6   | Field system and generated forms         | `[A]`  | 551 passing     | Approved      | `fbb4767` |
-| 7   | Entries and multilingual drafts          | `[R]`  | 603 passing     | In progress   | None      |
-| 8   | Per-locale publication and snapshots     | `[ ]`  | Not run         | Pending       | None      |
+| 7   | Entries and multilingual drafts          | `[A]`  | 603 passing     | Approved      | `60bd96f` |
+| 8   | Per-locale publication and snapshots     | `[~]`  | Not run         | Pending       | None      |
 | 9   | Delivery API                             | `[ ]`  | Not run         | Pending       | None      |
 | 10  | Preview API                              | `[ ]`  | Not run         | Pending       | None      |
 | 11  | Events, webhooks, invalidation           | `[ ]`  | Not run         | Pending       | None      |
@@ -287,11 +287,18 @@
 - `[x]` Treat an unpublished schema as an expected entry-workspace state: read collection publication metadata first, skip unavailable form/list prefetches, return an empty locale-neutral management list without requiring a value contract, and preserve direct 404 semantics for genuinely missing resources.
 - `[x]` Replace the raw-JSON rich-text default control with the configured lazy Portable Text editor and audit every other field kind’s default-entry method; correct long-text, date-time, exact-decimal, and structured root-shape controls, then normalize class-backed rich-text/money/asset defaults before server value validation.
 - `[x]` Emit entry-editor mutations at exact descendant paths beneath mixed objects while retaining atomic root mutations elsewhere, so generated default values respect server-enforced shared/localized partition authority.
-- `[R]` Resume developer manual English/Hindi/Gujarati create/name/rename/save/conflict/restore review.
+- `[A]` Developer completed manual English/Hindi/Gujarati review, approved Milestone 7, and committed it as `60bd96f` (`feat(m7): entries, multilingual drafts, and revision history`).
+
+## Milestone 8 checklist — design approval gate
+
+- `[ ]` Re-read the product vision, CMS PRD, mandatory rules, M8 milestone criteria, M1–M7 decisions, context, progress, and learnings for M8 design discovery.
+- `[ ]` Inspect the committed M7 publication seams, schema/revision identity, locale isolation, references, audits, outbox, repository locking, API/UI, and test infrastructure.
+- `[ ]` Author the M8 decision record for independent locale publication, immutable snapshots, shared-value staleness, unpublish, idempotency, concurrency, and atomic audit/outbox behavior.
+- `[ ]` Obtain explicit developer approval of the M8 design before changing schema or implementation code.
 
 ## Current blockers
 
-None. Milestone 7 is awaiting resumed developer manual review and explicit approval.
+None. Milestone 8 is active at the design-discovery gate; implementation must wait for an approved M8 decision record.
 
 ## Database migration state
 

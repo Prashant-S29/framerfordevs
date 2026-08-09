@@ -380,6 +380,8 @@ Implement the initial field vocabulary and form metadata without coupling conten
 
 ## Milestone 7 — Entries, multilingual drafts, and revision history
 
+**Status:** Developer approved and committed as `60bd96f` on 2026-08-09.
+
 ### Goal
 
 Allow editors to create one logical entry with shared values and independent locale drafts.
@@ -429,6 +431,8 @@ Likely migration name: `create_entries_and_locale_revisions`.
 ---
 
 ## Milestone 8 — Independent locale publication and immutable snapshots
+
+**Status:** Active at design discovery; implementation has not begun and requires an approved decision record.
 
 ### Goal
 
