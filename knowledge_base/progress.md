@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 8 automated implementation complete; awaiting developer manual review
-**Active milestone:** Milestone 8 — Independent locale publication and immutable snapshots
+**Overall status:** Milestone 8 approved and committed; Milestone 9 design discovery next
+**Active milestone:** Milestone 9 — Production Delivery API
 **Last updated:** 2026-08-09
 
 ## Status legend
@@ -25,7 +25,7 @@
 | 5   | Versioned schema engine                  | `[A]`  | 509 passing     | Approved      | `28ca04d` |
 | 6   | Field system and generated forms         | `[A]`  | 551 passing     | Approved      | `fbb4767` |
 | 7   | Entries and multilingual drafts          | `[A]`  | 603 passing     | Approved      | `60bd96f` |
-| 8   | Per-locale publication and snapshots     | `[R]`  | 627 passing     | Pending       | None      |
+| 8   | Per-locale publication and snapshots     | `[A]`  | 627 passing     | Approved      | `ad3cd5e` |
 | 9   | Delivery API                             | `[ ]`  | Not run         | Pending       | None      |
 | 10  | Preview API                              | `[ ]`  | Not run         | Pending       | None      |
 | 11  | Events, webhooks, invalidation           | `[ ]`  | Not run         | Pending       | None      |
@@ -310,11 +310,11 @@
 - `[x]` Add anonymous denial for all five management routes and automated axe coverage for exact-locale publish/unpublish dialogs.
 - `[x]` Complete shared-snapshot staleness/immutability, exact-locale reference linearization, stale same-locale publish and publish/unpublish authority conflicts, concurrent entry event sequencing, and complete role/locale-access policy matrices.
 - `[x]` Complete final readiness, coverage, production/full audits, builds, bundle review, `git diff --check`, and read-only database fixture/invariant verification.
-- `[R]` Await developer manual English/Hindi/Gujarati publication review and approval.
+- `[A]` Developer approved and committed M8 as `ad3cd5e` (`feat(m8): add independent locale publication and immutable snapshots`).
 
 ## Current blockers
 
-No blocker. All agent-owned M8 implementation and automated verification are complete; only developer manual review and approval remain.
+No blocker. M8 implementation, verification, approval, and commit are complete. M9 design discovery is next; no M9 implementation has begun.
 
 ## Database migration state
 
@@ -563,3 +563,5 @@ Milestone 4 automated criteria and developer review are complete. The developer 
 Milestone 6 automated criteria and developer/client review are complete. Manual review found and resolved the cold-hydration React hook-order crash and the invalid reference-collection page limit. The developer approved Milestone 6 and committed it as `fbb4767` (`feat(m6): field system, structured rich text, external assets, and editor layout`).
 
 Milestone 7 manual review found locale-dependent list presentation, missing CMS-only names, non-URL locale state, absent version-0 defaults, missing Portable Text hydration, a raw-JSON editor for rich-text defaults, other mismatched default controls, mixed-localization controls on ineligible kinds, and expected unpublished-schema absence surfacing as three global query-error toasts. The developer approved the amendment and generated/applied the inspected `0007_add_entry_display_names.sql` migration. The workspace now derives schema availability from collection metadata and avoids unavailable dependent queries while retaining genuine error semantics. The developer completed English/Hindi/Gujarati review, approved Milestone 7, and committed it as `60bd96f`; the documentation reconciliation was committed as `d90b31b`.
+
+Milestone 8 independent locale publication, immutable snapshots, exact-locale reference pinning, management API/UI, observability, concurrency, policy, append-only enforcement, and final readiness are complete with 627 passing tests and clean invariants. The developer approved and committed M8 as `ad3cd5e` (`feat(m8): add independent locale publication and immutable snapshots`).

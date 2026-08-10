@@ -432,7 +432,7 @@ Likely migration name: `create_entries_and_locale_revisions`.
 
 ## Milestone 8 — Independent locale publication and immutable snapshots
 
-**Status:** Automated implementation complete and developer-applied migration verified; awaiting developer manual review.
+**Status:** Developer approved and committed as `ad3cd5e` on 2026-08-09.
 
 ### Goal
 

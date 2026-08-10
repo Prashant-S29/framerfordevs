@@ -1,8 +1,8 @@
 # Agent Session Context
 
 **Last updated:** 2026-08-09
-**Current phase:** Milestone 8 automated implementation complete; awaiting developer manual review
-**Active milestone:** Milestone 8 — Independent locale publication and immutable snapshots
+**Current phase:** Milestone 8 approved and committed; Milestone 9 design discovery next
+**Active milestone:** Milestone 9 — Production Delivery API
 
 ## What this project is
 
@@ -133,7 +133,8 @@ The repository currently has:
 - Rollback-contained PostgreSQL coverage proves invalid validation, actionable exact-locale references, independent English/Hindi heads, publish/replay/history/unpublish/no-op behavior, append-only trigger rejection, intended query plans, inspected `read committed`, and rollback at all eight material artifact stages without leaving immutable fixtures
 - Final M8 PostgreSQL hardening proves shared-snapshot immutability/staleness, before/after grouped-reference-resolution outcomes, stale same-locale and publish/unpublish command conflicts, independent locale-local sequences, contiguous concurrent entry event sequencing, and rollback at every material artifact stage
 - The complete role/locale matrix covers publication reads and mutations across every role and `all`/`selected`/`none` locale access; anonymous route denial and automated exact-locale dialog accessibility remain covered
-- The final M8 readiness gate passes with 627 tests, API coverage at 89.83% statements and 72.19% branches, publication-repository coverage at 90.00% statements and 76.12% branches, clean production/full audits, production builds, `git diff --check`, four enabled immutable triggers, and zero durable M8 test artifacts; only developer manual review remains
+- The final M8 readiness gate passes with 627 tests, API coverage at 89.83% statements and 72.19% branches, publication-repository coverage at 90.00% statements and 76.12% branches, clean production/full audits, production builds, `git diff --check`, four enabled immutable triggers, and zero durable M8 test artifacts
+- The developer approved and committed M8 as `ad3cd5e` (`feat(m8): add independent locale publication and immutable snapshots`) after the complete automated gate
 - The developer generated and applied `0005_add_field_system_and_editor_layout.sql`; the agent inspected the complete SQL and snapshot and verified the live catalog read-only: 15 expected columns, 35 validated constraints, 16 valid/ready indexes, and valid legacy backfills
 - Complete M6 repository/API/UI/property/PostgreSQL/accessibility/bundle coverage with 551 passing tests and a clean production/full pnpm audit
 - Cold Docker manual review found and fixed a schema-builder hook-order crash during query hydration; hooks are now unconditional and `react-hooks/rules-of-hooks` is enforced workspace-wide
@@ -150,7 +151,7 @@ The repository currently has:
 The repository does not yet have:
 
 - Public Delivery API querying (M9) or Preview API workflows (M10)
-- Developer manual approval for the completed M8 publication workflow
+- Public Delivery API querying, which begins with M9 design discovery
 - Production telemetry backend/collector deployment
 
 ## Mandatory constraints
@@ -259,7 +260,6 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 
 ## What to do next
 
-1. Developer manually publishes and unpublishes English, Hindi, and Gujarati in different orders.
-2. Developer verifies that a shared-field edit reaches only a republished locale while older locale snapshots remain unchanged.
-3. Developer verifies that a shared-only reference still requires an exact-locale target publication and reviews the actionable target link.
-4. Developer approves M8 and commits it before the active milestone advances to M9.
+1. Re-read the product, CMS PRD, rules, M9 milestone criteria, context, progress, learnings, and approved M8 delivery-snapshot authority.
+2. Inspect current-publication lookup, credential, cache, filtering, pagination, and delivery-response seams.
+3. Propose the complete M9 Production Delivery API decision record before implementation.

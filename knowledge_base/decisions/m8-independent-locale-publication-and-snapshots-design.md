@@ -1,6 +1,6 @@
 # Milestone 8 independent locale publication and immutable delivery-snapshot design
 
-**Status:** Developer-approved; migration applied and verified; automated implementation complete; awaiting developer manual review
+**Status:** Developer-approved and committed as `ad3cd5e`
 
 **Date:** 2026-08-09
 
@@ -29,7 +29,7 @@ The design uses:
 - Permission-aware publication status, validation, publish, unpublish, and history management APIs
 - Accessible exact-locale publication controls integrated into the existing entry editor
 
-The developer explicitly approved this decision record and authorized M8 implementation. The pure compiler's realistic-content fixture passed the approved headroom gate, the developer confirmed it, and the developer generated and applied the reviewed migration. Repository, API, UI, observability, concurrency/linearization, policy, accessibility, rollback, and database-invariant automation are complete; developer manual review is the only remaining milestone gate.
+The developer explicitly approved this decision record and authorized M8 implementation. The pure compiler's realistic-content fixture passed the approved headroom gate, the developer confirmed it, and the developer generated and applied the reviewed migration. Repository, API, UI, observability, concurrency/linearization, policy, accessibility, rollback, and database-invariant automation are complete. The developer approved and committed the completed implementation as `ad3cd5e` (`feat(m8): add independent locale publication and immutable snapshots`).
 
 ## Source hierarchy and discovery
 
