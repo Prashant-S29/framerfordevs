@@ -11,6 +11,7 @@ export default defineConfig({
       include: [
         "src/contracts/**/*.ts",
         "src/lib/entry-values.ts",
+        "src/lib/publication-snapshot.ts",
         "src/observability/**/*.ts",
         "src/operations/**/*.ts",
         "src/services/**/*.ts",

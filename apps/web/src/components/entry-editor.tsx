@@ -4,6 +4,18 @@ import type {
   CollectionFieldDefinition,
   GeneratedFormDefinition,
 } from "@framerfordevs/api/contracts/schemas";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@framerfordevs/ui/components/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@framerfordevs/ui/components/alert";
 import { Badge } from "@framerfordevs/ui/components/badge";
 import { Button } from "@framerfordevs/ui/components/button";
 import {
@@ -33,7 +45,7 @@ import { Input } from "@framerfordevs/ui/components/input";
 import { Spinner } from "@framerfordevs/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, HistoryIcon, PencilIcon, RefreshCwIcon } from "lucide-react";
+import { ArrowLeftIcon, Globe2Icon, HistoryIcon, PencilIcon, RefreshCwIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -120,6 +132,7 @@ export function EntryEditor({
   const [reloadKey, setReloadKey] = useState(0);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const project = useQuery(orpc.platform.projects.get.queryOptions({ input: { projectId } }));
+  const access = useQuery(orpc.platform.projects.access.queryOptions({ input: { projectId } }));
   const locales = useQuery(
     orpc.platform.projects.locales.list.queryOptions({
       input: { projectId, view: "enabled", includeRemoved: false },
@@ -149,7 +162,13 @@ export function EntryEditor({
     retry: false,
   });
 
-  if (project.isPending || locales.isPending || definition.isPending || draft.isPending) {
+  if (
+    project.isPending ||
+    access.isPending ||
+    locales.isPending ||
+    definition.isPending ||
+    draft.isPending
+  ) {
     return (
       <div className="flex min-h-64 items-center justify-center">
         <Spinner />
@@ -157,7 +176,7 @@ export function EntryEditor({
       </div>
     );
   }
-  if (!project.data || !locales.data || !definition.data) return null;
+  if (!project.data || !access.data || !locales.data || !definition.data) return null;
   if (draft.isError || !draft.data) {
     return (
       <div role="alert" className="rounded-md border border-destructive p-4">
@@ -231,6 +250,7 @@ export function EntryEditor({
               locale={localeTag}
               definition={definition.data.data}
               draft={draftData}
+              canPublish={access.data.data.allowedActions.includes("content.publish")}
               onDirtyChange={setHasUnsavedChanges}
               onAuthoritativeReload={async () => {
                 await draft.refetch();
@@ -368,6 +388,7 @@ function EntryDraftWorkspace({
   locale,
   definition,
   draft,
+  canPublish,
   onAuthoritativeReload,
   onDirtyChange,
 }: {
@@ -398,6 +419,7 @@ function EntryDraftWorkspace({
       }>;
     };
   };
+  readonly canPublish: boolean;
   readonly onAuthoritativeReload: () => Promise<void>;
   readonly onDirtyChange: (dirty: boolean) => void;
 }) {
@@ -467,6 +489,9 @@ function EntryDraftWorkspace({
         }),
         queryClient.invalidateQueries({
           queryKey: orpc.platform.projects.collections.entries.listRevisions.key(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.collections.entries.publications.status.key(),
         }),
       ]);
       toast.success(
@@ -564,6 +589,15 @@ function EntryDraftWorkspace({
           )}
         </CardContent>
       </Card>
+      <PublicationCard
+        projectId={projectId}
+        environmentId={environmentId}
+        collectionId={collectionId}
+        entryId={entryId}
+        locale={locale}
+        canPublish={canPublish}
+        hasUnsavedChanges={dirty}
+      />
       <RevisionHistory
         projectId={projectId}
         environmentId={environmentId}
@@ -574,6 +608,354 @@ function EntryDraftWorkspace({
         onRestored={onAuthoritativeReload}
       />
     </div>
+  );
+}
+
+export function PublicationCard({
+  projectId,
+  environmentId,
+  collectionId,
+  entryId,
+  locale,
+  canPublish,
+  hasUnsavedChanges,
+}: {
+  readonly projectId: string;
+  readonly environmentId: string;
+  readonly collectionId: string;
+  readonly entryId: string;
+  readonly locale: string;
+  readonly canPublish: boolean;
+  readonly hasUnsavedChanges: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [unpublishOpen, setUnpublishOpen] = useState(false);
+  const scope = { projectId, environmentId, collectionId, entryId, locale };
+  const status = useQuery({
+    ...orpc.platform.projects.collections.entries.publications.status.queryOptions({
+      input: scope,
+    }),
+    retry: false,
+  });
+  const history = useQuery({
+    ...orpc.platform.projects.collections.entries.publications.list.queryOptions({
+      input: { ...scope, cursor: null, limit: 5 },
+    }),
+    retry: false,
+  });
+  const plan = useQuery({
+    ...orpc.platform.projects.collections.entries.publications.validate.queryOptions({
+      input: scope,
+    }),
+    enabled: publishOpen && canPublish && !hasUnsavedChanges,
+    retry: false,
+  });
+  const invalidatePublicationQueries = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: orpc.platform.projects.collections.entries.publications.status.key(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: orpc.platform.projects.collections.entries.publications.list.key(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: orpc.platform.projects.collections.entries.publications.validate.key(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: orpc.platform.projects.collections.entries.getDraft.key(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: orpc.platform.projects.collections.entries.list.key(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: orpc.platform.projects.locales.list.key(),
+      }),
+    ]);
+  };
+  const publish = useMutation({
+    mutationFn: () => {
+      const candidate = plan.data?.data;
+      if (!candidate?.valid || !candidate.authorityHash)
+        throw new Error("Validate this locale before publishing.");
+      return client.platform.projects.collections.entries.publications.publish({
+        ...scope,
+        commandId: crypto.randomUUID(),
+        authorityHash: candidate.authorityHash,
+        expectedStateVersion: candidate.stateVersion,
+        expectedPublicationId: candidate.currentPublicationId,
+        expectedSchemaRevisionId: candidate.schemaRevisionId,
+        expectedContractHash: candidate.contractHash,
+        expectedSharedVersion: candidate.sharedVersion,
+        expectedSharedRevisionId: candidate.sharedRevisionId,
+        expectedLocalizedVersion: candidate.localizedVersion,
+        expectedLocalizedRevisionId: candidate.localizedRevisionId,
+      });
+    },
+    onSuccess: async (response) => {
+      await invalidatePublicationQueries();
+      setPublishOpen(false);
+      toast.success(
+        response.data.resultKind === "no_op"
+          ? `${locale} is already current.`
+          : `${locale} published as sequence ${response.data.publication.sequence}.`,
+      );
+    },
+    onError: async (error) => {
+      await invalidatePublicationQueries();
+      toast.error(error.message);
+    },
+  });
+  const unpublish = useMutation({
+    mutationFn: () => {
+      const current = status.data?.data;
+      if (!current?.currentPublication) throw new Error("This locale is already unpublished.");
+      return client.platform.projects.collections.entries.publications.unpublish({
+        ...scope,
+        commandId: crypto.randomUUID(),
+        expectedStateVersion: current.stateVersion,
+        expectedPublicationId: current.currentPublication.id,
+      });
+    },
+    onSuccess: async () => {
+      await invalidatePublicationQueries();
+      setUnpublishOpen(false);
+      toast.success(`${locale} unpublished. Immutable history was preserved.`);
+    },
+    onError: async (error) => {
+      await invalidatePublicationQueries();
+      toast.error(error.message);
+    },
+  });
+
+  const publicationStatus = status.data?.data;
+  const current = publicationStatus?.currentPublication;
+  const planData = plan.data?.data;
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <CardTitle className="flex items-center gap-2">
+              <Globe2Icon aria-hidden="true" /> Publication — {locale}
+            </CardTitle>
+            <CardDescription>
+              Publication captures shared values only for this exact locale. Other locales are
+              unchanged.
+            </CardDescription>
+          </div>
+          <Badge variant={current ? "default" : "secondary"}>
+            {current ? "Published" : "Unpublished"}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-5">
+        {status.isPending ? (
+          <div role="status" className="flex items-center gap-2 text-sm">
+            <Spinner /> Loading publication status…
+          </div>
+        ) : status.isError || !publicationStatus ? (
+          <Alert variant="destructive">
+            <AlertTitle>Publication status unavailable</AlertTitle>
+            <AlertDescription>
+              Retry before publishing or unpublishing this locale.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2" aria-label="Publication change status">
+              <Badge variant="outline">
+                Shared {publicationStatus.sharedChanged ? "changed" : "current"}
+              </Badge>
+              <Badge variant="outline">
+                Locale {publicationStatus.localizedChanged ? "changed" : "current"}
+              </Badge>
+              <Badge variant="outline">
+                Schema {publicationStatus.schemaChanged ? "changed" : "current"}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground text-sm">
+              {current
+                ? `Sequence ${current.sequence} · ${dateFormatter.format(new Date(current.publishedAt))} · shared draft ${current.sharedVersion} · locale draft ${current.localizedVersion}`
+                : "This locale is not available to delivery. Drafts and publication history remain available."}
+            </p>
+            {hasUnsavedChanges ? (
+              <Alert>
+                <AlertTitle>Save the draft first</AlertTitle>
+                <AlertDescription>
+                  Publication cannot include unsaved editor changes.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              {canPublish ? (
+                <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
+                  <DialogTrigger
+                    render={<Button disabled={hasUnsavedChanges || publish.isPending} />}
+                  >
+                    Publish {locale}
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-xl">
+                    <DialogHeader>
+                      <DialogTitle>Publish {locale}?</DialogTitle>
+                      <DialogDescription>
+                        This compiles current shared and {locale} values into one immutable
+                        exact-locale snapshot.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div
+                      aria-live="polite"
+                      className="flex max-h-80 flex-col gap-3 overflow-y-auto"
+                    >
+                      {plan.isPending ? (
+                        <p className="flex items-center gap-2 text-sm">
+                          <Spinner /> Validating publication…
+                        </p>
+                      ) : plan.isError || !planData ? (
+                        <Alert variant="destructive">
+                          <AlertTitle>Validation failed to load</AlertTitle>
+                          <AlertDescription>Close this dialog and try again.</AlertDescription>
+                        </Alert>
+                      ) : planData.valid ? (
+                        <Alert>
+                          <AlertTitle>
+                            {planData.wouldCreatePublication
+                              ? "Ready to publish"
+                              : "Already current"}
+                          </AlertTitle>
+                          <AlertDescription>
+                            {planData.size
+                              ? `${planData.size.combinedBytes.toLocaleString()} of ${planData.size.maximumBytes.toLocaleString()} canonical bytes.`
+                              : "The candidate passed strict publication validation."}
+                          </AlertDescription>
+                        </Alert>
+                      ) : (
+                        <Alert variant="destructive">
+                          <AlertTitle>
+                            Resolve {planData.issues.length} publication issue
+                            {planData.issues.length === 1 ? "" : "s"}
+                          </AlertTitle>
+                          <AlertDescription>
+                            <ul className="mt-2 list-disc space-y-1 pl-5">
+                              {planData.issues.map((issue, index) => (
+                                <li key={`${issue.code}-${issue.path}-${index}`}>
+                                  {issue.message}{" "}
+                                  {issue.target ? (
+                                    <Link
+                                      className="underline underline-offset-2"
+                                      to="/projects/$projectId/collections/$collectionId/entries/$entryId"
+                                      params={{
+                                        projectId,
+                                        collectionId: issue.target.collectionId,
+                                        entryId: issue.target.entryId,
+                                      }}
+                                      search={{ locale }}
+                                    >
+                                      Open {issue.target.displayName ?? "referenced entry"} in{" "}
+                                      {locale}
+                                    </Link>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                            {planData.size?.bucket === "over_limit"
+                              ? ` Candidate size: ${planData.size.combinedBytes.toLocaleString()} of ${planData.size.maximumBytes.toLocaleString()} bytes. Content is never truncated.`
+                              : null}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setPublishOpen(false)}
+                        disabled={publish.isPending}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        disabled={!planData?.valid || !planData.authorityHash || publish.isPending}
+                        onClick={() => publish.mutate()}
+                      >
+                        {publish.isPending ? <Spinner data-icon="inline-start" /> : null}
+                        {publish.isPending
+                          ? "Publishing…"
+                          : planData?.wouldCreatePublication
+                            ? `Publish ${locale}`
+                            : "Confirm current publication"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              ) : null}
+              {canPublish && current ? (
+                <AlertDialog
+                  open={unpublishOpen}
+                  onOpenChange={(open) => {
+                    if (!unpublish.isPending) setUnpublishOpen(open);
+                  }}
+                >
+                  <AlertDialogTrigger
+                    render={<Button variant="destructive" disabled={unpublish.isPending} />}
+                  >
+                    Unpublish {locale}
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Unpublish {locale}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Only {locale} is removed from latest delivery. Drafts and immutable
+                        publication history remain, and other locales are unchanged. Republishing
+                        creates a new sequence.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={unpublish.isPending}>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        variant="destructive"
+                        disabled={unpublish.isPending}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          unpublish.mutate();
+                        }}
+                      >
+                        {unpublish.isPending ? <Spinner data-icon="inline-start" /> : null}
+                        {unpublish.isPending ? "Unpublishing…" : `Unpublish ${locale}`}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : null}
+            </div>
+          </>
+        )}
+        <section aria-labelledby="publication-history-heading" className="flex flex-col gap-2">
+          <h3 id="publication-history-heading" className="font-medium">
+            Recent immutable publications
+          </h3>
+          {history.isPending ? (
+            <Spinner />
+          ) : history.data?.data.items.length ? (
+            history.data.data.items.map((item) => (
+              <div key={item.id} className="rounded-md border p-3 text-sm">
+                <p className="font-medium">
+                  Sequence {item.sequence}
+                  {item.current ? " · current" : ""}
+                </p>
+                <p className="text-muted-foreground">
+                  {dateFormatter.format(new Date(item.publishedAt))} · shared {item.sharedVersion} ·
+                  locale {item.localizedVersion} · {item.size.combinedBytes.toLocaleString()} bytes
+                </p>
+              </div>
+            ))
+          ) : (
+            <p className="text-muted-foreground text-sm">No publications yet.</p>
+          )}
+        </section>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -657,6 +1039,9 @@ function RevisionHistory({
         }),
         queryClient.invalidateQueries({
           queryKey: orpc.platform.projects.collections.entries.list.key(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.collections.entries.publications.status.key(),
         }),
       ]);
       toast.success("Revision restored as a new revision.");

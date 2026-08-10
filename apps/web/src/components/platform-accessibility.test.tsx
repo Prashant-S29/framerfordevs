@@ -3,6 +3,12 @@
 import { ProjectMember } from "@framerfordevs/api/contracts/access";
 import { ProjectLocale } from "@framerfordevs/api/contracts/locales";
 import { Project } from "@framerfordevs/api/contracts/platform";
+import {
+  EntryPublicationPage,
+  EntryPublicationPlan,
+  EntryPublicationStatus,
+  EntryPublicationSummary,
+} from "@framerfordevs/api/contracts/publications";
 import { CollectionDraftSchema, SchemaChange } from "@framerfordevs/api/contracts/schemas";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -24,10 +30,11 @@ import {
 } from "./project-access-settings";
 import { AddLocaleDialog } from "./project-locale-settings";
 import { CreateEntryDialog } from "./collection-entries";
-import { RenameEntryDialog } from "./entry-editor";
+import { PublicationCard, RenameEntryDialog } from "./entry-editor";
 import { CreateCollectionDialog } from "./project-collections";
 import { PublishCard } from "./schema-builder";
 import { SchemaWorkbench } from "./schema-workbench";
+import { orpc } from "@/utils/orpc";
 
 const locale = Schema.decodeUnknownSync(ProjectLocale)({
   id: "019fae8b-1234-7000-8000-000000000004",
@@ -142,8 +149,8 @@ const riskySchemaChange = Schema.decodeUnknownSync(SchemaChange)({
   summary: "A required field was added.",
 });
 
-function renderWithQueryClient(component: ReactNode) {
-  return render(<QueryClientProvider client={new QueryClient()}>{component}</QueryClientProvider>);
+function renderWithQueryClient(component: ReactNode, queryClient = new QueryClient()) {
+  return render(<QueryClientProvider client={queryClient}>{component}</QueryClientProvider>);
 }
 
 async function expectOpenDialogToHaveNoViolations(
@@ -223,6 +230,131 @@ describe("platform management accessibility", () => {
       />,
     );
     await expectOpenDialogToHaveNoViolations(/rename entry/i);
+  });
+
+  it("has accessible exact-locale publication and unpublish semantics", async () => {
+    const publicationId = "019fae8b-1234-7000-8000-000000000041";
+    const schemaRevisionId = "019fae8b-1234-7000-8000-000000000042";
+    const hash = "d".repeat(64);
+    const scope = {
+      projectId: project.id,
+      environmentId: project.environment.id,
+      collectionId: collectionDraft.collection.id,
+      entryId: "019fae8b-1234-7000-8000-000000000043",
+      locale: "en",
+    };
+    const size = {
+      documentBytes: 512,
+      referenceManifestBytes: 2,
+      combinedBytes: 514,
+      maximumBytes: 1_048_576,
+      bucket: "small",
+    };
+    const summary = Schema.decodeUnknownSync(EntryPublicationSummary)({
+      id: publicationId,
+      snapshotId: publicationId,
+      entryId: scope.entryId,
+      localeId: locale.id,
+      locale: scope.locale,
+      sequence: 1,
+      schemaRevisionId,
+      contractHash: hash,
+      sharedRevisionId: null,
+      sharedVersion: 0,
+      localizedRevisionId: null,
+      localizedVersion: 0,
+      contentHash: hash,
+      authorityHash: hash,
+      documentHash: hash,
+      changedFieldIds: [],
+      size,
+      publishedByUserId: "accessible-user",
+      publishedAt: "2026-08-09T12:00:00.000Z",
+      current: true,
+    });
+    const status = Schema.decodeUnknownSync(EntryPublicationStatus)({
+      entryId: scope.entryId,
+      localeId: locale.id,
+      locale: scope.locale,
+      state: "published",
+      stateVersion: 1,
+      currentPublication: summary,
+      currentSchemaRevisionId: schemaRevisionId,
+      currentContractHash: hash,
+      currentSharedRevisionId: null,
+      currentSharedVersion: 0,
+      currentLocalizedRevisionId: null,
+      currentLocalizedVersion: 0,
+      sharedChanged: false,
+      localizedChanged: false,
+      schemaChanged: false,
+      changedSincePublication: false,
+    });
+    const plan = Schema.decodeUnknownSync(EntryPublicationPlan)({
+      entryId: scope.entryId,
+      localeId: locale.id,
+      locale: scope.locale,
+      stateVersion: 1,
+      currentPublicationId: publicationId,
+      schemaRevisionId,
+      contractHash: hash,
+      sharedRevisionId: null,
+      sharedVersion: 0,
+      localizedRevisionId: null,
+      localizedVersion: 0,
+      valid: true,
+      issues: [],
+      capped: false,
+      contentHash: hash,
+      authorityHash: hash,
+      changedFieldIds: [],
+      size,
+      referencesWouldRefresh: false,
+      wouldCreatePublication: false,
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { staleTime: Number.POSITIVE_INFINITY, retry: false } },
+    });
+    const statusOptions =
+      orpc.platform.projects.collections.entries.publications.status.queryOptions({ input: scope });
+    const historyOptions =
+      orpc.platform.projects.collections.entries.publications.list.queryOptions({
+        input: { ...scope, cursor: null, limit: 5 },
+      });
+    const planOptions =
+      orpc.platform.projects.collections.entries.publications.validate.queryOptions({
+        input: scope,
+      });
+    queryClient.setQueryData(statusOptions.queryKey, {
+      ok: true,
+      data: status,
+      error: null,
+      message: "Publication status loaded.",
+    });
+    queryClient.setQueryData(historyOptions.queryKey, {
+      ok: true,
+      data: EntryPublicationPage.make({ items: [summary], nextCursor: null }),
+      error: null,
+      message: "Publication history loaded.",
+    });
+    queryClient.setQueryData(planOptions.queryKey, {
+      ok: true,
+      data: plan,
+      error: null,
+      message: "Publication validation completed.",
+    });
+    renderWithQueryClient(
+      <PublicationCard {...scope} canPublish hasUnsavedChanges={false} />,
+      queryClient,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^publish en$/i }));
+    const publishDialog = await screen.findByRole("dialog");
+    expect((await axe.run(publishDialog)).violations).toEqual([]);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: /^unpublish en$/i }));
+    const unpublishDialog = await screen.findByRole("alertdialog");
+    expect((await axe.run(unpublishDialog)).violations).toEqual([]);
   });
 
   it("has accessible collection and schema-building semantics", async () => {

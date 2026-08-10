@@ -382,6 +382,22 @@ Record a learning when an implementation or decision:
 
 ---
 
+## 2026-08-09 — Append-only integration fixtures need rollback-contained lifecycle tests
+
+**Context:** M8 correctly rejects direct update/delete operations on publication artifacts and command receipts in PostgreSQL, including ordinary test cleanup deletes.
+
+**Incorrect assumption or decision:** Reusing the older create-test-fixture/delete-test-fixture pattern for successful publication workflows would make cleanup itself violate the production immutability contract or require disabling the very triggers under test.
+
+**Cost or risk:** Tests could leak durable publication history, weaken append-only enforcement during cleanup, or require unsafe privileged trigger bypasses.
+
+**Learning:** When production artifacts are database-enforced append-only, successful integration lifecycles should execute inside a containing transaction that is deliberately rolled back after assertions. The repository needs a narrow test transaction seam without weakening the production transaction configuration.
+
+**Prevention:** `PublicationRepository` keeps its production transaction runner explicitly configured as `READ COMMITTED`, while integration tests inject an already-open transaction/executor and roll the complete lifecycle back. Any fixture-state advancement needed after publication must use that same executor; starting an out-of-band repository transaction while the containing transaction holds source-head locks can wait indefinitely and strand setup fixtures when the test times out. Failure-injection tests use production transactions and assert every material stage rolls back naturally. No trigger is disabled and no immutable row is deleted.
+
+**Status:** Resolved with rollback-contained publication lifecycle, shared-staleness/reference-linearization coverage, and eight-stage failure injection.
+
+---
+
 ## Current implementation learnings
 
-The platform authorization, locale foundations, versioned schema engine, field system, schema-authoring workbench, stable entries, multilingual drafts, and revision history are developer-approved and committed through Milestone 7 at `60bd96f`. M7 closed with 603 passing tests, clean audits, and clean read-only database invariants. Milestone 8 is active at design discovery only; no decision record is approved and no implementation has begun. Additional entries should be added only when consequential drift or rework occurs.
+The platform authorization, locale foundations, versioned schema engine, field system, schema-authoring workbench, stable entries, multilingual drafts, and revision history are developer-approved and committed through Milestone 7 at `60bd96f`. M7 closed with 603 passing tests, clean audits, and clean read-only database invariants. The complete M8 independent-locale publication and immutable-snapshot design is developer-approved. Its compiler fixture remains 692,046 combined canonical bytes with 34.00% headroom under the provisional 1 MiB maximum, and the developer-generated/applied migration is verified. All agent-owned M8 repository, API, observability, locale-dependency, exact-locale editor, concurrency/linearization, policy, accessibility, rollback, query-plan, readiness, audit, build, and database-invariant work is complete; only developer manual review remains. Additional entries should be added only when consequential drift or rework occurs.

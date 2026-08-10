@@ -41,6 +41,18 @@ import {
   SaveEntryDraftResultOutputSchema,
 } from "../contracts/entries";
 import {
+  EntryPublicationPageOutputSchema,
+  EntryPublicationPlanOutputSchema,
+  EntryPublicationStatusOutputSchema,
+  GetEntryPublicationStatusInputSchema,
+  ListEntryPublicationsInputSchema,
+  PublishEntryInputSchema,
+  PublishEntryResultOutputSchema,
+  UnpublishEntryInputSchema,
+  UnpublishEntryResultOutputSchema,
+  ValidateEntryPublicationInputSchema,
+} from "../contracts/publications";
+import {
   CreateProjectLocaleInputSchema,
   ListProjectLocalesInputSchema,
   ProjectLocaleListOutputSchema,
@@ -111,6 +123,13 @@ import {
   restoreEntryRevision,
   saveEntryDraft,
 } from "../operations/entries";
+import {
+  getEntryPublicationStatus,
+  listEntryPublications,
+  publishEntryLocale,
+  unpublishEntryLocale,
+  validateEntryPublication,
+} from "../operations/publications";
 import {
   issueApiCredential,
   listApiCredentials,
@@ -504,6 +523,63 @@ export const appRouter = {
                 "Entry revision restored.",
               ),
             ),
+          publications: {
+            status: protectedProcedure
+              .input(GetEntryPublicationStatusInputSchema)
+              .output(EntryPublicationStatusOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.entry.publication.status",
+                  getEntryPublicationStatus(context.session.user.id, input),
+                  "Publication status loaded.",
+                ),
+              ),
+            validate: protectedProcedure
+              .input(ValidateEntryPublicationInputSchema)
+              .output(EntryPublicationPlanOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.entry.publication.validate",
+                  validateEntryPublication(context.session.user.id, input),
+                  "Publication validation completed.",
+                ),
+              ),
+            publish: protectedProcedure
+              .input(PublishEntryInputSchema)
+              .output(PublishEntryResultOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.entry.publication.publish",
+                  publishEntryLocale(context.session.user.id, input, context.request.requestId),
+                  "Entry locale published.",
+                ),
+              ),
+            unpublish: protectedProcedure
+              .input(UnpublishEntryInputSchema)
+              .output(UnpublishEntryResultOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.entry.publication.unpublish",
+                  unpublishEntryLocale(context.session.user.id, input, context.request.requestId),
+                  "Entry locale unpublished.",
+                ),
+              ),
+            list: protectedProcedure
+              .input(ListEntryPublicationsInputSchema)
+              .output(EntryPublicationPageOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.entry.publication.list",
+                  listEntryPublications(context.session.user.id, input),
+                  "Publication history loaded.",
+                ),
+              ),
+          },
         },
         schema: {
           draft: {

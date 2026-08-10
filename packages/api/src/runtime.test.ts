@@ -42,6 +42,8 @@ const TelemetryTest = Layer.succeed(Telemetry, {
   recordSchemaMutation: () => Effect.void,
   recordSchemaValidation: () => Effect.void,
   recordSchemaPublication: () => Effect.void,
+  recordEntryPublication: () => Effect.void,
+  recordEntryPublicationValidationFailure: () => Effect.void,
 });
 
 const AuthSessionTest = Layer.succeed(AuthSessionService, {

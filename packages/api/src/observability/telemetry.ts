@@ -49,6 +49,20 @@ export interface SchemaPublicationMetric {
   readonly durationMs: number;
 }
 
+export interface EntryPublicationMetric {
+  readonly operation: "validate" | "publish" | "unpublish";
+  readonly outcome: "success" | "invalid" | "conflict" | "failure";
+  readonly sizeBucket: "none" | "small" | "medium" | "large" | "near_limit" | "over_limit";
+  readonly durationMs: number;
+}
+
+export type EntryPublicationValidationCategory =
+  | "field_invalid"
+  | "hidden_field"
+  | "reference_target_locale_unpublished"
+  | "snapshot_size_exceeded"
+  | "other";
+
 const requestCount = Metric.counter("http_requests_total", {
   description: "Total inbound HTTP requests",
   incremental: true,
@@ -96,6 +110,22 @@ const schemaPublicationLatency = Metric.histogram(
   "CMS schema publication duration in milliseconds",
 );
 
+const entryPublicationCount = Metric.counter("cms_entry_publication_operations_total", {
+  description: "Entry publication outcomes by bounded operation, result, and size bucket",
+  incremental: true,
+});
+
+const entryPublicationLatency = Metric.histogram(
+  "cms_entry_publication_duration_ms",
+  MetricBoundaries.exponential({ start: 1, factor: 2, count: 16 }),
+  "Entry publication operation duration in milliseconds",
+);
+
+const entryPublicationValidationFailureCount = Metric.counter(
+  "cms_entry_publication_validation_failures_total",
+  { description: "Entry publication validation failures by bounded category", incremental: true },
+);
+
 function withRequestLabels<Type, In, Out>(
   metric: Metric.Metric<Type, In, Out>,
   event: HttpRequestMetric,
@@ -119,6 +149,10 @@ export class Telemetry extends Context.Tag("Telemetry")<
     readonly recordSchemaMutation: (event: SchemaMutationMetric) => Effect.Effect<void>;
     readonly recordSchemaValidation: (event: SchemaValidationMetric) => Effect.Effect<void>;
     readonly recordSchemaPublication: (event: SchemaPublicationMetric) => Effect.Effect<void>;
+    readonly recordEntryPublication: (event: EntryPublicationMetric) => Effect.Effect<void>;
+    readonly recordEntryPublicationValidationFailure: (
+      category: EntryPublicationValidationCategory,
+    ) => Effect.Effect<void>;
   }
 >() {}
 
@@ -181,6 +215,27 @@ export const TelemetryLive = Layer.succeed(Telemetry, {
       Effect.asVoid,
     );
   },
+  recordEntryPublication: (event) => {
+    const labels = Metric.tagged(
+      Metric.tagged(
+        Metric.tagged(entryPublicationCount, "operation", event.operation),
+        "outcome",
+        event.outcome,
+      ),
+      "size_bucket",
+      event.sizeBucket,
+    );
+    const latency = Metric.tagged(
+      Metric.tagged(entryPublicationLatency, "operation", event.operation),
+      "outcome",
+      event.outcome,
+    );
+    return Effect.all([Metric.update(labels, 1), Metric.update(latency, event.durationMs)]).pipe(
+      Effect.asVoid,
+    );
+  },
+  recordEntryPublicationValidationFailure: (category) =>
+    Metric.update(Metric.tagged(entryPublicationValidationFailureCount, "category", category), 1),
 });
 
 export function toStatusFamily(status: number): StatusFamily {

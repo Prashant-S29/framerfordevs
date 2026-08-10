@@ -1,6 +1,6 @@
 # Milestone 7 entries, multilingual drafts, and revision-history design
 
-**Status:** Implemented with approved manual-review corrections; awaiting final developer review
+**Status:** Implemented, manually approved, and committed as `60bd96f`
 
 **Date:** 2026-08-09
 
@@ -276,6 +276,10 @@ Durable save/restore receipt:
 - `completed_at`
 
 The receipt is written in the same transaction after all resulting revisions/heads and before commit. Matching retries return the recorded result even when the original command was a no-op. Reuse with a different actor, scope, schema authority, expected versions, mutation set, or restore target fails explicitly.
+
+### Command-receipt retention clarification
+
+Recorded during M8 design: `cms_entry_draft_command` receipts are retained for the lifetime of the project. M7 has no expiry, cleanup job, or ordinary delete path. Receipts contain bounded operational provenance and no draft values. Deleting them without a replacement expiry/tombstone contract would weaken durable changed/no-op replay, so M14 owns the cross-system retention review before any cleanup is introduced.
 
 No M7 table is read by a delivery credential or Delivery API procedure.
 

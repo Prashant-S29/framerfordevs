@@ -189,6 +189,47 @@ describe("PolicyService", () => {
       }),
     );
 
+    for (const action of ["content.read", "content.publish"] as const) {
+      it.effect(`applies the complete role and locale-access matrix to ${action}`, () =>
+        Effect.gen(function* () {
+          const policy = yield* PolicyService;
+          for (const role of projectRoleValues) {
+            const roleAllowed = expectedAllowedActions[role].has(action);
+            const base = userRequest(role, action);
+            const decisions = yield* Effect.all([
+              policy.decideUser({
+                ...base,
+                localeAccessMode: "all",
+                requestedLocaleId: localeId,
+              }),
+              policy.decideUser({
+                ...base,
+                localeAccessMode: "selected",
+                allowedLocaleIds: [localeId],
+                requestedLocaleId: localeId,
+              }),
+              policy.decideUser({
+                ...base,
+                localeAccessMode: "selected",
+                allowedLocaleIds: [localeId],
+                requestedLocaleId: otherLocaleId,
+              }),
+              policy.decideUser({
+                ...base,
+                localeAccessMode: "none",
+                requestedLocaleId: localeId,
+              }),
+            ]);
+            assert.deepEqual(
+              decisions.map((decision) => decision.allowed),
+              [roleAllowed, roleAllowed, false, false],
+              `${role} ${action} locale matrix`,
+            );
+          }
+        }),
+      );
+    }
+
     it.effect(
       "prevents locale-restricted developers from managing locales or issuing credentials",
       () =>

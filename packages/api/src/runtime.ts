@@ -32,6 +32,11 @@ import { FieldEngine, FieldEngineLive } from "./services/field-engine";
 import { LocaleRepository, LocaleRepositoryLive } from "./services/locale-repository";
 import { PlatformRepository, PlatformRepositoryLive } from "./services/platform-repository";
 import { PolicyService, PolicyServiceLive } from "./services/policy";
+import { PublicationEngine, PublicationEngineLive } from "./services/publication-engine";
+import {
+  PublicationRepository,
+  PublicationRepositoryLive,
+} from "./services/publication-repository";
 import { SchemaEngine, SchemaEngineLive } from "./services/schema-engine";
 import { SchemaRepository, SchemaRepositoryLive } from "./services/schema-repository";
 import { SecretGenerator, SecretGeneratorLive } from "./services/secret-generator";
@@ -51,9 +56,15 @@ export type ApplicationServices =
   | CredentialAuthenticator
   | EntryEngine
   | EntryRepository
+  | PublicationEngine
+  | PublicationRepository
   | FieldEngine
   | SchemaEngine
   | SchemaRepository;
+
+const PublicationRepositoryConfiguredLive = PublicationRepositoryLive.pipe(
+  Layer.provide(PublicationEngineLive),
+);
 
 const InfrastructureLive = Layer.mergeAll(
   ApplicationLoggerLive,
@@ -70,6 +81,8 @@ const InfrastructureLive = Layer.mergeAll(
   CredentialAuthenticatorLive,
   EntryEngineLive,
   EntryRepositoryLive,
+  PublicationEngineLive,
+  PublicationRepositoryConfiguredLive,
   FieldEngineLive,
   SchemaEngineLive,
   SchemaRepositoryLive,

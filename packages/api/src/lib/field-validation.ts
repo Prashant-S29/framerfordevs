@@ -1024,9 +1024,11 @@ function validatePresentValue(
       return normalized;
     }
     case "reference":
-      if (typeof value !== "string" || !uuidPattern.test(value))
+      if (typeof value !== "string" || !uuidPattern.test(value)) {
         addIssue(collector, path, "reference_invalid", "Use a stable entry UUID.");
-      return value;
+        return value;
+      }
+      return value.toLowerCase();
     case "external_asset": {
       if (!isPlainRecord(value)) {
         addIssue(
@@ -1106,7 +1108,12 @@ function validateValueInternal(
   if (value === undefined) {
     const configuredDefault = Reflect.get(definition.configuration, "default");
     if (configuredDefault !== undefined)
-      return validatePresentValue(definition, configuredDefault, collector, path);
+      return validatePresentValue(
+        definition,
+        copyDecodedSchemaClass(configuredDefault),
+        collector,
+        path,
+      );
     if (definition.required) addIssue(collector, path, "required", "This field is required.");
     return undefined;
   }

@@ -1,6 +1,6 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 7 approved and committed; Milestone 8 design discovery pending
+**Overall status:** Milestone 8 automated implementation complete; awaiting developer manual review
 **Active milestone:** Milestone 8 — Independent locale publication and immutable snapshots
 **Last updated:** 2026-08-09
 
@@ -25,7 +25,7 @@
 | 5   | Versioned schema engine                  | `[A]`  | 509 passing     | Approved      | `28ca04d` |
 | 6   | Field system and generated forms         | `[A]`  | 551 passing     | Approved      | `fbb4767` |
 | 7   | Entries and multilingual drafts          | `[A]`  | 603 passing     | Approved      | `60bd96f` |
-| 8   | Per-locale publication and snapshots     | `[~]`  | Not run         | Pending       | None      |
+| 8   | Per-locale publication and snapshots     | `[R]`  | 627 passing     | Pending       | None      |
 | 9   | Delivery API                             | `[ ]`  | Not run         | Pending       | None      |
 | 10  | Preview API                              | `[ ]`  | Not run         | Pending       | None      |
 | 11  | Events, webhooks, invalidation           | `[ ]`  | Not run         | Pending       | None      |
@@ -291,14 +291,30 @@
 
 ## Milestone 8 checklist — design approval gate
 
-- `[ ]` Re-read the product vision, CMS PRD, mandatory rules, M8 milestone criteria, M1–M7 decisions, context, progress, and learnings for M8 design discovery.
-- `[ ]` Inspect the committed M7 publication seams, schema/revision identity, locale isolation, references, audits, outbox, repository locking, API/UI, and test infrastructure.
-- `[ ]` Author the M8 decision record for independent locale publication, immutable snapshots, shared-value staleness, unpublish, idempotency, concurrency, and atomic audit/outbox behavior.
-- `[ ]` Obtain explicit developer approval of the M8 design before changing schema or implementation code.
+- `[x]` Re-read the product vision, CMS PRD, mandatory rules, M8 milestone criteria, M1–M7 decisions, context, progress, and learnings for M8 design discovery.
+- `[x]` Inspect the committed M7 publication seams, schema/revision identity, locale isolation, references, audits, outbox, repository locking, API/UI, and test infrastructure.
+- `[x]` Author and revise `knowledge_base/decisions/m8-independent-locale-publication-and-snapshots-design.md` for independent locale publication, immutable snapshots, shared-value staleness, shared-only exact-locale reference requirements and UI guidance, explicit `READ COMMITTED` semantics, a realistic 1 MiB fixture gate, locale-leading indexing, unpublish, idempotency, concurrency, retention, and atomic audit/outbox behavior.
+- `[x]` Developer explicitly approved the complete revised M8 design and authorized implementation.
+- `[x]` Implement M8 management contracts and OpenAPI conversion coverage.
+- `[x]` Implement the dependency-light strict publication compiler: schema-guided partition selection, defaults, normalization, API-key projection, exact-locale reference pinning, canonical hashes, changed roots, aggregate bounds, and no truncation.
+- `[x]` Lock the realistic-content fixture report at 675,221 document bytes + 16,825 manifest bytes = 692,046 combined bytes, leaving 356,530 bytes (34.00%) maximum headroom and passing the 786,432-byte gate.
+- `[x]` Lock synthetic 1,048,575 / 1,048,576 / 1,048,577-byte boundary behavior.
+- `[x]` Developer confirmed the realistic fixture report and provisional 1 MiB profile, authorizing Drizzle schema work.
+- `[x]` Implement the approved Drizzle schema: entry event sequence, five publication tables, strict tenant/source/reference/head/receipt constraints, aggregate snapshot counters, locale-leading current-head index, outbox scope extensions, relations, and entry-event uniqueness.
+- `[x]` Developer generated, augmented with the reviewed append-only triggers, and applied `0008_add_locale_publications_and_delivery_snapshots.sql`; agent inspected the complete migration/snapshot and live catalog read-only.
+- `[x]` Implement the replaceable `PublicationEngine` and focused `PublicationRepository` with explicit production `READ COMMITTED` transactions, deterministic project/collection/entry/source/head locking, grouped exact-locale target resolution, strict hidden-field issue redaction, and actionable authorized target links.
+- `[x]` Implement status, validation-plan, publish, unpublish, durable changed/no-op replay, staleness, immutable history pagination, snapshot/reference-edge persistence, audit/outbox atomicity, and centralized publication invalid/conflict errors.
+- `[x]` Wire named publication operations, runtime Layers, management oRPC/OpenAPI procedures, bounded publication metrics, and real locale current-publication dependency counts.
+- `[x]` Add selected-locale publication status/history, save-before-publish validation, measured size feedback, exact-locale reference guidance, publish/unpublish confirmation, targeted invalidation, and route-prefetched status/history to the entry editor.
+- `[x]` Add contract/cursor/engine/operation tests plus rollback-contained PostgreSQL coverage for invalid validation, authorized unpublished-target guidance, exact-locale target pinning, independent English/Hindi heads, publication/replay/history/unpublish/no-op behavior, all eight failure-injection stages under inspected `read committed`, append-only trigger rejection, and intended query indexes.
+- `[x]` Add anonymous denial for all five management routes and automated axe coverage for exact-locale publish/unpublish dialogs.
+- `[x]` Complete shared-snapshot staleness/immutability, exact-locale reference linearization, stale same-locale publish and publish/unpublish authority conflicts, concurrent entry event sequencing, and complete role/locale-access policy matrices.
+- `[x]` Complete final readiness, coverage, production/full audits, builds, bundle review, `git diff --check`, and read-only database fixture/invariant verification.
+- `[R]` Await developer manual English/Hindi/Gujarati publication review and approval.
 
 ## Current blockers
 
-None. Milestone 8 is active at the design-discovery gate; implementation must wait for an approved M8 decision record.
+No blocker. All agent-owned M8 implementation and automated verification are complete; only developer manual review and approval remain.
 
 ## Database migration state
 
@@ -317,6 +333,48 @@ The developer generated and applied `packages/db/src/migrations/0006_create_entr
 The developer generated and applied `packages/db/src/migrations/0007_add_entry_display_names.sql`. The agent inspected the complete SQL and snapshot without modification and verified the live catalog read-only: `display_name` is nullable `varchar(100)`, `name_version` is non-null with default `1`, all three name constraints are validated, eight migrations are recorded, four legacy entries remain null-named at valid version `1`, and no M7 constraint or index is invalid/unready. The agent did not generate, apply, execute, or modify the migration.
 
 ## Test results
+
+### Milestone 8 complete automated gate
+
+- Workspace API, web, and server type checks pass after publication repository, operations, router/runtime, and UI integration.
+- Rollback-contained PostgreSQL coverage proves the complete lifecycle and all eight material failure-injection stages without leaving append-only fixtures.
+- Deterministic statement-order coverage proves a target unpublish before grouped resolution rejects the source, while unpublish after resolution preserves the pinned immutable target; stale same-locale publish and publish/unpublish commands conflict after the serialized winner.
+- Shared-head advancement marks both locale publications stale, Hindi-only republish captures the newer shared value without changing English's snapshot, and independent locale publication sequences remain monotonic.
+- Two real concurrent `READ COMMITTED` entry writers serialize on the production event-sequence lock and return contiguous sequences before restoring the mutable fixture.
+- The complete policy matrix covers `content.read` and `content.publish` across every role and `all`/`selected`/`none` exact-locale access outcome.
+- The refreshed complete workspace test run passes: 430 API/domain/PostgreSQL + 90 server + 102 web + 5 environment = 627 tests.
+- Refreshed coverage passes: API/domain is 89.83% statements and 72.19% branches; the publication repository is 90.00% statements and 76.12% branches, with contracts/cursor/engine fully covered by statements.
+- `pnpm run ready` passes end to end, including format/lint, all package type checks, tests, coverage, and production builds; production/full dependency audits and `git diff --check` also pass. The entry-editor route remains a small dedicated chunk while Portable Text stays lazy.
+- Final read-only verification reports nine applied migrations, four enabled immutable-artifact triggers, zero unvalidated constraints, zero invalid publication indexes, and zero M8 test users, publications, snapshots, reference edges, heads, or command receipts.
+- No migration command or migration artifact modification occurred.
+
+### Milestone 8 applied migration verification
+
+- Developer generated and applied `packages/db/src/migrations/0008_add_locale_publications_and_delivery_snapshots.sql`; the agent did not generate, edit, or apply it.
+- Complete migration review confirms five publication tables, the entry/outbox extensions, tenant/source/reference/head/receipt constraints, approved indexes, and four append-only triggers backed by one hardened trigger function.
+- Snapshot lineage is valid: five tables added, only `cms_entry` and `outbox_event` changed, no table removed, and enums/schemas/sequences/roles/policies/views are unchanged.
+- Live PostgreSQL reports nine migration journal rows; all five new tables are empty, all eight existing entries have event sequence zero, and all 11 existing outbox rows have null paired publication scope.
+- All new constraints are validated; all new indexes are valid/ready; the locale-leading partial head index and entry-event unique index match the approved predicates.
+- All four triggers are enabled for `UPDATE` and `DELETE`; the one trigger function returns `trigger` with `search_path=pg_catalog`.
+
+### Milestone 8 Drizzle schema gate
+
+- `pnpm --filter @framerfordevs/db check-types`: pass.
+- `pnpm --filter @framerfordevs/api check-types`: pass.
+- Focused publication compiler, realistic-fixture, and publication-contract suites: 8 tests pass.
+- `oxlint`, focused formatting, and `git diff --check`: pass.
+- The Drizzle schema adds no migration artifact; full PostgreSQL integration/readiness intentionally awaits the developer-generated/applied migration because the live catalog does not yet contain the new schema.
+- No agent command generated, edited, applied, pushed, or executed a migration.
+
+### Milestone 8 pre-Drizzle compiler fixture gate
+
+- `pnpm run ready`: pass, including workspace format/lint, all package type checks, 611 tests, measured V8 coverage, and server/web production builds.
+- Test distribution: 420 API/domain/PostgreSQL, 85 server/API integration, 101 web validation/UI/accessibility/route, and 5 environment tests.
+- API coverage passes at 89.84% statements and 71.45% branches; the new publication contracts have 100% statements and branches, and the pure compiler has 89.56% statements, 79.10% branches, and 100% functions.
+- Focused M8 coverage locks contract/OpenAPI conversion, class-backed default materialization, strict partition ownership, removed-field omission, Unicode normalization, API-key projection, occurrence-level immutable reference pins, byte-stable hashes, metadata-only changed roots, exact-locale unpublished-target rejection, and below/exact/above aggregate boundaries without truncation.
+- The realistic fixture passes at 675,221 document bytes + 16,825 manifest bytes = 692,046 combined bytes, 94,386 bytes below the 786,432-byte gate and with 356,530 bytes (34.00%) remaining under the 1 MiB maximum.
+- No Drizzle schema or migration artifact was changed, generated, applied, pushed, edited, or executed.
+- `git diff --check`: pass.
 
 ### Milestone 7 refreshed complete gate after manual-review corrections
 
@@ -504,4 +562,4 @@ Milestone 4 automated criteria and developer review are complete. The developer 
 
 Milestone 6 automated criteria and developer/client review are complete. Manual review found and resolved the cold-hydration React hook-order crash and the invalid reference-collection page limit. The developer approved Milestone 6 and committed it as `fbb4767` (`feat(m6): field system, structured rich text, external assets, and editor layout`).
 
-Milestone 7 manual review found locale-dependent list presentation, missing CMS-only names, non-URL locale state, absent version-0 defaults, missing Portable Text hydration, a raw-JSON editor for rich-text defaults, other mismatched default controls, mixed-localization controls on ineligible kinds, and expected unpublished-schema absence surfacing as three global query-error toasts. The developer approved the amendment and generated/applied the inspected `0007_add_entry_display_names.sql` migration. The workspace now derives schema availability from collection metadata and avoids unavailable dependent queries while retaining genuine error semantics. The corrections and refreshed automated gate are complete; manual English/Hindi/Gujarati review now resumes before explicit approval and commit.
+Milestone 7 manual review found locale-dependent list presentation, missing CMS-only names, non-URL locale state, absent version-0 defaults, missing Portable Text hydration, a raw-JSON editor for rich-text defaults, other mismatched default controls, mixed-localization controls on ineligible kinds, and expected unpublished-schema absence surfacing as three global query-error toasts. The developer approved the amendment and generated/applied the inspected `0007_add_entry_display_names.sql` migration. The workspace now derives schema availability from collection metadata and avoids unavailable dependent queries while retaining genuine error semantics. The developer completed English/Hindi/Gujarati review, approved Milestone 7, and committed it as `60bd96f`; the documentation reconciliation was committed as `d90b31b`.

@@ -432,7 +432,7 @@ Likely migration name: `create_entries_and_locale_revisions`.
 
 ## Milestone 8 — Independent locale publication and immutable snapshots
 
-**Status:** Active at design discovery; implementation has not begun and requires an approved decision record.
+**Status:** Automated implementation complete and developer-applied migration verified; awaiting developer manual review.
 
 ### Goal
 
@@ -446,6 +446,9 @@ Implement the central CMS guarantee: each locale publishes independently and sna
 - Per-locale published pointers
 - Publication sequence
 - Shared-value stale indicators
+- Exact-locale reference-target validation and actionable publication guidance
+- Explicit publication transaction isolation and concurrency semantics
+- Fixture-validated snapshot bounds and query-plan-validated current-publication indexing
 - Atomic audit and outbox writes
 
 ### Automated success criteria
@@ -458,25 +461,31 @@ Implement the central CMS guarantee: each locale publishes independently and sna
 - UI/API clearly report which locale drafts differ from their publication.
 - Publication rejects missing required localized values.
 - Publication rejects invalid shared values.
-- Publication rejects missing/unpublished required references according to configured rules.
+- Every present reference requires a current target publication in the exact source locale, including optional references and shared-only targets; no locale fallback or automatic target publication occurs.
+- Authorized editors receive actionable exact-locale target-publication guidance without exposing hidden/inaccessible targets.
 - Publication uses the selected published schema revision.
 - Publication, snapshot, pointer, audit event, and outbox event commit atomically.
 - Injected failure at every transaction step leaves no partial publication state.
 - Concurrent publishes serialize or conflict safely and produce monotonic sequences.
+- Publish/unpublish explicitly use PostgreSQL `READ COMMITTED`; one grouped target-resolution statement passes before/after-unpublish concurrency tests.
 - Retried idempotent publish requests do not create unintended duplicate current state.
 - Unpublish affects only the requested locale.
 - Unpublish preserves drafts and publication history.
 - Archived/deleted entries cannot publish without explicit valid recovery.
 - Immutable publication records and snapshots reject mutation attempts.
 - Publication duration, validation failure, and snapshot size metrics are emitted.
+- Realistic large-content fixtures keep at least 25% headroom under the provisional 1 MiB document-plus-manifest profile before Drizzle schema work.
+- Representative query plans justify one locale-leading partial current-publication index; a second is added only with evidence.
 
 ### Database gate
 
-Likely migration name: `add_locale_publications_and_outbox`.
+Likely migration name: `add_locale_publications_and_delivery_snapshots`.
 
 ### Manual review
 
 - Developer verifies shared-field snapshots differ intentionally across independently published locales.
+- Developer confirms a shared-only reference target still requires an exact-locale publication and reviews the actionable UI guidance.
+- Developer reviews realistic snapshot-size measurements and confirms the 25% headroom gate before schema work.
 - Developer publishes and unpublishes all three locales in different orders.
 
 ---
@@ -707,6 +716,7 @@ Prove the CMS can operate production websites safely and predictably.
 - Rate-limit policy
 - Delivery/publication/webhook SLOs
 - Cache strategy and failure modes
+- Cross-system data-retention and cleanup policy for command receipts, audits, outbox records, and immutable history
 - Security review and dependency audit
 - Load, soak, concurrency, and recovery testing
 - Runbooks for incidents and rollback
@@ -715,6 +725,8 @@ Prove the CMS can operate production websites safely and predictably.
 
 - Backup restore reproduces schemas, drafts, publications, credentials metadata, events, and audit history according to policy.
 - Restore verification detects corrupted/incomplete backups.
+- Retention policy explicitly covers M5 schema-publication provenance, M7 draft-command receipts, M8 publication-command receipts, audits, outbox records, and immutable history without silently weakening idempotency guarantees.
+- Any finite command-receipt lifetime defines the supported retry window, deterministic expired-command behavior, replay-preventing tombstones or equivalent authority, bounded cleanup, and backup/privacy consequences before deletion is enabled.
 - Export/import round trips preserve stable contracts or report intentional remapping.
 - Tenant-isolation tests cover every table/query/service path.
 - Authorization matrix tests cover every protected endpoint and role.

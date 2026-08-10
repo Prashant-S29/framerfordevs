@@ -65,6 +65,22 @@ export const Route = createFileRoute(
           },
         }),
       ),
+      context.queryClient.ensureQueryData(
+        context.orpc.platform.projects.collections.entries.publications.status.queryOptions({
+          input: { ...scope, entryId: params.entryId, locale },
+        }),
+      ),
+      context.queryClient.ensureQueryData(
+        context.orpc.platform.projects.collections.entries.publications.list.queryOptions({
+          input: {
+            ...scope,
+            entryId: params.entryId,
+            locale,
+            cursor: null,
+            limit: 5,
+          },
+        }),
+      ),
     ]);
   },
   component: EntryEditorRoute,

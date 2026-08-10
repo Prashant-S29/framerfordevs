@@ -11,6 +11,7 @@ import {
   apiSuccess,
 } from "./api-response";
 import { LocaleDependencySummary } from "./locales";
+import { EntryPublicationValidationIssue } from "./publications";
 import {
   AuthSessionFailure,
   CmsCapabilityRequiredFailure,
@@ -20,6 +21,8 @@ import {
   DatabaseFailure,
   EntryCommandConflictFailure,
   EntryDraftConflictFailure,
+  EntryPublicationConflictFailure,
+  EntryPublicationInvalidFailure,
   EntryRevisionIncompatibleFailure,
   ForbiddenFailure,
   InvalidStateTransitionFailure,
@@ -228,6 +231,25 @@ describe("application error mapping", () => {
     }),
     EntryCommandConflictFailure.make(),
     EntryRevisionIncompatibleFailure.make(),
+    EntryPublicationInvalidFailure.make({
+      issues: [
+        EntryPublicationValidationIssue.make({
+          fieldId: null,
+          path: "data",
+          code: "publication_invalid",
+          message: "The publication is invalid.",
+        }),
+      ],
+    }),
+    EntryPublicationConflictFailure.make({
+      details: [
+        ApiErrorDetail.make({
+          path: "authorityHash",
+          code: "publication_authority_changed",
+          message: "The publication authority changed.",
+        }),
+      ],
+    }),
     InvitationConflictFailure.make(),
     InvitationInvalidFailure.make(),
     LastOwnerRequiredFailure.make(),
@@ -369,6 +391,18 @@ describe("application error mapping", () => {
           "tag": "EntryRevisionIncompatibleFailure",
         },
         {
+          "code": "ENTRY_PUBLICATION_INVALID",
+          "retryable": false,
+          "status": 422,
+          "tag": "EntryPublicationInvalidFailure",
+        },
+        {
+          "code": "ENTRY_PUBLICATION_CONFLICT",
+          "retryable": false,
+          "status": 409,
+          "tag": "EntryPublicationConflictFailure",
+        },
+        {
           "code": "INVITATION_CONFLICT",
           "retryable": false,
           "status": 409,
@@ -493,6 +527,8 @@ describe("application error mapping", () => {
           "false:null:CREDENTIAL_INVALID:401",
           "false:null:ENTRY_COMMAND_CONFLICT:409",
           "false:null:ENTRY_DRAFT_CONFLICT:409",
+          "false:null:ENTRY_PUBLICATION_CONFLICT:409",
+          "false:null:ENTRY_PUBLICATION_INVALID:422",
           "false:null:ENTRY_REVISION_INCOMPATIBLE:409",
           "false:null:FORBIDDEN:403",
           "false:null:INTERNAL_ERROR:500",
@@ -534,6 +570,8 @@ describe("application error mapping", () => {
       "CREDENTIAL_INVALID",
       "ENTRY_COMMAND_CONFLICT",
       "ENTRY_DRAFT_CONFLICT",
+      "ENTRY_PUBLICATION_CONFLICT",
+      "ENTRY_PUBLICATION_INVALID",
       "ENTRY_REVISION_INCOMPATIBLE",
       "FORBIDDEN",
       "INTERNAL_ERROR",

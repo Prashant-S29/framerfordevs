@@ -1,7 +1,7 @@
 # Agent Session Context
 
 **Last updated:** 2026-08-09
-**Current phase:** Milestone 7 developer-approved and committed; Milestone 8 design discovery is next
+**Current phase:** Milestone 8 automated implementation complete; awaiting developer manual review
 **Active milestone:** Milestone 8 — Independent locale publication and immutable snapshots
 
 ## What this project is
@@ -122,7 +122,18 @@ The repository currently has:
 - Entry-editor diffs retain atomic root mutations for ordinary fields but descend through mixed-object containers to exact shared/localized child paths, matching server partition authority without weakening its default-deny checks
 - The refreshed M7 automated gate passes with 603 tests, API coverage at 89.72% statements and 71.07% branches, clean production/full audits, production builds, rebuilt healthy Docker services, HTTP 200 liveness/readiness/API-reference/SSR-login checks, and `git diff --check`
 - The developer completed manual review, approved Milestone 7, and committed it as `60bd96f` (`feat(m7): entries, multilingual drafts, and revision history`)
-- Milestone 8 is active for design discovery only; no M8 decision has been approved and no M8 implementation has begun
+- The developer approved the complete M8 design at `knowledge_base/decisions/m8-independent-locale-publication-and-snapshots-design.md`; M8 contracts and the pure compiler are implemented, and the exact fixture report passes at 692,046 combined canonical bytes with 34.00% maximum headroom
+- The developer explicitly confirmed the fixture report and provisional 1 MiB profile; the approved Drizzle schema is implemented with five publication tables, aggregate snapshot counters, outbox scope, constraints, relations, and indexes
+- The developer generated, augmented, and applied `0008_add_locale_publications_and_delivery_snapshots.sql`; the agent did not generate, edit, or apply it and verified the complete migration/snapshot and live catalog read-only
+- Live verification confirms five empty publication tables, nine journal rows, correct entry/outbox backfills, zero unvalidated constraints, zero invalid/unready indexes, the approved partial indexes, and four enabled append-only triggers using one hardened function
+- The M8 pre-Drizzle readiness gate passes with 611 tests, API coverage at 89.84% statements and 71.45% branches, pure-compiler coverage at 89.56% statements and 79.10% branches, and clean production builds
+- M8 now has a replaceable `PublicationEngine`, focused `PublicationRepository`, explicit production `READ COMMITTED` transactions, deterministic locks, one grouped exact-locale target-resolution statement, strict/redacted plans, immutable publication/snapshot/reference persistence, independent heads, durable publish/unpublish replay, atomic audit/outbox events, status/staleness/history reads, and real locale publication dependency counts
+- Named publication operations, centralized invalid/conflict failures, bounded telemetry, shared runtime Layers, and all five protected management oRPC/OpenAPI procedures are wired; no public Delivery API route was added
+- The entry editor now prefetches exact-locale status/history and provides textual staleness, save-before-publish validation, measured size errors, permission-aware publish/unpublish controls, authorized reference-target links, recent immutable history, and targeted cache invalidation
+- Rollback-contained PostgreSQL coverage proves invalid validation, actionable exact-locale references, independent English/Hindi heads, publish/replay/history/unpublish/no-op behavior, append-only trigger rejection, intended query plans, inspected `read committed`, and rollback at all eight material artifact stages without leaving immutable fixtures
+- Final M8 PostgreSQL hardening proves shared-snapshot immutability/staleness, before/after grouped-reference-resolution outcomes, stale same-locale and publish/unpublish command conflicts, independent locale-local sequences, contiguous concurrent entry event sequencing, and rollback at every material artifact stage
+- The complete role/locale matrix covers publication reads and mutations across every role and `all`/`selected`/`none` locale access; anonymous route denial and automated exact-locale dialog accessibility remain covered
+- The final M8 readiness gate passes with 627 tests, API coverage at 89.83% statements and 72.19% branches, publication-repository coverage at 90.00% statements and 76.12% branches, clean production/full audits, production builds, `git diff --check`, four enabled immutable triggers, and zero durable M8 test artifacts; only developer manual review remains
 - The developer generated and applied `0005_add_field_system_and_editor_layout.sql`; the agent inspected the complete SQL and snapshot and verified the live catalog read-only: 15 expected columns, 35 validated constraints, 16 valid/ready indexes, and valid legacy backfills
 - Complete M6 repository/API/UI/property/PostgreSQL/accessibility/bundle coverage with 551 passing tests and a clean production/full pnpm audit
 - Cold Docker manual review found and fixed a schema-builder hook-order crash during query hydration; hooks are now unconditional and `react-hooks/rules-of-hooks` is enforced workspace-wide
@@ -138,7 +149,8 @@ The repository currently has:
 
 The repository does not yet have:
 
-- Locale publication/delivery snapshots (M8), Delivery API querying (M9), or Preview API workflows (M10)
+- Public Delivery API querying (M9) or Preview API workflows (M10)
+- Developer manual approval for the completed M8 publication workflow
 - Production telemetry backend/collector deployment
 
 ## Mandatory constraints
@@ -247,8 +259,7 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 
 ## What to do next
 
-1. Developer resumes manual English/Hindi/Gujarati create/name/rename/save/conflict/restore review against the corrected M7 implementation.
-2. Address any review findings within M7 and repeat the applicable gates.
-3. After explicit developer approval and manual commit, mark M7 approved and begin M8 design discovery; do not start M8 before that approval.
-
-The agent must never generate or apply migrations.
+1. Developer manually publishes and unpublishes English, Hindi, and Gujarati in different orders.
+2. Developer verifies that a shared-field edit reaches only a republished locale while older locale snapshots remain unchanged.
+3. Developer verifies that a shared-only reference still requires an exact-locale target publication and reviews the actionable target link.
+4. Developer approves M8 and commits it before the active milestone advances to M9.

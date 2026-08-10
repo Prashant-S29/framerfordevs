@@ -4,6 +4,7 @@ import { Schema } from "effect";
 
 import { ApiErrorDetail, type ApiErrorCode, type ApiFailure, apiFailure } from "./api-response";
 import { LocaleDependencySummary } from "./locales";
+import { EntryPublicationValidationIssue } from "./publications";
 import { SchemaChanges, SchemaValidationIssues } from "./schemas";
 
 const ValidationDetailsSchema = Schema.Array(ApiErrorDetail).pipe(
@@ -104,6 +105,21 @@ export class EntryRevisionIncompatibleFailure extends Schema.TaggedError<EntryRe
   "EntryRevisionIncompatibleFailure",
 )("EntryRevisionIncompatibleFailure", {}) {}
 
+export class EntryPublicationInvalidFailure extends Schema.TaggedError<EntryPublicationInvalidFailure>(
+  "EntryPublicationInvalidFailure",
+)("EntryPublicationInvalidFailure", {
+  issues: Schema.Array(EntryPublicationValidationIssue).pipe(
+    Schema.minItems(1),
+    Schema.maxItems(50),
+  ),
+}) {}
+
+export class EntryPublicationConflictFailure extends Schema.TaggedError<EntryPublicationConflictFailure>(
+  "EntryPublicationConflictFailure",
+)("EntryPublicationConflictFailure", {
+  details: Schema.Array(ApiErrorDetail).pipe(Schema.minItems(1), Schema.maxItems(50)),
+}) {}
+
 export class InvitationConflictFailure extends Schema.TaggedError<InvitationConflictFailure>(
   "InvitationConflictFailure",
 )("InvitationConflictFailure", {}) {}
@@ -166,6 +182,8 @@ export type ApplicationError =
   | EntryDraftConflictFailure
   | EntryCommandConflictFailure
   | EntryRevisionIncompatibleFailure
+  | EntryPublicationInvalidFailure
+  | EntryPublicationConflictFailure
   | InvitationConflictFailure
   | InvitationInvalidFailure
   | LastOwnerRequiredFailure
@@ -195,6 +213,8 @@ export const apiErrorHttpStatus = {
   ENTRY_DRAFT_CONFLICT: 409,
   ENTRY_COMMAND_CONFLICT: 409,
   ENTRY_REVISION_INCOMPATIBLE: 409,
+  ENTRY_PUBLICATION_INVALID: 422,
+  ENTRY_PUBLICATION_CONFLICT: 409,
   INVITATION_CONFLICT: 409,
   INVITATION_INVALID: 404,
   LAST_OWNER_REQUIRED: 409,
@@ -402,6 +422,27 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
         code: "ENTRY_REVISION_INCOMPATIBLE",
         message: "This revision cannot be restored under the current published schema.",
         retryable: false,
+      };
+    case "EntryPublicationInvalidFailure":
+      return {
+        code: "ENTRY_PUBLICATION_INVALID",
+        message:
+          "The selected locale cannot be published until its publication issues are resolved.",
+        retryable: false,
+        details: error.issues.map((issue) =>
+          ApiErrorDetail.make({
+            path: issue.path,
+            code: issue.code,
+            message: issue.message,
+          }),
+        ),
+      };
+    case "EntryPublicationConflictFailure":
+      return {
+        code: "ENTRY_PUBLICATION_CONFLICT",
+        message: "Publication authority changed. Validate the selected locale again.",
+        retryable: false,
+        details: error.details,
       };
     case "InvitationConflictFailure":
       return {

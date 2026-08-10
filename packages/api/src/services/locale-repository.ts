@@ -1,6 +1,6 @@
 import { db } from "@framerfordevs/db";
 import { and, eq, inArray, sql } from "@framerfordevs/db/query";
-import { cmsEntryLocaleDraft } from "@framerfordevs/db/schema/cms";
+import { cmsEntryLocaleDraft, cmsEntryLocalePublicationHead } from "@framerfordevs/db/schema/cms";
 import { projectLocale } from "@framerfordevs/db/schema/locale";
 import { auditEvent } from "@framerfordevs/db/schema/platform";
 import { Context, Effect, Layer, Schema } from "effect";
@@ -155,11 +155,23 @@ async function selectLocaleDependencies(
       ),
     )
     .limit(101);
+  const currentPublications = await executor
+    .select({ entryId: cmsEntryLocalePublicationHead.entryId })
+    .from(cmsEntryLocalePublicationHead)
+    .where(
+      and(
+        eq(cmsEntryLocalePublicationHead.workspaceId, locale.workspaceId),
+        eq(cmsEntryLocalePublicationHead.projectId, locale.projectId),
+        eq(cmsEntryLocalePublicationHead.localeId, locale.id),
+        sql`${cmsEntryLocalePublicationHead.currentPublicationId} is not null`,
+      ),
+    )
+    .limit(101);
   return LocaleDependencySummary.make({
     draftCount: Math.min(drafts.length, 100),
-    currentPublicationCount: 0,
+    currentPublicationCount: Math.min(currentPublications.length, 100),
     draftCountCapped: drafts.length > 100,
-    currentPublicationCountCapped: false,
+    currentPublicationCountCapped: currentPublications.length > 100,
   });
 }
 

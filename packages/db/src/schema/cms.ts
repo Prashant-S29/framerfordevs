@@ -652,6 +652,7 @@ export const cmsEntry = pgTable(
     collectionId: uuid("collection_id").notNull(),
     displayName: varchar("display_name", { length: 100 }),
     nameVersion: integer("name_version").default(1).notNull(),
+    publicationEventSequence: integer("publication_event_sequence").default(0).notNull(),
     createCommandId: uuid("create_command_id").notNull(),
     createCommandFingerprint: char("create_command_fingerprint", { length: 64 }).notNull(),
     createdByUserId: text("created_by_user_id")
@@ -690,6 +691,10 @@ export const cmsEntry = pgTable(
       sql`${table.displayName} is null or (char_length(${table.displayName}) between 1 and 100 and ${table.displayName} = btrim(${table.displayName}) and ${table.displayName} !~ '[[:cntrl:]]')`,
     ),
     check("cms_entry_name_version_positive", sql`${table.nameVersion} > 0`),
+    check(
+      "cms_entry_publication_event_sequence_nonnegative",
+      sql`${table.publicationEventSequence} >= 0`,
+    ),
     check(
       "cms_entry_create_fingerprint_valid",
       sql`${table.createCommandFingerprint} ~ '^[0-9a-f]{64}$'`,
@@ -1296,6 +1301,553 @@ export const cmsEntryDraftCommand = pgTable(
   ],
 );
 
+export const cmsEntryLocalePublication = pgTable(
+  "cms_entry_locale_publication",
+  {
+    id: cmsId("id").primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    collectionId: uuid("collection_id").notNull(),
+    entryId: uuid("entry_id").notNull(),
+    localeId: uuid("locale_id").notNull(),
+    publicationSequence: integer("publication_sequence").notNull(),
+    eventSequence: integer("event_sequence").notNull(),
+    previousPublicationId: uuid("previous_publication_id"),
+    schemaRevisionId: uuid("schema_revision_id").notNull(),
+    contractHash: char("contract_hash", { length: 64 }).notNull(),
+    sharedSourceVersion: integer("shared_source_version").notNull(),
+    sharedSourceRevisionId: uuid("shared_source_revision_id"),
+    localeSourceVersion: integer("locale_source_version").notNull(),
+    localeSourceRevisionId: uuid("locale_source_revision_id"),
+    contentHash: char("content_hash", { length: 64 }).notNull(),
+    authorityHash: char("authority_hash", { length: 64 }).notNull(),
+    changedFieldIds: uuid("changed_field_ids").array().notNull(),
+    commandId: uuid("command_id").notNull(),
+    commandFingerprint: char("command_fingerprint", { length: 64 }).notNull(),
+    publishedByUserId: text("published_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    publishedAt: cmsTimestamp("published_at").defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "cms_entry_pub_entry_tenant_fk",
+      columns: [
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntry.id,
+        cmsEntry.collectionId,
+        cmsEntry.environmentId,
+        cmsEntry.projectId,
+        cmsEntry.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_pub_locale_tenant_fk",
+      columns: [table.localeId, table.projectId, table.workspaceId],
+      foreignColumns: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_pub_schema_tenant_fk",
+      columns: [
+        table.schemaRevisionId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsSchemaRevision.id,
+        cmsSchemaRevision.collectionId,
+        cmsSchemaRevision.environmentId,
+        cmsSchemaRevision.projectId,
+        cmsSchemaRevision.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_pub_shared_source_fk",
+      columns: [
+        table.sharedSourceRevisionId,
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+        table.sharedSourceVersion,
+      ],
+      foreignColumns: [
+        cmsEntrySharedRevision.id,
+        cmsEntrySharedRevision.entryId,
+        cmsEntrySharedRevision.collectionId,
+        cmsEntrySharedRevision.environmentId,
+        cmsEntrySharedRevision.projectId,
+        cmsEntrySharedRevision.workspaceId,
+        cmsEntrySharedRevision.sequence,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_pub_locale_source_fk",
+      columns: [
+        table.localeSourceRevisionId,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+        table.localeSourceVersion,
+      ],
+      foreignColumns: [
+        cmsEntryLocaleRevision.id,
+        cmsEntryLocaleRevision.entryId,
+        cmsEntryLocaleRevision.localeId,
+        cmsEntryLocaleRevision.collectionId,
+        cmsEntryLocaleRevision.environmentId,
+        cmsEntryLocaleRevision.projectId,
+        cmsEntryLocaleRevision.workspaceId,
+        cmsEntryLocaleRevision.sequence,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_pub_previous_fk",
+      columns: [
+        table.previousPublicationId,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        table.id,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    unique("cms_entry_pub_entry_locale_sequence_unique").on(
+      table.entryId,
+      table.localeId,
+      table.publicationSequence,
+    ),
+    unique("cms_entry_pub_entry_event_sequence_unique").on(table.entryId, table.eventSequence),
+    unique("cms_entry_pub_entry_command_unique").on(table.entryId, table.commandId),
+    unique("cms_entry_pub_id_scope_unique").on(
+      table.id,
+      table.entryId,
+      table.localeId,
+      table.collectionId,
+      table.environmentId,
+      table.projectId,
+      table.workspaceId,
+    ),
+    unique("cms_entry_pub_id_scope_sequence_unique").on(
+      table.id,
+      table.entryId,
+      table.localeId,
+      table.collectionId,
+      table.environmentId,
+      table.projectId,
+      table.workspaceId,
+      table.publicationSequence,
+    ),
+    unique("cms_entry_pub_id_event_scope_unique").on(
+      table.id,
+      table.entryId,
+      table.localeId,
+      table.environmentId,
+      table.projectId,
+      table.workspaceId,
+    ),
+    check("cms_entry_pub_sequence_positive", sql`${table.publicationSequence} > 0`),
+    check("cms_entry_pub_event_sequence_positive", sql`${table.eventSequence} > 0`),
+    check(
+      "cms_entry_pub_previous_consistent",
+      sql`(${table.publicationSequence} = 1 and ${table.previousPublicationId} is null) or (${table.publicationSequence} > 1 and ${table.previousPublicationId} is not null)`,
+    ),
+    check(
+      "cms_entry_pub_shared_source_consistent",
+      sql`(${table.sharedSourceVersion} = 0 and ${table.sharedSourceRevisionId} is null) or (${table.sharedSourceVersion} > 0 and ${table.sharedSourceRevisionId} is not null)`,
+    ),
+    check(
+      "cms_entry_pub_locale_source_consistent",
+      sql`(${table.localeSourceVersion} = 0 and ${table.localeSourceRevisionId} is null) or (${table.localeSourceVersion} > 0 and ${table.localeSourceRevisionId} is not null)`,
+    ),
+    check("cms_entry_pub_contract_hash_valid", sql`${table.contractHash} ~ '^[0-9a-f]{64}$'`),
+    check("cms_entry_pub_content_hash_valid", sql`${table.contentHash} ~ '^[0-9a-f]{64}$'`),
+    check("cms_entry_pub_authority_hash_valid", sql`${table.authorityHash} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "cms_entry_pub_changed_fields_valid",
+      sql`coalesce(array_ndims(${table.changedFieldIds}), 1) = 1 and cardinality(${table.changedFieldIds}) between 0 and 100 and array_position(${table.changedFieldIds}, null) is null`,
+    ),
+    check(
+      "cms_entry_pub_command_fingerprint_valid",
+      sql`${table.commandFingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
+    index("cms_entry_pub_history_idx").on(
+      table.entryId,
+      table.localeId,
+      table.publicationSequence.desc(),
+      table.id.desc(),
+    ),
+    index("cms_entry_pub_schema_idx").on(table.schemaRevisionId),
+    index("cms_entry_pub_shared_source_idx")
+      .on(table.sharedSourceRevisionId)
+      .where(sql`${table.sharedSourceRevisionId} is not null`),
+    index("cms_entry_pub_locale_source_idx")
+      .on(table.localeSourceRevisionId)
+      .where(sql`${table.localeSourceRevisionId} is not null`),
+    index("cms_entry_pub_previous_idx")
+      .on(table.previousPublicationId)
+      .where(sql`${table.previousPublicationId} is not null`),
+    index("cms_entry_pub_publisher_idx").on(table.publishedByUserId),
+  ],
+);
+
+export const cmsEntryLocaleDeliverySnapshot = pgTable(
+  "cms_entry_locale_delivery_snapshot",
+  {
+    publicationId: uuid("publication_id").primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    collectionId: uuid("collection_id").notNull(),
+    entryId: uuid("entry_id").notNull(),
+    localeId: uuid("locale_id").notNull(),
+    formatVersion: integer("format_version").default(1).notNull(),
+    document: jsonb("document").$type<Readonly<Record<string, unknown>>>().notNull(),
+    documentHash: char("document_hash", { length: 64 }).notNull(),
+    referenceManifest: jsonb("reference_manifest").$type<ReadonlyArray<unknown>>().notNull(),
+    referenceManifestHash: char("reference_manifest_hash", { length: 64 }).notNull(),
+    canonicalDocumentBytes: integer("canonical_document_bytes").notNull(),
+    canonicalReferenceManifestBytes: integer("canonical_reference_manifest_bytes").notNull(),
+    canonicalCombinedBytes: integer("canonical_combined_bytes").notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "cms_entry_snapshot_publication_fk",
+      columns: [
+        table.publicationId,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntryLocalePublication.id,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    check("cms_entry_snapshot_format_valid", sql`${table.formatVersion} = 1`),
+    check(
+      "cms_entry_snapshot_document_valid",
+      sql`jsonb_typeof(${table.document}) = 'object' and octet_length(${table.document}::text) <= 1048576`,
+    ),
+    check("cms_entry_snapshot_document_hash_valid", sql`${table.documentHash} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "cms_entry_snapshot_manifest_valid",
+      sql`jsonb_typeof(${table.referenceManifest}) = 'array' and jsonb_array_length(${table.referenceManifest}) <= 20000 and octet_length(${table.referenceManifest}::text) <= 1048576`,
+    ),
+    check(
+      "cms_entry_snapshot_manifest_hash_valid",
+      sql`${table.referenceManifestHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "cms_entry_snapshot_document_bytes_valid",
+      sql`${table.canonicalDocumentBytes} between 2 and 1048576`,
+    ),
+    check(
+      "cms_entry_snapshot_manifest_bytes_valid",
+      sql`${table.canonicalReferenceManifestBytes} between 2 and 1048576`,
+    ),
+    check(
+      "cms_entry_snapshot_combined_bytes_valid",
+      sql`${table.canonicalCombinedBytes} = ${table.canonicalDocumentBytes} + ${table.canonicalReferenceManifestBytes} and ${table.canonicalCombinedBytes} <= 1048576`,
+    ),
+  ],
+);
+
+export const cmsEntryLocalePublicationReference = pgTable(
+  "cms_entry_locale_publication_reference",
+  {
+    sourcePublicationId: uuid("source_publication_id").notNull(),
+    sourceFieldId: uuid("source_field_id").notNull(),
+    targetPublicationId: uuid("target_publication_id").notNull(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    sourceCollectionId: uuid("source_collection_id").notNull(),
+    sourceEntryId: uuid("source_entry_id").notNull(),
+    localeId: uuid("locale_id").notNull(),
+    targetCollectionId: uuid("target_collection_id").notNull(),
+    targetEntryId: uuid("target_entry_id").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "cms_entry_pub_ref_source_field_target_pk",
+      columns: [table.sourcePublicationId, table.sourceFieldId, table.targetPublicationId],
+    }),
+    foreignKey({
+      name: "cms_entry_pub_ref_source_publication_fk",
+      columns: [
+        table.sourcePublicationId,
+        table.sourceEntryId,
+        table.localeId,
+        table.sourceCollectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntryLocalePublication.id,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_pub_ref_source_field_fk",
+      columns: [
+        table.sourceFieldId,
+        table.sourceCollectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsCollectionField.id,
+        cmsCollectionField.collectionId,
+        cmsCollectionField.environmentId,
+        cmsCollectionField.projectId,
+        cmsCollectionField.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_pub_ref_target_publication_fk",
+      columns: [
+        table.targetPublicationId,
+        table.targetEntryId,
+        table.localeId,
+        table.targetCollectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntryLocalePublication.id,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    index("cms_entry_pub_ref_target_publication_idx").on(table.targetPublicationId),
+    index("cms_entry_pub_ref_target_entry_locale_idx").on(table.targetEntryId, table.localeId),
+  ],
+);
+
+export const cmsEntryLocalePublicationHead = pgTable(
+  "cms_entry_locale_publication_head",
+  {
+    entryId: uuid("entry_id").notNull(),
+    localeId: uuid("locale_id").notNull(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    collectionId: uuid("collection_id").notNull(),
+    version: integer("version").notNull(),
+    latestPublicationSequence: integer("latest_publication_sequence").notNull(),
+    currentPublicationId: uuid("current_publication_id"),
+    changedByUserId: text("changed_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    updatedAt: cmsTimestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "cms_entry_pub_head_entry_locale_pk",
+      columns: [table.entryId, table.localeId],
+    }),
+    foreignKey({
+      name: "cms_entry_pub_head_entry_tenant_fk",
+      columns: [
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntry.id,
+        cmsEntry.collectionId,
+        cmsEntry.environmentId,
+        cmsEntry.projectId,
+        cmsEntry.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_pub_head_locale_tenant_fk",
+      columns: [table.localeId, table.projectId, table.workspaceId],
+      foreignColumns: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_pub_head_current_publication_fk",
+      columns: [
+        table.currentPublicationId,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+        table.latestPublicationSequence,
+      ],
+      foreignColumns: [
+        cmsEntryLocalePublication.id,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+        cmsEntryLocalePublication.publicationSequence,
+      ],
+    }).onDelete("restrict"),
+    check("cms_entry_pub_head_version_positive", sql`${table.version} > 0`),
+    check("cms_entry_pub_head_sequence_positive", sql`${table.latestPublicationSequence} > 0`),
+    index("cms_entry_pub_head_locale_collection_current_idx")
+      .on(table.localeId, table.collectionId, table.entryId)
+      .where(sql`${table.currentPublicationId} is not null`),
+    index("cms_entry_pub_head_current_publication_idx")
+      .on(table.currentPublicationId)
+      .where(sql`${table.currentPublicationId} is not null`),
+    index("cms_entry_pub_head_changed_by_user_idx").on(table.changedByUserId),
+  ],
+);
+
+export const cmsEntryPublicationCommand = pgTable(
+  "cms_entry_publication_command",
+  {
+    entryId: uuid("entry_id").notNull(),
+    commandId: uuid("command_id").notNull(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    collectionId: uuid("collection_id").notNull(),
+    localeId: uuid("locale_id").notNull(),
+    operation: varchar("operation", { length: 16 }).notNull(),
+    commandFingerprint: char("command_fingerprint", { length: 64 }).notNull(),
+    resultKind: varchar("result_kind", { length: 16 }).notNull(),
+    resultHeadVersion: integer("result_head_version").notNull(),
+    resultCurrentPublicationId: uuid("result_current_publication_id"),
+    resultLatestPublicationSequence: integer("result_latest_publication_sequence").notNull(),
+    resultEventSequence: integer("result_event_sequence"),
+    completedByUserId: text("completed_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    completedAt: cmsTimestamp("completed_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "cms_entry_pub_command_entry_command_pk",
+      columns: [table.entryId, table.commandId],
+    }),
+    foreignKey({
+      name: "cms_entry_pub_command_entry_tenant_fk",
+      columns: [
+        table.entryId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntry.id,
+        cmsEntry.collectionId,
+        cmsEntry.environmentId,
+        cmsEntry.projectId,
+        cmsEntry.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_pub_command_locale_tenant_fk",
+      columns: [table.localeId, table.projectId, table.workspaceId],
+      foreignColumns: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_pub_command_result_publication_fk",
+      columns: [
+        table.resultCurrentPublicationId,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+        table.resultLatestPublicationSequence,
+      ],
+      foreignColumns: [
+        cmsEntryLocalePublication.id,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+        cmsEntryLocalePublication.publicationSequence,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "cms_entry_pub_command_operation_valid",
+      sql`${table.operation} in ('publish', 'unpublish')`,
+    ),
+    check(
+      "cms_entry_pub_command_fingerprint_valid",
+      sql`${table.commandFingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "cms_entry_pub_command_result_kind_valid",
+      sql`${table.resultKind} in ('changed', 'no_op')`,
+    ),
+    check(
+      "cms_entry_pub_command_head_result_valid",
+      sql`(${table.resultHeadVersion} = 0 and ${table.resultLatestPublicationSequence} = 0 and ${table.resultCurrentPublicationId} is null) or (${table.resultHeadVersion} > 0 and ${table.resultLatestPublicationSequence} > 0)`,
+    ),
+    check(
+      "cms_entry_pub_command_operation_result_valid",
+      sql`(${table.operation} = 'publish' and ${table.resultCurrentPublicationId} is not null) or (${table.operation} = 'unpublish' and ${table.resultCurrentPublicationId} is null)`,
+    ),
+    check(
+      "cms_entry_pub_command_event_result_valid",
+      sql`(${table.resultKind} = 'changed' and ${table.resultEventSequence} > 0) or (${table.resultKind} = 'no_op' and ${table.resultEventSequence} is null)`,
+    ),
+    index("cms_entry_pub_command_locale_idx").on(table.localeId),
+    index("cms_entry_pub_command_completed_by_idx").on(table.completedByUserId),
+  ],
+);
+
 export const outboxEvent = pgTable(
   "outbox_event",
   {
@@ -1307,6 +1859,8 @@ export const outboxEvent = pgTable(
     subjectType: varchar("subject_type", { length: 64 }).notNull(),
     subjectId: uuid("subject_id").notNull(),
     schemaRevisionId: uuid("schema_revision_id"),
+    localeId: uuid("locale_id"),
+    entryPublicationId: uuid("entry_publication_id"),
     aggregateSequence: integer("aggregate_sequence").notNull(),
     payload: jsonb("payload").$type<Readonly<Record<string, unknown>>>().notNull(),
     occurredAt: cmsTimestamp("occurred_at").defaultNow().notNull(),
@@ -1330,11 +1884,38 @@ export const outboxEvent = pgTable(
         cmsSchemaRevision.workspaceId,
       ],
     }).onDelete("restrict"),
+    foreignKey({
+      name: "outbox_event_locale_tenant_fk",
+      columns: [table.localeId, table.projectId, table.workspaceId],
+      foreignColumns: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "outbox_event_entry_publication_scope_fk",
+      columns: [
+        table.entryPublicationId,
+        table.subjectId,
+        table.localeId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntryLocalePublication.id,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+      ],
+    }).onDelete("restrict"),
     unique("outbox_event_logical_sequence_unique").on(
       table.eventType,
       table.subjectId,
       table.aggregateSequence,
     ),
+    uniqueIndex("outbox_event_entry_sequence_unique")
+      .on(table.subjectId, table.aggregateSequence)
+      .where(sql`${table.eventType} in ('cms.entry.published', 'cms.entry.unpublished')`),
     check("outbox_event_type_valid", sql`${table.eventType} ~ '^[a-z][a-z0-9_.-]{0,127}$'`),
     check(
       "outbox_event_subject_type_valid",
@@ -1346,8 +1927,16 @@ export const outboxEvent = pgTable(
       sql`jsonb_typeof(${table.payload}) = 'object' and octet_length(${table.payload}::text) <= 16384`,
     ),
     check(
+      "outbox_event_publication_scope_paired",
+      sql`(${table.localeId} is null and ${table.entryPublicationId} is null) or (${table.localeId} is not null and ${table.entryPublicationId} is not null)`,
+    ),
+    check(
       "outbox_event_schema_publication_valid",
-      sql`${table.eventType} <> 'cms.schema.published' or (${table.subjectType} = 'cms.collection' and ${table.schemaRevisionId} is not null)`,
+      sql`${table.eventType} <> 'cms.schema.published' or (${table.subjectType} = 'cms.collection' and ${table.schemaRevisionId} is not null and ${table.localeId} is null and ${table.entryPublicationId} is null)`,
+    ),
+    check(
+      "outbox_event_entry_publication_valid",
+      sql`${table.eventType} not in ('cms.entry.published', 'cms.entry.unpublished') or (${table.subjectType} = 'cms.entry' and ${table.schemaRevisionId} is not null and ${table.localeId} is not null and ${table.entryPublicationId} is not null)`,
     ),
     check("outbox_event_availability_valid", sql`${table.availableAt} >= ${table.occurredAt}`),
     check("outbox_event_attempt_count_valid", sql`${table.attemptCount} >= 0`),
@@ -1358,6 +1947,12 @@ export const outboxEvent = pgTable(
     index("outbox_event_schema_revision_idx")
       .on(table.schemaRevisionId)
       .where(sql`${table.schemaRevisionId} is not null`),
+    index("outbox_event_locale_idx")
+      .on(table.localeId)
+      .where(sql`${table.localeId} is not null`),
+    index("outbox_event_entry_publication_idx")
+      .on(table.entryPublicationId)
+      .where(sql`${table.entryPublicationId} is not null`),
   ],
 );
 
@@ -1394,6 +1989,7 @@ export const cmsCollectionRelations = relations(cmsCollection, ({ one, many }) =
   revisions: many(cmsSchemaRevision),
   schemaHead: one(cmsCollectionSchemaHead),
   entries: many(cmsEntry),
+  entryPublications: many(cmsEntryLocalePublication),
 }));
 
 export const cmsCollectionFieldRelations = relations(cmsCollectionField, ({ one, many }) => ({
@@ -1485,6 +2081,7 @@ export const cmsSchemaRevisionRelations = relations(cmsSchemaRevision, ({ one, m
   fields: many(cmsSchemaRevisionField),
   entrySharedRevisions: many(cmsEntrySharedRevision),
   entryLocaleRevisions: many(cmsEntryLocaleRevision),
+  entryPublications: many(cmsEntryLocalePublication),
   outboxEvents: many(outboxEvent),
 }));
 
@@ -1639,6 +2236,9 @@ export const cmsEntryRelations = relations(cmsEntry, ({ one, many }) => ({
   sharedRevisions: many(cmsEntrySharedRevision),
   localeRevisions: many(cmsEntryLocaleRevision),
   commands: many(cmsEntryDraftCommand),
+  publications: many(cmsEntryLocalePublication),
+  publicationHeads: many(cmsEntryLocalePublicationHead),
+  publicationCommands: many(cmsEntryPublicationCommand),
 }));
 
 export const cmsEntrySharedRevisionRelations = relations(
@@ -1725,6 +2325,7 @@ export const cmsEntrySharedRevisionRelations = relations(
       fields: [cmsEntrySharedRevision.authoredByUserId],
       references: [user.id],
     }),
+    publications: many(cmsEntryLocalePublication),
   }),
 );
 
@@ -1824,6 +2425,7 @@ export const cmsEntryLocaleRevisionRelations = relations(
       fields: [cmsEntryLocaleRevision.authoredByUserId],
       references: [user.id],
     }),
+    publications: many(cmsEntryLocalePublication),
   }),
 );
 
@@ -1995,6 +2597,337 @@ export const cmsEntryDraftCommandRelations = relations(cmsEntryDraftCommand, ({ 
   }),
 }));
 
+export const cmsEntryLocalePublicationRelations = relations(
+  cmsEntryLocalePublication,
+  ({ one, many }) => ({
+    entry: one(cmsEntry, {
+      fields: [
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+      ],
+      references: [
+        cmsEntry.id,
+        cmsEntry.collectionId,
+        cmsEntry.environmentId,
+        cmsEntry.projectId,
+        cmsEntry.workspaceId,
+      ],
+    }),
+    locale: one(projectLocale, {
+      fields: [
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+      ],
+      references: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }),
+    schemaRevision: one(cmsSchemaRevision, {
+      fields: [
+        cmsEntryLocalePublication.schemaRevisionId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+      ],
+      references: [
+        cmsSchemaRevision.id,
+        cmsSchemaRevision.collectionId,
+        cmsSchemaRevision.environmentId,
+        cmsSchemaRevision.projectId,
+        cmsSchemaRevision.workspaceId,
+      ],
+    }),
+    sharedSourceRevision: one(cmsEntrySharedRevision, {
+      fields: [
+        cmsEntryLocalePublication.sharedSourceRevisionId,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+        cmsEntryLocalePublication.sharedSourceVersion,
+      ],
+      references: [
+        cmsEntrySharedRevision.id,
+        cmsEntrySharedRevision.entryId,
+        cmsEntrySharedRevision.collectionId,
+        cmsEntrySharedRevision.environmentId,
+        cmsEntrySharedRevision.projectId,
+        cmsEntrySharedRevision.workspaceId,
+        cmsEntrySharedRevision.sequence,
+      ],
+    }),
+    localeSourceRevision: one(cmsEntryLocaleRevision, {
+      fields: [
+        cmsEntryLocalePublication.localeSourceRevisionId,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+        cmsEntryLocalePublication.localeSourceVersion,
+      ],
+      references: [
+        cmsEntryLocaleRevision.id,
+        cmsEntryLocaleRevision.entryId,
+        cmsEntryLocaleRevision.localeId,
+        cmsEntryLocaleRevision.collectionId,
+        cmsEntryLocaleRevision.environmentId,
+        cmsEntryLocaleRevision.projectId,
+        cmsEntryLocaleRevision.workspaceId,
+        cmsEntryLocaleRevision.sequence,
+      ],
+    }),
+    previousPublication: one(cmsEntryLocalePublication, {
+      relationName: "cmsEntryLocalePublicationLineage",
+      fields: [
+        cmsEntryLocalePublication.previousPublicationId,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+      ],
+      references: [
+        cmsEntryLocalePublication.id,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+      ],
+    }),
+    nextPublications: many(cmsEntryLocalePublication, {
+      relationName: "cmsEntryLocalePublicationLineage",
+    }),
+    publisher: one(user, {
+      relationName: "cmsEntryLocalePublicationPublisher",
+      fields: [cmsEntryLocalePublication.publishedByUserId],
+      references: [user.id],
+    }),
+    snapshot: one(cmsEntryLocaleDeliverySnapshot),
+    sourceReferences: many(cmsEntryLocalePublicationReference, {
+      relationName: "cmsEntryPublicationReferenceSource",
+    }),
+    targetReferences: many(cmsEntryLocalePublicationReference, {
+      relationName: "cmsEntryPublicationReferenceTarget",
+    }),
+    currentHeads: many(cmsEntryLocalePublicationHead),
+    commandResults: many(cmsEntryPublicationCommand),
+    outboxEvents: many(outboxEvent),
+  }),
+);
+
+export const cmsEntryLocaleDeliverySnapshotRelations = relations(
+  cmsEntryLocaleDeliverySnapshot,
+  ({ one }) => ({
+    publication: one(cmsEntryLocalePublication, {
+      fields: [
+        cmsEntryLocaleDeliverySnapshot.publicationId,
+        cmsEntryLocaleDeliverySnapshot.entryId,
+        cmsEntryLocaleDeliverySnapshot.localeId,
+        cmsEntryLocaleDeliverySnapshot.collectionId,
+        cmsEntryLocaleDeliverySnapshot.environmentId,
+        cmsEntryLocaleDeliverySnapshot.projectId,
+        cmsEntryLocaleDeliverySnapshot.workspaceId,
+      ],
+      references: [
+        cmsEntryLocalePublication.id,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+      ],
+    }),
+  }),
+);
+
+export const cmsEntryLocalePublicationReferenceRelations = relations(
+  cmsEntryLocalePublicationReference,
+  ({ one }) => ({
+    sourcePublication: one(cmsEntryLocalePublication, {
+      relationName: "cmsEntryPublicationReferenceSource",
+      fields: [
+        cmsEntryLocalePublicationReference.sourcePublicationId,
+        cmsEntryLocalePublicationReference.sourceEntryId,
+        cmsEntryLocalePublicationReference.localeId,
+        cmsEntryLocalePublicationReference.sourceCollectionId,
+        cmsEntryLocalePublicationReference.environmentId,
+        cmsEntryLocalePublicationReference.projectId,
+        cmsEntryLocalePublicationReference.workspaceId,
+      ],
+      references: [
+        cmsEntryLocalePublication.id,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+      ],
+    }),
+    sourceField: one(cmsCollectionField, {
+      fields: [
+        cmsEntryLocalePublicationReference.sourceFieldId,
+        cmsEntryLocalePublicationReference.sourceCollectionId,
+        cmsEntryLocalePublicationReference.environmentId,
+        cmsEntryLocalePublicationReference.projectId,
+        cmsEntryLocalePublicationReference.workspaceId,
+      ],
+      references: [
+        cmsCollectionField.id,
+        cmsCollectionField.collectionId,
+        cmsCollectionField.environmentId,
+        cmsCollectionField.projectId,
+        cmsCollectionField.workspaceId,
+      ],
+    }),
+    targetPublication: one(cmsEntryLocalePublication, {
+      relationName: "cmsEntryPublicationReferenceTarget",
+      fields: [
+        cmsEntryLocalePublicationReference.targetPublicationId,
+        cmsEntryLocalePublicationReference.targetEntryId,
+        cmsEntryLocalePublicationReference.localeId,
+        cmsEntryLocalePublicationReference.targetCollectionId,
+        cmsEntryLocalePublicationReference.environmentId,
+        cmsEntryLocalePublicationReference.projectId,
+        cmsEntryLocalePublicationReference.workspaceId,
+      ],
+      references: [
+        cmsEntryLocalePublication.id,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+      ],
+    }),
+  }),
+);
+
+export const cmsEntryLocalePublicationHeadRelations = relations(
+  cmsEntryLocalePublicationHead,
+  ({ one }) => ({
+    entry: one(cmsEntry, {
+      fields: [
+        cmsEntryLocalePublicationHead.entryId,
+        cmsEntryLocalePublicationHead.collectionId,
+        cmsEntryLocalePublicationHead.environmentId,
+        cmsEntryLocalePublicationHead.projectId,
+        cmsEntryLocalePublicationHead.workspaceId,
+      ],
+      references: [
+        cmsEntry.id,
+        cmsEntry.collectionId,
+        cmsEntry.environmentId,
+        cmsEntry.projectId,
+        cmsEntry.workspaceId,
+      ],
+    }),
+    locale: one(projectLocale, {
+      fields: [
+        cmsEntryLocalePublicationHead.localeId,
+        cmsEntryLocalePublicationHead.projectId,
+        cmsEntryLocalePublicationHead.workspaceId,
+      ],
+      references: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }),
+    currentPublication: one(cmsEntryLocalePublication, {
+      fields: [
+        cmsEntryLocalePublicationHead.currentPublicationId,
+        cmsEntryLocalePublicationHead.entryId,
+        cmsEntryLocalePublicationHead.localeId,
+        cmsEntryLocalePublicationHead.collectionId,
+        cmsEntryLocalePublicationHead.environmentId,
+        cmsEntryLocalePublicationHead.projectId,
+        cmsEntryLocalePublicationHead.workspaceId,
+        cmsEntryLocalePublicationHead.latestPublicationSequence,
+      ],
+      references: [
+        cmsEntryLocalePublication.id,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+        cmsEntryLocalePublication.publicationSequence,
+      ],
+    }),
+    changedBy: one(user, {
+      relationName: "cmsEntryLocalePublicationHeadChanger",
+      fields: [cmsEntryLocalePublicationHead.changedByUserId],
+      references: [user.id],
+    }),
+  }),
+);
+
+export const cmsEntryPublicationCommandRelations = relations(
+  cmsEntryPublicationCommand,
+  ({ one }) => ({
+    entry: one(cmsEntry, {
+      fields: [
+        cmsEntryPublicationCommand.entryId,
+        cmsEntryPublicationCommand.collectionId,
+        cmsEntryPublicationCommand.environmentId,
+        cmsEntryPublicationCommand.projectId,
+        cmsEntryPublicationCommand.workspaceId,
+      ],
+      references: [
+        cmsEntry.id,
+        cmsEntry.collectionId,
+        cmsEntry.environmentId,
+        cmsEntry.projectId,
+        cmsEntry.workspaceId,
+      ],
+    }),
+    locale: one(projectLocale, {
+      fields: [
+        cmsEntryPublicationCommand.localeId,
+        cmsEntryPublicationCommand.projectId,
+        cmsEntryPublicationCommand.workspaceId,
+      ],
+      references: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }),
+    resultCurrentPublication: one(cmsEntryLocalePublication, {
+      fields: [
+        cmsEntryPublicationCommand.resultCurrentPublicationId,
+        cmsEntryPublicationCommand.entryId,
+        cmsEntryPublicationCommand.localeId,
+        cmsEntryPublicationCommand.collectionId,
+        cmsEntryPublicationCommand.environmentId,
+        cmsEntryPublicationCommand.projectId,
+        cmsEntryPublicationCommand.workspaceId,
+        cmsEntryPublicationCommand.resultLatestPublicationSequence,
+      ],
+      references: [
+        cmsEntryLocalePublication.id,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+        cmsEntryLocalePublication.publicationSequence,
+      ],
+    }),
+    completedBy: one(user, {
+      relationName: "cmsEntryPublicationCommandCompleter",
+      fields: [cmsEntryPublicationCommand.completedByUserId],
+      references: [user.id],
+    }),
+  }),
+);
+
 export const outboxEventRelations = relations(outboxEvent, ({ one }) => ({
   workspace: one(workspace, {
     fields: [outboxEvent.workspaceId],
@@ -2020,6 +2953,28 @@ export const outboxEventRelations = relations(outboxEvent, ({ one }) => ({
       cmsSchemaRevision.environmentId,
       cmsSchemaRevision.projectId,
       cmsSchemaRevision.workspaceId,
+    ],
+  }),
+  locale: one(projectLocale, {
+    fields: [outboxEvent.localeId, outboxEvent.projectId, outboxEvent.workspaceId],
+    references: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+  }),
+  entryPublication: one(cmsEntryLocalePublication, {
+    fields: [
+      outboxEvent.entryPublicationId,
+      outboxEvent.subjectId,
+      outboxEvent.localeId,
+      outboxEvent.environmentId,
+      outboxEvent.projectId,
+      outboxEvent.workspaceId,
+    ],
+    references: [
+      cmsEntryLocalePublication.id,
+      cmsEntryLocalePublication.entryId,
+      cmsEntryLocalePublication.localeId,
+      cmsEntryLocalePublication.environmentId,
+      cmsEntryLocalePublication.projectId,
+      cmsEntryLocalePublication.workspaceId,
     ],
   }),
 }));

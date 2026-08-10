@@ -288,6 +288,10 @@ Publication does not increment `draftVersion` because it does not mutate draft c
 
 A publication whose canonical hash equals the current published revision is a no-op success returning the current revision; it creates no sequence, audit event, or outbox event. A no-op does not persist or consume its command ID; it is naturally idempotent while the hash remains unchanged.
 
+### Command-provenance retention clarification
+
+Recorded during M8 design: state-changing schema-publication command identity/fingerprint is embedded in the immutable schema revision and follows schema-history retention; there is no separate M5 command-receipt table or cleanup path. M5 no-op command IDs are not durable and retain only the narrower hash-unchanged idempotency described above. M14 owns any holistic change to schema-history, command, audit, outbox, backup, or privacy retention.
+
 ## Database model
 
 All IDs use PostgreSQL 18 `uuidv7()`. All timestamps are `timestamp with time zone`. Foreign keys use `on delete restrict`. Every environment-scoped child carries workspace, project, and environment scope through composite foreign keys.
