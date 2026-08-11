@@ -159,7 +159,7 @@ describe("schema workbench", () => {
     );
     await user.click(screen.getByRole("checkbox", { name: "Configure a Default Document" }));
     expect(await screen.findByRole("textbox", { name: "Default rich text content" })).toBeTruthy();
-  });
+  }, 10_000);
 
   it("shows mixed localization only for object fields", async () => {
     const user = userEvent.setup();

@@ -4,6 +4,8 @@ import { db } from "@framerfordevs/db";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "@framerfordevs/db/query";
 import {
   cmsCollection,
+  cmsCollectionDeliveryConfig,
+  cmsCollectionDeliveryField,
   cmsCollectionField,
   cmsCollectionSchemaHead,
   cmsSchemaRevision,
@@ -1077,6 +1079,17 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               projectId: collection.projectId,
               environmentId: collection.environmentId,
               changedByUserId: actorId,
+              updatedAt: now,
+            });
+            await transaction.insert(cmsCollectionDeliveryConfig).values({
+              collectionId: collection.id,
+              workspaceId: collection.workspaceId,
+              projectId: collection.projectId,
+              environmentId: collection.environmentId,
+              access: "protected",
+              version: 1,
+              changedByUserId: actorId,
+              createdAt: now,
               updatedAt: now,
             });
             await transaction.insert(auditEvent).values(
@@ -2442,9 +2455,49 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
             const validation = validateCollectionDraft(draft, "publication");
             if (!validation.valid)
               return outcomeWith("schema_invalid", { issues: validation.issues });
+            const flattenedFields = flattenFieldTree(draft.fields);
+            const configuredDeliveryFields =
+              collection.currentPublishedRevisionId === null
+                ? []
+                : await transaction
+                    .select({
+                      fieldId: cmsCollectionDeliveryField.fieldId,
+                      kind: cmsSchemaRevisionField.kind,
+                    })
+                    .from(cmsCollectionDeliveryField)
+                    .innerJoin(
+                      cmsSchemaRevisionField,
+                      and(
+                        eq(
+                          cmsSchemaRevisionField.revisionId,
+                          collection.currentPublishedRevisionId,
+                        ),
+                        eq(cmsSchemaRevisionField.fieldId, cmsCollectionDeliveryField.fieldId),
+                        eq(cmsSchemaRevisionField.collectionId, collection.id),
+                      ),
+                    )
+                    .where(eq(cmsCollectionDeliveryField.collectionId, collection.id));
+            const nextFieldsById = new Map<string, (typeof flattenedFields)[number]>(
+              flattenedFields.map((field) => [field.id, field]),
+            );
+            const deliveryIssues = configuredDeliveryFields.flatMap((configured) => {
+              const next = nextFieldsById.get(configured.fieldId);
+              return next === undefined || next.nodeRole !== "root" || next.kind !== configured.kind
+                ? [
+                    SchemaValidationIssue.make({
+                      path: "fields",
+                      code: "delivery_configured_field_incompatible",
+                      message:
+                        "Remove the Delivery capability before removing or changing its field kind.",
+                    }),
+                  ]
+                : [];
+            });
+            if (deliveryIssues.length > 0) {
+              return outcomeWith("schema_invalid", { issues: deliveryIssues.slice(0, 50) });
+            }
             const schemaHash = hashCollectionDraft(draft);
             const contractHash = hashCollectionContract(draft);
-            const flattenedFields = flattenFieldTree(draft.fields);
             const publishedRows =
               collection.currentPublishedRevisionId === null
                 ? null

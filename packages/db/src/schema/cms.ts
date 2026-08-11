@@ -2,13 +2,17 @@
 
 import { relations, sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   char,
   check,
+  date,
+  doublePrecision,
   foreignKey,
   index,
   integer,
   jsonb,
+  numeric,
   pgTable,
   primaryKey,
   text,
@@ -253,6 +257,143 @@ export const cmsCollectionField = pgTable(
     index("cms_field_removed_by_user_idx")
       .on(table.removedByUserId)
       .where(sql`${table.removedByUserId} is not null`),
+  ],
+);
+
+export const cmsCollectionDeliveryConfig = pgTable(
+  "cms_collection_delivery_config",
+  {
+    collectionId: uuid("collection_id").primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    access: varchar("access", { length: 16 }).default("protected").notNull(),
+    version: integer("version").default(1).notNull(),
+    changedByUserId: text("changed_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    createdAt: cmsTimestamp("created_at").defaultNow().notNull(),
+    updatedAt: cmsTimestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "cms_collection_delivery_config_tenant_fk",
+      columns: [table.collectionId, table.environmentId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        cmsCollection.id,
+        cmsCollection.environmentId,
+        cmsCollection.projectId,
+        cmsCollection.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    unique("cms_collection_delivery_config_scope_unique").on(
+      table.collectionId,
+      table.environmentId,
+      table.projectId,
+      table.workspaceId,
+    ),
+    check(
+      "cms_collection_delivery_config_access_valid",
+      sql`${table.access} in ('protected', 'public')`,
+    ),
+    check("cms_collection_delivery_config_version_positive", sql`${table.version} > 0`),
+    index("cms_collection_delivery_config_environment_idx").on(
+      table.environmentId,
+      table.collectionId,
+    ),
+    index("cms_collection_delivery_config_changed_by_user_idx").on(table.changedByUserId),
+  ],
+);
+
+export const cmsCollectionDeliveryField = pgTable(
+  "cms_collection_delivery_field",
+  {
+    collectionId: uuid("collection_id").notNull(),
+    fieldId: uuid("field_id").notNull(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    filterable: boolean("filterable").default(false).notNull(),
+    sortable: boolean("sortable").default(false).notNull(),
+    uniqueLookup: boolean("unique_lookup").default(false).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "cms_collection_delivery_field_pk",
+      columns: [table.collectionId, table.fieldId],
+    }),
+    foreignKey({
+      name: "cms_collection_delivery_field_config_fk",
+      columns: [table.collectionId, table.environmentId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        cmsCollectionDeliveryConfig.collectionId,
+        cmsCollectionDeliveryConfig.environmentId,
+        cmsCollectionDeliveryConfig.projectId,
+        cmsCollectionDeliveryConfig.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_collection_delivery_field_tenant_fk",
+      columns: [
+        table.fieldId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsCollectionField.id,
+        cmsCollectionField.collectionId,
+        cmsCollectionField.environmentId,
+        cmsCollectionField.projectId,
+        cmsCollectionField.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "cms_collection_delivery_field_enabled",
+      sql`${table.filterable} or ${table.sortable} or ${table.uniqueLookup}`,
+    ),
+    check(
+      "cms_collection_delivery_field_unique_filterable",
+      sql`not ${table.uniqueLookup} or ${table.filterable}`,
+    ),
+    index("cms_collection_delivery_field_field_idx").on(table.fieldId),
+  ],
+);
+
+export const cmsCollectionLocaleDeliveryState = pgTable(
+  "cms_collection_locale_delivery_state",
+  {
+    collectionId: uuid("collection_id").notNull(),
+    localeId: uuid("locale_id").notNull(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    generation: bigint("generation", { mode: "bigint" }).notNull(),
+    lastChangedAt: cmsTimestamp("last_changed_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "cms_collection_locale_delivery_state_pk",
+      columns: [table.collectionId, table.localeId],
+    }),
+    foreignKey({
+      name: "cms_collection_locale_delivery_state_collection_fk",
+      columns: [table.collectionId, table.environmentId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        cmsCollection.id,
+        cmsCollection.environmentId,
+        cmsCollection.projectId,
+        cmsCollection.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_collection_locale_delivery_state_locale_fk",
+      columns: [table.localeId, table.projectId, table.workspaceId],
+      foreignColumns: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }).onDelete("restrict"),
+    check("cms_collection_locale_delivery_state_generation_positive", sql`${table.generation} > 0`),
+    index("cms_collection_locale_delivery_state_locale_idx").on(table.localeId, table.collectionId),
   ],
 );
 
@@ -1735,6 +1876,15 @@ export const cmsEntryLocalePublicationHead = pgTable(
         cmsEntryLocalePublication.publicationSequence,
       ],
     }).onDelete("restrict"),
+    unique("cms_entry_pub_head_current_scope_unique").on(
+      table.currentPublicationId,
+      table.entryId,
+      table.localeId,
+      table.collectionId,
+      table.environmentId,
+      table.projectId,
+      table.workspaceId,
+    ),
     check("cms_entry_pub_head_version_positive", sql`${table.version} > 0`),
     check("cms_entry_pub_head_sequence_positive", sql`${table.latestPublicationSequence} > 0`),
     index("cms_entry_pub_head_locale_collection_current_idx")
@@ -1744,6 +1894,156 @@ export const cmsEntryLocalePublicationHead = pgTable(
       .on(table.currentPublicationId)
       .where(sql`${table.currentPublicationId} is not null`),
     index("cms_entry_pub_head_changed_by_user_idx").on(table.changedByUserId),
+  ],
+);
+
+export const cmsEntryLocaleDeliveryCurrentValue = pgTable(
+  "cms_entry_locale_delivery_current_value",
+  {
+    entryId: uuid("entry_id").notNull(),
+    localeId: uuid("locale_id").notNull(),
+    fieldId: uuid("field_id").notNull(),
+    publicationId: uuid("publication_id").notNull(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    collectionId: uuid("collection_id").notNull(),
+    valueKind: varchar("value_kind", { length: 16 }).notNull(),
+    textValue: text("text_value"),
+    numberValue: doublePrecision("number_value"),
+    decimalValue: numeric("decimal_value"),
+    booleanValue: boolean("boolean_value"),
+    dateValue: date("date_value", { mode: "string" }),
+    dateTimeValue: timestamp("date_time_value", { withTimezone: true, mode: "string" }),
+    referenceValue: uuid("reference_value"),
+    uniqueLookup: boolean("unique_lookup").default(false).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "cms_entry_locale_delivery_current_value_pk",
+      columns: [table.entryId, table.localeId, table.fieldId],
+    }),
+    foreignKey({
+      name: "cms_entry_locale_delivery_value_field_fk",
+      columns: [
+        table.fieldId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsCollectionField.id,
+        cmsCollectionField.collectionId,
+        cmsCollectionField.environmentId,
+        cmsCollectionField.projectId,
+        cmsCollectionField.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_locale_delivery_value_publication_fk",
+      columns: [
+        table.publicationId,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntryLocalePublication.id,
+        cmsEntryLocalePublication.entryId,
+        cmsEntryLocalePublication.localeId,
+        cmsEntryLocalePublication.collectionId,
+        cmsEntryLocalePublication.environmentId,
+        cmsEntryLocalePublication.projectId,
+        cmsEntryLocalePublication.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_locale_delivery_value_current_head_fk",
+      columns: [
+        table.publicationId,
+        table.entryId,
+        table.localeId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsEntryLocalePublicationHead.currentPublicationId,
+        cmsEntryLocalePublicationHead.entryId,
+        cmsEntryLocalePublicationHead.localeId,
+        cmsEntryLocalePublicationHead.collectionId,
+        cmsEntryLocalePublicationHead.environmentId,
+        cmsEntryLocalePublicationHead.projectId,
+        cmsEntryLocalePublicationHead.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "cms_entry_locale_delivery_value_kind_valid",
+      sql`${table.valueKind} in ('short_text', 'slug', 'email', 'enum', 'number', 'decimal', 'boolean', 'date', 'date_time', 'reference')`,
+    ),
+    check(
+      "cms_entry_locale_delivery_value_typed_valid",
+      sql`(${table.valueKind} in ('short_text', 'slug', 'email', 'enum') and ${table.textValue} is not null and ${table.numberValue} is null and ${table.decimalValue} is null and ${table.booleanValue} is null and ${table.dateValue} is null and ${table.dateTimeValue} is null and ${table.referenceValue} is null) or (${table.valueKind} = 'number' and ${table.textValue} is null and ${table.numberValue} is not null and ${table.numberValue} > '-Infinity'::double precision and ${table.numberValue} < 'Infinity'::double precision and ${table.decimalValue} is null and ${table.booleanValue} is null and ${table.dateValue} is null and ${table.dateTimeValue} is null and ${table.referenceValue} is null) or (${table.valueKind} = 'decimal' and ${table.textValue} is null and ${table.numberValue} is null and ${table.decimalValue} is not null and ${table.decimalValue} > '-Infinity'::numeric and ${table.decimalValue} < 'Infinity'::numeric and ${table.booleanValue} is null and ${table.dateValue} is null and ${table.dateTimeValue} is null and ${table.referenceValue} is null) or (${table.valueKind} = 'boolean' and ${table.textValue} is null and ${table.numberValue} is null and ${table.decimalValue} is null and ${table.booleanValue} is not null and ${table.dateValue} is null and ${table.dateTimeValue} is null and ${table.referenceValue} is null) or (${table.valueKind} = 'date' and ${table.textValue} is null and ${table.numberValue} is null and ${table.decimalValue} is null and ${table.booleanValue} is null and ${table.dateValue} is not null and ${table.dateTimeValue} is null and ${table.referenceValue} is null) or (${table.valueKind} = 'date_time' and ${table.textValue} is null and ${table.numberValue} is null and ${table.decimalValue} is null and ${table.booleanValue} is null and ${table.dateValue} is null and ${table.dateTimeValue} is not null and ${table.referenceValue} is null) or (${table.valueKind} = 'reference' and ${table.textValue} is null and ${table.numberValue} is null and ${table.decimalValue} is null and ${table.booleanValue} is null and ${table.dateValue} is null and ${table.dateTimeValue} is null and ${table.referenceValue} is not null)`,
+    ),
+    index("cms_entry_locale_delivery_value_text_idx")
+      .on(
+        table.localeId,
+        table.collectionId,
+        table.fieldId,
+        sql`${table.textValue} collate "C"`,
+        table.entryId,
+      )
+      .where(sql`${table.textValue} is not null`),
+    index("cms_entry_locale_delivery_value_number_idx")
+      .on(table.localeId, table.collectionId, table.fieldId, table.numberValue, table.entryId)
+      .where(sql`${table.numberValue} is not null`),
+    index("cms_entry_locale_delivery_value_decimal_idx")
+      .on(table.localeId, table.collectionId, table.fieldId, table.decimalValue, table.entryId)
+      .where(sql`${table.decimalValue} is not null`),
+    index("cms_entry_locale_delivery_value_boolean_idx")
+      .on(table.localeId, table.collectionId, table.fieldId, table.booleanValue, table.entryId)
+      .where(sql`${table.booleanValue} is not null`),
+    index("cms_entry_locale_delivery_value_date_idx")
+      .on(table.localeId, table.collectionId, table.fieldId, table.dateValue, table.entryId)
+      .where(sql`${table.dateValue} is not null`),
+    index("cms_entry_locale_delivery_value_date_time_idx")
+      .on(table.localeId, table.collectionId, table.fieldId, table.dateTimeValue, table.entryId)
+      .where(sql`${table.dateTimeValue} is not null`),
+    index("cms_entry_locale_delivery_value_reference_idx")
+      .on(table.localeId, table.collectionId, table.fieldId, table.referenceValue, table.entryId)
+      .where(sql`${table.referenceValue} is not null`),
+    uniqueIndex("cms_entry_locale_delivery_value_text_unique")
+      .on(table.localeId, table.collectionId, table.fieldId, sql`${table.textValue} collate "C"`)
+      .where(sql`${table.uniqueLookup} and ${table.textValue} is not null`),
+    uniqueIndex("cms_entry_locale_delivery_value_number_unique")
+      .on(table.localeId, table.collectionId, table.fieldId, table.numberValue)
+      .where(sql`${table.uniqueLookup} and ${table.numberValue} is not null`),
+    uniqueIndex("cms_entry_locale_delivery_value_decimal_unique")
+      .on(table.localeId, table.collectionId, table.fieldId, table.decimalValue)
+      .where(sql`${table.uniqueLookup} and ${table.decimalValue} is not null`),
+    uniqueIndex("cms_entry_locale_delivery_value_date_unique")
+      .on(table.localeId, table.collectionId, table.fieldId, table.dateValue)
+      .where(sql`${table.uniqueLookup} and ${table.dateValue} is not null`),
+    uniqueIndex("cms_entry_locale_delivery_value_date_time_unique")
+      .on(table.localeId, table.collectionId, table.fieldId, table.dateTimeValue)
+      .where(sql`${table.uniqueLookup} and ${table.dateTimeValue} is not null`),
+    uniqueIndex("cms_entry_locale_delivery_value_reference_unique")
+      .on(table.localeId, table.collectionId, table.fieldId, table.referenceValue)
+      .where(sql`${table.uniqueLookup} and ${table.referenceValue} is not null`),
+    check(
+      "cms_entry_locale_delivery_value_text_bounded",
+      sql`${table.textValue} is null or octet_length(${table.textValue}) <= 2048`,
+    ),
+    check(
+      "cms_entry_locale_delivery_value_unique_kind_valid",
+      sql`not ${table.uniqueLookup} or ${table.valueKind} <> 'boolean'`,
+    ),
+    index("cms_entry_locale_delivery_value_publication_idx").on(table.publicationId),
   ],
 );
 

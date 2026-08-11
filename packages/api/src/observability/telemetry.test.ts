@@ -16,6 +16,8 @@ describe("Effect metrics", () => {
           durationMs: 12,
         });
         yield* telemetry.recordDefect("rpc");
+        yield* telemetry.recordCredentialVerification({ family: "delivery", outcome: "success" });
+        yield* telemetry.recordLocaleMutation({ action: "create", outcome: "success" });
         yield* telemetry.recordSchemaMutation({ action: "field_update", outcome: "success" });
         yield* telemetry.recordSchemaValidation({ outcome: "invalid" });
         yield* telemetry.recordSchemaPublication({
@@ -24,6 +26,19 @@ describe("Effect metrics", () => {
           fieldCountBucket: "11-50",
           durationMs: 24,
         });
+        yield* telemetry.recordEntryPublication({
+          operation: "publish",
+          outcome: "success",
+          sizeBucket: "small",
+          durationMs: 32,
+        });
+        yield* telemetry.recordEntryPublicationValidationFailure("field_invalid");
+        yield* telemetry.recordRateLimitDecision({
+          policy: "delivery.credential",
+          enforcementMode: "redis",
+          outcome: "allowed",
+        });
+        yield* telemetry.recordRateLimitStore({ result: "success", durationMs: 2 });
 
         assert.isTrue(true);
       }),

@@ -27,6 +27,11 @@ import {
   UpdateProjectMemberRoleInputSchema,
 } from "../contracts/access";
 import {
+  DeliveryConfigurationOutputSchema,
+  GetDeliveryConfigurationInputSchema,
+  UpdateDeliveryConfigurationInputSchema,
+} from "../contracts/delivery";
+import {
   CmsEntryDraftOutputSchema,
   CmsEntryOutputSchema,
   CmsEntryPageOutputSchema,
@@ -114,6 +119,7 @@ import {
   updateProjectMemberLocaleAccess,
   updateProjectMemberRole,
 } from "../operations/access";
+import { getDeliveryConfiguration, updateDeliveryConfiguration } from "../operations/delivery";
 import {
   createEntry,
   getEntryDraft,
@@ -445,6 +451,34 @@ export const appRouter = {
               "Collection updated.",
             ),
           ),
+        deliveryConfiguration: {
+          get: protectedProcedure
+            .input(GetDeliveryConfigurationInputSchema)
+            .output(DeliveryConfigurationOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                "api.delivery.configuration.get",
+                getDeliveryConfiguration(context.session.user.id, input),
+                "Delivery configuration loaded.",
+              ),
+            ),
+          update: protectedProcedure
+            .input(UpdateDeliveryConfigurationInputSchema)
+            .output(DeliveryConfigurationOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                "api.delivery.configuration.update",
+                updateDeliveryConfiguration(
+                  context.session.user.id,
+                  input,
+                  context.request.requestId,
+                ),
+                "Delivery configuration updated.",
+              ),
+            ),
+        },
         entries: {
           list: protectedProcedure
             .input(ListEntriesInputSchema)

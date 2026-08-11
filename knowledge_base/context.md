@@ -1,7 +1,7 @@
 # Agent Session Context
 
-**Last updated:** 2026-08-09
-**Current phase:** Milestone 8 approved and committed; Milestone 9 design discovery next
+**Last updated:** 2026-08-11
+**Current phase:** Milestone 9 automated implementation complete; awaiting developer manual review
 **Active milestone:** Milestone 9 — Production Delivery API
 
 ## What this project is
@@ -135,6 +135,27 @@ The repository currently has:
 - The complete role/locale matrix covers publication reads and mutations across every role and `all`/`selected`/`none` locale access; anonymous route denial and automated exact-locale dialog accessibility remain covered
 - The final M8 readiness gate passes with 627 tests, API coverage at 89.83% statements and 72.19% branches, publication-repository coverage at 90.00% statements and 76.12% branches, clean production/full audits, production builds, `git diff --check`, four enabled immutable triggers, and zero durable M8 test artifacts
 - The developer approved and committed M8 as `ad3cd5e` (`feat(m8): add independent locale publication and immutable snapshots`) after the complete automated gate
+- M9 requirements, prior decisions, Delivery credentials, Express/CORS, immutable publication reads, query/index constraints, cache validators, rate/resource controls, and applicable skills/standards have been reviewed
+- The developer approved `knowledge_base/decisions/m9-production-delivery-api-design.md` and authorized M9 implementation, including the versioned REST/OpenAPI surface, protected/public configuration, typed query read model, unique claims, signed generation-bound cursors, pinned expansion, HTTP caching, Delivery CORS, central generic Redis/memory rate-limit manager, observability, backfill/migration gate, and load baseline
+- M9 implementation includes the shared Redis/memory weighted rate-limit architecture, opaque identities and canonical network sources, strict Delivery contracts/query parsing/root projections, rolling active/previous-key cursor signing, and the approved four-table Drizzle read model with typed/unique indexes and current-head authority
+- The developer generated, corrected, and applied `0009_add_production_delivery_api_read_model.sql`; read-only verification confirms all four tables, protected configuration backfill, validated authority/tenant constraints, and valid/ready typed and unique indexes
+- Collection creation now writes protected Delivery configuration atomically; owner/unrestricted-developer management supports complete-set optimistic capability updates, public acknowledgement, compatibility/unique checks, no-op suppression, and audit/outbox persistence
+- M8 publish/unpublish transactions now atomically maintain typed current projections, deterministic unique-claim locking, and broad collection-locale cursor generations with rollback-injection coverage
+- The Delivery read repository serves only current/immutable publication artifacts with exact enabled locale, public/protected checks, stable typed filters/sorts/unique lookup, signed stale-aware pagination, pinned two-depth expansion, and repeatable-read bounded list transactions
+- Express now exposes the rollout-gated `/api/delivery/v1` GET/HEAD/OPTIONS surface, isolated wildcard no-credentials CORS, Delivery credential authentication, global/identity quotas, conditional validators, public/protected cache policies, response cap, and dedicated OpenAPI/reference routes
+- Collection settings expose access and kind-safe field capabilities with permission-aware read-only behavior and accessible irreversible-public warning; schema publication blocks incompatible configured field removal/kind changes
+- The developer ran the clean operator-controlled Delivery backfill apply; read-only verification reports three current heads, three generation-1 collection-locale states, no missing state, zero expected scalar projections for unsupported historical roots, and no open non-idle transaction
+- Explicit PostgreSQL pool maximum/acquisition/idle bounds, list transaction statement/idle timeouts, Redis infrastructure, canonical-byte expansion preflight plus exact final response cap, and a manual k6 three-scenario baseline profile are present
+- The refreshed M9 automated gate passes `pnpm run ready` with 704 tests and 89.01% API statement coverage; a subsequent manual-review correction adds typed malformed-reference handling and stale-field-issue clearing with focused coverage
+- The developer-authorized deterministic load utility created 10,000 current English fixture publications and 40 load-only Delivery credentials without printing secrets; the ignored local environment now contains the bounded sample authority
+- All three approved production-topology capacity scenarios pass after 15-second warm-up plus 60 measured seconds: mixed latest/unique at 200/s (p95 16.54 ms, p99 53.06 ms), indexed list at 100/s (p95 24.45 ms, p99 31.90 ms), and pinned expansion at 25/s (p95 15.33 ms, p99 16.91 ms), with zero errors or dropped iterations
+- The remaining approved M9 load gates also pass: conditional revalidation produced 6,001 measured 304s; one weighted hot credential shared across two server processes produced 1,350 intentional credential 429s with the stable contract; a 15-second hard Redis outage kept 3,001 measured reads successful and recreated 41 keys after recovery; and 301 oversized list reads returned stable 413s while repeated memory sampling stayed bounded
+- The oversized boundary utility restored all current fixture drafts/heads after each run; final read-only checks report 10,000 current publications, 4,794 maximum current canonical bytes, zero boundary documents, zero duplicate unique claims, and zero active/waiting/open application transactions
+- The tenant-neutral Delivery OpenAPI 3.1 document is now generated from/reconciled against Delivery Effect Schemas and fully documents all four GET/HEAD/OPTIONS paths, strict query bounds, schema-backed success/failure envelopes, conditional/cache/rate headers, authentication, examples, response limits, and cursor recovery; Scalar provides the interactive reference
+- The complete management oRPC reference is disabled by default and environment validation forbids enabling it in production; local/test opt-in remains available for internal contract inspection, while snapshot/HTTP tests prove public Delivery documentation excludes management/auth/operator contracts
+- The rebuilt production Docker server returns 200 for Delivery OpenAPI, Scalar docs, and a protected fixture read; `/api-reference` returns 404, the public document has 4 paths/12 operations/10 public schemas, and all primary services are healthy
+- M12 now owns the allowlisted public developer portal, versioned public specifications, guides, and generated tooling; M14 owns production marketing/application/API/developer/operator host and ingress separation
+- Final refreshed `pnpm run ready` passes after all load and documentation-boundary work with 712 tests and 89.40% API statement coverage; production/full audits and builds pass, and developer manual approval remains pending
 - The developer generated and applied `0005_add_field_system_and_editor_layout.sql`; the agent inspected the complete SQL and snapshot and verified the live catalog read-only: 15 expected columns, 35 validated constraints, 16 valid/ready indexes, and valid legacy backfills
 - Complete M6 repository/API/UI/property/PostgreSQL/accessibility/bundle coverage with 551 passing tests and a clean production/full pnpm audit
 - Cold Docker manual review found and fixed a schema-builder hook-order crash during query hydration; hooks are now unconditional and `react-hooks/rules-of-hooks` is enforced workspace-wide
@@ -150,8 +171,7 @@ The repository currently has:
 
 The repository does not yet have:
 
-- Public Delivery API querying (M9) or Preview API workflows (M10)
-- Public Delivery API querying, which begins with M9 design discovery
+- Preview API workflows (M10)
 - Production telemetry backend/collector deployment
 
 ## Mandatory constraints
@@ -260,6 +280,6 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 
 ## What to do next
 
-1. Re-read the product, CMS PRD, rules, M9 milestone criteria, context, progress, learnings, and approved M8 delivery-snapshot authority.
-2. Inspect current-publication lookup, credential, cache, filtering, pagination, and delivery-response seams.
-3. Propose the complete M9 Production Delivery API decision record before implementation.
+1. Wait for the developer to generate and apply `add_production_delivery_api_read_model` using the exact handoff commands.
+2. Inspect the generated migration/snapshot and live PostgreSQL catalog read-only against the approved Drizzle authority.
+3. After confirmation, continue M9 repository, publication dual-write, HTTP/OpenAPI/CORS/cache, backfill, management UI, integration, and load-test implementation.

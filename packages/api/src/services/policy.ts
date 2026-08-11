@@ -70,6 +70,7 @@ const unrestrictedLocaleActions = new Set<ProjectPermissionActionType>([
   "locale.manage",
   "schema.write",
   "schema.publish",
+  "delivery.configure",
   "project.credential.issue",
   "project.credential.rotate",
 ]);
@@ -87,6 +88,7 @@ const developerActions = new Set<ProjectPermissionActionType>([
   "schema.read",
   "schema.write",
   "schema.publish",
+  "delivery.configure",
   "content.read",
   "content.write",
   "content.review",

@@ -85,7 +85,9 @@ export class ApplicationLogger extends Context.Tag("ApplicationLogger")<
 
 export const ApplicationLoggerLive = Layer.succeed(ApplicationLogger, {
   info: (message, fields = {}) =>
-    env.NODE_ENV === "test" ? Effect.void : Effect.logInfo(message, redactFields(fields)),
+    env.NODE_ENV === "test" || env.APPLICATION_LOG_LEVEL === "error"
+      ? Effect.void
+      : Effect.logInfo(message, redactFields(fields)),
   error: (message, fields = {}) =>
     env.NODE_ENV === "test" ? Effect.void : Effect.logError(message, redactFields(fields)),
 });

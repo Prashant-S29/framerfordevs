@@ -635,21 +635,41 @@ export function makeCredentialRepository(options: RepositoryOptions = {}) {
       credentialId: ApiCredentialId,
     ) {
       const result = yield* Effect.tryPromise({
-        try: () =>
-          database.transaction(async (transaction) => {
-            const [credential] = await transaction
-              .select()
-              .from(apiCredential)
-              .where(eq(apiCredential.id, credentialId))
-              .limit(1);
-            if (!credential) return undefined;
-            const scopes = await selectCredentialScopes(transaction, [credential.id]);
-            return {
-              credential,
-              keyDigest: credential.keyDigest,
-              scopes: scopes.map((scope) => scope.scope),
-            };
-          }),
+        try: async () => {
+          const rows = await database
+            .select({
+              id: apiCredential.id,
+              workspaceId: apiCredential.workspaceId,
+              projectId: apiCredential.projectId,
+              environmentId: apiCredential.environmentId,
+              family: apiCredential.family,
+              name: apiCredential.name,
+              keyPrefix: apiCredential.keyPrefix,
+              keyDigest: apiCredential.keyDigest,
+              version: apiCredential.version,
+              rotatedFromCredentialId: apiCredential.rotatedFromCredentialId,
+              createdByUserId: apiCredential.createdByUserId,
+              expiresAt: apiCredential.expiresAt,
+              revokedAt: apiCredential.revokedAt,
+              revokedByUserId: apiCredential.revokedByUserId,
+              createdAt: apiCredential.createdAt,
+              updatedAt: apiCredential.updatedAt,
+              scope: apiCredentialScope.scope,
+            })
+            .from(apiCredential)
+            .leftJoin(apiCredentialScope, eq(apiCredentialScope.credentialId, apiCredential.id))
+            .where(eq(apiCredential.id, sql.placeholder("credentialId")))
+            .prepare("credential_verification_record_v1")
+            .execute({ credentialId });
+          const first = rows[0];
+          if (first === undefined) return undefined;
+          const { scope: _scope, ...credential } = first;
+          return {
+            credential,
+            keyDigest: credential.keyDigest,
+            scopes: rows.flatMap((row) => (row.scope === null ? [] : [row.scope])),
+          };
+        },
         catch: (cause) => databaseFailure("credential.verify.lookup", cause),
       });
       return result;

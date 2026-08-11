@@ -1,0 +1,47 @@
+// Verifies the closed policy registry and transport-neutral rate-limit decision contract.
+
+import { describe, expect, it } from "vitest";
+import { Schema } from "effect";
+
+import {
+  RateLimitCost,
+  RateLimitDecision,
+  RateLimitPolicy,
+  rateLimitPolicies,
+  rateLimitPolicyValues,
+} from "./rate-limit";
+
+describe("rate-limit contracts", () => {
+  it("keeps every registered policy source-controlled and configured", () => {
+    expect(Object.keys(rateLimitPolicies).sort()).toEqual([...rateLimitPolicyValues].sort());
+    expect(Schema.decodeUnknownSync(RateLimitPolicy)("delivery.credential")).toBe(
+      "delivery.credential",
+    );
+    expect(() => Schema.decodeUnknownSync(RateLimitPolicy)("caller.policy")).toThrow();
+  });
+
+  it("bounds weighted costs before store evaluation", () => {
+    expect(Schema.decodeUnknownSync(RateLimitCost)(1)).toBe(1);
+    expect(Schema.decodeUnknownSync(RateLimitCost)(100)).toBe(100);
+    expect(() => Schema.decodeUnknownSync(RateLimitCost)(0)).toThrow();
+    expect(() => Schema.decodeUnknownSync(RateLimitCost)(101)).toThrow();
+    expect(() => Schema.decodeUnknownSync(RateLimitCost)(1.5)).toThrow();
+  });
+
+  it("decodes a complete decision without identifiers or provider details", () => {
+    const decision = Schema.decodeUnknownSync(RateLimitDecision)({
+      allowed: false,
+      policy: "delivery.anonymous",
+      cost: 6,
+      limit: 120,
+      remaining: 2,
+      resetAtEpochMs: 10_000,
+      retryAfterSeconds: 2,
+      enforcementMode: "redis",
+    });
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.retryAfterSeconds).toBe(2);
+    expect(Object.hasOwn(decision, "identity")).toBe(false);
+  });
+});

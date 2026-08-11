@@ -10,7 +10,9 @@ export default defineConfig({
     coverage: {
       include: [
         "src/contracts/**/*.ts",
+        "src/lib/delivery-query.ts",
         "src/lib/entry-values.ts",
+        "src/lib/network-source.ts",
         "src/lib/publication-snapshot.ts",
         "src/observability/**/*.ts",
         "src/operations/**/*.ts",

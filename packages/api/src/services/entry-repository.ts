@@ -24,6 +24,7 @@ import { ApiErrorDetail } from "../contracts/api-response";
 import {
   CmsEntry,
   CmsEntryDraft,
+  EntryId,
   CmsEntryPage,
   EntryRevisionPage,
   EntryRevisionSummary,
@@ -702,7 +703,7 @@ function collectReferenceUses(options: {
     path: string,
     effective: "shared" | "localized",
   ) => {
-    if (field.kind === "reference" && typeof value === "string") {
+    if (field.kind === "reference" && Schema.is(EntryId)(value)) {
       uses.push({
         entryId: value,
         targetCollectionId: field.configuration.targetCollectionId,

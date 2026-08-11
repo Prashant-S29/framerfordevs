@@ -99,7 +99,7 @@ const AccessRepositoryTest = Layer.succeed(AccessRepository, {
 });
 
 const SecretGeneratorTest = Layer.succeed(SecretGenerator, {
-  ...makeSecretGenerator(Buffer.alloc(32, 1)),
+  ...makeSecretGenerator(),
   generateInvitationToken: () =>
     Effect.succeed(Schema.decodeUnknownSync(InspectProjectInvitationInput)({ token }).token),
   digest: () => Effect.succeed("a".repeat(64)),

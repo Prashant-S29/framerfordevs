@@ -373,6 +373,26 @@ describe.sequential("platform API contracts", () => {
       },
     ],
     [
+      "platform/projects/collections/deliveryConfiguration/get",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+      },
+    ],
+    [
+      "platform/projects/collections/deliveryConfiguration/update",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+        expectedVersion: 1,
+        access: "protected",
+        publicAccessAcknowledged: false,
+        fields: [],
+      },
+    ],
+    [
       "platform/projects/collections/schema/fields/update",
       {
         projectId: "019fae8b-1234-7000-8000-000000000001",

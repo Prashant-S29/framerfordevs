@@ -34,6 +34,8 @@ import {
   rotateApiCredential,
 } from "../operations/credentials";
 import { CredentialAttemptLimiterLive } from "./credential-attempt-limiter";
+import { makeRateLimitManagerLive } from "./rate-limit-manager";
+import { MemoryRateLimitFallbackStoreLive, MemoryRateLimitStoreLive } from "./rate-limit-store";
 import {
   type AuthenticateCredentialInput,
   CredentialAuthenticator,
@@ -57,10 +59,20 @@ const developerId = `m3-credential-developer-${suffix}`;
 const editorId = `m3-credential-editor-${suffix}`;
 const ownerActor = Schema.decodeUnknownSync(AuthUserId)(ownerId);
 const platform = makePlatformRepository();
+const RateLimitManagerTest = makeRateLimitManagerLive({
+  fingerprintSecret: "credential-integration-rate-limit-secret-32-bytes",
+}).pipe(
+  Layer.provide(
+    Layer.mergeAll(MemoryRateLimitStoreLive, MemoryRateLimitFallbackStoreLive, TelemetryLive),
+  ),
+);
+const CredentialAttemptLimiterTest = CredentialAttemptLimiterLive.pipe(
+  Layer.provide(RateLimitManagerTest),
+);
 const SecurityLayer = Layer.mergeAll(
   CredentialRepositoryLive,
   SecretGeneratorLive,
-  CredentialAttemptLimiterLive,
+  CredentialAttemptLimiterTest,
   PolicyServiceLive,
   CredentialAuthenticatorLive,
   TelemetryLive,
@@ -581,6 +593,8 @@ describe.sequential("credential repository PostgreSQL integration", () => {
         const plans = yield* Effect.promise(() =>
           db.transaction(async (transaction) => {
             await transaction.execute(sql`set local enable_seqscan = off`);
+            await transaction.execute(sql`set local enable_bitmapscan = off`);
+            await transaction.execute(sql`set local enable_sort = off`);
             const verification = await transaction.execute(
               sql`explain (format json) select id from api_credential where id = ${credential.id} limit 1`,
             );

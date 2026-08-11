@@ -1,5 +1,8 @@
+// Defines bounded application metrics and the replaceable telemetry service used by business operations.
+
 import { Context, Effect, Layer, Metric, MetricBoundaries, Schema } from "effect";
 
+import type { RateLimitEnforcementMode, RateLimitPolicy } from "../contracts/rate-limit";
 import type { HttpMethod, RouteFamily } from "./request-context";
 
 export const StatusFamilySchema = Schema.Literal("1xx", "2xx", "3xx", "4xx", "5xx");
@@ -62,6 +65,43 @@ export type EntryPublicationValidationCategory =
   | "reference_target_locale_unpublished"
   | "snapshot_size_exceeded"
   | "other";
+
+export interface RateLimitDecisionMetric {
+  readonly policy: RateLimitPolicy;
+  readonly enforcementMode: RateLimitEnforcementMode;
+  readonly outcome: "allowed" | "limited";
+}
+
+export interface RateLimitStoreMetric {
+  readonly result:
+    | "success"
+    | "script_reload"
+    | "connection"
+    | "timeout"
+    | "command"
+    | "invalid_response"
+    | "degraded"
+    | "recovered";
+  readonly durationMs: number;
+}
+
+export interface TelemetryService {
+  readonly recordHttpRequest: (event: HttpRequestMetric) => Effect.Effect<void>;
+  readonly recordDefect: (routeFamily: RouteFamily) => Effect.Effect<void>;
+  readonly recordCredentialVerification: (
+    event: CredentialVerificationMetric,
+  ) => Effect.Effect<void>;
+  readonly recordLocaleMutation: (event: LocaleMutationMetric) => Effect.Effect<void>;
+  readonly recordSchemaMutation: (event: SchemaMutationMetric) => Effect.Effect<void>;
+  readonly recordSchemaValidation: (event: SchemaValidationMetric) => Effect.Effect<void>;
+  readonly recordSchemaPublication: (event: SchemaPublicationMetric) => Effect.Effect<void>;
+  readonly recordEntryPublication: (event: EntryPublicationMetric) => Effect.Effect<void>;
+  readonly recordEntryPublicationValidationFailure: (
+    category: EntryPublicationValidationCategory,
+  ) => Effect.Effect<void>;
+  readonly recordRateLimitDecision: (event: RateLimitDecisionMetric) => Effect.Effect<void>;
+  readonly recordRateLimitStore: (event: RateLimitStoreMetric) => Effect.Effect<void>;
+}
 
 const requestCount = Metric.counter("http_requests_total", {
   description: "Total inbound HTTP requests",
@@ -126,6 +166,22 @@ const entryPublicationValidationFailureCount = Metric.counter(
   { description: "Entry publication validation failures by bounded category", incremental: true },
 );
 
+const rateLimitDecisionCount = Metric.counter("rate_limit_decisions_total", {
+  description: "Rate-limit decisions by closed policy, enforcement mode, and outcome",
+  incremental: true,
+});
+
+const rateLimitStoreCount = Metric.counter("rate_limit_store_operations_total", {
+  description: "Rate-limit store outcomes and degraded-mode transitions",
+  incremental: true,
+});
+
+const rateLimitStoreLatency = Metric.histogram(
+  "rate_limit_store_duration_ms",
+  MetricBoundaries.exponential({ start: 1, factor: 2, count: 12 }),
+  "Rate-limit primary-store duration in milliseconds",
+);
+
 function withRequestLabels<Type, In, Out>(
   metric: Metric.Metric<Type, In, Out>,
   event: HttpRequestMetric,
@@ -137,24 +193,7 @@ function withRequestLabels<Type, In, Out>(
   );
 }
 
-export class Telemetry extends Context.Tag("Telemetry")<
-  Telemetry,
-  {
-    readonly recordHttpRequest: (event: HttpRequestMetric) => Effect.Effect<void>;
-    readonly recordDefect: (routeFamily: RouteFamily) => Effect.Effect<void>;
-    readonly recordCredentialVerification: (
-      event: CredentialVerificationMetric,
-    ) => Effect.Effect<void>;
-    readonly recordLocaleMutation: (event: LocaleMutationMetric) => Effect.Effect<void>;
-    readonly recordSchemaMutation: (event: SchemaMutationMetric) => Effect.Effect<void>;
-    readonly recordSchemaValidation: (event: SchemaValidationMetric) => Effect.Effect<void>;
-    readonly recordSchemaPublication: (event: SchemaPublicationMetric) => Effect.Effect<void>;
-    readonly recordEntryPublication: (event: EntryPublicationMetric) => Effect.Effect<void>;
-    readonly recordEntryPublicationValidationFailure: (
-      category: EntryPublicationValidationCategory,
-    ) => Effect.Effect<void>;
-  }
->() {}
+export class Telemetry extends Context.Tag("Telemetry")<Telemetry, TelemetryService>() {}
 
 export const TelemetryLive = Layer.succeed(Telemetry, {
   recordHttpRequest: (event) =>
@@ -236,6 +275,27 @@ export const TelemetryLive = Layer.succeed(Telemetry, {
   },
   recordEntryPublicationValidationFailure: (category) =>
     Metric.update(Metric.tagged(entryPublicationValidationFailureCount, "category", category), 1),
+  recordRateLimitDecision: (event) =>
+    Metric.update(
+      Metric.tagged(
+        Metric.tagged(
+          Metric.tagged(rateLimitDecisionCount, "policy", event.policy),
+          "enforcement_mode",
+          event.enforcementMode,
+        ),
+        "outcome",
+        event.outcome,
+      ),
+      1,
+    ),
+  recordRateLimitStore: (event) => {
+    const resultMetric = Metric.tagged(rateLimitStoreCount, "result", event.result);
+    const latencyMetric = Metric.tagged(rateLimitStoreLatency, "result", event.result);
+    return Effect.all([
+      Metric.update(resultMetric, 1),
+      Metric.update(latencyMetric, event.durationMs),
+    ]).pipe(Effect.asVoid);
+  },
 });
 
 export function toStatusFamily(status: number): StatusFamily {

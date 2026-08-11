@@ -215,7 +215,7 @@ function isValidDateParts(year: number, month: number, day: number): boolean {
 }
 
 /** Validates and returns a canonical date string when possible. */
-function validDate(value: unknown): string | null {
+export function validDate(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const match = datePattern.exec(value);
   if (!match) return null;
@@ -226,7 +226,7 @@ function validDate(value: unknown): string | null {
 }
 
 /** Validates an RFC 3339 instant and returns its canonical UTC millisecond representation. */
-function canonicalDateTime(value: unknown): string | null {
+export function canonicalDateTime(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const match = dateTimePattern.exec(value);
   if (!match) return null;

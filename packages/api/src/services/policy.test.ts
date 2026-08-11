@@ -30,6 +30,7 @@ const expectedAllowedActions = {
     "schema.read",
     "schema.write",
     "schema.publish",
+    "delivery.configure",
     "content.read",
     "content.write",
     "content.review",
@@ -244,6 +245,7 @@ describe("PolicyService", () => {
             policy.decideUser(selectedDeveloper),
             policy.decideUser({ ...selectedDeveloper, action: "schema.write" }),
             policy.decideUser({ ...selectedDeveloper, action: "schema.publish" }),
+            policy.decideUser({ ...selectedDeveloper, action: "delivery.configure" }),
             policy.decideUser({ ...selectedDeveloper, action: "project.credential.issue" }),
             policy.decideUser({ ...selectedDeveloper, action: "project.credential.rotate" }),
             policy.decideUser({ ...selectedDeveloper, action: "project.credential.revoke" }),
@@ -252,7 +254,7 @@ describe("PolicyService", () => {
 
           assert.deepEqual(
             decisions.map((decision) => decision.allowed),
-            [false, false, false, false, false, true, true],
+            [false, false, false, false, false, false, true, true],
           );
         }),
     );

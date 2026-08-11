@@ -80,8 +80,15 @@ describe("server foundation", () => {
     expect(String(oversized.headers["x-request-id"])).toMatch(/^[A-Za-z0-9._:-]{1,128}$/);
   });
 
-  it("serves the OpenAPI reference for GET requests", async () => {
+  it("keeps the complete management API reference disabled by default", async () => {
     const response = await request(app).get("/api-reference");
+
+    expect(response.status).toBe(404);
+  });
+
+  it("serves the management API reference only when explicitly enabled locally", async () => {
+    const internalApp = createApp({ managementApiReferenceEnabled: true });
+    const response = await request(internalApp).get("/api-reference");
 
     expect(response.status).toBe(200);
     expect(response.headers["content-type"]).toContain("text/html");
@@ -170,6 +177,79 @@ describe("CORS policy", () => {
     expect(response.status).toBe(403);
     expect(response.headers["access-control-allow-origin"]).toBeUndefined();
     expect(response.body.error.code).toBe("FORBIDDEN");
+  });
+
+  it("isolates wildcard non-credentialed Delivery CORS from management CORS", async () => {
+    const response = await request(app)
+      .get("/api/delivery/v1/openapi.json")
+      .set("Origin", "https://consumer.example");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBe("*");
+    expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(response.body.info).toEqual(
+      expect.objectContaining({
+        title: "Framer for Devs Delivery API",
+        version: "1.0.0",
+      }),
+    );
+    expect(Object.keys(response.body.paths)).toHaveLength(4);
+  });
+
+  it("serves an interactive Delivery-only API reference", async () => {
+    const response = await request(app).get("/api/delivery/v1/docs");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/html");
+    expect(response.text).toContain("Framer for Devs Delivery API");
+    expect(response.text).toContain("/api/delivery/v1/openapi.json");
+    expect(response.text).not.toContain("platform.workspaces");
+  });
+
+  it("validates Delivery preflight methods and headers without content authentication", async () => {
+    const path =
+      "/api/delivery/v1/projects/019fae8b-1234-7000-8000-000000000001/environments/main/collections/posts/entries";
+    const allowed = await request(app)
+      .options(path)
+      .set("Origin", "https://consumer.example")
+      .set("Access-Control-Request-Method", "GET")
+      .set("Access-Control-Request-Headers", "Authorization, If-None-Match");
+    const denied = await request(app)
+      .options(path)
+      .set("Origin", "https://consumer.example")
+      .set("Access-Control-Request-Method", "POST");
+
+    expect(allowed.status).toBe(204);
+    expect(allowed.headers["access-control-allow-origin"]).toBe("*");
+    expect(denied.status).toBe(403);
+    expect(denied.body.error.code).toBe("FORBIDDEN");
+  });
+
+  it("requires explicit locale before Delivery scope database resolution", async () => {
+    const enabledApp = createApp({ deliveryApiEnabled: true });
+    const response = await request(enabledApp).get(
+      "/api/delivery/v1/projects/019fae8b-1234-7000-8000-000000000001/environments/main/collections/posts/entries",
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.headers["access-control-allow-origin"]).toBe("*");
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    expect(response.body.error.details).toEqual([
+      expect.objectContaining({ code: "locale_required", path: "locale" }),
+    ]);
+  });
+
+  it("keeps Delivery data routes disabled until backfill verification", async () => {
+    const disabledApp = createApp({ deliveryApiEnabled: false });
+    const response = await request(disabledApp).get(
+      "/api/delivery/v1/projects/019fae8b-1234-7000-8000-000000000001/environments/main/collections/posts/entries?locale=en",
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers["access-control-allow-origin"]).toBe("*");
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.body.error.code).toBe("SERVICE_UNAVAILABLE");
   });
 });
 

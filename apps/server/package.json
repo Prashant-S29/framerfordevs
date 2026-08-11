@@ -20,6 +20,7 @@
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
+    "@scalar/express-api-reference": "^0.10.13",
     "better-auth": "catalog:",
     "cors": "^2.8.6",
     "dotenv": "catalog:",

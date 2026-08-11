@@ -5,8 +5,11 @@ import { createHash } from "node:crypto";
 import { db } from "@framerfordevs/db";
 import { and, desc, eq, inArray, lt, or, sql } from "@framerfordevs/db/query";
 import {
+  cmsCollectionDeliveryField,
+  cmsCollectionLocaleDeliveryState,
   cmsCollectionSchemaHead,
   cmsEntry,
+  cmsEntryLocaleDeliveryCurrentValue,
   cmsEntryLocaleDeliverySnapshot,
   cmsEntryLocaleDraft,
   cmsEntryLocalePublication,
@@ -58,6 +61,7 @@ import {
 import type { AuthUserId } from "../contracts/platform";
 import {
   CollectionFieldDefinition,
+  CollectionFieldId,
   defaultFieldEditorMetadata,
   type CollectionFieldDefinition as CollectionField,
 } from "../contracts/schemas";
@@ -69,6 +73,7 @@ import {
   type PublicationReferenceUse,
   type ResolvedPublicationReference,
 } from "../lib/publication-snapshot";
+import { compileDeliveryProjections, type DeliveryProjectionRow } from "../lib/delivery-projection";
 import { canonicalizeEntryValue } from "../lib/entry-values";
 import type { ApplicationDb, ApplicationExecutor, ApplicationTransaction } from "./project-access";
 import { authorizeUserProject, selectUserProjectAccess } from "./project-access";
@@ -96,6 +101,140 @@ function toIso(value: Date): string {
 
 function digest(value: unknown): string {
   return createHash("sha256").update(canonicalizeEntryValue(value)).digest("hex");
+}
+
+const deliveryUniqueConstraints = new Set([
+  "cms_entry_locale_delivery_value_text_unique",
+  "cms_entry_locale_delivery_value_number_unique",
+  "cms_entry_locale_delivery_value_decimal_unique",
+  "cms_entry_locale_delivery_value_date_unique",
+  "cms_entry_locale_delivery_value_date_time_unique",
+  "cms_entry_locale_delivery_value_reference_unique",
+]);
+
+/** Finds a known PostgreSQL constraint through bounded wrapped causes. */
+function hasConstraint(cause: unknown, constraints: ReadonlySet<string>, depth = 0): boolean {
+  if (depth > 4 || typeof cause !== "object" || cause === null) return false;
+  const constraint = Reflect.get(cause, "constraint");
+  const nestedCause = Reflect.get(cause, "cause");
+  return (
+    (typeof constraint === "string" && constraints.has(constraint)) ||
+    (nestedCause !== undefined && hasConstraint(nestedCause, constraints, depth + 1))
+  );
+}
+
+/** Maps the final race-safe unique authority without exposing the conflicting value. */
+function publicationPersistenceFailure(operation: string, cause: unknown) {
+  return hasConstraint(cause, deliveryUniqueConstraints)
+    ? EntryPublicationInvalidFailure.make({
+        issues: [
+          EntryPublicationValidationIssue.make({
+            fieldId: null,
+            path: "data",
+            code: "delivery_unique_value_conflict",
+            message: "A current publication already claims this configured unique value.",
+          }),
+        ],
+      })
+    : databaseFailure(operation, cause);
+}
+
+/** Converts one pure typed projection into exactly one populated database value column. */
+function projectionInsertValue(options: {
+  readonly row: DeliveryProjectionRow;
+  readonly publicationId: string;
+  readonly entry: typeof cmsEntry.$inferSelect;
+  readonly localeId: string;
+}): typeof cmsEntryLocaleDeliveryCurrentValue.$inferInsert {
+  const common = {
+    entryId: options.entry.id,
+    localeId: options.localeId,
+    fieldId: options.row.fieldId,
+    publicationId: options.publicationId,
+    workspaceId: options.entry.workspaceId,
+    projectId: options.entry.projectId,
+    environmentId: options.entry.environmentId,
+    collectionId: options.entry.collectionId,
+    valueKind: options.row.kind,
+    uniqueLookup: options.row.uniqueLookup,
+  };
+  if (
+    options.row.kind === "short_text" ||
+    options.row.kind === "slug" ||
+    options.row.kind === "email" ||
+    options.row.kind === "enum"
+  ) {
+    return { ...common, textValue: String(options.row.value) };
+  }
+  if (options.row.kind === "number") return { ...common, numberValue: Number(options.row.value) };
+  if (options.row.kind === "decimal") return { ...common, decimalValue: String(options.row.value) };
+  if (options.row.kind === "boolean") {
+    return { ...common, booleanValue: options.row.value === true };
+  }
+  if (options.row.kind === "date") return { ...common, dateValue: String(options.row.value) };
+  if (options.row.kind === "date_time") {
+    return { ...common, dateTimeValue: String(options.row.value) };
+  }
+  return { ...common, referenceValue: String(options.row.value) };
+}
+
+/** Serializes potential unique claims in deterministic digest order before index enforcement. */
+async function lockUniqueDeliveryClaims(
+  transaction: ApplicationTransaction,
+  rows: ReadonlyArray<DeliveryProjectionRow>,
+  scope: { readonly collectionId: string; readonly localeId: string },
+): Promise<void> {
+  const claims = rows
+    .filter((row) => row.uniqueLookup)
+    .map((row) =>
+      createHash("sha256")
+        .update(
+          canonicalizeEntryValue([
+            scope.collectionId,
+            scope.localeId,
+            row.fieldId,
+            row.kind,
+            row.value,
+          ]),
+        )
+        .digest("hex"),
+    )
+    .sort();
+  for (const claim of claims) {
+    await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${claim}, 0))`);
+  }
+}
+
+/** Increments the conservative collection-locale traversal generation once per state change. */
+async function incrementDeliveryGeneration(
+  transaction: ApplicationTransaction,
+  options: {
+    readonly entry: typeof cmsEntry.$inferSelect;
+    readonly localeId: string;
+    readonly now: Date;
+  },
+): Promise<void> {
+  await transaction
+    .insert(cmsCollectionLocaleDeliveryState)
+    .values({
+      collectionId: options.entry.collectionId,
+      localeId: options.localeId,
+      workspaceId: options.entry.workspaceId,
+      projectId: options.entry.projectId,
+      environmentId: options.entry.environmentId,
+      generation: 1n,
+      lastChangedAt: options.now,
+    })
+    .onConflictDoUpdate({
+      target: [
+        cmsCollectionLocaleDeliveryState.collectionId,
+        cmsCollectionLocaleDeliveryState.localeId,
+      ],
+      set: {
+        generation: sql`${cmsCollectionLocaleDeliveryState.generation} + 1`,
+        lastChangedAt: options.now,
+      },
+    });
 }
 
 function entryValues(value: unknown): EntryValues {
@@ -967,6 +1106,8 @@ export type PublicationFailureStage =
   | "snapshot"
   | "references"
   | "pointer"
+  | "projection"
+  | "generation"
   | "audit"
   | "outbox"
   | "receipt";
@@ -1214,6 +1355,37 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
                 resultKind: "no_op" as const,
               });
             }
+            const deliveryCapabilities = await transaction
+              .select({
+                fieldId: cmsCollectionDeliveryField.fieldId,
+                uniqueLookup: cmsCollectionDeliveryField.uniqueLookup,
+              })
+              .from(cmsCollectionDeliveryField)
+              .where(eq(cmsCollectionDeliveryField.collectionId, entry.collectionId));
+            const projection = compileDeliveryProjections(
+              contract.fields,
+              compiled.candidate.document.data,
+              deliveryCapabilities,
+            );
+            if (!projection.valid) {
+              return withValue("invalid", {
+                issues: projection.issues.map((issue) =>
+                  EntryPublicationValidationIssue.make({
+                    fieldId:
+                      issue.fieldId === null
+                        ? null
+                        : Schema.decodeUnknownSync(CollectionFieldId)(issue.fieldId),
+                    path: issue.path,
+                    code: issue.code,
+                    message: issue.message,
+                  }),
+                ),
+              });
+            }
+            await lockUniqueDeliveryClaims(transaction, projection.rows, {
+              collectionId: entry.collectionId,
+              localeId: scope.access.locale.id,
+            });
             const publicationSequence = (head?.latestPublicationSequence ?? 0) + 1;
             const eventSequence = entry.publicationEventSequence + 1;
             await transaction
@@ -1320,6 +1492,14 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
                 })),
               );
             failAfter("references");
+            await transaction
+              .delete(cmsEntryLocaleDeliveryCurrentValue)
+              .where(
+                and(
+                  eq(cmsEntryLocaleDeliveryCurrentValue.entryId, entry.id),
+                  eq(cmsEntryLocaleDeliveryCurrentValue.localeId, scope.access.locale.id),
+                ),
+              );
             const stateVersion = (head?.version ?? 0) + 1;
             await transaction
               .insert(cmsEntryLocalePublicationHead)
@@ -1350,6 +1530,25 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
                 },
               });
             failAfter("pointer");
+            if (projection.rows.length > 0) {
+              await transaction.insert(cmsEntryLocaleDeliveryCurrentValue).values(
+                projection.rows.map((row) =>
+                  projectionInsertValue({
+                    row,
+                    publicationId: publication.id,
+                    entry,
+                    localeId: scope.access.locale.id,
+                  }),
+                ),
+              );
+            }
+            failAfter("projection");
+            await incrementDeliveryGeneration(transaction, {
+              entry,
+              localeId: scope.access.locale.id,
+              now,
+            });
+            failAfter("generation");
             await transaction.insert(auditEvent).values(
               makeAudit({
                 workspaceId: entry.workspaceId,
@@ -1434,7 +1633,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               resultKind: "changed" as const,
             });
           }),
-        catch: (cause) => databaseFailure("publication.publish", cause),
+        catch: (cause) => publicationPersistenceFailure("publication.publish", cause),
       });
       if (result.kind === "command_conflict") return yield* EntryCommandConflictFailure.make();
       if (result.kind === "publication_conflict")
@@ -1558,6 +1757,14 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
                 ),
               );
             failAfter("event_sequence");
+            await transaction
+              .delete(cmsEntryLocaleDeliveryCurrentValue)
+              .where(
+                and(
+                  eq(cmsEntryLocaleDeliveryCurrentValue.entryId, entry.id),
+                  eq(cmsEntryLocaleDeliveryCurrentValue.localeId, scope.access.locale.id),
+                ),
+              );
             const nextVersion = head.version + 1;
             await transaction
               .update(cmsEntryLocalePublicationHead)
@@ -1576,6 +1783,13 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
                 ),
               );
             failAfter("pointer");
+            failAfter("projection");
+            await incrementDeliveryGeneration(transaction, {
+              entry,
+              localeId: scope.access.locale.id,
+              now,
+            });
+            failAfter("generation");
             await transaction.insert(auditEvent).values(
               makeAudit({
                 workspaceId: entry.workspaceId,

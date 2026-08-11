@@ -398,6 +398,86 @@ Record a learning when an implementation or decision:
 
 ---
 
+## 2026-08-09 — Generated foreign-key order must respect newly introduced referenced authority
+
+**Context:** M9 added a composite current-head foreign key from typed Delivery values and a matching unique constraint on the existing publication-head table.
+
+**Incorrect assumption or decision:** The generated migration placed the new foreign key before the new referenced unique constraint and therefore treated structurally correct final schema output as executable in arbitrary statement order.
+
+**Cost or risk:** The first developer-controlled migration attempt failed with PostgreSQL reporting no matching unique constraint. PostgreSQL rolled the migration back transactionally, but application was delayed and required a reviewed statement-order correction.
+
+**Learning:** A valid final Drizzle schema does not guarantee that generated cross-table constraint statements are ordered so PostgreSQL can execute them. New foreign keys that depend on new uniqueness over an existing table require explicit generated-SQL dependency review.
+
+**Prevention:** Before developer application, inspect every generated foreign key's referenced uniqueness and ensure the primary/unique constraint is created first. After any failed application, verify table, constraint, index, and journal rollback read-only before retrying; never rewrite an applied migration.
+
+**Status:** Resolved. The developer applied corrected migration 0009, and the live catalog verifies the authority and all four M9 tables.
+
+---
+
+## 2026-08-11 — Invalid reference identities must be rejected before typed database predicates
+
+**Context:** Manual M9 fixture authoring entered a non-UUID string into a reference field and then saved the draft.
+
+**Incorrect assumption or decision:** Draft validation correctly produced `reference_invalid`, but reference-availability collection still treated every string as queryable and passed the malformed value to a PostgreSQL UUID predicate.
+
+**Cost or risk:** PostgreSQL rejected the cast, the typed validation result was replaced by a generic infrastructure failure, and the UI reported that a required service was unavailable. This allowed untrusted malformed input to reach a database type boundary unnecessarily.
+
+**Learning:** Validation findings do not themselves make later database use safe. Every collector that feeds typed SQL must independently narrow untrusted values to the exact branded identity before query construction.
+
+**Prevention:** Reference availability now collects only values accepted by the branded `EntryId` schema; malformed strings remain in deterministic validation issues and never reach SQL. PostgreSQL integration coverage asserts the typed failure. The generated form also suppresses stale server issues immediately after the corresponding field is edited.
+
+**Status:** Resolved and deployed to the rebuilt healthy local Docker web/server services.
+
+---
+
+## 2026-08-11 — Publicly routable application backends are not public integration contracts
+
+**Context:** M9 had a dedicated Delivery specification, but the server also exposed the complete dashboard oRPC reference at a public path, making internal management contracts discoverable alongside the intended public API.
+
+**Incorrect assumption or decision:** Treating every generated OpenAPI document as equally publishable conflated three surfaces: supported developer APIs, authenticated browser application backends, and operator-only artifacts.
+
+**Cost or risk:** A future developer portal could accidentally publish workspace, authoring, membership, credential-management, Better Auth, or operator contracts; hiding URLs alone would not secure the browser-facing management backend.
+
+**Learning:** Public contract status must be explicit and allowlisted. Delivery/Preview/webhook APIs are portable supported integrations; dashboard RPC remains session-authenticated application infrastructure; management references and operator endpoints remain internal even when their schemas are generated and tested.
+
+**Prevention:** M9 now exposes only a schema-reconciled Delivery specification, disables the aggregate management reference by default, and forbids it in production. M12 owns an allowlisted public contract registry and developer portal; M14 must prove host/ingress separation and route non-exposure. Management RPC still relies on authentication, authorization, tenant isolation, and browser security rather than obscurity.
+
+**Status:** Resolved for M9; consolidated portal and production host verification are assigned to M12 and M14.
+
+---
+
+## 2026-08-11 — Milestone checklists must preserve every approved test-plan category
+
+**Context:** M9's three capacity scenarios passed and were summarized as the complete production-topology load gate.
+
+**Incorrect assumption or decision:** The completion checklist collapsed the approved performance section into its three latency rows and did not separately track the same decision's mandatory conditional-revalidation, intentional hot-identity 429, Redis outage/recovery, and oversized-response/memory gates.
+
+**Cost or risk:** M9 was nearly presented for approval without real-topology evidence for its most important limiter degradation and resource-boundary behavior, despite the load README still stating that two profiles remained.
+
+**Learning:** A headline baseline table is not the whole approved test plan. Completion evidence must map one-to-one to every explicit bullet and separately expected-failure profiles must never disappear into a successful-traffic summary.
+
+**Prevention:** The M9 checklist, k6 scenario registry, wrapper, README, and baseline report now enumerate capacity, resilience, revalidation, and response-boundary profiles independently. Future milestone closure must reconcile every approved decision test bullet before `[R]` or `[A]` handoff.
+
+**Status:** Resolved. All seven M9 profiles and final restoration/resource invariants pass.
+
+---
+
+## 2026-08-11 — Load gates must verify dependency paths and environment bytes, not container names
+
+**Context:** The first M9 production-topology runs saw multi-second latency and stable authorization/rate failures despite healthy-looking server/PostgreSQL processes and a nominal Redis container.
+
+**Incorrect assumption or decision:** The existing Redis container had no active Compose network attachment, so every primary limiter call waited for its timeout before degrading. Separately, Docker `--env-file` preserved shell-safe quote characters around credentials, IDs, slugs, and filter values; those quotes became real request data. Repeated unnamed hot-path planning also consumed avoidable PostgreSQL CPU.
+
+**Cost or risk:** Initial load results incorrectly suggested the Delivery repository could not meet its targets, generated false invalid-credential/global-limit/404 outcomes, and saturated PostgreSQL well below the approved rates.
+
+**Learning:** A production-style load gate must verify end-to-end dependency connectivity, exact environment bytes as seen by the load process, limiter enforcement mode, and hot query planning—not merely container health or source-file appearance.
+
+**Prevention:** Compose Redis now uses a non-conflicting configurable host port and verified internal DNS/network connectivity; the server restarts only after Redis is healthy. The k6 wrapper sources the ignored environment and passes values by variable name rather than Docker `--env-file`. Warm-up is excluded from measured custom metrics, credentials use scenario-global round-robin selection, hot credential/Delivery reads use named prepared statements, and production load runs use error-level application logging. Final baseline and post-run resource invariants are recorded.
+
+**Status:** Resolved. All three approved scenarios pass with zero measured errors or dropped iterations.
+
+---
+
 ## Current implementation learnings
 
-The platform authorization, locale foundations, versioned schema engine, field system, schema-authoring workbench, stable entries, multilingual drafts, revision history, independent locale publication, and immutable delivery snapshots are developer-approved and committed through Milestone 8 at `ad3cd5e`. M8 closed with 627 passing tests, clean audits, clean database invariants, and the verified developer-generated/applied migration. Its compiler fixture remains 692,046 combined canonical bytes with 34.00% headroom under the provisional 1 MiB maximum. M9 Production Delivery API design discovery is next; no M9 implementation has begun. Additional entries should be added only when consequential drift or rework occurs.
+The platform authorization, locale foundations, versioned schema engine, field system, schema-authoring workbench, stable entries, multilingual drafts, revision history, independent locale publication, and immutable delivery snapshots are developer-approved and committed through Milestone 8 at `ad3cd5e`. M9 Production Delivery API has passed its complete automated readiness gate: its approved migration and operator backfill are applied and the public Delivery/API/read-model/UI path is implemented. Production-topology load execution and developer manual review remain. Additional entries should be added only when consequential drift or rework occurs.

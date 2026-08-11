@@ -120,6 +120,24 @@ export class EntryPublicationConflictFailure extends Schema.TaggedError<EntryPub
   details: Schema.Array(ApiErrorDetail).pipe(Schema.minItems(1), Schema.maxItems(50)),
 }) {}
 
+export class DeliveryQueryInvalidFailure extends Schema.TaggedError<DeliveryQueryInvalidFailure>(
+  "DeliveryQueryInvalidFailure",
+)("DeliveryQueryInvalidFailure", {
+  details: ValidationDetailsSchema,
+}) {}
+
+export class DeliveryCursorInvalidFailure extends Schema.TaggedError<DeliveryCursorInvalidFailure>(
+  "DeliveryCursorInvalidFailure",
+)("DeliveryCursorInvalidFailure", {}) {}
+
+export class DeliveryCursorStaleFailure extends Schema.TaggedError<DeliveryCursorStaleFailure>(
+  "DeliveryCursorStaleFailure",
+)("DeliveryCursorStaleFailure", {}) {}
+
+export class DeliveryResponseTooLargeFailure extends Schema.TaggedError<DeliveryResponseTooLargeFailure>(
+  "DeliveryResponseTooLargeFailure",
+)("DeliveryResponseTooLargeFailure", {}) {}
+
 export class InvitationConflictFailure extends Schema.TaggedError<InvitationConflictFailure>(
   "InvitationConflictFailure",
 )("InvitationConflictFailure", {}) {}
@@ -184,6 +202,10 @@ export type ApplicationError =
   | EntryRevisionIncompatibleFailure
   | EntryPublicationInvalidFailure
   | EntryPublicationConflictFailure
+  | DeliveryQueryInvalidFailure
+  | DeliveryCursorInvalidFailure
+  | DeliveryCursorStaleFailure
+  | DeliveryResponseTooLargeFailure
   | InvitationConflictFailure
   | InvitationInvalidFailure
   | LastOwnerRequiredFailure
@@ -215,6 +237,10 @@ export const apiErrorHttpStatus = {
   ENTRY_REVISION_INCOMPATIBLE: 409,
   ENTRY_PUBLICATION_INVALID: 422,
   ENTRY_PUBLICATION_CONFLICT: 409,
+  DELIVERY_QUERY_INVALID: 400,
+  DELIVERY_CURSOR_INVALID: 400,
+  DELIVERY_CURSOR_STALE: 409,
+  DELIVERY_RESPONSE_TOO_LARGE: 413,
   INVITATION_CONFLICT: 409,
   INVITATION_INVALID: 404,
   LAST_OWNER_REQUIRED: 409,
@@ -443,6 +469,31 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
         message: "Publication authority changed. Validate the selected locale again.",
         retryable: false,
         details: error.details,
+      };
+    case "DeliveryQueryInvalidFailure":
+      return {
+        code: "DELIVERY_QUERY_INVALID",
+        message: "The Delivery query is invalid or unsupported.",
+        retryable: false,
+        details: error.details,
+      };
+    case "DeliveryCursorInvalidFailure":
+      return {
+        code: "DELIVERY_CURSOR_INVALID",
+        message: "The Delivery cursor is invalid, expired, or does not match this query.",
+        retryable: false,
+      };
+    case "DeliveryCursorStaleFailure":
+      return {
+        code: "DELIVERY_CURSOR_STALE",
+        message: "Published content changed during pagination. Restart from the first page.",
+        retryable: true,
+      };
+    case "DeliveryResponseTooLargeFailure":
+      return {
+        code: "DELIVERY_RESPONSE_TOO_LARGE",
+        message: "The Delivery response is too large. Reduce the page size or expansion.",
+        retryable: false,
       };
     case "InvitationConflictFailure":
       return {

@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 8 approved and committed; Milestone 9 design discovery next
+**Overall status:** Milestone 9 automated implementation complete; awaiting developer manual review
 **Active milestone:** Milestone 9 — Production Delivery API
-**Last updated:** 2026-08-09
+**Last updated:** 2026-08-11
 
 ## Status legend
 
@@ -26,10 +26,10 @@
 | 6   | Field system and generated forms         | `[A]`  | 551 passing     | Approved      | `fbb4767` |
 | 7   | Entries and multilingual drafts          | `[A]`  | 603 passing     | Approved      | `60bd96f` |
 | 8   | Per-locale publication and snapshots     | `[A]`  | 627 passing     | Approved      | `ad3cd5e` |
-| 9   | Delivery API                             | `[ ]`  | Not run         | Pending       | None      |
+| 9   | Delivery API                             | `[R]`  | 712 passing     | Pending       | None      |
 | 10  | Preview API                              | `[ ]`  | Not run         | Pending       | None      |
 | 11  | Events, webhooks, invalidation           | `[ ]`  | Not run         | Pending       | None      |
-| 12  | Generated developer tooling              | `[ ]`  | Not run         | Pending       | None      |
+| 12  | Developer portal and generated tooling   | `[ ]`  | Not run         | Pending       | None      |
 | 13  | Client handover                          | `[ ]`  | Not run         | Pending       | None      |
 | 14  | Production hardening                     | `[ ]`  | Not run         | Pending       | None      |
 | 15  | Visual-builder readiness contracts       | `[ ]`  | Not run         | Pending       | None      |
@@ -312,9 +312,37 @@
 - `[x]` Complete final readiness, coverage, production/full audits, builds, bundle review, `git diff --check`, and read-only database fixture/invariant verification.
 - `[A]` Developer approved and committed M8 as `ad3cd5e` (`feat(m8): add independent locale publication and immutable snapshots`).
 
+## Milestone 9 checklist — design approval gate
+
+- `[x]` Re-read the product vision, CMS PRD, mandatory rules, M9 milestone criteria, M1-M8 decisions, context, progress, and learnings.
+- `[x]` Inspect the committed M8 current-publication/snapshot/reference authority, Delivery credentials/policy, Express/CORS/runtime/error/telemetry boundaries, schema/field/query seams, database indexes, UI conventions, and test infrastructure.
+- `[x]` Apply materially relevant Effect, Drizzle, PostgreSQL, Express, Better Auth, security, TanStack, shadcn/ui, React, Turborepo, and web-interface guidance.
+- `[x]` Research conditional HTTP validators/cache directives, wildcard non-credentialed CORS, signed cursor/resource-limit behavior, PostgreSQL typed indexes/keyset stability/advisory locks/query plans, connection use, and N+1 avoidance.
+- `[x]` Propose the complete design in `knowledge_base/decisions/m9-production-delivery-api-design.md`, including REST/OpenAPI contracts, strict locale behavior, protected/public access, typed query projections, uniqueness, signed generation-bound cursors, pinned expansion, cache/CORS/rate policy, observability, migration/backfill gates, and load targets.
+- `[x]` Amend the proposal with explicit collection-locale cursor invalidation guidance, rolling 15-minute continuation cursors, environment-wide credential trust semantics, complete published-field Delivery behavior, count omission, generic documentation scope, and a reusable generic Redis/memory rate-limit manager with cross-process credential quotas and no valid-credential source bucket.
+- `[A]` Developer explicitly approved the complete M9 design and authorized implementation.
+- `[x]` Implement the central weighted token-bucket manager, memory/Redis stores, atomic Redis Lua enforcement, HMAC identities, bounded degraded fallback, canonical network-source handling, adapted credential-attempt limiter, runtime/configuration wiring, and Redis integration infrastructure.
+- `[x]` Implement schema-backed Delivery contracts/errors, the strict bounded typed query parser, complete supported-root projection compiler, and rolling active/previous-key cursor signer with authority/generation/expiry binding.
+- `[x]` Implement the approved Drizzle read-model schema for protected-by-default collection configuration, field capabilities, collection-locale generation, typed current projections, current-head authority, tenant foreign keys, checks, and typed/unique indexes.
+- `[x]` Complete the developer-controlled `add_production_delivery_api_read_model` migration gate, including the protected existing-collection backfill, corrected current-head authority ordering, successful developer application, and read-only catalog verification.
+- `[x]` Create protected Delivery configuration with each collection and implement authorized complete-set optimistic management with public acknowledgement, published-field compatibility, unique capability checks, no-op suppression, audit, and outbox persistence.
+- `[x]` Extend publish/unpublish transactions with typed projection replacement/removal, deterministic advisory locking for unique claims, collection-locale generation changes, and rollback-injection coverage.
+- `[x]` Implement current/immutable/unique/list Delivery reads with exact locale and tenant authority, typed indexed predicates, signed rolling keyset pagination, broad stale detection, and bounded pinned-reference expansion.
+- `[x]` Add the rollout-gated versioned Express Delivery surface with GET/HEAD/OPTIONS, isolated wildcard no-credentials CORS, conditional credential authentication, global/identity rate limits, validators/cache policy, final response cap, and dedicated OpenAPI/reference routes.
+- `[x]` Protect configured Delivery fields from incompatible schema publication and add accessible permission-aware collection settings for access and kind-safe capabilities.
+- `[x]` Add the explicit dry-run/apply backfill utility; developer application and read-only verification confirm all three durable current scopes have generation state and require zero typed rows for their unsupported historical root kinds.
+- `[x]` Make PostgreSQL pool and Delivery transaction time bounds explicit and add the approved manual k6 baseline profile.
+- `[x]` Pass the refreshed complete readiness gate and final read-only database invariants.
+- `[x]` Create the deterministic 10,000-publication fixture and 40 load-only credentials without exposing one-time secrets.
+- `[x]` Pass all three approved production-topology capacity scenarios and post-run connection/Redis/database invariants.
+- `[x]` Pass the separate conditional-304, weighted hot-credential cross-process 429, hard Redis outage/degraded-memory/recovery, and oversized-response rejection/memory-stability gates; restore all current boundary fixture heads/drafts and verify final invariants.
+- `[x]` Complete the schema-reconciled Delivery-only OpenAPI 3.1 document and interactive reference, snapshot-lock all four GET/HEAD/OPTIONS surfaces and protocol headers, exclude internal contracts, and disable the complete management oRPC reference by default and unconditionally in production.
+- `[x]` Amend M12 to own the allowlisted developer portal/generated tooling and M14 to prove production marketing/application/API/developer/operator host separation.
+- `[R]` Complete developer manual review.
+
 ## Current blockers
 
-No blocker. M8 implementation, verification, approval, and commit are complete. M9 design discovery is next; no M9 implementation has begun.
+None. The complete local capacity, resilience, and response-boundary load plan passes; developer manual API/UI review is the remaining milestone gate.
 
 ## Database migration state
 
@@ -332,7 +360,30 @@ The developer generated and applied `packages/db/src/migrations/0006_create_entr
 
 The developer generated and applied `packages/db/src/migrations/0007_add_entry_display_names.sql`. The agent inspected the complete SQL and snapshot without modification and verified the live catalog read-only: `display_name` is nullable `varchar(100)`, `name_version` is non-null with default `1`, all three name constraints are validated, eight migrations are recorded, four legacy entries remain null-named at valid version `1`, and no M7 constraint or index is invalid/unready. The agent did not generate, apply, execute, or modify the migration.
 
+The developer generated, corrected, and applied `packages/db/src/migrations/0009_add_production_delivery_api_read_model.sql`. The first application failed transactionally because current-head unique authority followed its referencing foreign key; read-only verification proved complete rollback. The developer replaced it with the reviewed order and applied it successfully. Live verification confirms four M9 tables, protected configuration for all existing collections, validated constraints, valid/ready indexes, and no unintended public configuration. The agent neither generated nor applied the migration.
+
 ## Test results
+
+### Milestone 9 complete automated gate
+
+- `pnpm run ready`: pass end to end, including formatting/lint, all package type checks, tests, coverage, and production server/web builds.
+- 712 tests pass: 499 API/domain/PostgreSQL, 98 server, 106 web, and 9 environment tests.
+- API coverage is 89.40% statements and 72.64% branches; the Delivery OpenAPI generator and Delivery contracts have 100% statement/branch coverage.
+- Focused API, server, web, environment, Redis, publication dual-write, Delivery configuration/read/backfill, operation, HTTP/CORS/cache, and accessibility suites pass.
+- Manual fixture entry authoring exposed and resolved two boundary defects: malformed reference strings are now rejected as typed validation before PostgreSQL UUID predicates, and edited controls immediately clear stale server-side field issues. Rebuilt Docker web/server services are healthy.
+- Developer backfill apply report: 3 current heads, 3 collection-locale scopes, 0 invalid snapshots, 0 duplicate unique claims, 0 expected scalar projection rows, and 3 applied heads.
+- Read-only post-backfill verification: no current scope lacks state, generation range is `1..1`, zero unexpected projection rows, and zero open non-idle transactions.
+- `pnpm audit --prod`, `pnpm audit`, and `git diff --check` pass.
+- Final read-only catalog verification reports 10 migrations, all four M9 tables, zero invalid constraints/indexes, zero collections without protected-by-default configuration, zero unintended public configurations, zero current scopes without generation state, zero M9 test users, and zero open non-idle transactions.
+- With explicit developer approval, two stale pre-M9 failed-test workspace graphs (and their associated reader) were removed transactionally after proving they contained zero immutable publications/snapshots; read-only verification reports zero remaining identified users/projects and unchanged three current heads with complete generation state.
+- The production-topology capacity gate passes: mixed latest/unique at 200/s reached p95 16.54 ms and p99 53.06 ms; indexed list at 100/s reached p95 24.45 ms and p99 31.90 ms; pinned expansion at 25/s reached p95 15.33 ms and p99 16.91 ms. All measured stages had zero errors and zero dropped iterations.
+- The supplemental M9 load gates pass independently: conditional ETag traffic returned 6,001 measured 304s; weighted hot-credential traffic shared through Redis across two server processes returned 450 successes and 1,350 intentional credential 429s with the stable headers/envelope; a 15-second Redis hard outage returned 3,001 measured successes and recreated 41 bounded keys after automatic recovery; and 301 oversized list requests returned stable 413s.
+- The oversized fixture was restored after each run to 10,000 current publications and a 4,794-byte current maximum. A repeated boundary run sampled server memory at 288.0 MiB initially, 288.2 MiB peak, and 282.3 MiB finally. Final verification reports zero active/waiting/open application transactions, zero current boundary documents, zero duplicate unique claims, positive bounded Redis TTLs, healthy primary services, and no temporary second server.
+- The schema-reconciled public Delivery OpenAPI document now covers every GET/HEAD/OPTIONS route, strict query bounds, schema-backed envelopes, conditional/cache/rate headers, security, examples, stale-cursor recovery, and public-only error codes; Scalar serves the interactive reference.
+- The complete management oRPC reference is disabled by default, rejected by environment validation in production, and available only through explicit local/test enablement. Snapshot/HTTP tests prove the public document excludes management/auth/operator contracts.
+- The rebuilt production Docker server serves the OpenAPI JSON and interactive reference with HTTP 200, exposes 4 paths/12 operations/10 public schemas, returns 404 for `/api-reference`, and still serves a protected fixture read with HTTP 200; all primary services are healthy.
+- The final refreshed `pnpm run ready`, production/full audits, production builds, and `git diff --check` pass after all load and documentation-boundary work.
+- Developer manual approval remains the final explicit gate.
 
 ### Milestone 8 complete automated gate
 

@@ -507,6 +507,8 @@ Serve published locale snapshots through a fast, predictable, public developer A
 - ETag, Last-Modified, and immutable publication endpoints
 - Bounded reference expansion
 - Delivery rate limits and metrics
+- Dedicated Delivery-only OpenAPI JSON and interactive reference
+- Production-safe separation from internal management API documentation
 
 ### Automated success criteria
 
@@ -529,6 +531,9 @@ Serve published locale snapshots through a fast, predictable, public developer A
 - SQL query plans for representative list/lookups use intended indexes.
 - Load tests meet the developer-approved baseline for latency, throughput, error rate, and connection use.
 - Cache and database metrics avoid project-name/entry-ID cardinality explosions.
+- Delivery OpenAPI covers all four GET/HEAD paths, OPTIONS, strict locale/query bounds, success/failure envelopes, protocol headers, authentication, examples, and stale-cursor recovery.
+- Public Delivery documentation contains no dashboard oRPC, Better Auth, workspace, draft, membership, credential-management, or operator contracts.
+- The complete management API reference is disabled by default and cannot be enabled in production.
 
 ### Manual review
 
@@ -621,14 +626,17 @@ Likely migration name: `add_webhook_delivery_system`.
 
 ---
 
-## Milestone 12 — Generated developer tooling
+## Milestone 12 — Developer portal and generated tooling
 
 ### Goal
 
-Make CMS integration strongly typed and detect contract drift.
+Make public integrations discoverable and strongly typed while detecting contract drift without exposing internal application APIs.
 
 ### Deliverables
 
+- Public developer documentation portal (target: `developers.<product-domain>`)
+- Explicit allowlisted public contract registry for Delivery, Preview, and webhook specifications
+- Versioned public OpenAPI/JSON Schema publication, guides, quickstarts, examples, changelog, and deprecation policy
 - CLI login and project linking
 - Schema pull/check/generate
 - TypeScript types
@@ -641,6 +649,10 @@ Make CMS integration strongly typed and detect contract drift.
 
 ### Automated success criteria
 
+- The developer portal publishes only explicitly allowlisted public API families and versions.
+- Dashboard oRPC, Better Auth, workspace, authoring, membership, credential-management, and operator contracts never appear in public specifications, navigation, search, or generated clients.
+- Published OpenAPI/JSON Schema artifacts match their source contract snapshots and remain byte-stable for unchanged versions.
+- Delivery, Preview, and webhook guides use their canonical public API host and contain no tenant data or credential material.
 - Generated names are deterministic and valid TypeScript for allowed API keys.
 - Optional, nullable, localized, object, list, reference, asset, and rich-text fields generate correctly.
 - Generated Effect Schemas decode valid API responses and reject malformed responses.
@@ -659,7 +671,7 @@ Make CMS integration strongly typed and detect contract drift.
 
 ### Manual review
 
-- Developer integrates a clean example app using only generated tooling and documentation.
+- Developer navigates the public portal and integrates a clean example app using only public documentation and generated tooling.
 
 ---
 
@@ -720,6 +732,8 @@ Prove the CMS can operate production websites safely and predictably.
 - Security review and dependency audit
 - Load, soak, concurrency, and recovery testing
 - Runbooks for incidents and rollback
+- Production host/ingress separation for marketing, dashboard, public APIs, developer documentation, and operator-only surfaces
+- Explicit internal management-reference and operator-endpoint access policy
 
 ### Automated success criteria
 
@@ -743,6 +757,9 @@ Prove the CMS can operate production websites safely and predictably.
 - PII/secret scanning finds no prohibited data in logs, traces, metrics, or error payloads.
 - Alert simulations prove actionable signals for elevated errors, latency, queue age, dead letters, DB exhaustion, and publication failures.
 - Rollback and recovery procedures are exercised, timed, and documented.
+- The marketing host exposes no application or API routes; the application host exposes only the dashboard plus authenticated auth/RPC boundaries; the public API host exposes only versioned allowlisted developer APIs; and the developer host serves only allowlisted public documentation/specifications.
+- The management OpenAPI reference, metrics, detailed dependency diagnostics, and operator endpoints are unreachable from public production hosts.
+- Automated host-header and route-probing tests fail on any cross-surface exposure, including redirects, CORS/preflight, alternate methods, and common documentation paths.
 
 ### Manual review
 

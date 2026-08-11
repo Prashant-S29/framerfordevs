@@ -7,6 +7,8 @@ import { projectMembership } from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
 import {
   cmsCollection,
+  cmsCollectionDeliveryConfig,
+  cmsCollectionDeliveryField,
   cmsCollectionField,
   cmsCollectionSchemaHead,
   cmsSchemaRevision,
@@ -24,6 +26,10 @@ import {
 } from "@framerfordevs/db/schema/platform";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
 
+import {
+  GetDeliveryConfigurationInput,
+  UpdateDeliveryConfigurationInput,
+} from "../contracts/delivery";
 import {
   AuthUserId,
   CreateProjectInput,
@@ -53,6 +59,7 @@ import {
   ValidateCollectionSchemaInput,
   type CmsCollection as CmsCollectionModel,
 } from "../contracts/schemas";
+import { makeDeliveryRepository } from "./delivery-repository";
 import { makePlatformRepository } from "./platform-repository";
 import { makeSchemaRepository } from "./schema-repository";
 
@@ -65,6 +72,7 @@ const foreignActor = Schema.decodeUnknownSync(AuthUserId)(foreignId);
 const readerActor = Schema.decodeUnknownSync(AuthUserId)(readerId);
 const platform = makePlatformRepository();
 const schemas = makeSchemaRepository();
+const delivery = makeDeliveryRepository();
 
 let workspaceModel: WorkspaceModel | undefined;
 let projectModel: ProjectModel | undefined;
@@ -218,8 +226,14 @@ afterAll(async () => {
     .delete(cmsSchemaRevision)
     .where(sql`${cmsSchemaRevision.collectionId} in (${ownedCollections})`);
   await db
+    .delete(cmsCollectionDeliveryField)
+    .where(sql`${cmsCollectionDeliveryField.collectionId} in (${ownedCollections})`);
+  await db
     .delete(cmsCollectionField)
     .where(sql`${cmsCollectionField.collectionId} in (${ownedCollections})`);
+  await db
+    .delete(cmsCollectionDeliveryConfig)
+    .where(sql`${cmsCollectionDeliveryConfig.collectionId} in (${ownedCollections})`);
   await db
     .delete(cmsCollection)
     .where(
@@ -280,13 +294,31 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             eq(cmsCollectionSchemaHead.collectionId, required(firstCollection, "collection").id),
           ),
       );
+      const [configuration] = yield* Effect.promise(() =>
+        db
+          .select()
+          .from(cmsCollectionDeliveryConfig)
+          .where(
+            eq(
+              cmsCollectionDeliveryConfig.collectionId,
+              required(firstCollection, "collection").id,
+            ),
+          ),
+      );
       const [audit] = yield* Effect.promise(() =>
         db
           .select()
           .from(auditEvent)
-          .where(eq(auditEvent.requestId, "request-m5-collection-create")),
+          .where(
+            and(
+              eq(auditEvent.requestId, "request-m5-collection-create"),
+              eq(auditEvent.actorId, ownerId),
+            ),
+          ),
       );
       assert.strictEqual(head?.draftVersion, 1);
+      assert.strictEqual(configuration?.access, "protected");
+      assert.strictEqual(configuration?.version, 1);
       assert.strictEqual(audit?.action, "cms.collection.created");
       assert.strictEqual(audit?.resourceId, firstCollection.id);
     }),
@@ -1330,6 +1362,138 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             .length,
           1,
         );
+      }),
+  );
+
+  it.effect(
+    "manages protected-by-default Delivery configuration as one optimistic complete set",
+    () =>
+      Effect.gen(function* () {
+        const collection = required(firstCollection, "collection");
+        const scope = {
+          projectId: collection.projectId,
+          environmentId: collection.environmentId,
+          collectionId: collection.id,
+        };
+        const initial = yield* delivery.getConfiguration(
+          ownerActor,
+          yield* Schema.decodeUnknown(GetDeliveryConfigurationInput)(scope),
+        );
+        const denied = yield* Effect.exit(
+          delivery.getConfiguration(
+            readerActor,
+            yield* Schema.decodeUnknown(GetDeliveryConfigurationInput)(scope),
+          ),
+        );
+        const published = yield* schemas.getLatestPublished(
+          ownerActor,
+          yield* Schema.decodeUnknown(GetLatestPublishedSchemaInput)(scope),
+        );
+        const field = published.fields.find(
+          (candidate) => candidate.nodeRole === "root" && candidate.kind === "short_text",
+        );
+        if (field?.apiKey === null || field === undefined) {
+          throw new Error("A current root short-text field was not found.");
+        }
+        const capability = {
+          fieldId: field.id,
+          fieldKey: field.apiKey,
+          kind: field.kind,
+          filterable: true,
+          sortable: true,
+          uniqueLookup: false,
+        };
+        const unacknowledged = yield* Effect.exit(
+          delivery.updateConfiguration(
+            ownerActor,
+            yield* Schema.decodeUnknown(UpdateDeliveryConfigurationInput)({
+              ...scope,
+              expectedVersion: initial.version,
+              access: "public",
+              publicAccessAcknowledged: false,
+              fields: [capability],
+            }),
+            new Date("2026-08-01T14:05:30.000Z"),
+            `request-m9-delivery-unacknowledged-${suffix}`,
+          ),
+        );
+        const configured = yield* delivery.updateConfiguration(
+          ownerActor,
+          yield* Schema.decodeUnknown(UpdateDeliveryConfigurationInput)({
+            ...scope,
+            expectedVersion: initial.version,
+            access: "protected",
+            publicAccessAcknowledged: false,
+            fields: [capability],
+          }),
+          new Date("2026-08-01T14:05:31.000Z"),
+          `request-m9-delivery-fields-${suffix}`,
+        );
+        const publicConfiguration = yield* delivery.updateConfiguration(
+          ownerActor,
+          yield* Schema.decodeUnknown(UpdateDeliveryConfigurationInput)({
+            ...scope,
+            expectedVersion: configured.version,
+            access: "public",
+            publicAccessAcknowledged: true,
+            fields: [capability],
+          }),
+          new Date("2026-08-01T14:05:32.000Z"),
+          `request-m9-delivery-public-${suffix}`,
+        );
+        const noOp = yield* delivery.updateConfiguration(
+          ownerActor,
+          yield* Schema.decodeUnknown(UpdateDeliveryConfigurationInput)({
+            ...scope,
+            expectedVersion: publicConfiguration.version,
+            access: "public",
+            publicAccessAcknowledged: false,
+            fields: [capability],
+          }),
+          new Date("2026-08-01T14:05:33.000Z"),
+          `request-m9-delivery-no-op-${suffix}`,
+        );
+        const stale = yield* Effect.exit(
+          delivery.updateConfiguration(
+            ownerActor,
+            yield* Schema.decodeUnknown(UpdateDeliveryConfigurationInput)({
+              ...scope,
+              expectedVersion: configured.version,
+              access: "protected",
+              publicAccessAcknowledged: false,
+              fields: [],
+            }),
+            new Date("2026-08-01T14:05:34.000Z"),
+            `request-m9-delivery-stale-${suffix}`,
+          ),
+        );
+        const [mutationCount] = yield* Effect.promise(() =>
+          db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(auditEvent)
+            .where(
+              and(
+                eq(auditEvent.actorId, ownerId),
+                eq(auditEvent.action, "cms.collection.delivery_config.updated"),
+                eq(auditEvent.resourceId, collection.id),
+              ),
+            ),
+        );
+
+        assert.strictEqual(initial.access, "protected");
+        assert.strictEqual(initial.version, 1);
+        assert.deepStrictEqual(initial.fields, []);
+        assert.strictEqual(failureTag(denied), "ForbiddenFailure");
+        assert.include(
+          failureIssueCodes(unacknowledged),
+          "delivery_public_access_acknowledgement_required",
+        );
+        assert.strictEqual(configured.version, 2);
+        assert.strictEqual(publicConfiguration.version, 3);
+        assert.strictEqual(noOp.version, 3);
+        assert.strictEqual(noOp.access, "public");
+        assert.strictEqual(failureTag(stale), "VersionConflictFailure");
+        assert.strictEqual(mutationCount?.count, 2);
       }),
   );
 

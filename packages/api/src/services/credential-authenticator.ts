@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Layer, Schema } from "effect";
+import { Clock, Context, Effect, Either, Layer, Schema } from "effect";
 
 import {
   CredentialPrincipal,
@@ -32,20 +32,17 @@ export function makeCredentialAuthenticator() {
       const repository = yield* CredentialRepository;
       const policy = yield* PolicyService;
       const telemetry = yield* Telemetry;
-      const fingerprint = yield* secrets.fingerprintSource(input.source);
-      yield* limiter.assertAllowed(fingerprint).pipe(
-        Effect.catchTag("RateLimitedFailure", (error) =>
-          telemetry
-            .recordCredentialVerification({
-              family: input.expectedFamily,
-              outcome: "rate_limited",
-            })
-            .pipe(Effect.zipRight(Effect.fail(error))),
-        ),
-      );
+      const attemptLimit = yield* Effect.either(limiter.assertAllowed(input.source));
 
       const reject = Effect.fn(function* () {
-        yield* limiter.recordFailure(fingerprint);
+        if (Either.isLeft(attemptLimit)) {
+          yield* telemetry.recordCredentialVerification({
+            family: input.expectedFamily,
+            outcome: "rate_limited",
+          });
+          return yield* attemptLimit.left;
+        }
+        yield* limiter.recordFailure(input.source);
         yield* telemetry.recordCredentialVerification({
           family: input.expectedFamily,
           outcome: "invalid",
@@ -99,7 +96,6 @@ export function makeCredentialAuthenticator() {
           DatabaseFailure.make({ operation: "credential.verify.decode", cause }),
         ),
       );
-      yield* limiter.reset(fingerprint);
       yield* telemetry.recordCredentialVerification({
         family: input.expectedFamily,
         outcome: "success",

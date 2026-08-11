@@ -1,13 +1,12 @@
-import { assert, describe, layer } from "@effect/vitest";
+import { assert, describe, it, layer } from "@effect/vitest";
 import { Effect, TestClock } from "effect";
 
 import { ApiCredentialId, type CredentialFamily } from "../contracts/access";
-import {
-  CredentialAttemptLimiter,
-  CredentialAttemptLimiterLive,
-  makeCredentialAttemptLimiter,
-} from "./credential-attempt-limiter";
+import { makeCredentialAttemptLimiter } from "./credential-attempt-limiter";
+import { makeRateLimitManager } from "./rate-limit-manager";
+import { makeMemoryRateLimitStore } from "./rate-limit-store";
 import { SecretGenerator, SecretGeneratorLive, parseCredentialKey } from "./secret-generator";
+import type { TelemetryService } from "../observability/telemetry";
 
 const credentialId = ApiCredentialId.make("019fae8b-1234-7000-8000-000000000001");
 
@@ -61,72 +60,62 @@ describe("SecretGenerator", () => {
         );
       }),
     );
-
-    it.effect("creates a bounded non-raw source fingerprint", () =>
-      Effect.gen(function* () {
-        const secrets = yield* SecretGenerator;
-        const source = "198.51.100.12";
-        const fingerprint = yield* secrets.fingerprintSource(source);
-
-        assert.match(fingerprint, /^[0-9a-f]{64}$/u);
-        assert.notInclude(fingerprint, source);
-      }),
-    );
   });
 });
 
-describe("CredentialAttemptLimiter", () => {
-  layer(CredentialAttemptLimiterLive)((it) => {
-    it.effect(
-      "allows bounded failures, rate limits the next attempt, and resets after the window",
-      () =>
-        Effect.gen(function* () {
-          const limiter = makeCredentialAttemptLimiter({
-            maxFailures: 2,
-            windowMs: 1_000,
-            maxEntries: 10,
-          });
-          const fingerprint = "a".repeat(64);
+const NoopTelemetry: TelemetryService = {
+  recordHttpRequest: () => Effect.void,
+  recordDefect: () => Effect.void,
+  recordCredentialVerification: () => Effect.void,
+  recordLocaleMutation: () => Effect.void,
+  recordSchemaMutation: () => Effect.void,
+  recordSchemaValidation: () => Effect.void,
+  recordSchemaPublication: () => Effect.void,
+  recordEntryPublication: () => Effect.void,
+  recordEntryPublicationValidationFailure: () => Effect.void,
+  recordRateLimitDecision: () => Effect.void,
+  recordRateLimitStore: () => Effect.void,
+};
 
-          yield* limiter.assertAllowed(fingerprint);
-          yield* limiter.recordFailure(fingerprint);
-          yield* limiter.assertAllowed(fingerprint);
-          yield* limiter.recordFailure(fingerprint);
-          const limited = yield* Effect.exit(limiter.assertAllowed(fingerprint));
-          assert.strictEqual(limited._tag, "Failure");
-
-          yield* TestClock.adjust("1 second");
-          yield* limiter.assertAllowed(fingerprint);
-        }),
-    );
-
-    it.effect("caps retained source fingerprints and clears successful sources", () =>
-      Effect.gen(function* () {
-        const limiter = makeCredentialAttemptLimiter({
-          maxFailures: 3,
-          windowMs: 60_000,
-          maxEntries: 2,
-        });
-        yield* limiter.recordFailure("a".repeat(64));
-        yield* TestClock.adjust("1 millis");
-        yield* limiter.recordFailure("b".repeat(64));
-        yield* TestClock.adjust("1 millis");
-        yield* limiter.recordFailure("c".repeat(64));
-        assert.strictEqual(yield* limiter.retainedEntryCount(), 2);
-
-        yield* limiter.reset("c".repeat(64));
-        assert.strictEqual(yield* limiter.retainedEntryCount(), 1);
-      }),
-    );
-
-    it.effect("exposes a replaceable live limiter service", () =>
-      Effect.gen(function* () {
-        const limiter = yield* CredentialAttemptLimiter;
-        const fingerprint = "d".repeat(64);
-        yield* limiter.assertAllowed(fingerprint);
-        yield* limiter.recordFailure(fingerprint);
-        yield* limiter.reset(fingerprint);
-      }),
-    );
+/** Creates an isolated central manager for each credential limiter behavior test. */
+function makeTestCredentialLimiter() {
+  const manager = makeRateLimitManager({
+    primary: makeMemoryRateLimitStore({ maxEntries: 10 }),
+    fallback: makeMemoryRateLimitStore({ maxEntries: 10 }),
+    telemetry: NoopTelemetry,
+    fingerprintSecret: "credential-attempt-test-secret-that-is-long-enough",
   });
+  return makeCredentialAttemptLimiter(manager);
+}
+
+describe("CredentialAttemptLimiter", () => {
+  it.effect("limits repeated invalid attempts and clears a successful source", () =>
+    Effect.gen(function* () {
+      const limiter = makeTestCredentialLimiter();
+      const source = "198.51.100.10";
+
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        yield* limiter.assertAllowed(source);
+        yield* limiter.recordFailure(source);
+      }
+      const limited = yield* Effect.exit(limiter.assertAllowed(source));
+      assert.strictEqual(limited._tag, "Failure");
+
+      yield* limiter.reset(source);
+      yield* limiter.assertAllowed(source);
+    }),
+  );
+
+  it.effect("uses gradual refill instead of retaining a permanent fixed window", () =>
+    Effect.gen(function* () {
+      const limiter = makeTestCredentialLimiter();
+      const source = "198.51.100.11";
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        yield* limiter.assertAllowed(source);
+      }
+
+      yield* TestClock.adjust("6 seconds");
+      yield* limiter.assertAllowed(source);
+    }),
+  );
 });

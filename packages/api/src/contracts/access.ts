@@ -59,6 +59,7 @@ export const projectPermissionActionValues = [
   "schema.read",
   "schema.write",
   "schema.publish",
+  "delivery.configure",
   "content.read",
   "content.write",
   "content.review",

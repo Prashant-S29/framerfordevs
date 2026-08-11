@@ -64,6 +64,13 @@
       "when": 1786280665995,
       "tag": "0008_add_locale_publications_and_delivery_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786421743985,
+      "tag": "0009_add_production_delivery_api_read_model",
+      "breakpoints": true
     }
   ]
 }

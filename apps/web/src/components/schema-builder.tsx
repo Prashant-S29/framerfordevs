@@ -1,3 +1,8 @@
+import type {
+  DeliveryAccess,
+  DeliveryCollectionConfiguration,
+  DeliveryFieldCapability,
+} from "@framerfordevs/api/contracts/delivery";
 import type { EditorLayout } from "@framerfordevs/api/contracts/field-system";
 import type {
   CollectionDraftSchema,
@@ -15,6 +20,7 @@ import {
 } from "@framerfordevs/ui/components/card";
 import { Checkbox } from "@framerfordevs/ui/components/checkbox";
 import { Field, FieldLabel } from "@framerfordevs/ui/components/field";
+import { NativeSelect, NativeSelectOption } from "@framerfordevs/ui/components/native-select";
 import { Separator } from "@framerfordevs/ui/components/separator";
 import { Spinner } from "@framerfordevs/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -91,6 +97,16 @@ export function SchemaBuilder({
     }),
     enabled: Boolean(environmentId),
   });
+  const deliveryConfiguration = useQuery({
+    ...orpc.platform.projects.collections.deliveryConfiguration.get.queryOptions({
+      input: {
+        projectId,
+        environmentId: environmentId ?? "00000000-0000-0000-0000-000000000000",
+        collectionId,
+      },
+    }),
+    enabled: Boolean(environmentId),
+  });
   const publishedRevisionId = draft.data?.data.collection.currentPublishedRevisionId;
   const published = useQuery({
     ...orpc.platform.projects.collections.schema.published.getRevision.queryOptions({
@@ -159,7 +175,8 @@ export function SchemaBuilder({
     draft.isPending ||
     validation.isPending ||
     collections.isPending ||
-    formDefinition.isPending
+    formDefinition.isPending ||
+    deliveryConfiguration.isPending
   ) {
     return (
       <main className="mx-auto flex min-h-64 w-full max-w-5xl items-center justify-center">
@@ -175,6 +192,7 @@ export function SchemaBuilder({
     !validation.data ||
     !collections.data ||
     !formDefinition.data ||
+    !deliveryConfiguration.data ||
     !environmentId
   )
     return null;
@@ -185,6 +203,8 @@ export function SchemaBuilder({
   const allowed = new Set(access.data.data.allowedActions);
   const canWrite = allowed.has("schema.write") && projectModel.archivedAt === null;
   const canPublish = allowed.has("schema.publish") && projectModel.archivedAt === null;
+  const canConfigureDelivery =
+    allowed.has("delivery.configure") && projectModel.archivedAt === null;
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
@@ -237,6 +257,14 @@ export function SchemaBuilder({
           Schema
         </Button>
       </nav>
+
+      <DeliveryConfigurationCard
+        scope={scope}
+        configuration={deliveryConfiguration.data.data}
+        publishedFields={published.data?.data.fields ?? []}
+        hasPublishedSchema={published.data !== undefined}
+        canConfigure={canConfigureDelivery}
+      />
 
       <SchemaWorkbench
         scope={scope}
@@ -299,6 +327,206 @@ export function SchemaBuilder({
         onPublished={invalidateSchema}
       />
     </main>
+  );
+}
+
+const deliveryKinds = new Set<string>([
+  "short_text",
+  "slug",
+  "email",
+  "enum",
+  "number",
+  "decimal",
+  "boolean",
+  "date",
+  "date_time",
+  "reference",
+]);
+
+function isDeliveryKind(kind: string): kind is DeliveryFieldCapability["kind"] {
+  return deliveryKinds.has(kind);
+}
+
+export function DeliveryConfigurationCard({
+  scope,
+  configuration,
+  publishedFields,
+  hasPublishedSchema,
+  canConfigure,
+}: {
+  readonly scope: { projectId: string; environmentId: string; collectionId: string };
+  readonly configuration: DeliveryCollectionConfiguration;
+  readonly publishedFields: ReadonlyArray<CollectionFieldDefinition>;
+  readonly hasPublishedSchema: boolean;
+  readonly canConfigure: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [access, setAccess] = useState<DeliveryAccess>(configuration.access);
+  const [publicAcknowledged, setPublicAcknowledged] = useState(false);
+  const [capabilities, setCapabilities] = useState(
+    () => new Map(configuration.fields.map((field) => [field.fieldId, field])),
+  );
+  const queryKey = orpc.platform.projects.collections.deliveryConfiguration.get.queryOptions({
+    input: scope,
+  }).queryKey;
+  const update = useMutation(
+    orpc.platform.projects.collections.deliveryConfiguration.update.mutationOptions({
+      onSuccess: async (response) => {
+        setAccess(response.data.access);
+        setCapabilities(new Map(response.data.fields.map((field) => [field.fieldId, field])));
+        setPublicAcknowledged(false);
+        await queryClient.invalidateQueries({ queryKey });
+        toast.success(response.message);
+      },
+      onError: async (error) => {
+        await queryClient.invalidateQueries({ queryKey });
+        toast.error(error.message);
+      },
+    }),
+  );
+  const fields = publishedFields.filter(
+    (field) => field.nodeRole === "root" && field.apiKey !== null && isDeliveryKind(field.kind),
+  );
+  const setCapability = (
+    field: CollectionFieldDefinition,
+    key: "filterable" | "sortable" | "uniqueLookup",
+    checked: boolean,
+  ) => {
+    if (field.apiKey === null || !isDeliveryKind(field.kind)) return;
+    const fieldKey = field.apiKey;
+    const kind = field.kind;
+    setCapabilities((current) => {
+      const next = new Map(current);
+      const previous = next.get(field.id) ?? {
+        fieldId: field.id,
+        fieldKey,
+        kind,
+        filterable: false,
+        sortable: false,
+        uniqueLookup: false,
+      };
+      const changed = {
+        ...previous,
+        [key]: checked,
+        filterable: key === "uniqueLookup" && checked ? true : previous.filterable,
+      };
+      if (!changed.filterable && !changed.sortable && !changed.uniqueLookup) next.delete(field.id);
+      else next.set(field.id, changed);
+      return next;
+    });
+  };
+  const save = () =>
+    update.mutate({
+      ...scope,
+      expectedVersion: configuration.version,
+      access,
+      publicAccessAcknowledged: publicAcknowledged,
+      fields: [...capabilities.values()],
+    });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Production Delivery API</CardTitle>
+        <CardDescription>
+          Collections are protected by default. Query capabilities apply only to current published
+          scalar projections; every response still returns the complete immutable publication.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <Field>
+          <FieldLabel htmlFor="delivery-access">Collection access</FieldLabel>
+          <NativeSelect
+            id="delivery-access"
+            value={access}
+            disabled={!canConfigure || !hasPublishedSchema || update.isPending}
+            onChange={(event) =>
+              setAccess(event.target.value === "public" ? "public" : "protected")
+            }
+          >
+            <NativeSelectOption value="protected">
+              Protected — Delivery credential required
+            </NativeSelectOption>
+            <NativeSelectOption value="public">Public — anonymous reads allowed</NativeSelectOption>
+          </NativeSelect>
+        </Field>
+        {access === "public" && configuration.access !== "public" ? (
+          <Field orientation="horizontal">
+            <Checkbox
+              id="delivery-public-acknowledgement"
+              checked={publicAcknowledged}
+              onCheckedChange={(checked) => setPublicAcknowledged(checked === true)}
+            />
+            <FieldLabel htmlFor="delivery-public-acknowledgement">
+              I understand that anonymous callers can download latest and known immutable
+              publications, and external caches cannot be revoked by making this collection
+              protected again.
+            </FieldLabel>
+          </Field>
+        ) : null}
+        <Separator />
+        <fieldset
+          className="space-y-3"
+          disabled={!canConfigure || !hasPublishedSchema || update.isPending}
+        >
+          <legend className="text-sm font-medium">Current published root scalar fields</legend>
+          {fields.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              Publish a schema with supported root scalar fields before enabling Delivery queries.
+            </p>
+          ) : (
+            fields.map((field) => {
+              const capability = capabilities.get(field.id);
+              const uniqueSupported = field.kind !== "boolean";
+              return (
+                <div key={field.id} className="rounded-md border p-3">
+                  <p className="font-mono text-sm" translate="no">
+                    {field.apiKey}
+                  </p>
+                  <p className="text-muted-foreground mb-3 text-xs">{field.kind}</p>
+                  <div className="flex flex-wrap gap-4">
+                    {(["filterable", "sortable", "uniqueLookup"] as const).map((key) => (
+                      <Field orientation="horizontal" key={key}>
+                        <Checkbox
+                          id={`delivery-${field.id}-${key}`}
+                          checked={capability?.[key] ?? false}
+                          disabled={key === "uniqueLookup" && !uniqueSupported}
+                          onCheckedChange={(checked) => setCapability(field, key, checked === true)}
+                        />
+                        <FieldLabel htmlFor={`delivery-${field.id}-${key}`}>
+                          {key === "uniqueLookup"
+                            ? "Unique lookup"
+                            : key === "filterable"
+                              ? "Filter"
+                              : "Sort"}
+                        </FieldLabel>
+                      </Field>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </fieldset>
+        {!canConfigure ? (
+          <p className="text-muted-foreground text-sm">
+            Owner or unrestricted developer access is required to change Delivery exposure.
+          </p>
+        ) : null}
+        <Button
+          type="button"
+          disabled={
+            !canConfigure ||
+            !hasPublishedSchema ||
+            update.isPending ||
+            (access === "public" && configuration.access !== "public" && !publicAcknowledged)
+          }
+          onClick={save}
+        >
+          {update.isPending ? "Saving Delivery settings…" : "Save Delivery settings"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

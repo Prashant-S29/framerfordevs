@@ -164,6 +164,8 @@ const TelemetryTest = Layer.succeed(Telemetry, {
       metrics.push(`${event.operation}:${event.outcome}`);
     }),
   recordEntryPublicationValidationFailure: () => Effect.void,
+  recordRateLimitDecision: () => Effect.void,
+  recordRateLimitStore: () => Effect.void,
 });
 
 const TestLayer = Layer.merge(RepositoryTest, TelemetryTest);

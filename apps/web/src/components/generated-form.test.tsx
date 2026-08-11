@@ -169,6 +169,23 @@ describe("generated form", () => {
     expect(screen.getByText(/never saved/i)).toBeTruthy();
   });
 
+  it("clears stale server issues when the corresponding value is edited", async () => {
+    const user = userEvent.setup();
+    const titleId = fields[0]?.id ?? "missing";
+    render(
+      <GeneratedForm
+        definition={definition}
+        values={{}}
+        onValuesChange={() => undefined}
+        serverIssues={{ [titleId]: "This field is required." }}
+      />,
+    );
+
+    expect(screen.getByText("This field is required.")).toBeTruthy();
+    await user.type(screen.getByLabelText(/title/i), "Updated");
+    expect(screen.queryByText("This field is required.")).toBeNull();
+  });
+
   it("hydrates saved rich text into the lazy controlled editor", async () => {
     const document = {
       version: 1,

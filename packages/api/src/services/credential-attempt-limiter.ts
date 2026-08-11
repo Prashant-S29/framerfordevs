@@ -1,87 +1,33 @@
-import { Clock, Context, Effect, Layer } from "effect";
+// Preserves the credential-verification limiter facade while delegating enforcement to the central manager.
+
+import { Context, Effect, Layer } from "effect";
 
 import { RateLimitedFailure } from "../contracts/errors";
+import { RateLimitManager, type RateLimitManagerService } from "./rate-limit-manager";
 
-interface AttemptEntry {
-  readonly windowStartedAt: number;
-  readonly failures: number;
-  readonly lastSeenAt: number;
-}
-
-export interface CredentialAttemptLimiterOptions {
-  readonly maxFailures: number;
-  readonly windowMs: number;
-  readonly maxEntries: number;
-}
-
-const defaultOptions: CredentialAttemptLimiterOptions = {
-  maxFailures: 10,
-  windowMs: 60_000,
-  maxEntries: 10_000,
-};
-
-function oldestFingerprint(entries: ReadonlyMap<string, AttemptEntry>): string | undefined {
-  let oldestKey: string | undefined;
-  let oldestSeenAt = Number.POSITIVE_INFINITY;
-  for (const [fingerprint, entry] of entries) {
-    if (entry.lastSeenAt < oldestSeenAt) {
-      oldestKey = fingerprint;
-      oldestSeenAt = entry.lastSeenAt;
-    }
-  }
-  return oldestKey;
-}
-
-export function makeCredentialAttemptLimiter(
-  options: CredentialAttemptLimiterOptions = defaultOptions,
-) {
-  const entries = new Map<string, AttemptEntry>();
-
-  const currentEntry = (fingerprint: string, now: number) => {
-    const entry = entries.get(fingerprint);
-    if (!entry) return undefined;
-    if (now - entry.windowStartedAt >= options.windowMs) {
-      entries.delete(fingerprint);
-      return undefined;
-    }
-    return entry;
-  };
-
+/** Adapts credential verification to the shared weighted policy without exposing arbitrary limits. */
+export function makeCredentialAttemptLimiter(manager: RateLimitManagerService) {
   return {
-    assertAllowed: Effect.fn("CredentialAttemptLimiter.assertAllowed")(function* (
-      fingerprint: string,
-    ) {
-      const now = yield* Clock.currentTimeMillis;
-      const entry = yield* Effect.sync(() => currentEntry(fingerprint, now));
-      if (entry && entry.failures >= options.maxFailures) {
-        return yield* RateLimitedFailure.make();
-      }
-    }),
-
-    recordFailure: Effect.fn("CredentialAttemptLimiter.recordFailure")(function* (
-      fingerprint: string,
-    ) {
-      const now = yield* Clock.currentTimeMillis;
-      yield* Effect.sync(() => {
-        const entry = currentEntry(fingerprint, now);
-        if (!entry && !entries.has(fingerprint) && entries.size >= options.maxEntries) {
-          const oldest = oldestFingerprint(entries);
-          if (oldest !== undefined) entries.delete(oldest);
-        }
-        entries.set(fingerprint, {
-          windowStartedAt: entry?.windowStartedAt ?? now,
-          failures: (entry?.failures ?? 0) + 1,
-          lastSeenAt: now,
-        });
+    assertAllowed: Effect.fn("CredentialAttemptLimiter.assertAllowed")(function* (source: string) {
+      const decision = yield* manager.evaluate({
+        policy: "credential.verification.invalid",
+        identity: source,
+        cost: 1,
       });
+      if (!decision.allowed) return yield* RateLimitedFailure.make();
     }),
 
-    reset: Effect.fn("CredentialAttemptLimiter.reset")(function* (fingerprint: string) {
-      yield* Effect.sync(() => entries.delete(fingerprint));
-    }),
+    // Consumption occurs before verification so malformed inputs cannot avoid the central limiter.
+    recordFailure: Effect.fn("CredentialAttemptLimiter.recordFailure")(
+      (_source: string) => Effect.void,
+    ),
 
-    retainedEntryCount: Effect.fn("CredentialAttemptLimiter.retainedEntryCount")(() =>
-      Effect.sync(() => entries.size),
+    reset: Effect.fn("CredentialAttemptLimiter.reset")((source: string) =>
+      manager.reset({ policy: "credential.verification.invalid", identity: source }),
+    ),
+
+    retainedEntryCount: Effect.fn("CredentialAttemptLimiter.retainedEntryCount")(
+      () => manager.retainedFallbackEntryCount,
     ),
   };
 }
@@ -91,7 +37,7 @@ export class CredentialAttemptLimiter extends Context.Tag("CredentialAttemptLimi
   ReturnType<typeof makeCredentialAttemptLimiter>
 >() {}
 
-export const CredentialAttemptLimiterLive = Layer.succeed(
+export const CredentialAttemptLimiterLive = Layer.effect(
   CredentialAttemptLimiter,
-  makeCredentialAttemptLimiter(),
+  Effect.map(RateLimitManager, makeCredentialAttemptLimiter),
 );

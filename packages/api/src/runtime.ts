@@ -1,6 +1,9 @@
 // Composes the shared application Layer/ManagedRuntime and maps Effect exits at framework boundaries.
 
+import { randomBytes } from "node:crypto";
+
 import * as OtelTracer from "@effect/opentelemetry/Tracer";
+import { env } from "@framerfordevs/env/server";
 import { Cause, Chunk, Clock, Effect, Exit, Layer, ManagedRuntime, Option } from "effect";
 
 import { type ApiData, type ApiResponse, apiSuccess } from "./contracts/api-response";
@@ -26,11 +29,26 @@ import {
 } from "./services/credential-authenticator";
 import { CredentialRepository, CredentialRepositoryLive } from "./services/credential-repository";
 import { Database, DatabaseLive } from "./services/database";
+import {
+  DeliveryCursorSigner,
+  makeDeliveryCursorSignerLive,
+} from "./services/delivery-cursor-signer";
+import {
+  DeliveryReadRepository,
+  DeliveryReadRepositoryLive,
+} from "./services/delivery-read-repository";
+import { DeliveryRepository, DeliveryRepositoryLive } from "./services/delivery-repository";
 import { EntryEngine, EntryEngineLive } from "./services/entry-engine";
 import { EntryRepository, EntryRepositoryLive } from "./services/entry-repository";
 import { FieldEngine, FieldEngineLive } from "./services/field-engine";
 import { LocaleRepository, LocaleRepositoryLive } from "./services/locale-repository";
 import { PlatformRepository, PlatformRepositoryLive } from "./services/platform-repository";
+import { RateLimitManager, makeRateLimitManagerLive } from "./services/rate-limit-manager";
+import {
+  MemoryRateLimitFallbackStoreLive,
+  MemoryRateLimitStoreLive,
+} from "./services/rate-limit-store";
+import { makeRedisRateLimitStoreLive } from "./services/redis-rate-limit-store";
 import { PolicyService, PolicyServiceLive } from "./services/policy";
 import { PublicationEngine, PublicationEngineLive } from "./services/publication-engine";
 import {
@@ -46,11 +64,15 @@ export type ApplicationServices =
   | Telemetry
   | AuthSessionService
   | Database
+  | DeliveryCursorSigner
+  | DeliveryReadRepository
+  | DeliveryRepository
   | PlatformRepository
   | LocaleRepository
   | AccessRepository
   | PolicyService
   | SecretGenerator
+  | RateLimitManager
   | CredentialAttemptLimiter
   | CredentialRepository
   | CredentialAuthenticator
@@ -66,17 +88,52 @@ const PublicationRepositoryConfiguredLive = PublicationRepositoryLive.pipe(
   Layer.provide(PublicationEngineLive),
 );
 
+const PrimaryRateLimitStoreLive =
+  env.RATE_LIMIT_STORE === "redis" && env.RATE_LIMIT_REDIS_URL !== undefined
+    ? makeRedisRateLimitStoreLive({
+        url: env.RATE_LIMIT_REDIS_URL,
+        timeoutMs: env.RATE_LIMIT_REDIS_TIMEOUT_MS,
+        reconnectAttempts: 2,
+      })
+    : MemoryRateLimitStoreLive;
+
+const rateLimitFingerprintSecret =
+  env.RATE_LIMIT_FINGERPRINT_SECRET ?? randomBytes(32).toString("base64url");
+const deliveryCursorSecret = env.DELIVERY_CURSOR_SECRET ?? randomBytes(32).toString("base64url");
+const DeliveryCursorSignerLive = makeDeliveryCursorSignerLive({
+  activeSecret: deliveryCursorSecret,
+  ...(env.DELIVERY_CURSOR_PREVIOUS_SECRET === undefined
+    ? {}
+    : { previousSecret: env.DELIVERY_CURSOR_PREVIOUS_SECRET }),
+});
+
+const RateLimitManagerConfiguredLive = makeRateLimitManagerLive({
+  fingerprintSecret: rateLimitFingerprintSecret,
+}).pipe(
+  Layer.provide(
+    Layer.mergeAll(PrimaryRateLimitStoreLive, MemoryRateLimitFallbackStoreLive, TelemetryLive),
+  ),
+);
+
+const CredentialAttemptLimiterConfiguredLive = CredentialAttemptLimiterLive.pipe(
+  Layer.provide(RateLimitManagerConfiguredLive),
+);
+
 const InfrastructureLive = Layer.mergeAll(
   ApplicationLoggerLive,
   TelemetryLive,
   AuthSessionLive,
   DatabaseLive,
+  DeliveryCursorSignerLive,
+  DeliveryReadRepositoryLive,
+  DeliveryRepositoryLive,
   PlatformRepositoryLive,
   LocaleRepositoryLive,
   AccessRepositoryLive,
   PolicyServiceLive,
   SecretGeneratorLive,
-  CredentialAttemptLimiterLive,
+  RateLimitManagerConfiguredLive,
+  CredentialAttemptLimiterConfiguredLive,
   CredentialRepositoryLive,
   CredentialAuthenticatorLive,
   EntryEngineLive,

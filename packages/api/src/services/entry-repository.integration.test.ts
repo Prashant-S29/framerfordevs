@@ -9,6 +9,7 @@ import { projectMembership } from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
 import {
   cmsCollection,
+  cmsCollectionDeliveryConfig,
   cmsCollectionField,
   cmsCollectionSchemaHead,
   cmsEntry,
@@ -411,6 +412,9 @@ afterAll(async () => {
       .where(eq(cmsSchemaRevisionField.collectionId, collectionId));
     await db.delete(cmsSchemaRevision).where(eq(cmsSchemaRevision.collectionId, collectionId));
     await db.delete(cmsCollectionField).where(eq(cmsCollectionField.collectionId, collectionId));
+    await db
+      .delete(cmsCollectionDeliveryConfig)
+      .where(eq(cmsCollectionDeliveryConfig.collectionId, collectionId));
     await db.delete(cmsCollection).where(eq(cmsCollection.id, collectionId));
   }
   await db
@@ -473,6 +477,9 @@ describe.sequential("entry repository PostgreSQL integration", () => {
             await db
               .delete(cmsCollectionSchemaHead)
               .where(eq(cmsCollectionSchemaHead.collectionId, collection.id));
+            await db
+              .delete(cmsCollectionDeliveryConfig)
+              .where(eq(cmsCollectionDeliveryConfig.collectionId, collection.id));
             await db.delete(cmsCollection).where(eq(cmsCollection.id, collection.id));
           }),
       );
@@ -885,6 +892,31 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         new Date("2026-08-08T11:08:00.000Z"),
         `m7-concurrent-create-${suffix}`,
       );
+      const malformedReference = yield* Effect.exit(
+        entries.saveDraft(
+          ownerActor,
+          Schema.decodeUnknownSync(SaveEntryDraftInput)({
+            projectId: project.id,
+            environmentId: project.environment.id,
+            collectionId: collection.id,
+            entryId: entry.id,
+            locale: "en",
+            schemaRevisionId: published.id,
+            contractHash: published.contractHash,
+            commandId: randomUUID(),
+            expectedSharedVersion: 0,
+            expectedLocalizedVersion: 0,
+            sharedMutations: [],
+            localizedMutations: [
+              { operation: "set", path: [referenceId], value: "not-an-entry-uuid" },
+            ],
+          }),
+          new Date("2026-08-08T11:08:30.000Z"),
+          `m7-malformed-reference-${suffix}`,
+        ),
+      );
+      assert.strictEqual(failureTag(malformedReference), "ValidationFailure");
+
       const save = (locale: "en" | "hi", value: string) =>
         entries.saveDraft(
           ownerActor,

@@ -563,8 +563,14 @@ export function GeneratedForm({
     applyGeneratedFormDefaults(definition.fields, {}),
   );
   const [localIssues, setLocalIssues] = useState<Readonly<Record<string, string>>>({});
+  const [editedFieldIds, setEditedFieldIds] = useState<ReadonlySet<string>>(() => new Set());
   const values = controlledValues ?? localValues;
-  const issues = serverIssues ?? localIssues;
+  const issues = {
+    ...Object.fromEntries(
+      Object.entries(serverIssues ?? {}).filter(([fieldId]) => !editedFieldIds.has(fieldId)),
+    ),
+    ...localIssues,
+  };
   const setValues = (
     update: (current: Readonly<Record<string, unknown>>) => Readonly<Record<string, unknown>>,
   ) => {
@@ -627,9 +633,15 @@ export function GeneratedForm({
                       value={Reflect.get(values, field.id)}
                       disabled={!definition.canEdit || !editable.has(field.id)}
                       issue={Reflect.get(issues, field.id)}
-                      onChange={(value) =>
-                        setValues((current) => ({ ...current, [field.id]: value }))
-                      }
+                      onChange={(value) => {
+                        setEditedFieldIds((current) => new Set(current).add(field.id));
+                        setLocalIssues((current) =>
+                          Object.fromEntries(
+                            Object.entries(current).filter(([fieldId]) => fieldId !== field.id),
+                          ),
+                        );
+                        setValues((current) => ({ ...current, [field.id]: value }));
+                      }}
                     />
                   );
                 })}

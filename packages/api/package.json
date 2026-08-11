@@ -11,6 +11,9 @@
   },
   "scripts": {
     "check-types": "tsc --noEmit",
+    "delivery:backfill": "tsx src/scripts/delivery-backfill.ts",
+    "delivery:load-prepare": "tsx src/scripts/delivery-load-prepare.ts",
+    "delivery:load-boundary": "tsx src/scripts/delivery-load-boundary.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },
@@ -30,6 +33,7 @@
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
+    "@redis/client": "6.2.0",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
     "effect": "3.22.0",
@@ -41,6 +45,7 @@
     "@framerfordevs/config": "workspace:*",
     "@types/express": "catalog:",
     "@vitest/coverage-v8": "3.2.7",
+    "tsx": "4.23.1",
     "typescript": "catalog:",
     "vitest": "3.2.7"
   }

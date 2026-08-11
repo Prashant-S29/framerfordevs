@@ -1,4 +1,6 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+// Generates one-time invitation/API credentials and verifies digest-only persistence material.
+
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { Context, Effect, Layer, Option, Schema } from "effect";
 
@@ -66,7 +68,8 @@ export function parseCredentialKey(value: string): ParsedCredentialKey | undefin
   }
 }
 
-export function makeSecretGenerator(sourceFingerprintKey: Buffer) {
+/** Creates the cryptographic service without retaining credential or invitation material. */
+export function makeSecretGenerator() {
   return {
     generateInvitationToken: Effect.fn("SecretGenerator.generateInvitationToken")(function* () {
       const encoded = yield* Effect.try({
@@ -122,13 +125,6 @@ export function makeSecretGenerator(sourceFingerprintKey: Buffer) {
         catch: (cause) => securityFailure("security.digest.verify", cause),
       });
     }),
-
-    fingerprintSource: Effect.fn("SecretGenerator.fingerprintSource")(function* (source: string) {
-      return yield* Effect.try({
-        try: () => createHmac("sha256", sourceFingerprintKey).update(source, "utf8").digest("hex"),
-        catch: (cause) => securityFailure("security.source.fingerprint", cause),
-      });
-    }),
   };
 }
 
@@ -137,12 +133,4 @@ export class SecretGenerator extends Context.Tag("SecretGenerator")<
   ReturnType<typeof makeSecretGenerator>
 >() {}
 
-const liveSecretGenerator = Effect.try({
-  try: () => makeSecretGenerator(randomBytes(32)),
-  catch: (cause) => securityFailure("security.source-key.random", cause),
-});
-
-export const SecretGeneratorLive = Layer.effect(
-  SecretGenerator,
-  liveSecretGenerator.pipe(Effect.orDie),
-);
+export const SecretGeneratorLive = Layer.succeed(SecretGenerator, makeSecretGenerator());

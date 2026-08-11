@@ -9,10 +9,14 @@ import { projectMembership } from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
 import {
   cmsCollection,
+  cmsCollectionDeliveryConfig,
+  cmsCollectionDeliveryField,
   cmsCollectionField,
+  cmsCollectionLocaleDeliveryState,
   cmsCollectionSchemaHead,
   cmsEntry,
   cmsEntryDraftCommand,
+  cmsEntryLocaleDeliveryCurrentValue,
   cmsEntryLocaleDeliverySnapshot,
   cmsEntryLocaleDraft,
   cmsEntryLocalePublication,
@@ -63,6 +67,8 @@ import {
   type CmsCollection,
   type PublishedSchemaRevision,
 } from "../contracts/schemas";
+import { makeDeliveryCursorSignerLive } from "./delivery-cursor-signer";
+import { makeDeliveryReadRepository } from "./delivery-read-repository";
 import { makeEntryRepository } from "./entry-repository";
 import { makeLocaleRepository } from "./locale-repository";
 import { makePlatformRepository } from "./platform-repository";
@@ -314,6 +320,9 @@ afterAll(async () => {
     await db
       .delete(cmsEntryDraftCommand)
       .where(eq(cmsEntryDraftCommand.collectionId, collectionId));
+    await db
+      .delete(cmsEntryLocaleDeliveryCurrentValue)
+      .where(eq(cmsEntryLocaleDeliveryCurrentValue.collectionId, collectionId));
     await db.delete(cmsEntrySharedDraft).where(eq(cmsEntrySharedDraft.collectionId, collectionId));
     await db.delete(cmsEntryLocaleDraft).where(eq(cmsEntryLocaleDraft.collectionId, collectionId));
     await db
@@ -330,7 +339,16 @@ afterAll(async () => {
       .delete(cmsSchemaRevisionField)
       .where(eq(cmsSchemaRevisionField.collectionId, collectionId));
     await db.delete(cmsSchemaRevision).where(eq(cmsSchemaRevision.collectionId, collectionId));
+    await db
+      .delete(cmsCollectionDeliveryField)
+      .where(eq(cmsCollectionDeliveryField.collectionId, collectionId));
     await db.delete(cmsCollectionField).where(eq(cmsCollectionField.collectionId, collectionId));
+    await db
+      .delete(cmsCollectionLocaleDeliveryState)
+      .where(eq(cmsCollectionLocaleDeliveryState.collectionId, collectionId));
+    await db
+      .delete(cmsCollectionDeliveryConfig)
+      .where(eq(cmsCollectionDeliveryConfig.collectionId, collectionId));
     await db.delete(cmsCollection).where(eq(cmsCollection.id, collectionId));
   }
   await db.delete(auditEvent).where(eq(auditEvent.actorId, ownerId));
@@ -452,6 +470,20 @@ describe.sequential("publication repository PostgreSQL integration", () => {
           executor: transaction,
           runTransaction: (work) => work(transaction),
         });
+        await transaction
+          .update(cmsCollectionDeliveryConfig)
+          .set({ version: 2 })
+          .where(eq(cmsCollectionDeliveryConfig.collectionId, currentCollection.id));
+        await transaction.insert(cmsCollectionDeliveryField).values({
+          collectionId: currentCollection.id,
+          fieldId: currentTitleFieldId,
+          workspaceId: currentProject.workspaceId,
+          projectId: currentProject.id,
+          environmentId: currentProject.environment.id,
+          filterable: true,
+          sortable: true,
+          uniqueLookup: true,
+        });
         const missingTargetPlan = await Effect.runPromise(
           publications.validate(
             ownerActor,
@@ -564,6 +596,104 @@ describe.sequential("publication repository PostgreSQL integration", () => {
         );
         assert.strictEqual(published.resultKind, "changed");
         assert.strictEqual(replay.publication.id, published.publication.id);
+        const projectedAfterPublish = await transaction
+          .select()
+          .from(cmsEntryLocaleDeliveryCurrentValue)
+          .where(
+            and(
+              eq(cmsEntryLocaleDeliveryCurrentValue.entryId, currentEntryId),
+              eq(cmsEntryLocaleDeliveryCurrentValue.localeId, published.localeId),
+            ),
+          );
+        const [generationAfterPublish] = await transaction
+          .select()
+          .from(cmsCollectionLocaleDeliveryState)
+          .where(
+            and(
+              eq(cmsCollectionLocaleDeliveryState.collectionId, currentCollection.id),
+              eq(cmsCollectionLocaleDeliveryState.localeId, published.localeId),
+            ),
+          );
+        assert.isAtLeast(projectedAfterPublish.length, 2);
+        assert.isTrue(
+          projectedAfterPublish.every(
+            (projection) => projection.publicationId === published.publication.id,
+          ),
+        );
+        assert.strictEqual(generationAfterPublish?.generation, 2n);
+        const deliveryReads = makeDeliveryReadRepository({
+          executor: transaction,
+          runReadTransaction: (work) => work(transaction),
+        });
+        const cursorLayer = makeDeliveryCursorSignerLive({
+          activeSecret: "publication-integration-delivery-cursor-secret-32-bytes",
+        });
+        const deliveryScope = {
+          projectId: currentProject.id,
+          environmentKey: currentProject.environment.key,
+          collectionKey: currentCollection.apiKey,
+          locale: "en",
+        };
+        const currentDeliveryItem = await Effect.runPromise(
+          deliveryReads.getCurrentById(deliveryScope, currentEntryId, true, []),
+        );
+        const immutableDeliveryItem = await Effect.runPromise(
+          deliveryReads.getImmutable(
+            deliveryScope,
+            currentEntryId,
+            published.publication.id,
+            true,
+            [],
+          ),
+        );
+        const uniqueDeliveryItem = await Effect.runPromise(
+          deliveryReads.getByUnique(deliveryScope, "title", "Published title", true, []),
+        );
+        const filteredDeliveryPage = await Effect.runPromise(
+          deliveryReads
+            .list(deliveryScope, "locale=en&filter.title.eq=Published%20title", true)
+            .pipe(Effect.provide(cursorLayer)),
+        );
+        const expandedDeliveryPage = await Effect.runPromise(
+          deliveryReads
+            .list(
+              deliveryScope,
+              "locale=en&filter.title.eq=Published%20title&expand=related_entry",
+              true,
+            )
+            .pipe(Effect.provide(cursorLayer)),
+        );
+        const firstDeliveryPage = await Effect.runPromise(
+          deliveryReads
+            .list(deliveryScope, "locale=en&limit=1&sort=title", true)
+            .pipe(Effect.provide(cursorLayer)),
+        );
+        assert.strictEqual(currentDeliveryItem.id, currentEntryId);
+        assert.strictEqual(immutableDeliveryItem.publication.id, published.publication.id);
+        assert.strictEqual(uniqueDeliveryItem.id, currentEntryId);
+        assert.deepStrictEqual(
+          filteredDeliveryPage.items.map((item) => item.id),
+          [currentEntryId],
+        );
+        const expandedReference = Reflect.get(
+          expandedDeliveryPage.items[0]?.data ?? {},
+          "related_entry",
+        );
+        assert.strictEqual(Reflect.get(expandedReference ?? {}, "id"), currentTargetEntryId);
+        assert.strictEqual(firstDeliveryPage.items.length, 1);
+        assert.isTrue(firstDeliveryPage.page.hasMore);
+        assert.isNotNull(firstDeliveryPage.page.nextCursor);
+        const secondDeliveryPage = await Effect.runPromise(
+          deliveryReads
+            .list(
+              deliveryScope,
+              `locale=en&limit=1&sort=title&cursor=${firstDeliveryPage.page.nextCursor}`,
+              true,
+            )
+            .pipe(Effect.provide(cursorLayer)),
+        );
+        assert.strictEqual(secondDeliveryPage.items.length, 1);
+        assert.notStrictEqual(secondDeliveryPage.items[0]?.id, firstDeliveryPage.items[0]?.id);
         for (const statement of [
           sql`update cms_entry_locale_publication set content_hash = content_hash where id = ${published.publication.id}`,
           sql`delete from cms_entry_locale_publication where id = ${published.publication.id}`,
@@ -620,6 +750,36 @@ describe.sequential("publication repository PostgreSQL integration", () => {
         );
         assert.strictEqual(unpublished.resultKind, "changed");
         assert.strictEqual(unpublished.unpublishedPublicationId, published.publication.id);
+        const projectedAfterUnpublish = await transaction
+          .select()
+          .from(cmsEntryLocaleDeliveryCurrentValue)
+          .where(
+            and(
+              eq(cmsEntryLocaleDeliveryCurrentValue.entryId, currentEntryId),
+              eq(cmsEntryLocaleDeliveryCurrentValue.localeId, published.localeId),
+            ),
+          );
+        const [generationAfterUnpublish] = await transaction
+          .select()
+          .from(cmsCollectionLocaleDeliveryState)
+          .where(
+            and(
+              eq(cmsCollectionLocaleDeliveryState.collectionId, currentCollection.id),
+              eq(cmsCollectionLocaleDeliveryState.localeId, published.localeId),
+            ),
+          );
+        assert.deepStrictEqual(projectedAfterUnpublish, []);
+        assert.strictEqual(generationAfterUnpublish?.generation, 3n);
+        const staleDeliveryCursor = await Effect.runPromiseExit(
+          deliveryReads
+            .list(
+              deliveryScope,
+              `locale=en&limit=1&sort=title&cursor=${firstDeliveryPage.page.nextCursor}`,
+              true,
+            )
+            .pipe(Effect.provide(cursorLayer)),
+        );
+        assert.strictEqual(failureTag(staleDeliveryCursor), "DeliveryCursorStaleFailure");
         const noOpCommandId = randomUUID();
         const noOpInput = Schema.decodeUnknownSync(UnpublishEntryInput)({
           ...scope,
@@ -1062,6 +1222,8 @@ describe.sequential("publication repository PostgreSQL integration", () => {
       "snapshot",
       "references",
       "pointer",
+      "projection",
+      "generation",
       "audit",
       "outbox",
       "receipt",
