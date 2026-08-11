@@ -1,8 +1,8 @@
 # Agent Session Context
 
 **Last updated:** 2026-08-11
-**Current phase:** Milestone 9 automated implementation complete; awaiting developer manual review
-**Active milestone:** Milestone 9 — Production Delivery API
+**Current phase:** Milestone 9 approved and committed; Milestone 10 design discovery not started
+**Active milestone:** Milestone 10 — Preview API
 
 ## What this project is
 
@@ -155,7 +155,8 @@ The repository currently has:
 - The complete management oRPC reference is disabled by default and environment validation forbids enabling it in production; local/test opt-in remains available for internal contract inspection, while snapshot/HTTP tests prove public Delivery documentation excludes management/auth/operator contracts
 - The rebuilt production Docker server returns 200 for Delivery OpenAPI, Scalar docs, and a protected fixture read; `/api-reference` returns 404, the public document has 4 paths/12 operations/10 public schemas, and all primary services are healthy
 - M12 now owns the allowlisted public developer portal, versioned public specifications, guides, and generated tooling; M14 owns production marketing/application/API/developer/operator host and ingress separation
-- Final refreshed `pnpm run ready` passes after all load and documentation-boundary work with 712 tests and 89.40% API statement coverage; production/full audits and builds pass, and developer manual approval remains pending
+- Final refreshed `pnpm run ready` passes after all load and documentation-boundary work with 712 tests and 89.40% API statement coverage; production/full audits and builds pass
+- The developer completed manual review, approved M9, and committed it as `8559aa4` (`feat(m9): production delivery API`)
 - The developer generated and applied `0005_add_field_system_and_editor_layout.sql`; the agent inspected the complete SQL and snapshot and verified the live catalog read-only: 15 expected columns, 35 validated constraints, 16 valid/ready indexes, and valid legacy backfills
 - Complete M6 repository/API/UI/property/PostgreSQL/accessibility/bundle coverage with 551 passing tests and a clean production/full pnpm audit
 - Cold Docker manual review found and fixed a schema-builder hook-order crash during query hydration; hooks are now unconditional and `react-hooks/rules-of-hooks` is enforced workspace-wide
@@ -280,6 +281,6 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 
 ## What to do next
 
-1. Wait for the developer to generate and apply `add_production_delivery_api_read_model` using the exact handoff commands.
-2. Inspect the generated migration/snapshot and live PostgreSQL catalog read-only against the approved Drizzle authority.
-3. After confirmation, continue M9 repository, publication dual-write, HTTP/OpenAPI/CORS/cache, backfill, management UI, integration, and load-test implementation.
+1. Begin M10 Preview API discovery by rereading the active milestone, product/PRD requirements, M1-M9 decisions, current implementation boundaries, and relevant skills.
+2. Inspect the committed M9 Delivery/publication/credential/cache/OpenAPI seams that Preview must reuse without exposing drafts through Delivery.
+3. Propose and obtain developer approval for the complete M10 design before changing schema or implementation code.

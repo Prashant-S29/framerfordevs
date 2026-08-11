@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 9 automated implementation complete; awaiting developer manual review
-**Active milestone:** Milestone 9 — Production Delivery API
+**Overall status:** Milestone 9 approved and committed; Milestone 10 not started
+**Active milestone:** Milestone 10 — Preview API
 **Last updated:** 2026-08-11
 
 ## Status legend
@@ -26,7 +26,7 @@
 | 6   | Field system and generated forms         | `[A]`  | 551 passing     | Approved      | `fbb4767` |
 | 7   | Entries and multilingual drafts          | `[A]`  | 603 passing     | Approved      | `60bd96f` |
 | 8   | Per-locale publication and snapshots     | `[A]`  | 627 passing     | Approved      | `ad3cd5e` |
-| 9   | Delivery API                             | `[R]`  | 712 passing     | Pending       | None      |
+| 9   | Delivery API                             | `[A]`  | 712 passing     | Approved      | `8559aa4` |
 | 10  | Preview API                              | `[ ]`  | Not run         | Pending       | None      |
 | 11  | Events, webhooks, invalidation           | `[ ]`  | Not run         | Pending       | None      |
 | 12  | Developer portal and generated tooling   | `[ ]`  | Not run         | Pending       | None      |
@@ -338,11 +338,11 @@
 - `[x]` Pass the separate conditional-304, weighted hot-credential cross-process 429, hard Redis outage/degraded-memory/recovery, and oversized-response rejection/memory-stability gates; restore all current boundary fixture heads/drafts and verify final invariants.
 - `[x]` Complete the schema-reconciled Delivery-only OpenAPI 3.1 document and interactive reference, snapshot-lock all four GET/HEAD/OPTIONS surfaces and protocol headers, exclude internal contracts, and disable the complete management oRPC reference by default and unconditionally in production.
 - `[x]` Amend M12 to own the allowlisted developer portal/generated tooling and M14 to prove production marketing/application/API/developer/operator host separation.
-- `[R]` Complete developer manual review.
+- `[A]` Developer approved and committed M9 as `8559aa4` (`feat(m9): production delivery API`).
 
 ## Current blockers
 
-None. The complete local capacity, resilience, and response-boundary load plan passes; developer manual API/UI review is the remaining milestone gate.
+None. M9 is approved and committed; M10 Preview API design discovery has not started.
 
 ## Database migration state
 
@@ -364,7 +364,7 @@ The developer generated, corrected, and applied `packages/db/src/migrations/0009
 
 ## Test results
 
-### Milestone 9 complete automated gate
+### Milestone 9 approved completion gate
 
 - `pnpm run ready`: pass end to end, including formatting/lint, all package type checks, tests, coverage, and production server/web builds.
 - 712 tests pass: 499 API/domain/PostgreSQL, 98 server, 106 web, and 9 environment tests.
@@ -383,7 +383,7 @@ The developer generated, corrected, and applied `packages/db/src/migrations/0009
 - The complete management oRPC reference is disabled by default, rejected by environment validation in production, and available only through explicit local/test enablement. Snapshot/HTTP tests prove the public document excludes management/auth/operator contracts.
 - The rebuilt production Docker server serves the OpenAPI JSON and interactive reference with HTTP 200, exposes 4 paths/12 operations/10 public schemas, returns 404 for `/api-reference`, and still serves a protected fixture read with HTTP 200; all primary services are healthy.
 - The final refreshed `pnpm run ready`, production/full audits, production builds, and `git diff --check` pass after all load and documentation-boundary work.
-- Developer manual approval remains the final explicit gate.
+- The developer completed manual review, approved M9, and committed it as `8559aa4` (`feat(m9): production delivery API`).
 
 ### Milestone 8 complete automated gate
 
