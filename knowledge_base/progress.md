@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 10 implementation in progress
-**Active milestone:** Milestone 10 — Preview API
-**Last updated:** 2026-08-12
+**Overall status:** Milestone 10 approved and committed; Milestone 11 not started
+**Active milestone:** Milestone 11 — Publication events, webhooks, retries, and invalidation
+**Last updated:** 2026-08-13
 
 ## Status legend
 
@@ -27,7 +27,7 @@
 | 7   | Entries and multilingual drafts          | `[A]`  | 603 passing     | Approved      | `60bd96f` |
 | 8   | Per-locale publication and snapshots     | `[A]`  | 627 passing     | Approved      | `ad3cd5e` |
 | 9   | Delivery API                             | `[A]`  | 712 passing     | Approved      | `8559aa4` |
-| 10  | Preview API                              | `[~]`  | In progress     | Pending       | None      |
+| 10  | Preview API                              | `[A]`  | 780 passing     | Approved      | `aa177b5` |
 | 11  | Events, webhooks, invalidation           | `[ ]`  | Not run         | Pending       | None      |
 | 12  | Developer portal and generated tooling   | `[ ]`  | Not run         | Pending       | None      |
 | 13  | Client handover                          | `[ ]`  | Not run         | Pending       | None      |
@@ -340,7 +340,7 @@
 - `[x]` Amend M12 to own the allowlisted developer portal/generated tooling and M14 to prove production marketing/application/API/developer/operator host separation.
 - `[A]` Developer approved and committed M9 as `8559aa4` (`feat(m9): production delivery API`).
 
-## Milestone 10 checklist — design approval gate
+## Milestone 10 checklist — approved completion
 
 - `[x]` Re-read the product vision, CMS PRD, every mandatory rule, active milestone, context, progress, learnings, and M1–M9 decisions.
 - `[x]` Verify clean Git state and reconcile M9 completion with `main`/`origin/main` at `70ce4fd` and implementation commit `8559aa4`.
@@ -371,11 +371,12 @@
 - `[x]` Complete concurrent save/read and parallel same-entry read/audit/serialization profiles: the audited save loop completed 488 alternating saves and restored the original value; the 60-second read gate returned 4,500 measured 2xx with zero unknown/torn tuples, errors, or drops (p95 16.82 ms), and fixed-count parallel audit passed with exactly 1,000/1,000 successes and 1,000 distinct content-free audits.
 - `[x]` Rebuild the production Docker server/web images and verify healthy containers, web reachability, dedicated Preview OpenAPI 3.1/Scalar reachability, and rollout-disabled data routes returning no-store HTTP 503; explicitly exclude both secret-bearing load environment files from Git/Docker contexts and verify neither exists in rebuilt images; developer-approved dangling-image pruning removed obsolete local layers and left current services healthy.
 - `[x]` Verify read-only post-test invariants: zero M10 fixture users/audits, zero non-idle external transactions, unchanged durable publication/snapshot counts, and no migration activity.
-- `[R]` Reconcile every approved load/manual bullet: all automated/load/credential gates are complete; developer manual Gujarati unpublished-preview review is now the sole remaining approval gate.
+- `[A]` Developer manually verified current and historical Gujarati Preview behavior, approved M10, and committed it as `aa177b5` (`feat(m10): preview API`).
+- `[A]` Developer confirmed the family-first public API versioning policy for first launch: independently versioned `/api/delivery/v1` and `/api/preview/v1` families, SemVer SDK releases in M12, additive evolution within an API major, parallel major-version migrations, and no date-based behavioral versioning until demonstrated need.
 
 ## Current blockers
 
-All automated M10 load gates and credential replacement controls now pass. The legacy non-expiring credential was replaced with one acknowledged 30-day credential and revoked through normal audited controls; all temporary load credentials were also revoked. Read-only inventory reports one active compliant credential and zero active non-expiring credentials. The isolated oversized fixture remains private with zero publications and its load path disabled. Only developer manual Gujarati unpublished Preview review remains pending. M10 requires no database migration.
+None. M10 is approved and committed with no database migration. M11 publication-event/webhook design discovery has not started.
 
 ## Database migration state
 
@@ -396,6 +397,17 @@ The developer generated and applied `packages/db/src/migrations/0007_add_entry_d
 The developer generated, corrected, and applied `packages/db/src/migrations/0009_add_production_delivery_api_read_model.sql`. The first application failed transactionally because current-head unique authority followed its referencing foreign key; read-only verification proved complete rollback. The developer replaced it with the reviewed order and applied it successfully. Live verification confirms four M9 tables, protected configuration for all existing collections, validated constraints, valid/ready indexes, and no unintended public configuration. The agent neither generated nor applied the migration.
 
 ## Test results
+
+### Milestone 10 approved completion gate
+
+- `pnpm run ready`: pass end to end with formatting/lint, workspace type checks, coverage tests, and production server/web builds.
+- 780 tests pass: 549 API/domain/PostgreSQL, 109 server, 113 web, and 9 environment tests.
+- API coverage is 90.29% statements and 74.89% branches; Preview parser statements/branches/functions and compiler statements/functions are 100%, Preview repository coverage is 98% statements/81.57% branches, and Preview UI coverage is 95.89% statements/85.71% branches.
+- Production and full dependency audits, `git diff --check`, Docker image secret-exclusion checks, service health checks, and final read-only PostgreSQL/credential invariants pass.
+- All separate current, revision, distributed quota, Redis outage/recovery, oversized response/memory, concurrent save/read coherence, and parallel-audit load gates pass; accepted evidence is recorded in `apps/server/load/m10-baseline-2026-08-12.md`.
+- The legacy active non-expiring Preview credential was replaced through audited controls by one acknowledged compliant 30-day credential and revoked; all temporary load credentials were revoked.
+- The developer manually verified current and historical Gujarati Preview behavior, production separation, exact source metadata, validation/JSON behavior, navigation, and credential-free endpoint copying.
+- The developer approved M10 and committed it as `aa177b5` (`feat(m10): preview API`). M10 required no database migration.
 
 ### Milestone 9 approved completion gate
 
@@ -649,3 +661,7 @@ Milestone 6 automated criteria and developer/client review are complete. Manual 
 Milestone 7 manual review found locale-dependent list presentation, missing CMS-only names, non-URL locale state, absent version-0 defaults, missing Portable Text hydration, a raw-JSON editor for rich-text defaults, other mismatched default controls, mixed-localization controls on ineligible kinds, and expected unpublished-schema absence surfacing as three global query-error toasts. The developer approved the amendment and generated/applied the inspected `0007_add_entry_display_names.sql` migration. The workspace now derives schema availability from collection metadata and avoids unavailable dependent queries while retaining genuine error semantics. The developer completed English/Hindi/Gujarati review, approved Milestone 7, and committed it as `60bd96f`; the documentation reconciliation was committed as `d90b31b`.
 
 Milestone 8 independent locale publication, immutable snapshots, exact-locale reference pinning, management API/UI, observability, concurrency, policy, append-only enforcement, and final readiness are complete with 627 passing tests and clean invariants. The developer approved and committed M8 as `ad3cd5e` (`feat(m8): add independent locale publication and immutable snapshots`).
+
+Milestone 9 Delivery API was manually approved and committed by the developer as `8559aa4` (`feat(m9): production delivery API`).
+
+Milestone 10 Preview API passed all automated, security, credential-remediation, load/resilience, and invariant gates with 780 tests. The developer manually verified current and historical Gujarati Preview behavior, approved M10, and committed it as `aa177b5` (`feat(m10): preview API`). The developer also confirmed family-first independent API major versions and the initial M12 SDK/versioning policy.

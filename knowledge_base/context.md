@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-08-12
-**Current phase:** Milestone 10 design approved; implementation in progress
-**Active milestone:** Milestone 10 — Preview API
+**Last updated:** 2026-08-13
+**Current phase:** Milestone 10 approved and committed; Milestone 11 design discovery not started
+**Active milestone:** Milestone 11 — Publication events, webhooks, retries, and invalidation
 
 ## What this project is
 
@@ -167,9 +167,11 @@ The repository currently has:
 - The rollout-gated bearer-only `/api/preview/v1` boundary now has closed global/credential quotas, wildcard non-credentialed CORS, exact no-store/no-referrer/nosniff headers, GET/HEAD/OPTIONS behavior, dedicated Preview OpenAPI/Scalar docs, bounded metrics, and no management/Delivery/session fallback
 - The authenticated dashboard now has a non-nested exact-locale Preview route with URL-authoritative current/revision selectors, no malformed historical fallback/request, renderer-neutral JSON and validation/source/production status, credential-free endpoint examples, save-before-preview guards, explicit historical Preview links, targeted invalidation, and accessibility/route coverage
 - The separate secret-safe M10 k6 harness and wrapper cover current GET/HEAD, exact revision, shared two-process quota, Redis outage/recovery, oversized response, committed-tuple-allowlisted concurrent save/read coherence, and fixed-count parallel audit profiles; the wrapper now uses k6-compatible query validation and unique run IDs for exact rerun-safe audit reconciliation.
-- All separate M10 load gates now pass: current, exact revision, distributed 429, Redis outage/recovery, fixed-count parallel audit, repeated oversized 413/memory recovery, and concurrent save/read coherent tuple verification. Temporary credentials were issued/revoked through audited controls; the legacy non-expiring credential was replaced by one acknowledged 30-day credential and revoked. Read-only inventory reports one active compliant credential and zero active non-expiring credentials. The baseline is recorded in `apps/server/load/m10-baseline-2026-08-12.md`; only manual Gujarati review remains.
-- Final readiness now passes with 780 tests (549 API, 109 server, 113 web, 9 environment), 90.29% API statement/74.89% branch coverage, 100% Preview parser statements/branches/functions, 100% Preview compiler statements/functions, 98% Preview repository statements/81.57% branches, explicit Preview UI coverage at 95.89% statements/85.71% branches, and clean production/full pnpm audits.
-- Fresh production Docker server/web images are healthy; Preview OpenAPI 3.1 and Scalar docs are reachable, the rebuilt server successfully serves compliant bearer Preview reads, no non-idle external transactions remain, and the read-only credential inventory still includes one active non-expiring Preview credential requiring normal audited revocation.
+- All separate M10 load gates pass: current, exact revision, distributed 429, Redis outage/recovery, fixed-count parallel audit, repeated oversized 413/memory recovery, and concurrent save/read coherent tuple verification. Temporary credentials were issued/revoked through audited controls; the legacy non-expiring credential was replaced by one acknowledged 30-day credential and revoked. Read-only inventory reports one active compliant credential and zero active non-expiring credentials. The baseline is recorded in `apps/server/load/m10-baseline-2026-08-12.md`.
+- Final M10 readiness passes with 780 tests (549 API, 109 server, 113 web, 9 environment), 90.29% API statement/74.89% branch coverage, 100% Preview parser statements/branches/functions, 100% Preview compiler statements/functions, 98% Preview repository statements/81.57% branches, explicit Preview UI coverage at 95.89% statements/85.71% branches, and clean production/full pnpm audits.
+- Fresh production Docker server/web images are healthy; Preview OpenAPI 3.1 and Scalar docs are reachable, the rebuilt server successfully serves compliant bearer Preview reads, no non-idle external transactions remain, and credential inventory has one active compliant Preview credential with zero active non-expiring credentials.
+- The developer manually verified current and historical Gujarati Preview behavior, approved M10, and committed it as `aa177b5` (`feat(m10): preview API`).
+- The developer confirmed family-first independent public API versions (`/api/delivery/v1`, `/api/preview/v1`) for first launch. M12 will use SemVer for generated SDK packages, preserve explicit API-family majors, allow only additive evolution within a major, support parallel major migrations, and defer date-based behavioral versioning until demonstrated need.
 - Readiness found that the Git-ignored Delivery load environment was not Docker-ignored and had entered local image layers; both Delivery and Preview load files are now excluded from Git and Docker contexts, fresh images were rebuilt, existence-only inspection confirms both are absent without reading secret values, and developer-approved dangling-image pruning removed obsolete local layers while all four current services remain healthy
 - The developer generated and applied `0005_add_field_system_and_editor_layout.sql`; the agent inspected the complete SQL and snapshot and verified the live catalog read-only: 15 expected columns, 35 validated constraints, 16 valid/ready indexes, and valid legacy backfills
 - Complete M6 repository/API/UI/property/PostgreSQL/accessibility/bundle coverage with 551 passing tests and a clean production/full pnpm audit
@@ -186,7 +188,7 @@ The repository currently has:
 
 The repository does not yet have:
 
-- Completed M10 load/resilience profiles and final readiness/manual-review approval
+- M11 publication-event/webhook implementation
 - Production telemetry backend/collector deployment
 
 ## Mandatory constraints
@@ -295,6 +297,6 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 
 ## What to do next
 
-1. Developer manually verifies an unpublished Gujarati current Preview and one explicit historical source combination in the dashboard, including source metadata, validation, production separation, JSON display, navigation, and credential-free endpoint copy.
-2. Keep public rollout disabled until that review is explicitly approved.
-3. After approval, reconcile M10 completion documentation and stop for developer review without committing.
+1. Begin M11 publication events/webhooks discovery by rereading the active milestone, product/PRD requirements, M1–M10 decisions, and relevant implementation boundaries and skills.
+2. Inspect the committed publication transaction/outbox extension seams from M8–M10 and current credential, audit, runtime, worker, and operator UI patterns.
+3. Propose and obtain developer approval for the complete M11 design before changing schema or implementation code.

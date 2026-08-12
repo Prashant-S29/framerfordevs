@@ -642,6 +642,8 @@ Make public integrations discoverable and strongly typed while detecting contrac
 - TypeScript types
 - Effect Schema runtime validators
 - Typed Delivery/Preview client
+- Independent family-first API majors (`delivery/v1`, `preview/v1`) with a documented compatibility, deprecation, and parallel-major migration policy
+- SemVer SDK releases with explicit supported API-family majors; date-based behavioral versioning remains deferred until demonstrated need
 - JSON Schema and OpenAPI output
 - Schema lock
 - Webhook verification and invalidation helpers
@@ -665,6 +667,10 @@ Make public integrations discoverable and strongly typed while detecting contrac
 - Repeated generation with unchanged schema is byte-stable except explicitly variable metadata.
 - Credentials are never written into generated source or logs.
 - Client preserves response envelope and typed error information.
+- Delivery and Preview evolve independently; generated clients target explicit family majors without implying one global API version.
+- Contract-diff checks reject breaking changes within a released API major while allowing documented additive changes.
+- SDK package versions follow SemVer independently of HTTP API majors and publish their supported family/version matrix.
+- A future API major can run in parallel with its predecessor and includes migration guidance, deprecation notice, and a sunset date; first-launch tooling does not implement date-based request/account behavior versions.
 - Pagination helpers handle empty, final, invalid, and repeated cursors.
 - Webhook verifier rejects replay and tampering cases.
 - Generated package examples compile in a clean fixture project.
