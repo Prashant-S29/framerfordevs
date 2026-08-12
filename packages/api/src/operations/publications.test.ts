@@ -164,6 +164,9 @@ const TelemetryTest = Layer.succeed(Telemetry, {
       metrics.push(`${event.operation}:${event.outcome}`);
     }),
   recordEntryPublicationValidationFailure: () => Effect.void,
+  recordPreviewRead: () => Effect.void,
+  recordPreviewQueryRejection: () => Effect.void,
+  recordPreviewAuditFailure: () => Effect.void,
   recordRateLimitDecision: () => Effect.void,
   recordRateLimitStore: () => Effect.void,
 });

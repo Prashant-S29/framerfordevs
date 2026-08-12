@@ -147,18 +147,17 @@ function makeLayers(calls: Array<string>) {
     reset: () => Effect.void,
     retainedFallbackEntryCount: Effect.succeed(0),
   };
+  const principal = Schema.decodeUnknownSync(CredentialPrincipal)({
+    credentialId: ids.credential,
+    workspaceId: ids.workspace,
+    projectId: ids.project,
+    environmentId: ids.environment,
+    family: "delivery",
+    scopes: ["delivery.read"],
+  });
   const authenticator = {
-    authenticate: () =>
-      Effect.succeed(
-        Schema.decodeUnknownSync(CredentialPrincipal)({
-          credentialId: ids.credential,
-          workspaceId: ids.workspace,
-          projectId: ids.project,
-          environmentId: ids.environment,
-          family: "delivery",
-          scopes: ["delivery.read"],
-        }),
-      ),
+    verify: () => Effect.succeed(principal),
+    authenticate: () => Effect.succeed(principal),
   };
   return Layer.mergeAll(
     Layer.succeed(DeliveryRepository, management),

@@ -1,3 +1,5 @@
+// Renders permission-aware project membership, invitation, locale-access, and credential controls.
+
 import type {
   ApiCredential,
   CredentialFamily,
@@ -9,6 +11,7 @@ import type {
   ProjectRole,
 } from "@framerfordevs/api/contracts/access";
 import type { ProjectLocale } from "@framerfordevs/api/contracts/locales";
+import { Alert, AlertDescription, AlertTitle } from "@framerfordevs/ui/components/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1013,7 +1016,7 @@ function CredentialsPanel({
   );
 }
 
-function CredentialRow({
+export function CredentialRow({
   credential,
   canRotate,
   canRevoke,
@@ -1072,6 +1075,15 @@ function CredentialRow({
           ? `Expires ${dateFormatter.format(new Date(credential.expiresAt))}`
           : "Does not expire"}
       </p>
+      {credential.family === "preview" && !credential.expiresAt && !credential.revokedAt ? (
+        <Alert variant="destructive" role="alert">
+          <AlertTitle>Legacy Preview credential blocked</AlertTitle>
+          <AlertDescription>
+            This non-expiring key now fails authentication and cannot rotate. Revoke it after
+            issuing an acknowledged Preview replacement that expires within 30 days.
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {!credential.revokedAt && (canRotate || canRevoke) ? (
         <div className="flex flex-wrap gap-2">
           {canRotate ? (
@@ -1155,8 +1167,8 @@ function CredentialRow({
   );
 }
 
-function defaultExpiryLocal(): string {
-  const date = new Date(Date.now() + 90 * 24 * 60 * 60 * 1_000);
+function defaultExpiryLocal(days = 90): string {
+  const date = new Date(Date.now() + days * 24 * 60 * 60 * 1_000);
   const offset = date.getTimezoneOffset() * 60_000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
@@ -1181,6 +1193,7 @@ export function IssueCredentialDialog({
   const [expiry, setExpiry] = useState(defaultExpiryLocal);
   const [nonExpiring, setNonExpiring] = useState(false);
   const [nonExpiringAcknowledged, setNonExpiringAcknowledged] = useState(false);
+  const [previewAuthorityAcknowledged, setPreviewAuthorityAcknowledged] = useState(false);
   const [issuedKey, setIssuedKey] = useState<string | null>(null);
   const [keyAcknowledged, setKeyAcknowledged] = useState(false);
   const issue = useMutation(
@@ -1204,6 +1217,10 @@ export function IssueCredentialDialog({
           ? ["preview.read"]
           : ["project.read"],
     );
+    setExpiry(defaultExpiryLocal(nextFamily === "preview" ? 30 : 90));
+    setNonExpiring(false);
+    setNonExpiringAcknowledged(false);
+    setPreviewAuthorityAcknowledged(false);
   }
 
   function reset() {
@@ -1213,6 +1230,7 @@ export function IssueCredentialDialog({
     setExpiry(defaultExpiryLocal());
     setNonExpiring(false);
     setNonExpiringAcknowledged(false);
+    setPreviewAuthorityAcknowledged(false);
     setIssuedKey(null);
     setKeyAcknowledged(false);
     issue.reset();
@@ -1231,11 +1249,16 @@ export function IssueCredentialDialog({
   }
 
   const expiresAt = nonExpiring ? null : futureExpiryIso(expiry);
+  const previewExpiryAllowed =
+    family !== "preview" ||
+    (expiresAt !== null && new Date(expiresAt).getTime() - Date.now() <= 30 * 24 * 60 * 60 * 1_000);
   const canSubmit =
     name.trim() !== "" &&
     scopes.length > 0 &&
     (!nonExpiring || nonExpiringAcknowledged) &&
-    (nonExpiring || expiresAt !== null);
+    (nonExpiring || expiresAt !== null) &&
+    previewExpiryAllowed &&
+    (family !== "preview" || previewAuthorityAcknowledged);
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
@@ -1273,6 +1296,7 @@ export function IssueCredentialDialog({
                 name,
                 scopes,
                 expiresAt,
+                previewAuthorityAcknowledged,
               });
             }}
           >
@@ -1310,7 +1334,7 @@ export function IssueCredentialDialog({
                     ? "Authoring and integration operations only."
                     : family === "delivery"
                       ? "Published delivery reads only."
-                      : "Authenticated draft and revision preview reads only."}
+                      : "Environment-wide authenticated draft and revision preview reads only."}
                 </FieldDescription>
               </Field>
               {family === "management" ? (
@@ -1331,7 +1355,37 @@ export function IssueCredentialDialog({
                   {scopes.length === 0 ? <FieldError>Select at least one scope.</FieldError> : null}
                 </FieldSet>
               ) : null}
-              <Field data-disabled={nonExpiring}>
+              {family === "preview" ? (
+                <Alert>
+                  <AlertTitle>Complete environment draft authority</AlertTitle>
+                  <AlertDescription>
+                    This credential can read every current and historical unpublished draft,
+                    including fields hidden from editor roles, in this environment. Store it only in
+                    trusted server-side infrastructure. Preview credentials expire within 30 days.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              {family === "preview" ? (
+                <Field
+                  orientation="horizontal"
+                  data-invalid={!previewAuthorityAcknowledged || undefined}
+                >
+                  <Checkbox
+                    id="credential-preview-authority-ack"
+                    checked={previewAuthorityAcknowledged}
+                    aria-invalid={!previewAuthorityAcknowledged}
+                    onCheckedChange={setPreviewAuthorityAcknowledged}
+                  />
+                  <FieldLabel htmlFor="credential-preview-authority-ack">
+                    I understand this Preview credential has complete environment-wide draft and
+                    hidden-field read authority.
+                  </FieldLabel>
+                </Field>
+              ) : null}
+              <Field
+                data-disabled={nonExpiring}
+                data-invalid={(!nonExpiring && (!expiresAt || !previewExpiryAllowed)) || undefined}
+              >
                 <FieldLabel htmlFor="credential-expiry">Expiry</FieldLabel>
                 <Input
                   id="credential-expiry"
@@ -1340,25 +1394,35 @@ export function IssueCredentialDialog({
                   value={expiry}
                   disabled={nonExpiring}
                   required={!nonExpiring}
+                  aria-invalid={!nonExpiring && (!expiresAt || !previewExpiryAllowed)}
                   onChange={(event) => setExpiry(event.target.value)}
                 />
-                <FieldDescription>Defaults to 90 days.</FieldDescription>
+                <FieldDescription>
+                  {family === "preview" ? "Required; maximum 30 days." : "Defaults to 90 days."}
+                </FieldDescription>
                 {!nonExpiring && expiresAt === null ? (
                   <FieldError>Choose a future expiry date and time.</FieldError>
                 ) : null}
+                {family === "preview" && expiresAt !== null && !previewExpiryAllowed ? (
+                  <FieldError>Preview credentials cannot exceed 30 days.</FieldError>
+                ) : null}
               </Field>
-              <Field orientation="horizontal">
-                <Checkbox
-                  id="credential-non-expiring"
-                  checked={nonExpiring}
-                  onCheckedChange={(checked) => {
-                    setNonExpiring(checked);
-                    if (!checked) setNonExpiringAcknowledged(false);
-                  }}
-                />
-                <FieldLabel htmlFor="credential-non-expiring">Create without an expiry</FieldLabel>
-              </Field>
-              {nonExpiring ? (
+              {family !== "preview" ? (
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="credential-non-expiring"
+                    checked={nonExpiring}
+                    onCheckedChange={(checked) => {
+                      setNonExpiring(checked);
+                      if (!checked) setNonExpiringAcknowledged(false);
+                    }}
+                  />
+                  <FieldLabel htmlFor="credential-non-expiring">
+                    Create without an expiry
+                  </FieldLabel>
+                </Field>
+              ) : null}
+              {family !== "preview" && nonExpiring ? (
                 <Field orientation="horizontal">
                   <Checkbox
                     id="credential-non-expiring-ack"

@@ -27,6 +27,10 @@ const validatedEnv = createEnv({
       .enum(["true", "false"])
       .default("false")
       .transform((value) => value === "true"),
+    PREVIEW_API_ENABLED: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
     MANAGEMENT_API_REFERENCE_ENABLED: z
       .enum(["true", "false"])
       .default("false")

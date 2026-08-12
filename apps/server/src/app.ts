@@ -11,8 +11,18 @@ import {
 } from "@framerfordevs/api/contracts/api-response";
 import type { DeliveryAccessPrincipal } from "@framerfordevs/api/contracts/delivery";
 import { deliveryOpenApiDocument } from "@framerfordevs/api/contracts/delivery-openapi";
+import { previewOpenApiDocument } from "@framerfordevs/api/contracts/preview-openapi";
 import type { RateLimitDecision } from "@framerfordevs/api/contracts/rate-limit";
 import { selectCanonicalNetworkSource } from "@framerfordevs/api/lib/network-source";
+import {
+  authenticatePreviewRequest,
+  evaluatePreviewCredentialRateLimit,
+  evaluatePreviewGlobalRateLimit,
+  getCredentialCurrentPreview,
+  getCredentialRevisionPreview,
+  makeCurrentPreviewRouteScope,
+  makeRevisionPreviewRouteScope,
+} from "@framerfordevs/api/operations/preview-public";
 import {
   authenticateDeliveryRequest,
   evaluateDeliveryGlobalRateLimit,
@@ -30,7 +40,12 @@ import type {
 } from "@framerfordevs/api/services/delivery-read-repository";
 import { readinessCheck, healthCheck } from "@framerfordevs/api/operations/system";
 import { makeRequestContext } from "@framerfordevs/api/observability/request-context";
-import { observeHttpRequest, reportBoundaryDefect } from "@framerfordevs/api/runtime";
+import type { PreviewQueryRejectionCategory } from "@framerfordevs/api/observability/telemetry";
+import {
+  observeHttpRequest,
+  observePreviewQueryRejection,
+  reportBoundaryDefect,
+} from "@framerfordevs/api/runtime";
 import { appRouter } from "@framerfordevs/api/routers/index";
 import { auth } from "@framerfordevs/auth";
 import { env } from "@framerfordevs/env/server";
@@ -586,14 +601,323 @@ function createDeliveryRouter(deliveryApiEnabled: boolean): Router {
   return router;
 }
 
+const previewAllowedHeaders = new Set(["authorization", "traceparent", "x-request-id"]);
+const previewExposedHeaders = [
+  "Cache-Control",
+  "X-Request-Id",
+  "RateLimit-Limit",
+  "RateLimit-Remaining",
+  "RateLimit-Reset",
+  "Retry-After",
+].join(", ");
+
+/** Applies the complete isolated Preview CORS and anti-leak header set. */
+function setPreviewHeaders(res: Response): void {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization, Traceparent, X-Request-Id");
+  res.setHeader("Access-Control-Expose-Headers", previewExposedHeaders);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "no-referrer");
+}
+
+/** Sends a no-store Preview envelope without validators or a body for HEAD. */
+function sendPreviewResponse(
+  req: Request,
+  res: Response,
+  status: number,
+  response: ApiResponse<ApiData>,
+): void {
+  res.setHeader("Cache-Control", "private, no-store, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.removeHeader("ETag");
+  res.removeHeader("Last-Modified");
+  if (status === 401) res.setHeader("WWW-Authenticate", 'Bearer realm="preview"');
+  const body = Buffer.from(JSON.stringify(response), "utf8");
+  res.status(status).setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Content-Length", String(body.byteLength));
+  if (req.method === "HEAD") {
+    res.end();
+    return;
+  }
+  res.end(body);
+}
+
+/** Records only the closed parser category and never the raw rejected Preview query. */
+function observePreviewScopeFailure(response: ApiResponse<ApiData>): void {
+  if (response.ok || response.error.code !== "PREVIEW_QUERY_INVALID") return;
+  const detail = response.error.details?.[0];
+  const code = detail?.code;
+  let category: PreviewQueryRejectionCategory;
+  switch (code) {
+    case "query_too_large":
+    case "duplicate_parameter":
+      category = code;
+      break;
+    case "query_parameter_unknown":
+      category = ["token", "key", "credential", "authorization"].includes(detail?.path ?? "")
+        ? "credential_in_query"
+        : "unknown_parameter";
+      break;
+    case "locale_required":
+    case "revision_selector_required":
+      category = "missing_parameter";
+      break;
+    case "locale_invalid":
+    case "revision_selector_invalid":
+    default:
+      category = "invalid_parameter";
+  }
+  void observePreviewQueryRejection(category).catch(() => undefined);
+}
+
+/** Unwraps one Preview runtime step while preserving no-store failures and bearer challenges. */
+function previewStepData<A extends ApiData>(
+  req: Request,
+  res: Response,
+  result: { readonly status: number; readonly response: ApiResponse<A> },
+): A | null {
+  if (!result.response.ok) {
+    sendPreviewResponse(req, res, result.status, result.response);
+    return null;
+  }
+  return result.response.data;
+}
+
+/** Executes authentication and closed Preview quotas before any persisted route scope lookup. */
+async function preparePreviewRequest(
+  req: Request,
+  res: Response,
+  context: Context,
+  previewApiEnabled: boolean,
+) {
+  if (!previewApiEnabled) {
+    sendPreviewResponse(
+      req,
+      res,
+      503,
+      apiFailure({
+        code: "SERVICE_UNAVAILABLE",
+        message: "The service is temporarily unavailable.",
+        requestId: context.request.requestId,
+        retryable: true,
+      }),
+    );
+    return undefined;
+  }
+  const globalResult = await context.execute(
+    "api.preview.rate_limit.global",
+    evaluatePreviewGlobalRateLimit(),
+    "Preview installation quota evaluated.",
+  );
+  const global = previewStepData(req, res, globalResult);
+  if (global === null) return undefined;
+  setRateLimitHeaders(res, global);
+  if (!global.allowed) {
+    sendPreviewResponse(
+      req,
+      res,
+      429,
+      apiFailure({
+        code: "RATE_LIMITED",
+        message: "Too many requests. Try again later.",
+        requestId: context.request.requestId,
+        retryable: true,
+      }),
+    );
+    return undefined;
+  }
+  const principalResult = await context.execute(
+    "api.preview.authenticate",
+    authenticatePreviewRequest(
+      req.headers.authorization ?? null,
+      selectCanonicalNetworkSource(req.ip, req.socket.remoteAddress),
+    ),
+    "Preview credential authenticated.",
+  );
+  const principal = previewStepData(req, res, principalResult);
+  if (principal === null) return undefined;
+  const identityResult = await context.execute(
+    "api.preview.rate_limit.credential",
+    evaluatePreviewCredentialRateLimit(principal.credentialId),
+    "Preview credential quota evaluated.",
+  );
+  const identity = previewStepData(req, res, identityResult);
+  if (identity === null) return undefined;
+  setRateLimitHeaders(res, identity);
+  if (!identity.allowed) {
+    sendPreviewResponse(
+      req,
+      res,
+      429,
+      apiFailure({
+        code: "RATE_LIMITED",
+        message: "Too many requests. Try again later.",
+        requestId: context.request.requestId,
+        retryable: true,
+      }),
+    );
+    return undefined;
+  }
+  return principal;
+}
+
+/** Creates the isolated bearer-only Preview router before credentialed management CORS. */
+function createPreviewRouter(previewApiEnabled: boolean): Router {
+  const router = express.Router();
+  router.use((req, res, next) => {
+    setPreviewHeaders(res);
+    if (req.method !== "OPTIONS") {
+      next();
+      return;
+    }
+    const requestedMethod = req.headers["access-control-request-method"]?.toUpperCase();
+    const requestedHeaders = (req.headers["access-control-request-headers"] ?? "")
+      .split(",")
+      .map((header) => header.trim().toLowerCase())
+      .filter(Boolean);
+    if (
+      (requestedMethod !== undefined && requestedMethod !== "GET" && requestedMethod !== "HEAD") ||
+      requestedHeaders.some((header) => !previewAllowedHeaders.has(header))
+    ) {
+      sendPreviewResponse(
+        req,
+        res,
+        403,
+        apiFailure({
+          code: "FORBIDDEN",
+          message: "The requested Preview preflight is not allowed.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    res.status(204).end();
+  });
+
+  router.get("/openapi.json", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.json(previewOpenApiDocument);
+  });
+  router.get(
+    "/docs",
+    (_req, res, next) => {
+      res.setHeader("Cache-Control", "public, max-age=300");
+      next();
+    },
+    apiReference({
+      pageTitle: "Framer for Devs Preview API",
+      url: "/api/preview/v1/openapi.json",
+    }),
+  );
+
+  const entryPath =
+    "/projects/:projectId/environments/:environmentKey/collections/:collectionKey/entries/:entryId";
+  const currentHandler = async (req: Request, res: Response) => {
+    const context = createContext({ req });
+    const principal = await preparePreviewRequest(req, res, context, previewApiEnabled);
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.preview.scope.current.decode",
+      makeCurrentPreviewRouteScope({
+        projectId: routeParameter(req, "projectId"),
+        environmentKey: routeParameter(req, "environmentKey"),
+        collectionKey: routeParameter(req, "collectionKey"),
+        entryId: routeParameter(req, "entryId"),
+        rawQuery: req.originalUrl.split("?", 2)[1] ?? "",
+      }),
+      "Preview scope decoded.",
+    );
+    observePreviewScopeFailure(scopeResult.response);
+    const scope = previewStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const result = await context.execute(
+      "api.preview.current",
+      getCredentialCurrentPreview(principal, scope, context.request.requestId),
+      "Preview entry loaded.",
+    );
+    sendPreviewResponse(req, res, result.status, result.response);
+  };
+  router.get(`${entryPath}/draft`, currentHandler);
+  router.head(`${entryPath}/draft`, currentHandler);
+
+  const revisionHandler = async (req: Request, res: Response) => {
+    const context = createContext({ req });
+    const principal = await preparePreviewRequest(req, res, context, previewApiEnabled);
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.preview.scope.revision.decode",
+      makeRevisionPreviewRouteScope({
+        projectId: routeParameter(req, "projectId"),
+        environmentKey: routeParameter(req, "environmentKey"),
+        collectionKey: routeParameter(req, "collectionKey"),
+        entryId: routeParameter(req, "entryId"),
+        schemaRevisionId: routeParameter(req, "schemaRevisionId"),
+        rawQuery: req.originalUrl.split("?", 2)[1] ?? "",
+      }),
+      "Preview revision scope decoded.",
+    );
+    observePreviewScopeFailure(scopeResult.response);
+    const scope = previewStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const result = await context.execute(
+      "api.preview.revision",
+      getCredentialRevisionPreview(principal, scope, context.request.requestId),
+      "Preview entry loaded.",
+    );
+    sendPreviewResponse(req, res, result.status, result.response);
+  };
+  router.get(`${entryPath}/revisions/:schemaRevisionId`, revisionHandler);
+  router.head(`${entryPath}/revisions/:schemaRevisionId`, revisionHandler);
+
+  router.use((req, res) => {
+    res.setHeader("Allow", "GET, HEAD, OPTIONS");
+    sendPreviewResponse(
+      req,
+      res,
+      req.method === "GET" || req.method === "HEAD" ? 404 : 405,
+      apiFailure({
+        code: "NOT_FOUND",
+        message: "The requested resource was not found.",
+        requestId: requestContext(req).requestId,
+        retryable: false,
+      }),
+    );
+  });
+  router.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      next(error);
+      return;
+    }
+    const context = requestContext(req);
+    void reportBoundaryDefect(context, error).catch(() => undefined);
+    sendPreviewResponse(
+      req,
+      res,
+      500,
+      apiFailure({
+        code: "INTERNAL_ERROR",
+        message: "An unexpected error occurred.",
+        requestId: context.requestId,
+        retryable: false,
+      }),
+    );
+  });
+  return router;
+}
+
 export interface CreateAppOptions {
   readonly deliveryApiEnabled?: boolean;
+  readonly previewApiEnabled?: boolean;
   readonly managementApiReferenceEnabled?: boolean;
 }
 
 export function createApp(options: CreateAppOptions = {}): Express {
   const app = express();
   const deliveryApiEnabled = options.deliveryApiEnabled ?? env.DELIVERY_API_ENABLED;
+  const previewApiEnabled = options.previewApiEnabled ?? env.PREVIEW_API_ENABLED;
   const managementApiReferenceEnabled =
     options.managementApiReferenceEnabled ?? env.MANAGEMENT_API_REFERENCE_ENABLED;
   app.set("trust proxy", env.TRUST_PROXY_HOPS);
@@ -613,6 +937,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   });
 
   app.use("/api/delivery/v1", createDeliveryRouter(deliveryApiEnabled));
+  app.use("/api/preview/v1", createPreviewRouter(previewApiEnabled));
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;

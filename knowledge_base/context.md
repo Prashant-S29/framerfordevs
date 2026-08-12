@@ -1,7 +1,7 @@
 # Agent Session Context
 
-**Last updated:** 2026-08-11
-**Current phase:** Milestone 9 approved and committed; Milestone 10 design discovery not started
+**Last updated:** 2026-08-12
+**Current phase:** Milestone 10 design approved; implementation in progress
 **Active milestone:** Milestone 10 — Preview API
 
 ## What this project is
@@ -157,6 +157,20 @@ The repository currently has:
 - M12 now owns the allowlisted public developer portal, versioned public specifications, guides, and generated tooling; M14 owns production marketing/application/API/developer/operator host and ingress separation
 - Final refreshed `pnpm run ready` passes after all load and documentation-boundary work with 712 tests and 89.40% API statement coverage; production/full audits and builds pass
 - The developer completed manual review, approved M9, and committed it as `8559aa4` (`feat(m9): production delivery API`)
+- M10 requirements, M1–M9 decisions, current credential/draft/revision/Delivery/Express/runtime/UI/test seams, relevant installed skills, current shadcn project context, and applicable HTTP security standards have been reviewed
+- The developer approved the complete M10 design at `knowledge_base/decisions/m10-preview-api-and-ux-design.md` and authorized implementation; it defines bearer-only Preview routes, explicit current versus compatible revision-source authority, permissive API-key projection, isolated no-store/CORS behavior, credential-free dashboard session handoff, central rate limits, successful-access audits, Effect architecture, and maximum-coverage gates without a database migration
+- After security review, the developer separately approved environment-wide/full-field Preview authority only with an expiring-only server-enforced 30-day maximum, a dedicated authority warning/acknowledgement, and pre-rollout replacement/revocation of noncompliant credentials; read-only inventory found one active non-expiring non-test Preview credential and exposed no identifying values or secrets; the dashboard now marks such legacy Preview rows as blocked, non-rotatable, and requiring compliant replacement/revocation
+- The amended proposal now treats M3 credential tightening and M8/M9 compiler extraction as explicit load-bearing changes, defines at-most-once whole-transaction retry only for PostgreSQL `40001`, requires parallel-read/audit tests, preserves each rate/load profile as a separate gate, and forbids automatic malformed-selector fallback
+- M10 implementation now includes the approved 30-day Preview credential hardening and authority acknowledgement, behavior-neutral shared projection extraction, Preview contracts/query parser/permissive compiler/Effect engine, and unchanged publication/Delivery regression evidence
+- The exact-scope Preview repository and runtime operations now resolve current or explicit historical schema/shared/localized authority inside short `REPEATABLE READ` source-plus-audit transactions, enforce timeouts, retry only one complete SQLSTATE `40001` transaction, and fail all other database/audit/compile outcomes closed
+- PostgreSQL coverage proves version-0 and historical behavior, old API-key projection, mixed-contract rejection, complete credential versus role-projected dashboard values, locale/role/lifecycle denial and restoration, content-free audits, audit rollback, concurrent-save snapshot coherence, parallel independent audits, retry classification, and intended indexes
+- The rollout-gated bearer-only `/api/preview/v1` boundary now has closed global/credential quotas, wildcard non-credentialed CORS, exact no-store/no-referrer/nosniff headers, GET/HEAD/OPTIONS behavior, dedicated Preview OpenAPI/Scalar docs, bounded metrics, and no management/Delivery/session fallback
+- The authenticated dashboard now has a non-nested exact-locale Preview route with URL-authoritative current/revision selectors, no malformed historical fallback/request, renderer-neutral JSON and validation/source/production status, credential-free endpoint examples, save-before-preview guards, explicit historical Preview links, targeted invalidation, and accessibility/route coverage
+- The separate secret-safe M10 k6 harness and wrapper cover current GET/HEAD, exact revision, shared two-process quota, Redis outage/recovery, oversized response, committed-tuple-allowlisted concurrent save/read coherence, and fixed-count parallel audit profiles; the wrapper now uses k6-compatible query validation and unique run IDs for exact rerun-safe audit reconciliation.
+- All separate M10 load gates now pass: current, exact revision, distributed 429, Redis outage/recovery, fixed-count parallel audit, repeated oversized 413/memory recovery, and concurrent save/read coherent tuple verification. Temporary credentials were issued/revoked through audited controls; the legacy non-expiring credential was replaced by one acknowledged 30-day credential and revoked. Read-only inventory reports one active compliant credential and zero active non-expiring credentials. The baseline is recorded in `apps/server/load/m10-baseline-2026-08-12.md`; only manual Gujarati review remains.
+- Final readiness now passes with 780 tests (549 API, 109 server, 113 web, 9 environment), 90.29% API statement/74.89% branch coverage, 100% Preview parser statements/branches/functions, 100% Preview compiler statements/functions, 98% Preview repository statements/81.57% branches, explicit Preview UI coverage at 95.89% statements/85.71% branches, and clean production/full pnpm audits.
+- Fresh production Docker server/web images are healthy; Preview OpenAPI 3.1 and Scalar docs are reachable, the rebuilt server successfully serves compliant bearer Preview reads, no non-idle external transactions remain, and the read-only credential inventory still includes one active non-expiring Preview credential requiring normal audited revocation.
+- Readiness found that the Git-ignored Delivery load environment was not Docker-ignored and had entered local image layers; both Delivery and Preview load files are now excluded from Git and Docker contexts, fresh images were rebuilt, existence-only inspection confirms both are absent without reading secret values, and developer-approved dangling-image pruning removed obsolete local layers while all four current services remain healthy
 - The developer generated and applied `0005_add_field_system_and_editor_layout.sql`; the agent inspected the complete SQL and snapshot and verified the live catalog read-only: 15 expected columns, 35 validated constraints, 16 valid/ready indexes, and valid legacy backfills
 - Complete M6 repository/API/UI/property/PostgreSQL/accessibility/bundle coverage with 551 passing tests and a clean production/full pnpm audit
 - Cold Docker manual review found and fixed a schema-builder hook-order crash during query hydration; hooks are now unconditional and `react-hooks/rules-of-hooks` is enforced workspace-wide
@@ -172,7 +186,7 @@ The repository currently has:
 
 The repository does not yet have:
 
-- Preview API workflows (M10)
+- Completed M10 load/resilience profiles and final readiness/manual-review approval
 - Production telemetry backend/collector deployment
 
 ## Mandatory constraints
@@ -281,6 +295,6 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 
 ## What to do next
 
-1. Begin M10 Preview API discovery by rereading the active milestone, product/PRD requirements, M1-M9 decisions, current implementation boundaries, and relevant skills.
-2. Inspect the committed M9 Delivery/publication/credential/cache/OpenAPI seams that Preview must reuse without exposing drafts through Delivery.
-3. Propose and obtain developer approval for the complete M10 design before changing schema or implementation code.
+1. Developer manually verifies an unpublished Gujarati current Preview and one explicit historical source combination in the dashboard, including source metadata, validation, production separation, JSON display, navigation, and credential-free endpoint copy.
+2. Keep public rollout disabled until that review is explicitly approved.
+3. After approval, reconcile M10 completion documentation and stop for developer review without committing.

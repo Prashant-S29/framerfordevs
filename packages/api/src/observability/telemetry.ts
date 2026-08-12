@@ -66,6 +66,24 @@ export type EntryPublicationValidationCategory =
   | "snapshot_size_exceeded"
   | "other";
 
+export type PreviewQueryRejectionCategory =
+  | "query_too_large"
+  | "unknown_parameter"
+  | "duplicate_parameter"
+  | "credential_in_query"
+  | "missing_parameter"
+  | "invalid_parameter";
+
+export interface PreviewReadMetric {
+  readonly source: "current" | "revision";
+  readonly subject: "credential" | "user";
+  readonly outcome: "success" | "failure";
+  readonly validation: "valid" | "invalid" | "unavailable";
+  readonly issueCountBucket: "0" | "1-10" | "11-25" | "26-50";
+  readonly sizeBucket: "none" | "small" | "medium" | "large" | "near_limit";
+  readonly durationMs: number;
+}
+
 export interface RateLimitDecisionMetric {
   readonly policy: RateLimitPolicy;
   readonly enforcementMode: RateLimitEnforcementMode;
@@ -99,6 +117,11 @@ export interface TelemetryService {
   readonly recordEntryPublicationValidationFailure: (
     category: EntryPublicationValidationCategory,
   ) => Effect.Effect<void>;
+  readonly recordPreviewRead: (event: PreviewReadMetric) => Effect.Effect<void>;
+  readonly recordPreviewQueryRejection: (
+    category: PreviewQueryRejectionCategory,
+  ) => Effect.Effect<void>;
+  readonly recordPreviewAuditFailure: () => Effect.Effect<void>;
   readonly recordRateLimitDecision: (event: RateLimitDecisionMetric) => Effect.Effect<void>;
   readonly recordRateLimitStore: (event: RateLimitStoreMetric) => Effect.Effect<void>;
 }
@@ -164,6 +187,28 @@ const entryPublicationLatency = Metric.histogram(
 const entryPublicationValidationFailureCount = Metric.counter(
   "cms_entry_publication_validation_failures_total",
   { description: "Entry publication validation failures by bounded category", incremental: true },
+);
+
+const previewReadCount = Metric.counter("cms_preview_reads_total", {
+  description:
+    "Preview read outcomes by bounded source, subject, validation, issue, and size buckets",
+  incremental: true,
+});
+
+const previewQueryRejectionCount = Metric.counter("cms_preview_query_rejections_total", {
+  description: "Preview query rejections by closed parser category",
+  incremental: true,
+});
+
+const previewAuditFailureCount = Metric.counter("cms_preview_audit_failures_total", {
+  description: "Preview reads failed closed because audit persistence failed",
+  incremental: true,
+});
+
+const previewReadLatency = Metric.histogram(
+  "cms_preview_read_duration_ms",
+  MetricBoundaries.exponential({ start: 1, factor: 2, count: 16 }),
+  "Preview read duration in milliseconds",
 );
 
 const rateLimitDecisionCount = Metric.counter("rate_limit_decisions_total", {
@@ -275,6 +320,30 @@ export const TelemetryLive = Layer.succeed(Telemetry, {
   },
   recordEntryPublicationValidationFailure: (category) =>
     Metric.update(Metric.tagged(entryPublicationValidationFailureCount, "category", category), 1),
+  recordPreviewRead: (event) => {
+    const label = <Type, In, Out>(metric: Metric.Metric<Type, In, Out>) =>
+      Metric.tagged(
+        Metric.tagged(
+          Metric.tagged(
+            Metric.tagged(Metric.tagged(metric, "source", event.source), "subject", event.subject),
+            "outcome",
+            event.outcome,
+          ),
+          "validation",
+          event.validation,
+        ),
+        "issue_count",
+        event.issueCountBucket,
+      );
+    const count = Metric.tagged(label(previewReadCount), "size", event.sizeBucket);
+    const latency = Metric.tagged(label(previewReadLatency), "size", event.sizeBucket);
+    return Effect.all([Metric.update(count, 1), Metric.update(latency, event.durationMs)]).pipe(
+      Effect.asVoid,
+    );
+  },
+  recordPreviewQueryRejection: (category) =>
+    Metric.update(Metric.tagged(previewQueryRejectionCount, "category", category), 1),
+  recordPreviewAuditFailure: () => Metric.update(previewAuditFailureCount, 1),
   recordRateLimitDecision: (event) =>
     Metric.update(
       Metric.tagged(

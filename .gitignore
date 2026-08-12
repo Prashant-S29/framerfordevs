@@ -16,6 +16,7 @@ apps/web/src/routeTree.gen.ts
 .env
 .env*.local
 delivery-load.env
+preview-load.env
 
 # IDEs and editors
 .vscode/*

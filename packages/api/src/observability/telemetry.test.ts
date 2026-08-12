@@ -33,6 +33,17 @@ describe("Effect metrics", () => {
           durationMs: 32,
         });
         yield* telemetry.recordEntryPublicationValidationFailure("field_invalid");
+        yield* telemetry.recordPreviewRead({
+          source: "revision",
+          subject: "credential",
+          outcome: "success",
+          validation: "invalid",
+          issueCountBucket: "1-10",
+          sizeBucket: "small",
+          durationMs: 18,
+        });
+        yield* telemetry.recordPreviewQueryRejection("credential_in_query");
+        yield* telemetry.recordPreviewAuditFailure();
         yield* telemetry.recordRateLimitDecision({
           policy: "delivery.credential",
           enforcementMode: "redis",

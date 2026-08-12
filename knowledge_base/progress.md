@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 9 approved and committed; Milestone 10 not started
+**Overall status:** Milestone 10 implementation in progress
 **Active milestone:** Milestone 10 — Preview API
-**Last updated:** 2026-08-11
+**Last updated:** 2026-08-12
 
 ## Status legend
 
@@ -27,7 +27,7 @@
 | 7   | Entries and multilingual drafts          | `[A]`  | 603 passing     | Approved      | `60bd96f` |
 | 8   | Per-locale publication and snapshots     | `[A]`  | 627 passing     | Approved      | `ad3cd5e` |
 | 9   | Delivery API                             | `[A]`  | 712 passing     | Approved      | `8559aa4` |
-| 10  | Preview API                              | `[ ]`  | Not run         | Pending       | None      |
+| 10  | Preview API                              | `[~]`  | In progress     | Pending       | None      |
 | 11  | Events, webhooks, invalidation           | `[ ]`  | Not run         | Pending       | None      |
 | 12  | Developer portal and generated tooling   | `[ ]`  | Not run         | Pending       | None      |
 | 13  | Client handover                          | `[ ]`  | Not run         | Pending       | None      |
@@ -340,9 +340,42 @@
 - `[x]` Amend M12 to own the allowlisted developer portal/generated tooling and M14 to prove production marketing/application/API/developer/operator host separation.
 - `[A]` Developer approved and committed M9 as `8559aa4` (`feat(m9): production delivery API`).
 
+## Milestone 10 checklist — design approval gate
+
+- `[x]` Re-read the product vision, CMS PRD, every mandatory rule, active milestone, context, progress, learnings, and M1–M9 decisions.
+- `[x]` Verify clean Git state and reconcile M9 completion with `main`/`origin/main` at `70ce4fd` and implementation commit `8559aa4`.
+- `[x]` Load materially relevant Effect, security, Express, Better Auth, Drizzle, PostgreSQL, TanStack Start/Router/Query, shadcn, React, Turborepo, Portable Text, and web-interface guidance.
+- `[x]` Verify stable Effect 3.22/`@effect/vitest` behavior, current shadcn Base UI project context, installed components, and current public component/web-interface guidance.
+- `[x]` Inspect the committed Preview credential, policy, draft/revision, publication, Delivery, rate-limit, Express/CORS/cache/OpenAPI, runtime/Layer, dashboard route/editor, database schema, and representative test seams.
+- `[x]` Research bearer-header, no-store, no-referrer, and wildcard non-credentialed CORS constraints from authoritative HTTP/security sources.
+- `[x]` Resolve the separate shared/locale history ambiguity with explicit schema plus shared/localized revision-source selection rather than inferred historical counterparts.
+- `[x]` Propose the complete M10 API, credential, projection, cache/CORS, session-handoff, rate-limit, audit, Effect, UI, threat, performance, and maximum-coverage design at `knowledge_base/decisions/m10-preview-api-and-ux-design.md`.
+- `[x]` Review credential blast radius, M3/M8 cross-milestone risk, repeatable-read audit concurrency, rate-gate preservation, and invalid-selector UX; amend the proposal with concrete controls.
+- `[x]` Inventory Preview credentials read-only without exposing identifiers or secrets: one active non-expiring non-test Preview credential currently requires normal replacement/revocation before rollout.
+- `[A]` Developer separately approved environment-wide/full-field Preview authority only with an expiring-only server-enforced 30-day maximum, dedicated authority warning/acknowledgement, and pre-rollout noncompliant-credential replacement/revocation.
+- `[A]` Developer approved the complete amended M10 design and authorized implementation.
+- `[x]` Tighten M3 Preview credentials to mandatory acknowledged environment-wide authority, server-clock expiry, a 30-day maximum original lifetime, fail-closed legacy authentication/rotation, and complete credential regressions/UI warning coverage, including an accessible fail-closed warning on inventoried legacy non-expiring Preview rows.
+- `[x]` Extract shared stable-ID projection primitives from the M8 compiler and prove publication fixtures/hashes plus M9 Delivery behavior unchanged.
+- `[x]` Implement M10 source/query/response/error contracts, strict query parser, permissive bounded compiler, role-safe projection, and replaceable `PreviewDocumentEngine` with focused tests.
+- `[x]` Implement the exact-scope `PreviewRepository`, current/historical source loading, short `REPEATABLE READ` source-plus-audit transactions, 750 ms/2 s timeouts, one-time `40001` whole-transaction retry, runtime Layer, and named credential/user operations.
+- `[x]` Add PostgreSQL coverage for version-0/current/history sources, old API keys, incompatible contracts, full machine versus role-projected values, locale/role/lifecycle denial and restoration, audit rollback/content absence, concurrent-save coherence, parallel audit counts, retry classification, and intended indexes.
+- `[x]` Add closed Preview global/credential/user rate policies, bounded Preview telemetry, operation ordering tests, rollout configuration, bearer-only Express GET/HEAD/OPTIONS routes, wildcard non-credentialed CORS, exact no-store/no-referrer headers, and dedicated Preview OpenAPI/Scalar documentation.
+- `[x]` Add the protected non-nested dashboard Preview route, strict URL source state with no malformed historical fallback, current/revision controls, validation/source/production status, renderer-neutral JSON, credential-free endpoint copying, save-before-preview guards, explicit history Preview links, targeted invalidation, global referrer protection, and accessibility/route tests.
+- `[x]` Reconcile approved non-load contract/property/HTTP/authorization/observability/coverage requirements and pass the refreshed full automated readiness gate: `pnpm run ready` passes with 780 tests, 90.29% API statements, 74.89% API branches, 100% Preview parser statements/branches/functions, 100% Preview compiler statements/functions, 98% Preview repository statements, and 81.57% Preview repository branches. Preview UI coverage is measured explicitly at 95.89% statements/85.71% branches with source/status/error/empty/accessibility interactions; production and full pnpm audits report no known vulnerabilities.
+- `[x]` Implement and k6-parse the separate current, revision, two-process quota, Redis outage, oversized-response, concurrent-save/read coherence-allowlist, and fixed-count parallel-audit harness plus secret-safe orchestration/runbook and normal audited short-lived load-credential issuance utility.
+- `[x]` Complete the full 15-second warm-up/60-second current Preview capacity profile: 4,503 measured 2xx at the 75 req/s target, p95 30.30 ms, p99 47.46 ms, and zero unexpected errors/drops.
+- `[x]` Complete the full 15-second warm-up/60-second revision Preview capacity profile: 3,001 measured 2xx at the 50 req/s target, p95 20.38 ms, p99 22.27 ms, and zero unexpected errors/drops.
+- `[x]` Complete the two-process 300-unit credential quota/429 profile: 300 measured 2xx plus 600 stable 429s split across both processes, with zero unexpected errors/drops.
+- `[x]` Complete the Redis outage/degraded-memory/recovery profile: 3,001 measured 2xx through a 15-second hard outage, p95 308.40 ms/p99 326.29 ms, zero errors/drops, and bounded limiter-key recovery.
+- `[x]` Complete the oversized-response/memory-stability profile: 300/300 measured stable 413 responses at 5 req/s, p95 84.15 ms/p99 86.70 ms, zero unexpected errors/drops, and server memory returned from the transient peak to near baseline after the run.
+- `[x]` Complete concurrent save/read and parallel same-entry read/audit/serialization profiles: the audited save loop completed 488 alternating saves and restored the original value; the 60-second read gate returned 4,500 measured 2xx with zero unknown/torn tuples, errors, or drops (p95 16.82 ms), and fixed-count parallel audit passed with exactly 1,000/1,000 successes and 1,000 distinct content-free audits.
+- `[x]` Rebuild the production Docker server/web images and verify healthy containers, web reachability, dedicated Preview OpenAPI 3.1/Scalar reachability, and rollout-disabled data routes returning no-store HTTP 503; explicitly exclude both secret-bearing load environment files from Git/Docker contexts and verify neither exists in rebuilt images; developer-approved dangling-image pruning removed obsolete local layers and left current services healthy.
+- `[x]` Verify read-only post-test invariants: zero M10 fixture users/audits, zero non-idle external transactions, unchanged durable publication/snapshot counts, and no migration activity.
+- `[R]` Reconcile every approved load/manual bullet: all automated/load/credential gates are complete; developer manual Gujarati unpublished-preview review is now the sole remaining approval gate.
+
 ## Current blockers
 
-None. M9 is approved and committed; M10 Preview API design discovery has not started.
+All automated M10 load gates and credential replacement controls now pass. The legacy non-expiring credential was replaced with one acknowledged 30-day credential and revoked through normal audited controls; all temporary load credentials were also revoked. Read-only inventory reports one active compliant credential and zero active non-expiring credentials. The isolated oversized fixture remains private with zero publications and its load path disabled. Only developer manual Gujarati unpublished Preview review remains pending. M10 requires no database migration.
 
 ## Database migration state
 

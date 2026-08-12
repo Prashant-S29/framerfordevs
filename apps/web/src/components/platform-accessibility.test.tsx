@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { ProjectMember } from "@framerfordevs/api/contracts/access";
+import { ApiCredential, ProjectMember } from "@framerfordevs/api/contracts/access";
 import { ProjectLocale } from "@framerfordevs/api/contracts/locales";
 import { Project } from "@framerfordevs/api/contracts/platform";
 import {
@@ -24,6 +24,7 @@ import { CreateWorkspaceDialog } from "./create-workspace-dialog";
 import { EditProjectDialog } from "./edit-project-dialog";
 import { LocaleTabs } from "./locale-tabs";
 import {
+  CredentialRow,
   InviteMemberDialog,
   IssueCredentialDialog,
   LocaleAccessDialog,
@@ -198,6 +199,30 @@ describe("platform management accessibility", () => {
       <IssueCredentialDialog projectId={project.id} environmentId={project.environment.id} />,
     );
     await expectOpenDialogToHaveNoViolations(/issue credential/i);
+  });
+
+  it("warns that legacy non-expiring Preview credentials fail closed", async () => {
+    const credential = Schema.decodeUnknownSync(ApiCredential)({
+      id: "019fae8b-1234-7000-8000-000000000099",
+      workspaceId: project.workspaceId,
+      projectId: project.id,
+      environmentId: project.environment.id,
+      family: "preview",
+      name: "Legacy Preview",
+      keyPrefix: "ffd_prev_019fae8b-1234-7000-8000-000000000099",
+      scopes: ["preview.read"],
+      version: 1,
+      expiresAt: null,
+      revokedAt: null,
+      createdAt: "2026-07-29T00:00:00.000Z",
+      updatedAt: "2026-07-29T00:00:00.000Z",
+    });
+    const { container } = renderWithQueryClient(
+      <CredentialRow credential={credential} canRotate canRevoke />,
+    );
+    expect(screen.getByText("Legacy Preview credential blocked")).toBeTruthy();
+    expect(screen.getByText(/fails authentication and cannot rotate/i)).toBeTruthy();
+    expect((await axe.run(container)).violations).toEqual([]);
   });
 
   it("has accessible locale creation semantics", async () => {

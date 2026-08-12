@@ -1,3 +1,5 @@
+// Persists and verifies tenant-bound credential lifecycle state with atomic audits and safe projections.
+
 import { db } from "@framerfordevs/db";
 import { and, eq, inArray, isNull, lt, or, sql } from "@framerfordevs/db/query";
 import { apiCredential, apiCredentialScope } from "@framerfordevs/db/schema/access";
@@ -28,13 +30,19 @@ import {
 } from "../contracts/errors";
 import type { AuthUserId } from "../contracts/platform";
 import type { CredentialMaterial } from "./secret-generator";
+import {
+  isCredentialIssueLifetimeCompliant,
+  isStoredCredentialLifetimeCompliant,
+} from "./credential-lifetime";
 import { areScopesAllowedForFamily, isRoleAllowed } from "./policy";
 import { type ApplicationDb, authorizeUserProject } from "./project-access";
 
+/** Creates a discriminated repository outcome without attaching mutable state. */
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
 }
 
+/** Creates a discriminated repository outcome with its bounded result projection. */
 function outcomeWith<K extends string, A extends object>(
   kind: K,
   value: A,
@@ -42,10 +50,12 @@ function outcomeWith<K extends string, A extends object>(
   return { kind, ...value };
 }
 
+/** Translates foreign database failures into the shared redacted infrastructure error. */
 function databaseFailure(operation: string, cause: unknown) {
   return DatabaseFailure.make({ operation, cause });
 }
 
+/** Decodes persisted values before they can enter credential domain workflows. */
 function decodeDatabaseValue<A, I>(
   operation: string,
   schema: Schema.Schema<A, I, never>,
@@ -56,10 +66,12 @@ function decodeDatabaseValue<A, I>(
   );
 }
 
+/** Encodes database timestamps in the canonical application instant representation. */
 function toIso(value: Date): string {
   return value.toISOString();
 }
 
+/** Returns the bounded validation failure for family-incompatible credential scopes. */
 function invalidScopes() {
   return ValidationFailure.make({
     details: [
@@ -72,6 +84,7 @@ function invalidScopes() {
   });
 }
 
+/** Returns the existing generic invalid-expiry failure for non-Preview credentials. */
 function invalidExpiry() {
   return ValidationFailure.make({
     details: [
@@ -84,6 +97,33 @@ function invalidExpiry() {
   });
 }
 
+/** Returns the approved expiring-only maximum-lifetime failure for Preview credentials. */
+function invalidPreviewExpiry() {
+  return ValidationFailure.make({
+    details: [
+      ApiErrorDetail.make({
+        path: "expiresAt",
+        code: "preview_expiry_invalid",
+        message: "Preview credentials require a future expiry no more than 30 days from issuance.",
+      }),
+    ],
+  });
+}
+
+/** Requires explicit consent to environment-wide unpublished and hidden-field Preview authority. */
+function previewAuthorityNotAcknowledged() {
+  return ValidationFailure.make({
+    details: [
+      ApiErrorDetail.make({
+        path: "previewAuthorityAcknowledged",
+        code: "preview_authority_acknowledgement_required",
+        message: "Acknowledge the complete environment-wide Preview authority before issuance.",
+      }),
+    ],
+  });
+}
+
+/** Constructs content-free immutable credential lifecycle audit values. */
 function makeAuditValues(options: {
   readonly workspaceId: string;
   readonly projectId: string;
@@ -111,6 +151,7 @@ interface CredentialRowWithScopes {
   readonly scopes: ReadonlyArray<string>;
 }
 
+/** Projects credential rows to the public metadata contract without key digests. */
 function credentialValue(value: CredentialRowWithScopes) {
   return {
     id: value.credential.id,
@@ -129,6 +170,7 @@ function credentialValue(value: CredentialRowWithScopes) {
   };
 }
 
+/** Loads normalized scope rows for a bounded set of credential identities. */
 async function selectCredentialScopes(
   executor: ApplicationDb | Parameters<Parameters<ApplicationDb["transaction"]>[0]>[0],
   credentialIds: ReadonlyArray<string>,
@@ -154,6 +196,7 @@ interface RepositoryOptions {
   readonly database?: ApplicationDb;
 }
 
+/** Creates the credential repository over the shared database or an explicit test database. */
 export function makeCredentialRepository(options: RepositoryOptions = {}) {
   const database = options.database ?? db;
 
@@ -192,6 +235,12 @@ export function makeCredentialRepository(options: RepositoryOptions = {}) {
             if (authorization.kind !== "allowed") return outcome(authorization.kind);
             const expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
             if (expiresAt && expiresAt <= now) return outcome("invalid_expiry");
+            if (!isCredentialIssueLifetimeCompliant(input.family, expiresAt, now)) {
+              return outcome("invalid_preview_expiry");
+            }
+            if (input.family === "preview" && !input.previewAuthorityAcknowledged) {
+              return outcome("preview_authority_not_acknowledged");
+            }
             if (!areScopesAllowedForFamily(input.family, input.scopes)) {
               return outcome("invalid_scopes");
             }
@@ -264,6 +313,10 @@ export function makeCredentialRepository(options: RepositoryOptions = {}) {
           return yield* invalidScopes();
         case "invalid_expiry":
           return yield* invalidExpiry();
+        case "invalid_preview_expiry":
+          return yield* invalidPreviewExpiry();
+        case "preview_authority_not_acknowledged":
+          return yield* previewAuthorityNotAcknowledged();
         case "success":
           return yield* decodeDatabaseValue(
             "credential.issue",
@@ -392,7 +445,11 @@ export function makeCredentialRepository(options: RepositoryOptions = {}) {
             );
             if (authorization.kind !== "allowed") return outcome(authorization.kind);
             if (row.version !== input.version) return outcome("version_conflict");
-            if (row.revokedAt || (row.expiresAt && row.expiresAt <= now))
+            if (
+              row.revokedAt ||
+              (row.expiresAt && row.expiresAt <= now) ||
+              !isStoredCredentialLifetimeCompliant(row)
+            )
               return outcome("invalid_state");
             const scopes = await selectCredentialScopes(transaction, [row.id]);
             return outcomeWith("success", { row, scopes: scopes.map((scope) => scope.scope) });
@@ -453,7 +510,11 @@ export function makeCredentialRepository(options: RepositoryOptions = {}) {
             );
             if (authorization.kind !== "allowed") return outcome(authorization.kind);
             if (current.version !== input.version) return outcome("version_conflict");
-            if (current.revokedAt || (current.expiresAt && current.expiresAt <= now)) {
+            if (
+              current.revokedAt ||
+              (current.expiresAt && current.expiresAt <= now) ||
+              !isStoredCredentialLifetimeCompliant(current)
+            ) {
               return outcome("invalid_state");
             }
             if (

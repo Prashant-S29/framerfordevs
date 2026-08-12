@@ -20,6 +20,27 @@ describe("rate-limit contracts", () => {
     expect(() => Schema.decodeUnknownSync(RateLimitPolicy)("caller.policy")).toThrow();
   });
 
+  it("keeps approved Preview budgets closed and source-controlled", () => {
+    expect(rateLimitPolicies["preview.global"]).toEqual({
+      policy: "preview.global",
+      limitPerInterval: 12_000,
+      intervalMs: 60_000,
+      capacity: 1_000,
+    });
+    expect(rateLimitPolicies["preview.credential"]).toEqual({
+      policy: "preview.credential",
+      limitPerInterval: 300,
+      intervalMs: 60_000,
+      capacity: 50,
+    });
+    expect(rateLimitPolicies["preview.user"]).toEqual({
+      policy: "preview.user",
+      limitPerInterval: 300,
+      intervalMs: 60_000,
+      capacity: 50,
+    });
+  });
+
   it("bounds weighted costs before store evaluation", () => {
     expect(Schema.decodeUnknownSync(RateLimitCost)(1)).toBe(1);
     expect(Schema.decodeUnknownSync(RateLimitCost)(100)).toBe(100);

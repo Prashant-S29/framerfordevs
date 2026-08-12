@@ -19,6 +19,7 @@ const environmentKeys = [
   "DELIVERY_CURSOR_SECRET",
   "DELIVERY_CURSOR_PREVIOUS_SECRET",
   "DELIVERY_API_ENABLED",
+  "PREVIEW_API_ENABLED",
   "MANAGEMENT_API_REFERENCE_ENABLED",
   "TRUST_PROXY_HOPS",
   "NODE_ENV",
@@ -46,6 +47,7 @@ beforeEach(() => {
   delete process.env.DELIVERY_CURSOR_SECRET;
   delete process.env.DELIVERY_CURSOR_PREVIOUS_SECRET;
   delete process.env.DELIVERY_API_ENABLED;
+  delete process.env.PREVIEW_API_ENABLED;
   delete process.env.MANAGEMENT_API_REFERENCE_ENABLED;
   delete process.env.TRUST_PROXY_HOPS;
   process.env.NODE_ENV = "test";
@@ -81,6 +83,7 @@ describe("server environment", () => {
     expect(env.APPLICATION_LOG_LEVEL).toBe("info");
     expect(env.RATE_LIMIT_STORE).toBe("memory");
     expect(env.RATE_LIMIT_REDIS_TIMEOUT_MS).toBe(100);
+    expect(env.PREVIEW_API_ENABLED).toBe(false);
     expect(env.MANAGEMENT_API_REFERENCE_ENABLED).toBe(false);
     expect(env.TRUST_PROXY_HOPS).toBe(0);
   });

@@ -6,12 +6,19 @@ import { ApplicationLogger, type LogRecord, redactFields } from "./observability
 import { RequestContext } from "./observability/request-context";
 import { Telemetry, type HttpRequestMetric } from "./observability/telemetry";
 import { readinessCheck, requireSession } from "./operations/system";
-import { classifyCause, executeWithRuntime, recordHttpRequest } from "./runtime";
+import {
+  applicationRuntime,
+  classifyCause,
+  executeWithRuntime,
+  recordHttpRequest,
+} from "./runtime";
 import { AuthSessionFailure } from "./contracts/errors";
 import { AuthSessionService } from "./services/auth-session";
 import { DatabaseFailure } from "./contracts/errors";
 import { Database } from "./services/database";
 import { PlatformRepositoryLive } from "./services/platform-repository";
+import { PreviewDocumentEngine } from "./services/preview-document-engine";
+import { PreviewRepository } from "./services/preview-repository";
 
 const logRecords: Array<LogRecord> = [];
 const requestMetrics: Array<HttpRequestMetric> = [];
@@ -44,6 +51,9 @@ const TelemetryTest = Layer.succeed(Telemetry, {
   recordSchemaPublication: () => Effect.void,
   recordEntryPublication: () => Effect.void,
   recordEntryPublicationValidationFailure: () => Effect.void,
+  recordPreviewRead: () => Effect.void,
+  recordPreviewQueryRejection: () => Effect.void,
+  recordPreviewAuditFailure: () => Effect.void,
   recordRateLimitDecision: () => Effect.void,
   recordRateLimitStore: () => Effect.void,
 });
@@ -260,6 +270,14 @@ describe("replaceable infrastructure services", () => {
 });
 
 describe("ManagedRuntime lifecycle", () => {
+  it("composes Preview compiler and repository services once in ApplicationLive", async () => {
+    const compiler = await applicationRuntime.runPromise(PreviewDocumentEngine);
+    const repository = await applicationRuntime.runPromise(PreviewRepository);
+    expect(compiler.compile).toBeTypeOf("function");
+    expect(repository.getCredentialCurrent).toBeTypeOf("function");
+    expect(repository.getUserRevision).toBeTypeOf("function");
+  });
+
   it("initializes a shared resource once and releases it on shutdown", async () => {
     let initialized = 0;
     let released = 0;

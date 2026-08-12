@@ -1,3 +1,5 @@
+// Exercises credential lifecycle, policy, isolation, verification, concurrency, audit, and query-plan behavior against PostgreSQL.
+
 import { randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, layer } from "@effect/vitest";
@@ -238,6 +240,7 @@ describe.sequential("credential repository PostgreSQL integration", () => {
             family: "preview",
             name: "Preview integration",
             scopes: ["preview.read"],
+            previewAuthorityAcknowledged: true,
           }),
           "request-m3-credential-preview",
         );
@@ -288,6 +291,7 @@ describe.sequential("credential repository PostgreSQL integration", () => {
                 family: "preview",
                 scopes: ["preview.read"],
                 expiresAt: new Date(Date.now() - 60_000).toISOString(),
+                previewAuthorityAcknowledged: true,
               }),
               "request-m3-credential-expired",
             ),
@@ -300,6 +304,7 @@ describe.sequential("credential repository PostgreSQL integration", () => {
                 family: "preview",
                 scopes: ["preview.read"],
                 expiresAt: null,
+                previewAuthorityAcknowledged: true,
               }),
               "request-m3-credential-editor",
             ),
@@ -309,6 +314,55 @@ describe.sequential("credential repository PostgreSQL integration", () => {
           assert.strictEqual(failureTag(expired), "ValidationFailure");
           assert.strictEqual(failureTag(editor), "ForbiddenFailure");
         }),
+    );
+
+    it.effect("rejects unacknowledged, non-expiring, and over-30-day Preview issuance", () =>
+      Effect.gen(function* () {
+        const currentProject = required(projectModel, "project");
+        const base = {
+          projectId: currentProject.id,
+          environmentId: currentProject.environment.id,
+          family: "preview" as const,
+          name: "Rejected Preview credential",
+          scopes: ["preview.read"] as const,
+        };
+        const exits = yield* Effect.all([
+          Effect.exit(
+            issueApiCredential(
+              ownerId,
+              yield* Schema.decodeUnknown(IssueApiCredentialInput)({
+                ...base,
+                expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+              }),
+              "request-m10-preview-credential-unacknowledged",
+            ),
+          ),
+          Effect.exit(
+            issueApiCredential(
+              ownerId,
+              yield* Schema.decodeUnknown(IssueApiCredentialInput)({
+                ...base,
+                expiresAt: null,
+                previewAuthorityAcknowledged: true,
+              }),
+              "request-m10-preview-credential-non-expiring",
+            ),
+          ),
+          Effect.exit(
+            issueApiCredential(
+              ownerId,
+              yield* Schema.decodeUnknown(IssueApiCredentialInput)({
+                ...base,
+                expiresAt: new Date(Date.now() + 31 * 86_400_000).toISOString(),
+                previewAuthorityAcknowledged: true,
+              }),
+              "request-m10-preview-credential-over-limit",
+            ),
+          ),
+        ]);
+
+        assert.isTrue(exits.every((exit) => failureTag(exit) === "ValidationFailure"));
+      }),
     );
 
     it.effect("prevents locale-restricted developers from issuing or rotating credentials", () =>
@@ -463,6 +517,48 @@ describe.sequential("credential repository PostgreSQL integration", () => {
         assert.strictEqual(principal.credentialId, management.credential.id);
         assert.isTrue(denied.every((exit) => failureTag(exit) === "CredentialInvalidFailure"));
       }),
+    );
+
+    it.effect(
+      "fails base authentication and rotation closed for a legacy non-expiring Preview row",
+      () =>
+        Effect.gen(function* () {
+          const authenticator = yield* CredentialAuthenticator;
+          const preview = required(previewCredential, "preview");
+          yield* Effect.promise(() =>
+            db
+              .update(apiCredential)
+              .set({ expiresAt: null })
+              .where(eq(apiCredential.id, preview.credential.id)),
+          );
+          const verification = yield* Effect.exit(
+            authenticator.verify({
+              key: preview.key,
+              expectedFamily: "preview",
+              requiredScope: "preview.read",
+              source: "198.51.100.19",
+            }),
+          );
+          const rotation = yield* Effect.exit(
+            rotateApiCredential(
+              ownerId,
+              yield* Schema.decodeUnknown(RotateApiCredentialInput)({
+                credentialId: preview.credential.id,
+                version: preview.credential.version,
+              }),
+              "request-m10-preview-credential-legacy-rotate",
+            ),
+          );
+          yield* Effect.promise(() =>
+            db
+              .update(apiCredential)
+              .set({ expiresAt: new Date(preview.credential.expiresAt ?? "") })
+              .where(eq(apiCredential.id, preview.credential.id)),
+          );
+
+          assert.strictEqual(failureTag(verification), "CredentialInvalidFailure");
+          assert.strictEqual(failureTag(rotation), "InvalidStateTransitionFailure");
+        }),
     );
 
     it.effect("revokes credentials immediately and never returns the digest", () =>

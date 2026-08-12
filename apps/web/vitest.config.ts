@@ -15,6 +15,7 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     coverage: {
       include: [
+        "src/components/entry-preview.tsx",
         "src/components/generated-form.tsx",
         "src/components/locale-tabs.tsx",
         "src/components/portable-text-field.tsx",

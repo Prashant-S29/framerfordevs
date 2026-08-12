@@ -253,6 +253,103 @@ describe("CORS policy", () => {
   });
 });
 
+describe("Preview HTTP isolation", () => {
+  const path =
+    "/api/preview/v1/projects/019fae8b-1234-7000-8000-000000000001/environments/main/collections/posts/entries/019fae8b-1234-7000-8000-000000000002/draft?locale=gu";
+
+  it("serves dedicated Preview-only OpenAPI and interactive reference", async () => {
+    const specification = await request(app)
+      .get("/api/preview/v1/openapi.json")
+      .set("Origin", "https://consumer.example");
+    const reference = await request(app).get("/api/preview/v1/docs");
+
+    expect(specification.status).toBe(200);
+    expect(specification.headers["access-control-allow-origin"]).toBe("*");
+    expect(specification.headers["access-control-allow-credentials"]).toBeUndefined();
+    expect(specification.headers["referrer-policy"]).toBe("no-referrer");
+    expect(specification.body.info.title).toBe("Framer for Devs Preview API");
+    expect(Object.keys(specification.body.paths)).toHaveLength(2);
+    expect(JSON.stringify(specification.body)).not.toContain("DELIVERY_CURSOR_STALE");
+    expect(reference.status).toBe(200);
+    expect(reference.text).toContain("Framer for Devs Preview API");
+    expect(reference.text).toContain("/api/preview/v1/openapi.json");
+  });
+
+  it("validates wildcard non-credentialed Preview preflight without authentication", async () => {
+    const allowed = await request(app)
+      .options(path)
+      .set("Origin", "https://consumer.example")
+      .set("Access-Control-Request-Method", "GET")
+      .set("Access-Control-Request-Headers", "Authorization, Traceparent, X-Request-Id");
+    const deniedHeader = await request(app)
+      .options(path)
+      .set("Access-Control-Request-Method", "GET")
+      .set("Access-Control-Request-Headers", "Cookie");
+    const deniedMethod = await request(app)
+      .options(path)
+      .set("Access-Control-Request-Method", "POST");
+
+    expect(allowed.status).toBe(204);
+    expect(allowed.headers["access-control-allow-origin"]).toBe("*");
+    expect(allowed.headers["access-control-allow-headers"]).toBe(
+      "Authorization, Traceparent, X-Request-Id",
+    );
+    expect(deniedHeader.status).toBe(403);
+    expect(deniedHeader.body.error.code).toBe("FORBIDDEN");
+    expect(deniedMethod.status).toBe(403);
+  });
+
+  it("keeps Preview content disabled behind its independent rollout gate", async () => {
+    const response = await request(createApp({ previewApiEnabled: false })).get(path);
+
+    expect(response.status).toBe(503);
+    expect(response.headers["cache-control"]).toBe("private, no-store, max-age=0");
+    expect(response.headers.pragma).toBe("no-cache");
+    expect(response.headers.expires).toBe("0");
+    expect(response.headers["referrer-policy"]).toBe("no-referrer");
+    expect(response.headers.etag).toBeUndefined();
+    expect(response.headers["last-modified"]).toBeUndefined();
+    expect(response.body.error.code).toBe("SERVICE_UNAVAILABLE");
+  });
+
+  it("requires bearer authentication before resource lookup and ignores cookies", async () => {
+    const enabledApp = createApp({ previewApiEnabled: true });
+    const missing = await request(enabledApp).get(path);
+    const foreign = await request(enabledApp).get(
+      path.replace("019fae8b-1234-7000-8000-000000000001", randomUUID()),
+    );
+    const cookieOnly = await request(enabledApp).get(path).set("Cookie", "session=ignored");
+    const malformed = await request(enabledApp).get(path).set("Authorization", "Basic secret");
+
+    for (const response of [missing, foreign, cookieOnly, malformed]) {
+      expect(response.status).toBe(401);
+      expect(response.headers["www-authenticate"]).toBe('Bearer realm="preview"');
+      expect(response.headers["cache-control"]).toBe("private, no-store, max-age=0");
+      expect(response.headers["access-control-allow-origin"]).toBe("*");
+      expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
+      expect(response.headers.etag).toBeUndefined();
+    }
+    expect(missing.body.error.code).toBe("UNAUTHORIZED");
+    expect(foreign.body.error.code).toBe("UNAUTHORIZED");
+    expect(cookieOnly.body.error.code).toBe("UNAUTHORIZED");
+    expect(malformed.body.error.code).toBe("CREDENTIAL_INVALID");
+  });
+
+  it("keeps HEAD bodyless with full security headers and rejects unknown methods", async () => {
+    const enabledApp = createApp({ previewApiEnabled: true });
+    const head = await request(enabledApp).head(path);
+    const method = await request(enabledApp).post(path);
+
+    expect(head.status).toBe(401);
+    expect(head.text).toBeUndefined();
+    expect(head.headers["www-authenticate"]).toBe('Bearer realm="preview"');
+    expect(head.headers["cache-control"]).toBe("private, no-store, max-age=0");
+    expect(method.status).toBe(405);
+    expect(method.headers.allow).toBe("GET, HEAD, OPTIONS");
+    expect(method.body.error.code).toBe("NOT_FOUND");
+  });
+});
+
 describe.sequential("Better Auth foundation", () => {
   it("uses environment-appropriate cookie defaults", () => {
     expect(getDefaultCookieAttributes("development")).toEqual({

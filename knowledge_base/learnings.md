@@ -478,6 +478,38 @@ Record a learning when an implementation or decision:
 
 ---
 
+## 2026-08-12 — Git-ignored load secrets must also be excluded from Docker contexts
+
+**Context:** M10 added a separate secret-bearing load environment file and production Docker rebuild verification.
+
+**Incorrect assumption or decision:** The existing Delivery load file was ignored by Git but not by `.dockerignore`; `COPY . .` therefore placed it in locally built server/web image layers even though application code never read it.
+
+**Cost or risk:** One-time load credentials and fixture authority could survive in image layers, caches, or registries and gain a wider distribution boundary than the ignored workspace file.
+
+**Learning:** Git exclusion and Docker build-context exclusion are independent security controls. Every secret-bearing local harness file must be denied by both before any image build.
+
+**Prevention:** `.gitignore` and `.dockerignore` now explicitly exclude both Delivery and Preview load environment files. Fresh production images were rebuilt, inspected by file existence only, and verified to contain neither file; no secret value was read or printed. With developer approval, all dangling local images containing obsolete layers were pruned while current healthy images, containers, and volumes remained.
+
+**Status:** Resolved during M10 readiness.
+
+---
+
+## 2026-08-12 — k6 runtime support and audit reruns need explicit harness design
+
+**Context:** Executing the separate M10 Preview load profiles against compliant short-lived credentials.
+
+**Incorrect assumption or decision:** The harness used browser `URLSearchParams`, which is unavailable in the selected k6 runtime, and fixed audit request IDs did not distinguish repeated profile runs. The generic boundary latency threshold also accidentally applied to the fixed-count audit cardinality profile.
+
+**Cost or risk:** A parser exception could produce misleading zero-sample threshold output, repeated audit runs could not be reconciled exactly, and a non-capacity audit gate could fail for an unapproved latency criterion despite perfect success/audit counts.
+
+**Learning:** Load harness code must be validated in the actual runtime, every database-reconciled run needs a unique non-secret ID, and each profile must enforce only its approved independent gate.
+
+**Prevention:** Preview path validation now uses k6-compatible decoding, the wrapper injects and prints a unique `PREVIEW_RUN_ID`, measured request IDs include it, ramping iterations that finish after the measured window are excluded from measured IDs/metrics, and the parallel-audit profile gates exact success/audit cardinality without inheriting capacity latency thresholds.
+
+**Status:** Resolved during M10 load execution.
+
+---
+
 ## Current implementation learnings
 
-The platform authorization, locale foundations, versioned schema engine, field system, schema-authoring workbench, stable entries, multilingual drafts, revision history, independent locale publication, and immutable delivery snapshots are developer-approved and committed through Milestone 8 at `ad3cd5e`. M9 Production Delivery API has passed its complete automated readiness gate: its approved migration and operator backfill are applied and the public Delivery/API/read-model/UI path is implemented. Production-topology load execution and developer manual review remain. Additional entries should be added only when consequential drift or rework occurs.
+The platform authorization, locale foundations, versioned schema engine, field system, schema-authoring workbench, stable entries, multilingual drafts, revision history, independent locale publication, immutable delivery snapshots, and Production Delivery API are developer-approved and committed through Milestone 9 at `8559aa4`; completion documentation is committed at `70ce4fd`. The complete amended M10 Preview API design is developer-approved and implementation is in progress. Additional entries should be added only when consequential drift or rework occurs.

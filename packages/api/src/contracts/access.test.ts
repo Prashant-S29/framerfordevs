@@ -1,3 +1,5 @@
+// Verifies access identity normalization, credential formats, permissions, and issuance boundary contracts.
+
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Exit, Schema } from "effect";
 
@@ -7,6 +9,7 @@ import {
   CredentialScopes,
   CredentialSecret,
   InvitationToken,
+  IssueApiCredentialInput,
   LocaleAccessMode,
   ProjectInvitationStatus,
   ProjectLocaleAccess,
@@ -55,6 +58,21 @@ describe("access contracts", () => {
       ]);
 
       assert.isTrue(exits.every((exit) => exit._tag === "Failure"));
+    }),
+  );
+
+  it.effect("defaults Preview authority acknowledgement to false at the decoded boundary", () =>
+    Effect.gen(function* () {
+      const input = yield* Schema.decodeUnknown(IssueApiCredentialInput)({
+        projectId: "019fae8b-1234-7000-8000-000000000010",
+        environmentId: "019fae8b-1234-7000-8000-000000000011",
+        family: "preview",
+        name: "Preview integration",
+        scopes: ["preview.read"],
+        expiresAt: "2026-09-01T00:00:00.000Z",
+      });
+
+      assert.isFalse(input.previewAuthorityAcknowledged);
     }),
   );
 

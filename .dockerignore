@@ -29,3 +29,5 @@ docker-compose.yml
 **/.env
 **/.env.*
 !**/.env.example
+delivery-load.env
+preview-load.env

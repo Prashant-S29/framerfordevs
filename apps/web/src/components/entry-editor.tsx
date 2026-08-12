@@ -17,7 +17,7 @@ import {
 } from "@framerfordevs/ui/components/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@framerfordevs/ui/components/alert";
 import { Badge } from "@framerfordevs/ui/components/badge";
-import { Button } from "@framerfordevs/ui/components/button";
+import { Button, buttonVariants } from "@framerfordevs/ui/components/button";
 import {
   Card,
   CardContent,
@@ -45,7 +45,14 @@ import { Input } from "@framerfordevs/ui/components/input";
 import { Spinner } from "@framerfordevs/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, Globe2Icon, HistoryIcon, PencilIcon, RefreshCwIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  EyeIcon,
+  Globe2Icon,
+  HistoryIcon,
+  PencilIcon,
+  RefreshCwIcon,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -380,6 +387,44 @@ export function RenameEntryDialog({
   );
 }
 
+export function PersistedDraftPreviewLink({
+  projectId,
+  collectionId,
+  entryId,
+  locale,
+  hasUnsavedChanges,
+}: {
+  readonly projectId: string;
+  readonly collectionId: string;
+  readonly entryId: string;
+  readonly locale: string;
+  readonly hasUnsavedChanges: boolean;
+}) {
+  return (
+    <section aria-label="Preview persisted draft" className="flex flex-col items-start gap-2">
+      {hasUnsavedChanges ? (
+        <Button variant="outline" disabled>
+          <EyeIcon data-icon="inline-start" /> Preview persisted draft
+        </Button>
+      ) : (
+        <Link
+          className={buttonVariants({ variant: "outline" })}
+          to="/projects/$projectId/collections/$collectionId/entries/$entryId/preview"
+          params={{ projectId, collectionId, entryId }}
+          search={{ locale, source: "current" }}
+        >
+          <EyeIcon data-icon="inline-start" /> Preview persisted draft
+        </Link>
+      )}
+      <p className="text-muted-foreground text-sm">
+        {hasUnsavedChanges
+          ? "Save the draft first. Preview never includes unsaved browser state."
+          : `Preview the exact persisted ${locale} draft without changing production.`}
+      </p>
+    </section>
+  );
+}
+
 function EntryDraftWorkspace({
   projectId,
   environmentId,
@@ -493,6 +538,14 @@ function EntryDraftWorkspace({
         queryClient.invalidateQueries({
           queryKey: orpc.platform.projects.collections.entries.publications.status.key(),
         }),
+        queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.collections.entries.preview.current.queryOptions({
+            input: { projectId, environmentId, collectionId, entryId, locale },
+          }).queryKey,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.collections.entries.preview.revision.key(),
+        }),
       ]);
       toast.success(
         response.data.validation.valid ? "Draft saved." : "Draft saved with validation issues.",
@@ -520,6 +573,13 @@ function EntryDraftWorkspace({
 
   return (
     <div className="flex flex-col gap-6">
+      <PersistedDraftPreviewLink
+        projectId={projectId}
+        collectionId={collectionId}
+        entryId={entryId}
+        locale={locale}
+        hasUnsavedChanges={dirty}
+      />
       {status === "conflict" ? (
         <div role="alert" className="rounded-md border border-destructive p-4">
           <p className="font-medium">This draft changed elsewhere.</p>
@@ -605,6 +665,7 @@ function EntryDraftWorkspace({
         entryId={entryId}
         locale={locale}
         draft={draft}
+        hasUnsavedChanges={dirty}
         onRestored={onAuthoritativeReload}
       />
     </div>
@@ -966,6 +1027,7 @@ function RevisionHistory({
   entryId,
   locale,
   draft,
+  hasUnsavedChanges,
   onRestored,
 }: {
   readonly projectId: string;
@@ -980,6 +1042,7 @@ function RevisionHistory({
     readonly localizedVersion: number;
     readonly canEditShared: boolean;
   };
+  readonly hasUnsavedChanges: boolean;
   readonly onRestored: () => Promise<void>;
 }) {
   const queryClient = useQueryClient();
@@ -1043,6 +1106,14 @@ function RevisionHistory({
         queryClient.invalidateQueries({
           queryKey: orpc.platform.projects.collections.entries.publications.status.key(),
         }),
+        queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.collections.entries.preview.current.queryOptions({
+            input: { projectId, environmentId, collectionId, entryId, locale },
+          }).queryKey,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.collections.entries.preview.revision.key(),
+        }),
       ]);
       toast.success("Revision restored as a new revision.");
       await onRestored();
@@ -1054,6 +1125,7 @@ function RevisionHistory({
     items: ReadonlyArray<{
       readonly id: string;
       readonly sequence: number;
+      readonly schemaRevisionId: string;
       readonly authoredAt: string;
       readonly changedFieldIds: ReadonlyArray<string>;
       readonly restoredFromRevisionId: string | null;
@@ -1081,21 +1153,43 @@ function RevisionHistory({
                 changed field{item.changedFieldIds.length === 1 ? "" : "s"}
               </p>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={restore.isPending || (scope === "shared" && !draft.canEditShared)}
-              onClick={() => {
-                if (
-                  globalThis.confirm(
-                    `Restore ${scope} revision ${item.sequence} as a new revision?`,
+            <div className="flex flex-wrap gap-2">
+              {hasUnsavedChanges ? (
+                <Button size="sm" variant="outline" disabled>
+                  Preview
+                </Button>
+              ) : (
+                <Link
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                  to="/projects/$projectId/collections/$collectionId/entries/$entryId/preview"
+                  params={{ projectId, collectionId, entryId }}
+                  search={{
+                    locale,
+                    source: "revision",
+                    schemaRevisionId: item.schemaRevisionId,
+                    sharedRevision: scope === "shared" ? item.id : "none",
+                    localizedRevision: scope === "localized" ? item.id : "none",
+                  }}
+                >
+                  Preview
+                </Link>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={restore.isPending || (scope === "shared" && !draft.canEditShared)}
+                onClick={() => {
+                  if (
+                    globalThis.confirm(
+                      `Restore ${scope} revision ${item.sequence} as a new revision?`,
+                    )
                   )
-                )
-                  restore.mutate({ scope, revisionId: item.id });
-              }}
-            >
-              Restore
-            </Button>
+                    restore.mutate({ scope, revisionId: item.id });
+                }}
+              >
+                Restore
+              </Button>
+            </div>
           </div>
         ))
       )}

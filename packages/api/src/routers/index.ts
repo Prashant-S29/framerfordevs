@@ -46,6 +46,11 @@ import {
   SaveEntryDraftResultOutputSchema,
 } from "../contracts/entries";
 import {
+  GetCurrentUserPreviewInputSchema,
+  GetRevisionUserPreviewInputSchema,
+  PreviewItemOutputSchema,
+} from "../contracts/preview";
+import {
   EntryPublicationPageOutputSchema,
   EntryPublicationPlanOutputSchema,
   EntryPublicationStatusOutputSchema,
@@ -129,6 +134,7 @@ import {
   restoreEntryRevision,
   saveEntryDraft,
 } from "../operations/entries";
+import { getUserCurrentPreview, getUserRevisionPreview } from "../operations/preview";
 import {
   getEntryPublicationStatus,
   listEntryPublications,
@@ -557,6 +563,30 @@ export const appRouter = {
                 "Entry revision restored.",
               ),
             ),
+          preview: {
+            current: protectedProcedure
+              .input(GetCurrentUserPreviewInputSchema)
+              .output(PreviewItemOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.preview.user.current",
+                  getUserCurrentPreview(context.session.user.id, input, context.request.requestId),
+                  "Preview entry loaded.",
+                ),
+              ),
+            revision: protectedProcedure
+              .input(GetRevisionUserPreviewInputSchema)
+              .output(PreviewItemOutputSchema)
+              .handler(({ context, input }) =>
+                executeProcedure(
+                  context,
+                  "api.preview.user.revision",
+                  getUserRevisionPreview(context.session.user.id, input, context.request.requestId),
+                  "Preview entry loaded.",
+                ),
+              ),
+          },
           publications: {
             status: protectedProcedure
               .input(GetEntryPublicationStatusInputSchema)

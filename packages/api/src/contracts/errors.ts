@@ -138,6 +138,24 @@ export class DeliveryResponseTooLargeFailure extends Schema.TaggedError<Delivery
   "DeliveryResponseTooLargeFailure",
 )("DeliveryResponseTooLargeFailure", {}) {}
 
+export class PreviewQueryInvalidFailure extends Schema.TaggedError<PreviewQueryInvalidFailure>(
+  "PreviewQueryInvalidFailure",
+)("PreviewQueryInvalidFailure", {
+  details: ValidationDetailsSchema,
+}) {}
+
+export class PreviewRevisionIncompatibleFailure extends Schema.TaggedError<PreviewRevisionIncompatibleFailure>(
+  "PreviewRevisionIncompatibleFailure",
+)("PreviewRevisionIncompatibleFailure", {}) {}
+
+export class PreviewResponseTooLargeFailure extends Schema.TaggedError<PreviewResponseTooLargeFailure>(
+  "PreviewResponseTooLargeFailure",
+)("PreviewResponseTooLargeFailure", {}) {}
+
+export class PreviewDocumentCorruptFailure extends Schema.TaggedError<PreviewDocumentCorruptFailure>(
+  "PreviewDocumentCorruptFailure",
+)("PreviewDocumentCorruptFailure", {}) {}
+
 export class InvitationConflictFailure extends Schema.TaggedError<InvitationConflictFailure>(
   "InvitationConflictFailure",
 )("InvitationConflictFailure", {}) {}
@@ -206,6 +224,10 @@ export type ApplicationError =
   | DeliveryCursorInvalidFailure
   | DeliveryCursorStaleFailure
   | DeliveryResponseTooLargeFailure
+  | PreviewQueryInvalidFailure
+  | PreviewRevisionIncompatibleFailure
+  | PreviewResponseTooLargeFailure
+  | PreviewDocumentCorruptFailure
   | InvitationConflictFailure
   | InvitationInvalidFailure
   | LastOwnerRequiredFailure
@@ -241,6 +263,9 @@ export const apiErrorHttpStatus = {
   DELIVERY_CURSOR_INVALID: 400,
   DELIVERY_CURSOR_STALE: 409,
   DELIVERY_RESPONSE_TOO_LARGE: 413,
+  PREVIEW_QUERY_INVALID: 400,
+  PREVIEW_REVISION_INCOMPATIBLE: 409,
+  PREVIEW_RESPONSE_TOO_LARGE: 413,
   INVITATION_CONFLICT: 409,
   INVITATION_INVALID: 404,
   LAST_OWNER_REQUIRED: 409,
@@ -493,6 +518,31 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
       return {
         code: "DELIVERY_RESPONSE_TOO_LARGE",
         message: "The Delivery response is too large. Reduce the page size or expansion.",
+        retryable: false,
+      };
+    case "PreviewQueryInvalidFailure":
+      return {
+        code: "PREVIEW_QUERY_INVALID",
+        message: "The Preview query is invalid or unsupported.",
+        retryable: false,
+        details: error.details,
+      };
+    case "PreviewRevisionIncompatibleFailure":
+      return {
+        code: "PREVIEW_REVISION_INCOMPATIBLE",
+        message: "The selected Preview revisions do not share the selected schema contract.",
+        retryable: false,
+      };
+    case "PreviewResponseTooLargeFailure":
+      return {
+        code: "PREVIEW_RESPONSE_TOO_LARGE",
+        message: "The Preview response exceeds the maximum size.",
+        retryable: false,
+      };
+    case "PreviewDocumentCorruptFailure":
+      return {
+        code: "SERVICE_UNAVAILABLE",
+        message: "The selected Preview source is temporarily unavailable.",
         retryable: false,
       };
     case "InvitationConflictFailure":

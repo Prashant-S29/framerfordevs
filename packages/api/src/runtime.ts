@@ -16,7 +16,12 @@ import {
 import { ApplicationLogger, ApplicationLoggerLive, sanitizeCause } from "./observability/logger";
 import { OpenTelemetryLive } from "./observability/opentelemetry";
 import type { RequestContext } from "./observability/request-context";
-import { Telemetry, TelemetryLive, toStatusFamily } from "./observability/telemetry";
+import {
+  Telemetry,
+  TelemetryLive,
+  toStatusFamily,
+  type PreviewQueryRejectionCategory,
+} from "./observability/telemetry";
 import { AccessRepository, AccessRepositoryLive } from "./services/access-repository";
 import { AuthSessionLive, AuthSessionService } from "./services/auth-session";
 import {
@@ -50,6 +55,11 @@ import {
 } from "./services/rate-limit-store";
 import { makeRedisRateLimitStoreLive } from "./services/redis-rate-limit-store";
 import { PolicyService, PolicyServiceLive } from "./services/policy";
+import {
+  PreviewDocumentEngine,
+  PreviewDocumentEngineLive,
+} from "./services/preview-document-engine";
+import { PreviewRepository, PreviewRepositoryLive } from "./services/preview-repository";
 import { PublicationEngine, PublicationEngineLive } from "./services/publication-engine";
 import {
   PublicationRepository,
@@ -80,12 +90,17 @@ export type ApplicationServices =
   | EntryRepository
   | PublicationEngine
   | PublicationRepository
+  | PreviewDocumentEngine
+  | PreviewRepository
   | FieldEngine
   | SchemaEngine
   | SchemaRepository;
 
 const PublicationRepositoryConfiguredLive = PublicationRepositoryLive.pipe(
   Layer.provide(PublicationEngineLive),
+);
+const PreviewRepositoryConfiguredLive = PreviewRepositoryLive.pipe(
+  Layer.provide(PreviewDocumentEngineLive),
 );
 
 const PrimaryRateLimitStoreLive =
@@ -140,6 +155,8 @@ const InfrastructureLive = Layer.mergeAll(
   EntryRepositoryLive,
   PublicationEngineLive,
   PublicationRepositoryConfiguredLive,
+  PreviewDocumentEngineLive,
+  PreviewRepositoryConfiguredLive,
   FieldEngineLive,
   SchemaEngineLive,
   SchemaRepositoryLive,
@@ -361,6 +378,15 @@ export function observeHttpRequest(
   durationMs: number,
 ): Promise<void> {
   return applicationRuntime.runPromise(recordHttpRequest(request, status, durationMs));
+}
+
+/** Records a closed parser category without retaining the raw Preview query. */
+export function observePreviewQueryRejection(
+  category: PreviewQueryRejectionCategory,
+): Promise<void> {
+  return applicationRuntime.runPromise(
+    Effect.flatMap(Telemetry, (telemetry) => telemetry.recordPreviewQueryRejection(category)),
+  );
 }
 
 const reportBoundaryDefectEffect = Effect.fn("reportBoundaryDefect")(function* (

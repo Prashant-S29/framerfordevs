@@ -31,6 +31,10 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
         name: "theme-color",
         content: "#252525",
       },
+      {
+        name: "referrer",
+        content: "no-referrer",
+      },
     ],
     links: [
       {

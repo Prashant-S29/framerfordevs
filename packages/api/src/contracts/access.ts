@@ -1,3 +1,5 @@
+// Defines project access, membership, invitation, and environment credential boundary contracts.
+
 import { Schema } from "effect";
 
 import { ApiSuccessSchema } from "./api-response";
@@ -13,6 +15,7 @@ import {
   WorkspaceId,
 } from "./platform";
 
+/** Detects control characters that are unsafe in normalized human-entered identity metadata. */
 function hasControlCharacter(value: string): boolean {
   for (const character of value) {
     const codePoint = character.codePointAt(0);
@@ -291,6 +294,9 @@ export class IssueApiCredentialInput extends Schema.Class<IssueApiCredentialInpu
   name: CredentialName,
   scopes: CredentialScopes,
   expiresAt: Schema.NullOr(IsoDateTime),
+  previewAuthorityAcknowledged: Schema.optionalWith(Schema.Boolean, {
+    default: () => false,
+  }),
 }) {}
 
 export class ListApiCredentialsInput extends Schema.Class<ListApiCredentialsInput>(

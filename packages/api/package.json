@@ -14,6 +14,9 @@
     "delivery:backfill": "tsx src/scripts/delivery-backfill.ts",
     "delivery:load-prepare": "tsx src/scripts/delivery-load-prepare.ts",
     "delivery:load-boundary": "tsx src/scripts/delivery-load-boundary.ts",
+    "preview:load-prepare": "tsx src/scripts/preview-load-prepare.ts",
+    "preview:load-fixture": "tsx src/scripts/preview-load-fixture.ts",
+    "preview:load-save-loop": "tsx src/scripts/preview-load-save-loop.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },
