@@ -1,0 +1,26 @@
+{
+  "name": "@framerfordevs/webhook-test-receiver",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "pnpm run check-types && pnpm run test",
+    "check-types": "tsc --noEmit",
+    "check:tunnel": "tsx scripts/check-tunnel.ts",
+    "dev": "tsx watch src/server.ts",
+    "report": "tsx scripts/report.ts",
+    "smoke:tunnel": "tsx scripts/send-smoke.ts",
+    "start": "node dist/index.js",
+    "test": "tsx --test test/**/*.test.ts",
+    "test:coverage": "tsx --test --experimental-test-coverage test/**/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "4.23.1",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

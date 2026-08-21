@@ -50,6 +50,12 @@ import {
   UnauthorizedFailure,
   ValidationFailure,
   VersionConflictFailure,
+  WebhookDestinationResolutionFailure,
+  WebhookDestinationUnsafeFailure,
+  WebhookEndpointLimitReachedFailure,
+  WebhookEventInvalidFailure,
+  WebhookReplayNotAllowedFailure,
+  WebhookSecretRotationConflictFailure,
   apiErrorHttpStatus,
   applicationFailure,
 } from "./errors";
@@ -266,6 +272,12 @@ describe("application error mapping", () => {
     PreviewRevisionIncompatibleFailure.make(),
     PreviewResponseTooLargeFailure.make(),
     PreviewDocumentCorruptFailure.make(),
+    WebhookDestinationUnsafeFailure.make(),
+    WebhookDestinationResolutionFailure.make(),
+    WebhookEndpointLimitReachedFailure.make(),
+    WebhookSecretRotationConflictFailure.make(),
+    WebhookReplayNotAllowedFailure.make(),
+    WebhookEventInvalidFailure.make(),
     InvitationConflictFailure.make(),
     InvitationInvalidFailure.make(),
     LastOwnerRequiredFailure.make(),
@@ -467,6 +479,42 @@ describe("application error mapping", () => {
           "tag": "PreviewDocumentCorruptFailure",
         },
         {
+          "code": "WEBHOOK_DESTINATION_UNSAFE",
+          "retryable": false,
+          "status": 422,
+          "tag": "WebhookDestinationUnsafeFailure",
+        },
+        {
+          "code": "SERVICE_UNAVAILABLE",
+          "retryable": true,
+          "status": 503,
+          "tag": "WebhookDestinationResolutionFailure",
+        },
+        {
+          "code": "WEBHOOK_ENDPOINT_LIMIT_REACHED",
+          "retryable": false,
+          "status": 409,
+          "tag": "WebhookEndpointLimitReachedFailure",
+        },
+        {
+          "code": "WEBHOOK_SECRET_ROTATION_CONFLICT",
+          "retryable": false,
+          "status": 409,
+          "tag": "WebhookSecretRotationConflictFailure",
+        },
+        {
+          "code": "WEBHOOK_REPLAY_NOT_ALLOWED",
+          "retryable": false,
+          "status": 409,
+          "tag": "WebhookReplayNotAllowedFailure",
+        },
+        {
+          "code": "SERVICE_UNAVAILABLE",
+          "retryable": false,
+          "status": 503,
+          "tag": "WebhookEventInvalidFailure",
+        },
+        {
           "code": "INVITATION_CONFLICT",
           "retryable": false,
           "status": 409,
@@ -620,6 +668,10 @@ describe("application error mapping", () => {
           "false:null:UNAUTHORIZED:401",
           "false:null:VALIDATION_ERROR:400",
           "false:null:VERSION_CONFLICT:409",
+          "false:null:WEBHOOK_DESTINATION_UNSAFE:422",
+          "false:null:WEBHOOK_ENDPOINT_LIMIT_REACHED:409",
+          "false:null:WEBHOOK_REPLAY_NOT_ALLOWED:409",
+          "false:null:WEBHOOK_SECRET_ROTATION_CONFLICT:409",
         ],
         "success": {
           "data": {
@@ -670,6 +722,10 @@ describe("application error mapping", () => {
       "UNAUTHORIZED",
       "VALIDATION_ERROR",
       "VERSION_CONFLICT",
+      "WEBHOOK_DESTINATION_UNSAFE",
+      "WEBHOOK_ENDPOINT_LIMIT_REACHED",
+      "WEBHOOK_REPLAY_NOT_ALLOWED",
+      "WEBHOOK_SECRET_ROTATION_CONFLICT",
     ]);
   });
 

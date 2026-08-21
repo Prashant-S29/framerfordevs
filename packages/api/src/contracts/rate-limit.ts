@@ -10,6 +10,7 @@ export const rateLimitPolicyValues = [
   "preview.credential",
   "preview.global",
   "preview.user",
+  "webhook.replay.user",
 ] as const;
 
 export const RateLimitPolicy = Schema.Literal(...rateLimitPolicyValues);
@@ -88,5 +89,11 @@ export const rateLimitPolicies = {
     limitPerInterval: 300,
     intervalMs: 60_000,
     capacity: 50,
+  },
+  "webhook.replay.user": {
+    policy: "webhook.replay.user",
+    limitPerInterval: 30,
+    intervalMs: 60_000,
+    capacity: 5,
   },
 } satisfies Readonly<Record<RateLimitPolicy, RateLimitPolicyConfiguration>>;

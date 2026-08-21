@@ -71,6 +71,20 @@
       "when": 1786421743985,
       "tag": "0009_add_production_delivery_api_read_model",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786647786929,
+      "tag": "0010_add_webhook_delivery_system",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786649276910,
+      "tag": "0011_raise_outbox_event_payload_limit",
+      "breakpoints": true
     }
   ]
 }

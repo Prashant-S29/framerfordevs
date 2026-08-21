@@ -1,7 +1,7 @@
 # Agent Session Context
 
 **Last updated:** 2026-08-13
-**Current phase:** Milestone 10 approved and committed; Milestone 11 design discovery not started
+**Current phase:** Milestone 11 security and temporary public Cloudflare validation complete; awaiting developer manual review
 **Active milestone:** Milestone 11 — Publication events, webhooks, retries, and invalidation
 
 ## What this project is
@@ -179,6 +179,11 @@ The repository currently has:
 - The collection route now uses a visual field tree plus persistent inspector, a synchronized versioned field-schema JSON view, and a separate bounded sample-JSON inference flow; every field configuration and editor role setting is exposed without adopting code or architecture from the UX reference repository
 - One optimistic `fields.replace` operation atomically validates and replaces the complete active tree, preserves active stable IDs, generates IDs for new nodes, rejects identity reparenting, reconciles layout placements, and exposes precise validation details without any database schema or migration change
 - Property, Effect service, PostgreSQL concurrency/isolation/index-plan, API, UI validation, and automated accessibility tests
+- M11 now includes the reconciled Webhooks workspace: complete endpoint/subscription/rotation controls and summaries, editable exact-scope invalidation mappings with system-tag preview, URL-backed delivery filters and keyset pagination, safe canonical event/attempt detail, dead-letter replay confirmation, and consequence-aware destructive actions. Final refreshed readiness passes with 868 tests, 90.14% API statement coverage, clean audits, and current healthy server/web/worker images.
+- The webhook boundary now has typed retryable resolver failures, a two-second DNS bound, a separate three-second TCP/TLS establishment bound, the existing ten-second total request bound, and integrated DNS-mutation proof that the validated address—not a later ambient answer—is used.
+- The private developer-only `tools/webhook-test-receiver` workspace package provides strict signed content-free event reception, deterministic receiver behaviors, atomic secret-safe captures/reports, Docker health, and named/Quick Cloudflare Tunnel configuration. Deterministic tests participate in root readiness while live network checks remain opt-in; production Docker contexts/manifests exclude the harness. A free temporary Quick Tunnel passed public A/AAAA, Cloudflare edge TLS, synthetic signing, and one real worker publication at verified HTTP 204; its endpoint/tunnel/secret/captures were then disabled or removed. A stable named hostname remains optional and requires a developer-owned domain.
+- The version-1 webhook payload review found no field suitable for removal: bounded duplicate scope/aggregate identity avoids string parsing, while the remaining fields support interoperability, idempotency, ordering, exact schema/publication use, compatibility, changed-field processing, and invalidation without exposing content or actor/credential/destination/request data.
+- M14 owns production worker egress firewalling, cloud metadata hardening, and deployment-topology tests that bypass application validation to prove the independent network control.
 - First-party project memberships, fixed default-deny role policies, invitations, and last-owner protection
 - Environment-bound management/delivery/preview credentials with one-time keys, immediate revocation, rotation, bounded attempt limiting, and security telemetry
 - Permission-aware project access management and fragment-safe invitation acceptance UI
@@ -188,7 +193,8 @@ The repository currently has:
 
 The repository does not yet have:
 
-- M11 publication-event/webhook implementation
+- Developer-approved M11 completion or commit; every automated, load, resilience, coverage, audit, Docker, and catalog gate now passes, while the runtime remains unapproved and uncommitted pending developer manual review
+- Optional stable named Cloudflare Tunnel activation; the prepared temporary Quick Tunnel path is validated, but no developer-owned domain is available for a durable hostname
 - Production telemetry backend/collector deployment
 
 ## Mandatory constraints
@@ -297,6 +303,6 @@ The validated Docker PostgreSQL, server, and web services are currently running 
 
 ## What to do next
 
-1. Begin M11 publication events/webhooks discovery by rereading the active milestone, product/PRD requirements, M1–M10 decisions, and relevant implementation boundaries and skills.
-2. Inspect the committed publication transaction/outbox extension seams from M8–M10 and current credential, audit, runtime, worker, and operator UI patterns.
-3. Propose and obtain developer approval for the complete M11 design before changing schema or implementation code.
+1. Implement endpoint, subscription, secret, route-mapping, history, and replay repositories/operations.
+2. Implement dispatcher/attempt claims, transport, leases, recovery, retries, and dedicated worker process.
+3. Complete protected routes, UI, observability, concurrency/load gates, and final readiness.

@@ -740,6 +740,8 @@ Prove the CMS can operate production websites safely and predictably.
 - Runbooks for incidents and rollback
 - Production host/ingress separation for marketing, dashboard, public APIs, developer documentation, and operator-only surfaces
 - Explicit internal management-reference and operator-endpoint access policy
+- Worker-specific network egress policy that permits only required DNS and public HTTPS flows while denying internal, private, link-local, loopback, and cloud-metadata destinations
+- Cloud metadata hardening appropriate to the selected provider, including IMDSv2-only or metadata-service disablement where applicable
 
 ### Automated success criteria
 
@@ -759,6 +761,8 @@ Prove the CMS can operate production websites safely and predictably.
 - Webhook destination failure cannot exhaust global worker capacity.
 - Rate limits protect auth, management, preview, and delivery independently.
 - Security tests cover injection, XSS/rich text, CSRF, CORS, SSRF boundaries, credential leakage, replay, enumeration, and privilege escalation.
+- Production-topology egress tests prove the webhook worker cannot reach loopback, private, link-local, carrier-grade NAT, internal-service, or cloud-metadata targets even when a controlled test bypasses the application validator; required DNS and public TCP/443 delivery remain available.
+- Cloud metadata configuration rejects legacy unauthenticated access and is verified against the selected provider's supported hardening mode.
 - Dependency and container vulnerability checks meet the approved threshold.
 - PII/secret scanning finds no prohibited data in logs, traces, metrics, or error payloads.
 - Alert simulations prove actionable signals for elevated errors, latency, queue age, dead letters, DB exhaustion, and publication failures.

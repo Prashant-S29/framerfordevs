@@ -55,6 +55,12 @@ The API is running at [http://localhost:3000](http://localhost:3000).
 
 Set `OTEL_EXPORTER_OTLP_ENDPOINT` in `apps/server/.env` to enable OTLP/HTTP trace and metric export. When it is omitted, development prints bounded trace summaries locally, while production performs no network telemetry export.
 
+## Webhook test receiver
+
+`tools/webhook-test-receiver` is a private developer harness for exercising signed publication webhooks, retries, timeouts, redirects, replay, idempotency, secret overlap, and optional named Cloudflare Tunnel delivery. Its deterministic tests run in the root readiness gate, but the receiver and tunnel are never part of the production deployment manifests.
+
+See [`tools/webhook-test-receiver/README.md`](tools/webhook-test-receiver/README.md) for local, Docker, and opt-in public-tunnel usage. Never commit its signing secrets, Cloudflare credentials, or captures.
+
 ## UI Customization
 
 React web apps in this stack share shadcn/ui primitives through `packages/ui`.
@@ -107,12 +113,15 @@ For more details, see the guide on [Deploying with Docker Compose](https://www.b
 framerfordevs/
 ├── apps/
 │   ├── web/         # Frontend application (React + TanStack Start)
-│   └── server/      # Backend API (Express, ORPC)
+│   ├── server/      # Backend API (Express, ORPC)
+│   └── worker/      # Dedicated publication webhook worker
 ├── packages/
 │   ├── ui/          # Shared shadcn/ui components and styles
 │   ├── api/         # API layer / business logic
 │   ├── auth/        # Authentication configuration & logic
 │   └── db/          # Database schema & queries
+└── tools/
+    └── webhook-test-receiver/ # Developer-only external receiver harness
 ```
 
 ## Available Scripts

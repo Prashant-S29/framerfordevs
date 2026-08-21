@@ -1,0 +1,8 @@
+# Copy to config.yml after creating the named tunnel; config.yml and credentials are ignored.
+tunnel: replace-with-tunnel-uuid
+credentials-file: /etc/cloudflared/replace-with-tunnel-uuid.json
+
+ingress:
+  - hostname: webhooks-test.example.com
+    service: http://receiver:8787
+  - service: http_status:404

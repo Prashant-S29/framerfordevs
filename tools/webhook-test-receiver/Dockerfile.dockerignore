@@ -1,0 +1,11 @@
+**
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tools/
+!tools/webhook-test-receiver/
+!tools/webhook-test-receiver/package.json
+!tools/webhook-test-receiver/tsconfig.json
+!tools/webhook-test-receiver/tsconfig.build.json
+!tools/webhook-test-receiver/src/
+!tools/webhook-test-receiver/src/**

@@ -248,13 +248,15 @@ describe("PolicyService", () => {
             policy.decideUser({ ...selectedDeveloper, action: "delivery.configure" }),
             policy.decideUser({ ...selectedDeveloper, action: "project.credential.issue" }),
             policy.decideUser({ ...selectedDeveloper, action: "project.credential.rotate" }),
+            policy.decideUser({ ...selectedDeveloper, action: "webhook.read" }),
+            policy.decideUser({ ...selectedDeveloper, action: "webhook.manage" }),
             policy.decideUser({ ...selectedDeveloper, action: "project.credential.revoke" }),
             policy.decideUser({ ...selectedDeveloper, action: "locale.read" }),
           ]);
 
           assert.deepEqual(
             decisions.map((decision) => decision.allowed),
-            [false, false, false, false, false, false, true, true],
+            [false, false, false, false, false, false, false, false, true, true],
           );
         }),
     );

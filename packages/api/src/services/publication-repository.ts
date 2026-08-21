@@ -25,6 +25,7 @@ import {
 } from "@framerfordevs/db/schema/cms";
 import { projectLocale } from "@framerfordevs/db/schema/locale";
 import { auditEvent, environment, projectCapability } from "@framerfordevs/db/schema/platform";
+import { cmsInvalidationRouteMapping } from "@framerfordevs/db/schema/webhooks";
 import { Context, Effect, Layer, Schema } from "effect";
 
 import { ApiErrorDetail } from "../contracts/api-response";
@@ -75,6 +76,7 @@ import {
 } from "../lib/publication-snapshot";
 import { compileDeliveryProjections, type DeliveryProjectionRow } from "../lib/delivery-projection";
 import { canonicalizeEntryValue } from "../lib/entry-values";
+import { matchInvalidationMappings } from "../lib/invalidation-mappings";
 import type { ApplicationDb, ApplicationExecutor, ApplicationTransaction } from "./project-access";
 import { authorizeUserProject, selectUserProjectAccess } from "./project-access";
 import { PublicationEngine } from "./publication-engine";
@@ -1088,6 +1090,43 @@ function publicationFingerprint(
   return digest({ operation, actorId, workspaceId, localeId, ...input });
 }
 
+async function loadInvalidationSnapshot(
+  transaction: ApplicationTransaction,
+  entry: typeof cmsEntry.$inferSelect,
+  localeId: string,
+  eventType: "cms.entry.published" | "cms.entry.unpublished",
+) {
+  const mappings = await transaction
+    .select({
+      eventTypes: cmsInvalidationRouteMapping.eventTypes,
+      entryId: cmsInvalidationRouteMapping.entryId,
+      localeId: cmsInvalidationRouteMapping.localeId,
+      routePath: cmsInvalidationRouteMapping.routePath,
+      semanticTags: cmsInvalidationRouteMapping.semanticTags,
+    })
+    .from(cmsInvalidationRouteMapping)
+    .where(
+      and(
+        eq(cmsInvalidationRouteMapping.workspaceId, entry.workspaceId),
+        eq(cmsInvalidationRouteMapping.projectId, entry.projectId),
+        eq(cmsInvalidationRouteMapping.environmentId, entry.environmentId),
+        eq(cmsInvalidationRouteMapping.collectionId, entry.collectionId),
+        eq(cmsInvalidationRouteMapping.state, "enabled"),
+        sql`${eventType} = any(${cmsInvalidationRouteMapping.eventTypes})`,
+        or(
+          sql`${cmsInvalidationRouteMapping.entryId} is null`,
+          eq(cmsInvalidationRouteMapping.entryId, entry.id),
+        ),
+        or(
+          sql`${cmsInvalidationRouteMapping.localeId} is null`,
+          eq(cmsInvalidationRouteMapping.localeId, localeId),
+        ),
+      ),
+    )
+    .orderBy(cmsInvalidationRouteMapping.id);
+  return matchInvalidationMappings(mappings, { eventType, entryId: entry.id, localeId });
+}
+
 function makeAudit(options: {
   readonly workspaceId: string;
   readonly projectId: string;
@@ -1108,6 +1147,10 @@ export type PublicationFailureStage =
   | "pointer"
   | "projection"
   | "generation"
+  | "invalidation_mapping_load"
+  | "invalidation_projection"
+  | "event_size_validation"
+  | "pre_outbox"
   | "audit"
   | "outbox"
   | "receipt";
@@ -1561,6 +1604,13 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               }),
             );
             failAfter("audit");
+            const invalidationSnapshot = await loadInvalidationSnapshot(
+              transaction,
+              entry,
+              scope.access.locale.id,
+              "cms.entry.published",
+            );
+            failAfter("invalidation_mapping_load");
             const invalidationTags = [
               `project:${entry.projectId}`,
               `environment:${entry.environmentId}`,
@@ -1569,6 +1619,30 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               `locale:${scope.access.locale.id}`,
               ...candidate.changedFieldIds.map((fieldId) => `field:${fieldId}`),
             ];
+            failAfter("invalidation_projection");
+            const eventPayload = {
+              version: 1,
+              projectId: entry.projectId,
+              environmentId: entry.environmentId,
+              collectionId: entry.collectionId,
+              entryId: entry.id,
+              localeId: scope.access.locale.id,
+              locale: scope.access.locale.tag,
+              publicationId: publication.id,
+              publicationSequence,
+              eventSequence,
+              schemaRevisionId: publication.schemaRevisionId,
+              contractHash: publication.contractHash,
+              changedFieldIds: publication.changedFieldIds,
+              invalidationTags,
+              semanticTags: invalidationSnapshot.semanticTags,
+              routes: invalidationSnapshot.routes,
+            };
+            if (Buffer.byteLength(canonicalizeEntryValue(eventPayload), "utf8") > 131_072) {
+              throw new Error("Publication event payload exceeded the fixed M11 limit.");
+            }
+            failAfter("event_size_validation");
+            failAfter("pre_outbox");
             await transaction.insert(outboxEvent).values({
               workspaceId: entry.workspaceId,
               projectId: entry.projectId,
@@ -1580,22 +1654,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               localeId: scope.access.locale.id,
               entryPublicationId: publication.id,
               aggregateSequence: eventSequence,
-              payload: {
-                version: 1,
-                projectId: entry.projectId,
-                environmentId: entry.environmentId,
-                collectionId: entry.collectionId,
-                entryId: entry.id,
-                localeId: scope.access.locale.id,
-                locale: scope.access.locale.tag,
-                publicationId: publication.id,
-                publicationSequence,
-                eventSequence,
-                schemaRevisionId: publication.schemaRevisionId,
-                contractHash: publication.contractHash,
-                changedFieldIds: publication.changedFieldIds,
-                invalidationTags,
-              },
+              payload: eventPayload,
               occurredAt: now,
               availableAt: now,
             });
@@ -1802,6 +1861,59 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               }),
             );
             failAfter("audit");
+            const invalidationSnapshot = await loadInvalidationSnapshot(
+              transaction,
+              entry,
+              scope.access.locale.id,
+              "cms.entry.unpublished",
+            );
+            failAfter("invalidation_mapping_load");
+            const publishedFieldRows = await transaction
+              .select({ id: cmsSchemaRevisionField.fieldId })
+              .from(cmsSchemaRevisionField)
+              .where(
+                and(
+                  eq(cmsSchemaRevisionField.revisionId, artifact.publication.schemaRevisionId),
+                  eq(cmsSchemaRevisionField.collectionId, entry.collectionId),
+                  eq(cmsSchemaRevisionField.environmentId, entry.environmentId),
+                  eq(cmsSchemaRevisionField.projectId, entry.projectId),
+                  eq(cmsSchemaRevisionField.workspaceId, entry.workspaceId),
+                ),
+              )
+              .orderBy(cmsSchemaRevisionField.fieldId);
+            const changedFieldIds = publishedFieldRows.map((field) => field.id);
+            const invalidationTags = [
+              `project:${entry.projectId}`,
+              `environment:${entry.environmentId}`,
+              `collection:${entry.collectionId}`,
+              `entry:${entry.id}`,
+              `locale:${scope.access.locale.id}`,
+              ...changedFieldIds.map((fieldId) => `field:${fieldId}`),
+            ];
+            failAfter("invalidation_projection");
+            const eventPayload = {
+              version: 1,
+              projectId: entry.projectId,
+              environmentId: entry.environmentId,
+              collectionId: entry.collectionId,
+              entryId: entry.id,
+              localeId: scope.access.locale.id,
+              locale: scope.access.locale.tag,
+              publicationId: currentId,
+              publicationSequence: artifact.publication.publicationSequence,
+              eventSequence,
+              schemaRevisionId: artifact.publication.schemaRevisionId,
+              contractHash: artifact.publication.contractHash,
+              changedFieldIds,
+              invalidationTags,
+              semanticTags: invalidationSnapshot.semanticTags,
+              routes: invalidationSnapshot.routes,
+            };
+            if (Buffer.byteLength(canonicalizeEntryValue(eventPayload), "utf8") > 131_072) {
+              throw new Error("Publication event payload exceeded the fixed M11 limit.");
+            }
+            failAfter("event_size_validation");
+            failAfter("pre_outbox");
             await transaction.insert(outboxEvent).values({
               workspaceId: entry.workspaceId,
               projectId: entry.projectId,
@@ -1813,29 +1925,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               localeId: scope.access.locale.id,
               entryPublicationId: currentId,
               aggregateSequence: eventSequence,
-              payload: {
-                version: 1,
-                projectId: entry.projectId,
-                environmentId: entry.environmentId,
-                collectionId: entry.collectionId,
-                entryId: entry.id,
-                localeId: scope.access.locale.id,
-                locale: scope.access.locale.tag,
-                publicationId: currentId,
-                publicationSequence: artifact.publication.publicationSequence,
-                eventSequence,
-                schemaRevisionId: artifact.publication.schemaRevisionId,
-                contractHash: artifact.publication.contractHash,
-                changedFieldIds: artifact.publication.changedFieldIds,
-                invalidationTags: [
-                  `project:${entry.projectId}`,
-                  `environment:${entry.environmentId}`,
-                  `collection:${entry.collectionId}`,
-                  `entry:${entry.id}`,
-                  `locale:${scope.access.locale.id}`,
-                  ...artifact.publication.changedFieldIds.map((fieldId) => `field:${fieldId}`),
-                ],
-              },
+              payload: eventPayload,
               occurredAt: now,
               availableAt: now,
             });

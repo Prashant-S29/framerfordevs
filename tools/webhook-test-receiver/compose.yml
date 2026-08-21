@@ -1,0 +1,76 @@
+# Runs the receiver and a locally-managed Cloudflare Tunnel without placing tunnel authority in arguments or environment variables.
+
+name: framerfordevs-wb-test
+
+services:
+  receiver:
+    build:
+      context: ../..
+      dockerfile: tools/webhook-test-receiver/Dockerfile
+    init: true
+    read_only: true
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      PORT: 8787
+      DATA_DIR: /app/data
+      SECRETS_DIR: /run/secrets/webhooks
+      MAX_BODY_BYTES: 131072
+      TIMESTAMP_TOLERANCE_SECONDS: 300
+    volumes:
+      - ./data:/app/data
+      - ./secrets:/run/secrets/webhooks:ro
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8787/health/ready').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  tunnel:
+    profiles: ["named"]
+    image: cloudflare/cloudflared:2026.8.2
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    read_only: true
+    command: ["tunnel", "--no-autoupdate", "--config", "/etc/cloudflared/config.yml", "run"]
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      receiver:
+        condition: service_healthy
+    restart: unless-stopped
+
+  quick-tunnel:
+    profiles: ["quick"]
+    image: cloudflare/cloudflared:2026.8.2
+    read_only: true
+    command: ["tunnel", "--no-autoupdate", "--url", "http://receiver:8787"]
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      receiver:
+        condition: service_healthy
+    restart: unless-stopped

@@ -23,6 +23,16 @@ const validatedEnv = createEnv({
     RATE_LIMIT_FINGERPRINT_SECRET: z.string().min(32).optional(),
     DELIVERY_CURSOR_SECRET: z.string().min(32).optional(),
     DELIVERY_CURSOR_PREVIOUS_SECRET: z.string().min(32).optional(),
+    WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID: z
+      .string()
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u)
+      .optional(),
+    WEBHOOK_ENCRYPTION_KEYS: z.string().min(1).optional(),
+    WEBHOOK_WORKER_ENABLED: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
+    WEBHOOK_WORKER_PORT: z.coerce.number().int().min(1_024).max(65_535).default(3_002),
     DELIVERY_API_ENABLED: z
       .enum(["true", "false"])
       .default("false")
@@ -56,6 +66,20 @@ if (
   validatedEnv.DELIVERY_CURSOR_SECRET === validatedEnv.DELIVERY_CURSOR_PREVIOUS_SECRET
 ) {
   throw new Error("Delivery cursor active and previous secrets must be different.");
+}
+
+if (
+  (validatedEnv.WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID === undefined) !==
+  (validatedEnv.WEBHOOK_ENCRYPTION_KEYS === undefined)
+) {
+  throw new Error("Webhook encryption requires both an active key ID and a persistent key ring.");
+}
+
+if (
+  validatedEnv.WEBHOOK_WORKER_ENABLED &&
+  validatedEnv.WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID === undefined
+) {
+  throw new Error("Enabled webhook delivery requires a persistent encryption key ring.");
 }
 
 if (validatedEnv.NODE_ENV === "production" && validatedEnv.MANAGEMENT_API_REFERENCE_ENABLED) {

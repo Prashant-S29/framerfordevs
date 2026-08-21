@@ -3,6 +3,7 @@
 .agents
 .repos
 knowledge_base
+tools/webhook-test-receiver
 
 **/dist
 **/build

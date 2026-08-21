@@ -1307,7 +1307,11 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
 
     assert.include(plans, "cms_entry_shared_draft_pkey");
     assert.include(plans, "cms_entry_locale_draft_locale_entry_idx");
-    assert.include(plans, "cms_entry_shared_revision_id_entry_sequence_unique");
+    assert.match(
+      plans,
+      /cms_entry_shared_revision_(?:pkey|id_entry_scope_unique|id_entry_sequence_unique|entry_sequence_idx)/u,
+      "shared revision loading must use indexed ID or entry authority",
+    );
     assert.include(plans, "cms_entry_locale_revision_locale_idx");
     assert.match(
       plans,

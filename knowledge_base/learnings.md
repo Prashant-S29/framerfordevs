@@ -510,6 +510,86 @@ Record a learning when an implementation or decision:
 
 ---
 
+## 2026-08-13 — Stateful delivery transitions must be tested against all interacting constraints and partial indexes
+
+**Context:** M11 first exercised real webhook claim, secret activation, and cancellation transitions after the schema had been applied.
+
+**Incorrect assumption or decision:** Updating the obvious lifecycle columns was treated as sufficient. A claim incremented `attempt_count` without the check-required non-null outcome; rotation promoted the pending secret before moving the old active row out of the partial unique index; cancellation assigned an outcome even to zero-attempt deliveries, whose check requires null.
+
+**Cost or risk:** The worker could not claim its first delivery, secret overlap activation failed transactionally, and disabling an endpoint with untouched queued work could fail instead of canceling it. Unit tests over isolated retry/crypto logic did not expose these relational transition defects.
+
+**Learning:** A valid row before and after a state change does not imply that an arbitrary SQL update order is valid. Database checks and partial unique indexes define intermediate-state requirements, and complete transition tests must exercise zero, active, overlap, recovery, and terminal variants against the applied schema.
+
+**Prevention:** PostgreSQL integration now covers initial claim, concurrent claim exclusion, stale recovery, stale-token finalization, active-to-retiring-before-pending-to-active rotation, ciphertext destruction, and complete endpoint/mapping lifecycle. Claims persist the fixed `attempt_started` outcome, and cancellation uses a database expression that preserves null for zero-attempt deliveries.
+
+**Status:** Resolved in the uncommitted M11 implementation.
+
+---
+
+## 2026-08-13 — Historical outbox compatibility must be proven with real recursive-schema cardinality
+
+**Context:** The authorized M11 rollout drained 10,155 pre-existing supported outbox rows after pure projector fixtures had passed.
+
+**Incorrect assumption or decision:** The first event contract capped changed field IDs and matching system tags at 100 even though M6 bounds recursive schemas by aggregate bytes/depth, not by 100 total stable nodes. Valid historical publications contained 146 and 180 changed nodes. The dispatcher also persisted projection/fan-out row by row despite an approved 10,000-event drain target.
+
+**Cost or risk:** Two valid rows became poison events that rolled back and indefinitely blocked the final dispatcher batch. The serial implementation needed about 34 seconds for 10,099 projections, narrowly missing the 30-second acceptance target.
+
+**Learning:** Compatibility fixtures must include real historical maximum shapes, especially when later contracts add cardinality limits absent from the source domain. Queue workers must isolate bounded poison handling and avoid per-item database round trips when batch atomicity already exists.
+
+**Prevention:** M11 now permits up to 1,000 stable field IDs/system field tags inside the unchanged exact 128 KiB event cap, has a 1,000-node projector boundary test, and runs batch canonical insertion, one interval-aware subscription read, bulk fan-out, and one processed-marker update. A dedicated cleaned 10,000-event profile completes in 3.625 seconds with exact reconciliation.
+
+**Status:** Resolved before outbound worker enablement; the existing backlog is fully projected with zero missing events or deliveries.
+
+---
+
+## 2026-08-13 — Pinned HTTPS must follow the runtime lookup contract and measure handshake cost
+
+**Context:** M11 moved from structural transport adapters to a controlled-TLS receiver on Node 24 and the real PostgreSQL claim/finalize path.
+
+**Incorrect assumption or decision:** The pinned lookup always returned the legacy single-address callback shape and every request disabled agents entirely. Node 24 requested `all: true`, causing every live request to fail before TLS with a fixed invalid-address category. After correcting that shape, repeated full TLS handshakes left the approved 20 ms single-endpoint profile below 25 attempts/s even though unit adapters passed.
+
+**Cost or risk:** Structural tests could have allowed a production worker that never reached any destination. Treating cryptography/network setup as free would also hide a real throughput miss and encourage raising endpoint concurrency without evidence.
+
+**Learning:** SSRF-safe pinning must honor every supported runtime lookup callback shape, and transport acceptance must include real certificate/SNI/handshake behavior. A private non-keepalive agent can retain a bounded TLS session cache without reusing sockets or bypassing the per-attempt pinned lookup.
+
+**Prevention:** Transport tests now cover Node's `all: true` array callback. The controlled-TLS gates exercise SNI/certificate verification and exact receiver counts. The transport uses `keepAlive: false` with at most 100 cached TLS sessions; every request still creates a connection and invokes its validated pinned lookup. The accepted single-endpoint profile now sustains 25.61 attempts/s at 20 ms receiver latency.
+
+**Status:** Resolved in the uncommitted M11 implementation.
+
+---
+
+## 2026-08-13 — Automated readiness does not replace requirement-by-requirement UI reconciliation
+
+**Context:** M11 reached a clean automated/load/readiness gate and was handed off for manual Webhooks review.
+
+**Incorrect assumption or decision:** The first handoff treated management APIs plus partial endpoint/mapping/delivery controls and broad axe coverage as equivalent to the approved Dashboard UX checklist. It did not explicitly reconcile every visible field, complete-set subscription/edit flow, exact mapping scope, URL filter, pagination, consequence confirmation, and event-detail requirement.
+
+**Cost or risk:** The developer would have started manual review without subscription replacement, mapping edit and exact entry/locale scope, delivery filters/load-more, complete delivery/endpoint summaries, canonical event detail, or required replay/lifecycle guidance. Passing backend tests could have obscured a materially incomplete operator workflow.
+
+**Learning:** A feature with an approved UI decision needs a final requirement-to-control matrix in addition to route existence, mutation coverage, and accessibility checks. Automated readiness proves the implemented surface is healthy; it does not prove every approved surface was implemented.
+
+**Prevention:** Before requesting manual review, enumerate each Dashboard UX bullet against a concrete rendered control and interaction test. M11 now covers endpoint/subscription/rotation summaries and consequences, editable exact-scope mappings and system tags, URL-bound filters, keyset pagination, complete delivery/event/attempt detail, and confirmed replay semantics.
+
+**Status:** Resolved in the uncommitted M11 implementation; refreshed readiness and Docker health pass.
+
+---
+
+## 2026-08-13 — A delivery-enabled local worker must not share an integration-test database
+
+**Context:** M11 live testing enabled the Compose webhook worker against the same local PostgreSQL database used by repository integration suites.
+
+**Incorrect assumption or decision:** The full readiness suite was started while that independent worker remained active. It claimed newly committed test outbox rows before each suite's teardown could remove them.
+
+**Cost or risk:** The worker created five immutable canonical events and consumed delivery fixtures, causing unrelated cleanup foreign-key failures and claim assertions. The leaked rows were test-only, but required developer-authorized, precisely scoped transactional cleanup.
+
+**Learning:** In-process test isolation cannot control an independently running consumer of the same database. Queue integration suites need a separate database or an explicit operational exclusion around all external workers.
+
+**Prevention:** Stop the local worker before PostgreSQL integration/coverage gates, verify it is stopped, remove only explicitly identified test fixtures if an accidental claim occurs, and restart it only after validation. Production workers and tests should use isolated databases in deployment/CI topology.
+
+**Status:** Resolved for the current M11 validation run; durable database isolation remains an environment concern.
+
+---
+
 ## Current implementation learnings
 
-The platform authorization, locale foundations, versioned schema engine, field system, schema-authoring workbench, stable entries, multilingual drafts, revision history, independent locale publication, immutable delivery snapshots, and Production Delivery API are developer-approved and committed through Milestone 9 at `8559aa4`; completion documentation is committed at `70ce4fd`. The complete amended M10 Preview API design is developer-approved and implementation is in progress. Additional entries should be added only when consequential drift or rework occurs.
+The platform authorization, locale foundations, versioned schema engine, field system, schema-authoring workbench, stable entries, multilingual drafts, revision history, independent locale publication, immutable Delivery snapshots, Production Delivery API, and Preview API are developer-approved and committed through Milestone 10 at `aa177b5`; completion documentation is committed at `14881fe`. The amended M11 publication-event/webhook design is approved, migrations `0010` and `0011` are developer-applied and read-only verified, and the runtime remains uncommitted pending developer manual review. Additional entries should be added only when consequential drift or rework occurs.

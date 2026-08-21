@@ -156,6 +156,30 @@ export class PreviewDocumentCorruptFailure extends Schema.TaggedError<PreviewDoc
   "PreviewDocumentCorruptFailure",
 )("PreviewDocumentCorruptFailure", {}) {}
 
+export class WebhookDestinationUnsafeFailure extends Schema.TaggedError<WebhookDestinationUnsafeFailure>(
+  "WebhookDestinationUnsafeFailure",
+)("WebhookDestinationUnsafeFailure", {}) {}
+
+export class WebhookDestinationResolutionFailure extends Schema.TaggedError<WebhookDestinationResolutionFailure>(
+  "WebhookDestinationResolutionFailure",
+)("WebhookDestinationResolutionFailure", {}) {}
+
+export class WebhookEndpointLimitReachedFailure extends Schema.TaggedError<WebhookEndpointLimitReachedFailure>(
+  "WebhookEndpointLimitReachedFailure",
+)("WebhookEndpointLimitReachedFailure", {}) {}
+
+export class WebhookSecretRotationConflictFailure extends Schema.TaggedError<WebhookSecretRotationConflictFailure>(
+  "WebhookSecretRotationConflictFailure",
+)("WebhookSecretRotationConflictFailure", {}) {}
+
+export class WebhookReplayNotAllowedFailure extends Schema.TaggedError<WebhookReplayNotAllowedFailure>(
+  "WebhookReplayNotAllowedFailure",
+)("WebhookReplayNotAllowedFailure", {}) {}
+
+export class WebhookEventInvalidFailure extends Schema.TaggedError<WebhookEventInvalidFailure>(
+  "WebhookEventInvalidFailure",
+)("WebhookEventInvalidFailure", {}) {}
+
 export class InvitationConflictFailure extends Schema.TaggedError<InvitationConflictFailure>(
   "InvitationConflictFailure",
 )("InvitationConflictFailure", {}) {}
@@ -228,6 +252,12 @@ export type ApplicationError =
   | PreviewRevisionIncompatibleFailure
   | PreviewResponseTooLargeFailure
   | PreviewDocumentCorruptFailure
+  | WebhookDestinationUnsafeFailure
+  | WebhookDestinationResolutionFailure
+  | WebhookEndpointLimitReachedFailure
+  | WebhookSecretRotationConflictFailure
+  | WebhookReplayNotAllowedFailure
+  | WebhookEventInvalidFailure
   | InvitationConflictFailure
   | InvitationInvalidFailure
   | LastOwnerRequiredFailure
@@ -266,6 +296,10 @@ export const apiErrorHttpStatus = {
   PREVIEW_QUERY_INVALID: 400,
   PREVIEW_REVISION_INCOMPATIBLE: 409,
   PREVIEW_RESPONSE_TOO_LARGE: 413,
+  WEBHOOK_DESTINATION_UNSAFE: 422,
+  WEBHOOK_ENDPOINT_LIMIT_REACHED: 409,
+  WEBHOOK_SECRET_ROTATION_CONFLICT: 409,
+  WEBHOOK_REPLAY_NOT_ALLOWED: 409,
   INVITATION_CONFLICT: 409,
   INVITATION_INVALID: 404,
   LAST_OWNER_REQUIRED: 409,
@@ -543,6 +577,42 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
       return {
         code: "SERVICE_UNAVAILABLE",
         message: "The selected Preview source is temporarily unavailable.",
+        retryable: false,
+      };
+    case "WebhookDestinationUnsafeFailure":
+      return {
+        code: "WEBHOOK_DESTINATION_UNSAFE",
+        message: "The webhook destination does not meet the outbound security policy.",
+        retryable: false,
+      };
+    case "WebhookDestinationResolutionFailure":
+      return {
+        code: "SERVICE_UNAVAILABLE",
+        message: "The webhook destination could not be resolved temporarily.",
+        retryable: true,
+      };
+    case "WebhookEndpointLimitReachedFailure":
+      return {
+        code: "WEBHOOK_ENDPOINT_LIMIT_REACHED",
+        message: "This environment has reached its enabled webhook endpoint limit.",
+        retryable: false,
+      };
+    case "WebhookSecretRotationConflictFailure":
+      return {
+        code: "WEBHOOK_SECRET_ROTATION_CONFLICT",
+        message: "Complete or cancel the current webhook secret rotation first.",
+        retryable: false,
+      };
+    case "WebhookReplayNotAllowedFailure":
+      return {
+        code: "WEBHOOK_REPLAY_NOT_ALLOWED",
+        message: "This event cannot be replayed to the selected endpoint.",
+        retryable: false,
+      };
+    case "WebhookEventInvalidFailure":
+      return {
+        code: "SERVICE_UNAVAILABLE",
+        message: "The publication event is temporarily unavailable.",
         retryable: false,
       };
     case "InvitationConflictFailure":

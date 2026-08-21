@@ -1,0 +1,21 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+
+# Local secrets and Cloudflare authority
+.env
+.env.*
+!.env.example
+secrets/*.txt
+cloudflared/*
+!cloudflared/config.yml.example
+!cloudflared/README.md
+
+# Captured webhook data and receiver state
+data/**
+!data/.gitkeep
+
+# Editor and operating-system files
+.DS_Store
+*.log

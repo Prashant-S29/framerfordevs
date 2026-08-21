@@ -20,7 +20,7 @@ describe("rate-limit contracts", () => {
     expect(() => Schema.decodeUnknownSync(RateLimitPolicy)("caller.policy")).toThrow();
   });
 
-  it("keeps approved Preview budgets closed and source-controlled", () => {
+  it("keeps approved Preview and webhook budgets closed and source-controlled", () => {
     expect(rateLimitPolicies["preview.global"]).toEqual({
       policy: "preview.global",
       limitPerInterval: 12_000,
@@ -38,6 +38,12 @@ describe("rate-limit contracts", () => {
       limitPerInterval: 300,
       intervalMs: 60_000,
       capacity: 50,
+    });
+    expect(rateLimitPolicies["webhook.replay.user"]).toEqual({
+      policy: "webhook.replay.user",
+      limitPerInterval: 30,
+      intervalMs: 60_000,
+      capacity: 5,
     });
   });
 

@@ -68,6 +68,17 @@ import {
 import { SchemaEngine, SchemaEngineLive } from "./services/schema-engine";
 import { SchemaRepository, SchemaRepositoryLive } from "./services/schema-repository";
 import { SecretGenerator, SecretGeneratorLive } from "./services/secret-generator";
+import {
+  WebhookCrypto,
+  WebhookCryptoUnavailableLive,
+  makeWebhookCryptoLive,
+} from "./services/webhook-crypto";
+import {
+  WebhookDestinationValidator,
+  WebhookDestinationValidatorLive,
+} from "./services/webhook-destination-validator";
+import { parseWebhookKeyRing } from "./services/webhook-key-ring";
+import { WebhookRepository, WebhookRepositoryLive } from "./services/webhook-repository";
 
 export type ApplicationServices =
   | ApplicationLogger
@@ -94,7 +105,10 @@ export type ApplicationServices =
   | PreviewRepository
   | FieldEngine
   | SchemaEngine
-  | SchemaRepository;
+  | SchemaRepository
+  | WebhookCrypto
+  | WebhookDestinationValidator
+  | WebhookRepository;
 
 const PublicationRepositoryConfiguredLive = PublicationRepositoryLive.pipe(
   Layer.provide(PublicationEngineLive),
@@ -134,6 +148,13 @@ const CredentialAttemptLimiterConfiguredLive = CredentialAttemptLimiterLive.pipe
   Layer.provide(RateLimitManagerConfiguredLive),
 );
 
+const webhookKeyRing = parseWebhookKeyRing(
+  env.WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID,
+  env.WEBHOOK_ENCRYPTION_KEYS,
+);
+const WebhookCryptoLive =
+  webhookKeyRing === null ? WebhookCryptoUnavailableLive : makeWebhookCryptoLive(webhookKeyRing);
+
 const InfrastructureLive = Layer.mergeAll(
   ApplicationLoggerLive,
   TelemetryLive,
@@ -160,6 +181,9 @@ const InfrastructureLive = Layer.mergeAll(
   FieldEngineLive,
   SchemaEngineLive,
   SchemaRepositoryLive,
+  WebhookCryptoLive,
+  WebhookDestinationValidatorLive,
+  WebhookRepositoryLive,
 );
 
 export const ApplicationLive = Layer.mergeAll(InfrastructureLive, OpenTelemetryLive);

@@ -13,7 +13,7 @@ import { Skeleton } from "@framerfordevs/ui/components/skeleton";
 import { Spinner } from "@framerfordevs/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, BoxesIcon, CheckIcon, DatabaseIcon } from "lucide-react";
+import { ArrowLeftIcon, BoxesIcon, CheckIcon, DatabaseIcon, WebhookIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { ArchiveProjectDialog } from "@/components/archive-project-dialog";
@@ -66,6 +66,7 @@ function ProjectDetail() {
   const canManageLocales = allowedActions.has("locale.manage");
   const canReadSchemas = allowedActions.has("schema.read");
   const canWriteSchemas = allowedActions.has("schema.write");
+  const canReadWebhooks = allowedActions.has("webhook.read") && access.localeAccess.mode === "all";
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">
@@ -175,6 +176,28 @@ function ProjectDetail() {
           canWrite={canWriteSchemas}
           isArchived={isArchived}
         />
+      ) : null}
+
+      {canReadWebhooks ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle>Publication webhooks</CardTitle>
+                <CardDescription>
+                  Configure signed publication events, retries, dead letters, and invalidation
+                  hints.
+                </CardDescription>
+              </div>
+              <WebhookIcon aria-hidden="true" />
+            </div>
+          </CardHeader>
+          <CardFooter>
+            <Button render={<Link to="/projects/$projectId/webhooks" params={{ projectId }} />}>
+              Open Webhooks
+            </Button>
+          </CardFooter>
+        </Card>
       ) : null}
 
       {canReadLocales ? (

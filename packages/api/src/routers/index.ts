@@ -97,6 +97,31 @@ import {
   ValidateCollectionSchemaInputSchema,
 } from "../contracts/schemas";
 import {
+  CreateInvalidationRouteMappingInputSchema,
+  CreateWebhookEndpointInputSchema,
+  InvalidationRouteMappingOutputSchema,
+  InvalidationRouteMappingPageOutputSchema,
+  IssuedWebhookEndpointOutputSchema,
+  ListInvalidationRouteMappingsInputSchema,
+  ListWebhookAttemptsInputSchema,
+  ListWebhookDeliveriesInputSchema,
+  ListWebhookEndpointsInputSchema,
+  ReplayWebhookEventInputSchema,
+  ReplaceWebhookSubscriptionsInputSchema,
+  RotatedWebhookSecretOutputSchema,
+  SetInvalidationRouteMappingStateInputSchema,
+  SetWebhookEndpointStateInputSchema,
+  StartWebhookSecretRotationInputSchema,
+  UpdateInvalidationRouteMappingInputSchema,
+  UpdateWebhookEndpointInputSchema,
+  ChangeWebhookSecretRotationInputSchema,
+  ReplayWebhookEventResultOutputSchema,
+  WebhookAttemptPageOutputSchema,
+  WebhookDeliveryPageOutputSchema,
+  WebhookEndpointOutputSchema,
+  WebhookEndpointPageOutputSchema,
+} from "../contracts/webhooks";
+import {
   ArchiveProjectInputSchema,
   CapabilityOutputSchema,
   CreateProjectInputSchema,
@@ -185,6 +210,22 @@ import {
   updateProject,
 } from "../operations/platform";
 import { healthCheck, loadPrivateData } from "../operations/system";
+import {
+  createInvalidationMapping,
+  createWebhookEndpoint,
+  listInvalidationMappings,
+  listWebhookAttempts,
+  listWebhookDeliveries,
+  listWebhookEndpoints,
+  replayWebhookEvent,
+  replaceWebhookSubscriptions,
+  setInvalidationMappingState,
+  setWebhookEndpointState,
+  startWebhookSecretRotation,
+  changeWebhookSecretRotation,
+  updateInvalidationMapping,
+  updateWebhookEndpoint,
+} from "../operations/webhooks";
 
 export const appRouter = {
   healthCheck: publicProcedure.handler(({ context }) =>
@@ -198,6 +239,170 @@ export const appRouter = {
       "Private data loaded.",
     ),
   ),
+  webhooks: {
+    endpoints: {
+      create: protectedProcedure
+        .input(CreateWebhookEndpointInputSchema)
+        .output(IssuedWebhookEndpointOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.endpoint.create",
+            createWebhookEndpoint(context.session.user.id, input, context.request.requestId),
+            "Webhook endpoint created. Copy the signing secret now.",
+          ),
+        ),
+      update: protectedProcedure
+        .input(UpdateWebhookEndpointInputSchema)
+        .output(WebhookEndpointOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.endpoint.update",
+            updateWebhookEndpoint(context.session.user.id, input, context.request.requestId),
+            "Webhook endpoint updated.",
+          ),
+        ),
+      list: protectedProcedure
+        .input(ListWebhookEndpointsInputSchema)
+        .output(WebhookEndpointPageOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.endpoint.list",
+            listWebhookEndpoints(context.session.user.id, input),
+            "Webhook endpoints loaded.",
+          ),
+        ),
+      setState: protectedProcedure
+        .input(SetWebhookEndpointStateInputSchema)
+        .output(WebhookEndpointOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.endpoint.state",
+            setWebhookEndpointState(context.session.user.id, input, context.request.requestId),
+            "Webhook endpoint state updated.",
+          ),
+        ),
+      replaceSubscriptions: protectedProcedure
+        .input(ReplaceWebhookSubscriptionsInputSchema)
+        .output(WebhookEndpointOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.subscription.replace",
+            replaceWebhookSubscriptions(context.session.user.id, input, context.request.requestId),
+            "Webhook subscriptions updated.",
+          ),
+        ),
+      startRotation: protectedProcedure
+        .input(StartWebhookSecretRotationInputSchema)
+        .output(RotatedWebhookSecretOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.secret.start",
+            startWebhookSecretRotation(context.session.user.id, input, context.request.requestId),
+            "Next webhook signing secret generated. Copy it now.",
+          ),
+        ),
+      changeRotation: protectedProcedure
+        .input(ChangeWebhookSecretRotationInputSchema)
+        .output(WebhookEndpointOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.secret.change",
+            changeWebhookSecretRotation(context.session.user.id, input, context.request.requestId),
+            "Webhook secret rotation updated.",
+          ),
+        ),
+    },
+    mappings: {
+      create: protectedProcedure
+        .input(CreateInvalidationRouteMappingInputSchema)
+        .output(InvalidationRouteMappingOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.mapping.create",
+            createInvalidationMapping(context.session.user.id, input, context.request.requestId),
+            "Invalidation mapping created.",
+          ),
+        ),
+      update: protectedProcedure
+        .input(UpdateInvalidationRouteMappingInputSchema)
+        .output(InvalidationRouteMappingOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.mapping.update",
+            updateInvalidationMapping(context.session.user.id, input, context.request.requestId),
+            "Invalidation mapping updated.",
+          ),
+        ),
+      setState: protectedProcedure
+        .input(SetInvalidationRouteMappingStateInputSchema)
+        .output(InvalidationRouteMappingOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.mapping.state",
+            setInvalidationMappingState(context.session.user.id, input, context.request.requestId),
+            "Invalidation mapping state updated.",
+          ),
+        ),
+      list: protectedProcedure
+        .input(ListInvalidationRouteMappingsInputSchema)
+        .output(InvalidationRouteMappingPageOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.mapping.list",
+            listInvalidationMappings(context.session.user.id, input),
+            "Invalidation mappings loaded.",
+          ),
+        ),
+    },
+    deliveries: {
+      list: protectedProcedure
+        .input(ListWebhookDeliveriesInputSchema)
+        .output(WebhookDeliveryPageOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.delivery.list",
+            listWebhookDeliveries(context.session.user.id, input),
+            "Webhook deliveries loaded.",
+          ),
+        ),
+      replay: protectedProcedure
+        .input(ReplayWebhookEventInputSchema)
+        .output(ReplayWebhookEventResultOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.delivery.replay",
+            replayWebhookEvent(context.session.user.id, input, context.request.requestId),
+            "Webhook event replay queued.",
+          ),
+        ),
+    },
+    attempts: {
+      list: protectedProcedure
+        .input(ListWebhookAttemptsInputSchema)
+        .output(WebhookAttemptPageOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.attempt.list",
+            listWebhookAttempts(context.session.user.id, input),
+            "Webhook attempts loaded.",
+          ),
+        ),
+    },
+  },
   platform: {
     workspaces: {
       create: protectedProcedure

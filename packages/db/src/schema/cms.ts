@@ -2208,6 +2208,13 @@ export const outboxEvent = pgTable(
         cmsEntryLocalePublication.workspaceId,
       ],
     }).onDelete("restrict"),
+    unique("outbox_event_id_scope_unique").on(
+      table.id,
+      table.eventType,
+      table.environmentId,
+      table.projectId,
+      table.workspaceId,
+    ),
     unique("outbox_event_logical_sequence_unique").on(
       table.eventType,
       table.subjectId,
@@ -2224,7 +2231,7 @@ export const outboxEvent = pgTable(
     check("outbox_event_sequence_positive", sql`${table.aggregateSequence} > 0`),
     check(
       "outbox_event_payload_valid",
-      sql`jsonb_typeof(${table.payload}) = 'object' and octet_length(${table.payload}::text) <= 16384`,
+      sql`jsonb_typeof(${table.payload}) = 'object' and octet_length(${table.payload}::text) <= 131072`,
     ),
     check(
       "outbox_event_publication_scope_paired",

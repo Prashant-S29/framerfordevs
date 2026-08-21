@@ -18,6 +18,10 @@ const environmentKeys = [
   "RATE_LIMIT_FINGERPRINT_SECRET",
   "DELIVERY_CURSOR_SECRET",
   "DELIVERY_CURSOR_PREVIOUS_SECRET",
+  "WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID",
+  "WEBHOOK_ENCRYPTION_KEYS",
+  "WEBHOOK_WORKER_ENABLED",
+  "WEBHOOK_WORKER_PORT",
   "DELIVERY_API_ENABLED",
   "PREVIEW_API_ENABLED",
   "MANAGEMENT_API_REFERENCE_ENABLED",
@@ -46,6 +50,10 @@ beforeEach(() => {
   delete process.env.RATE_LIMIT_FINGERPRINT_SECRET;
   delete process.env.DELIVERY_CURSOR_SECRET;
   delete process.env.DELIVERY_CURSOR_PREVIOUS_SECRET;
+  delete process.env.WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID;
+  delete process.env.WEBHOOK_ENCRYPTION_KEYS;
+  delete process.env.WEBHOOK_WORKER_ENABLED;
+  delete process.env.WEBHOOK_WORKER_PORT;
   delete process.env.DELIVERY_API_ENABLED;
   delete process.env.PREVIEW_API_ENABLED;
   delete process.env.MANAGEMENT_API_REFERENCE_ENABLED;
@@ -84,8 +92,38 @@ describe("server environment", () => {
     expect(env.RATE_LIMIT_STORE).toBe("memory");
     expect(env.RATE_LIMIT_REDIS_TIMEOUT_MS).toBe(100);
     expect(env.PREVIEW_API_ENABLED).toBe(false);
+    expect(env.WEBHOOK_WORKER_ENABLED).toBe(false);
+    expect(env.WEBHOOK_WORKER_PORT).toBe(3_002);
     expect(env.MANAGEMENT_API_REFERENCE_ENABLED).toBe(false);
     expect(env.TRUST_PROXY_HOPS).toBe(0);
+  });
+
+  it("accepts a complete persistent webhook encryption key ring", async () => {
+    process.env.WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID = "active-1";
+    process.env.WEBHOOK_ENCRYPTION_KEYS = JSON.stringify({
+      "active-1": Buffer.alloc(32, 7).toString("base64url"),
+    });
+
+    const { env } = await import("./server");
+
+    expect(env.WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID).toBe("active-1");
+    expect(env.WEBHOOK_ENCRYPTION_KEYS).toBeDefined();
+  });
+
+  it("rejects an incomplete webhook encryption key ring", async () => {
+    process.env.WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID = "active-1";
+
+    await expect(import("./server")).rejects.toThrow(
+      "Webhook encryption requires both an active key ID and a persistent key ring.",
+    );
+  });
+
+  it("rejects enabled webhook delivery without a persistent key ring", async () => {
+    process.env.WEBHOOK_WORKER_ENABLED = "true";
+
+    await expect(import("./server")).rejects.toThrow(
+      "Enabled webhook delivery requires a persistent encryption key ring.",
+    );
   });
 
   it("accepts optional OpenTelemetry exporter configuration", async () => {

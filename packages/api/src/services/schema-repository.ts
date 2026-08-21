@@ -13,6 +13,7 @@ import {
   outboxEvent,
 } from "@framerfordevs/db/schema/cms";
 import { environment, projectCapability, auditEvent } from "@framerfordevs/db/schema/platform";
+import { cmsInvalidationRouteMapping } from "@framerfordevs/db/schema/webhooks";
 import { Context, Effect, Layer, Schema } from "effect";
 
 import { ProjectRole, type ProjectPermissionAction } from "../contracts/access";
@@ -77,6 +78,8 @@ import {
 import { reconstructFieldTree, flattenFieldTree } from "../lib/field-tree";
 import { fieldSystemLimits, fieldSystemValidationProfile } from "../lib/field-system-profile";
 import { iso4217MinorUnits } from "../registry/iso-4217.generated";
+import { matchInvalidationMappings } from "../lib/invalidation-mappings";
+import { canonicalizeEntryValue } from "../lib/entry-values";
 import { isRoleAllowed } from "./policy";
 import {
   type ApplicationDb,
@@ -946,16 +949,25 @@ function exactAcknowledgements(
   return required.length === values.size && required.every((change) => values.has(change.changeId));
 }
 
-type PublicationStep = "revision" | "snapshots" | "head" | "audit" | "outbox";
+export type SchemaPublicationStep =
+  | "revision"
+  | "snapshots"
+  | "head"
+  | "audit"
+  | "invalidation_mapping_load"
+  | "invalidation_projection"
+  | "event_size_validation"
+  | "pre_outbox"
+  | "outbox";
 
 interface RepositoryOptions {
   readonly database?: ApplicationDb;
-  readonly testFailPublicationAfter?: PublicationStep;
+  readonly testFailPublicationAfter?: SchemaPublicationStep;
 }
 
 export function makeSchemaRepository(options: RepositoryOptions = {}) {
   const database = options.database ?? db;
-  const failPublicationAfter = (step: PublicationStep) => {
+  const failPublicationAfter = (step: SchemaPublicationStep) => {
     if (options.testFailPublicationAfter === step) {
       throw new Error(`Injected schema publication failure after ${step}.`);
     }
@@ -2591,6 +2603,34 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               }),
             );
             failPublicationAfter("audit");
+            const mappings = await transaction
+              .select({
+                eventTypes: cmsInvalidationRouteMapping.eventTypes,
+                entryId: cmsInvalidationRouteMapping.entryId,
+                localeId: cmsInvalidationRouteMapping.localeId,
+                routePath: cmsInvalidationRouteMapping.routePath,
+                semanticTags: cmsInvalidationRouteMapping.semanticTags,
+              })
+              .from(cmsInvalidationRouteMapping)
+              .where(
+                and(
+                  eq(cmsInvalidationRouteMapping.workspaceId, collection.workspaceId),
+                  eq(cmsInvalidationRouteMapping.projectId, collection.projectId),
+                  eq(cmsInvalidationRouteMapping.environmentId, collection.environmentId),
+                  eq(cmsInvalidationRouteMapping.collectionId, collection.id),
+                  eq(cmsInvalidationRouteMapping.state, "enabled"),
+                  sql`'cms.schema.published' = any(${cmsInvalidationRouteMapping.eventTypes})`,
+                  isNull(cmsInvalidationRouteMapping.entryId),
+                  isNull(cmsInvalidationRouteMapping.localeId),
+                ),
+              )
+              .orderBy(cmsInvalidationRouteMapping.id);
+            failPublicationAfter("invalidation_mapping_load");
+            const invalidationSnapshot = matchInvalidationMappings(mappings, {
+              eventType: "cms.schema.published",
+              entryId: null,
+              localeId: null,
+            });
             const changedFieldIds = [
               ...new Set(
                 changes.items.flatMap((change) =>
@@ -2598,6 +2638,31 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 ),
               ),
             ].sort();
+            failPublicationAfter("invalidation_projection");
+            const eventPayload = {
+              version: 1,
+              projectId: collection.projectId,
+              environmentId: collection.environmentId,
+              collectionId: collection.id,
+              schemaRevisionId: revisionRow.id,
+              sequence,
+              schemaHash,
+              contractHash,
+              changedFieldIds,
+              invalidationTags: [
+                `project:${collection.projectId}`,
+                `environment:${collection.environmentId}`,
+                `collection:${collection.id}`,
+                ...changedFieldIds.map((fieldId) => `field:${fieldId}`),
+              ],
+              semanticTags: invalidationSnapshot.semanticTags,
+              routes: invalidationSnapshot.routes,
+            };
+            if (Buffer.byteLength(canonicalizeEntryValue(eventPayload), "utf8") > 131_072) {
+              throw new Error("Schema publication event payload exceeded the fixed M11 limit.");
+            }
+            failPublicationAfter("event_size_validation");
+            failPublicationAfter("pre_outbox");
             await transaction.insert(outboxEvent).values({
               workspaceId: collection.workspaceId,
               projectId: collection.projectId,
@@ -2607,23 +2672,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               subjectId: collection.id,
               schemaRevisionId: revisionRow.id,
               aggregateSequence: sequence,
-              payload: {
-                version: 1,
-                projectId: collection.projectId,
-                environmentId: collection.environmentId,
-                collectionId: collection.id,
-                schemaRevisionId: revisionRow.id,
-                sequence,
-                schemaHash,
-                contractHash,
-                changedFieldIds,
-                invalidationTags: [
-                  `project:${collection.projectId}`,
-                  `environment:${collection.environmentId}`,
-                  `collection:${collection.id}`,
-                  ...changedFieldIds.map((fieldId) => `field:${fieldId}`),
-                ],
-              },
+              payload: eventPayload,
               occurredAt: now,
               availableAt: now,
             });

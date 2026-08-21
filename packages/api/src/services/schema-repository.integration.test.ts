@@ -1084,7 +1084,17 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         .map((change) => change.changeId);
 
       yield* Effect.forEach(
-        ["revision", "snapshots", "head", "audit", "outbox"] as const,
+        [
+          "revision",
+          "snapshots",
+          "head",
+          "audit",
+          "invalidation_mapping_load",
+          "invalidation_projection",
+          "event_size_validation",
+          "pre_outbox",
+          "outbox",
+        ] as const,
         (step) =>
           Effect.gen(function* () {
             const injected = makeSchemaRepository({ testFailPublicationAfter: step });

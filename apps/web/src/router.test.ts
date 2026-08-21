@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getRouter } from "./router";
 
 describe("route structure", () => {
-  it("keeps schema, entry list, editor, and Preview workspaces outside the project detail tree", () => {
+  it("keeps schema, entry, Preview, and Webhooks workspaces outside the project detail tree", () => {
     const router = getRouter();
     const schemaRoute = router.routesById["/_auth/projects/$projectId_/collections/$collectionId"];
     const entriesRoute =
@@ -14,6 +14,7 @@ describe("route structure", () => {
       router.routesById[
         "/_auth/projects/$projectId_/collections/$collectionId_/entries_/$entryId_/preview"
       ];
+    const webhooksRoute = router.routesById["/_auth/projects/$projectId_/webhooks"];
 
     expect(schemaRoute.fullPath).toBe("/projects/$projectId/collections/$collectionId");
     expect(entriesRoute.fullPath).toBe("/projects/$projectId/collections/$collectionId/entries");
@@ -23,10 +24,12 @@ describe("route structure", () => {
     expect(previewRoute.fullPath).toBe(
       "/projects/$projectId/collections/$collectionId/entries/$entryId/preview",
     );
+    expect(webhooksRoute.fullPath).toBe("/projects/$projectId/webhooks");
     expect(schemaRoute.parentRoute.id).toBe("/_auth");
     expect(entriesRoute.parentRoute.id).toBe("/_auth");
     expect(editorRoute.parentRoute.id).toBe("/_auth");
     expect(previewRoute.parentRoute.id).toBe("/_auth");
+    expect(webhooksRoute.parentRoute.id).toBe("/_auth");
     const validateSearch = editorRoute.options.validateSearch;
     expect(typeof validateSearch).toBe("function");
     if (typeof validateSearch !== "function")
@@ -41,6 +44,24 @@ describe("route structure", () => {
       locale: "gu",
       source: "current",
     });
+    const validateWebhookSearch = webhooksRoute.options.validateSearch;
+    expect(typeof validateWebhookSearch).toBe("function");
+    if (typeof validateWebhookSearch !== "function")
+      throw new Error("Webhook search validator is missing.");
+    expect(
+      validateWebhookSearch({
+        endpoint: "019fae8b-1234-7000-8000-000000000071",
+        event: "cms.entry.published",
+        status: "dead_letter",
+      }),
+    ).toEqual({
+      endpoint: "019fae8b-1234-7000-8000-000000000071",
+      event: "cms.entry.published",
+      status: "dead_letter",
+    });
+    expect(
+      validateWebhookSearch({ endpoint: "invalid", event: "internal.event", status: "failed" }),
+    ).toEqual({});
     expect(
       validatePreviewSearch({
         locale: "gu",

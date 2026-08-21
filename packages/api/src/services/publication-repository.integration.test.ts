@@ -1225,6 +1225,10 @@ describe.sequential("publication repository PostgreSQL integration", () => {
       "projection",
       "generation",
       "audit",
+      "invalidation_mapping_load",
+      "invalidation_projection",
+      "event_size_validation",
+      "pre_outbox",
       "outbox",
       "receipt",
     ];

@@ -1,0 +1,2 @@
+ALTER TABLE "outbox_event" DROP CONSTRAINT "outbox_event_payload_valid";--> statement-breakpoint
+ALTER TABLE "outbox_event" ADD CONSTRAINT "outbox_event_payload_valid" CHECK (jsonb_typeof("outbox_event"."payload") = 'object' and octet_length("outbox_event"."payload"::text) <= 131072);

@@ -10,6 +10,7 @@ import {
   EntryPublicationSummary,
 } from "@framerfordevs/api/contracts/publications";
 import { CollectionDraftSchema, SchemaChange } from "@framerfordevs/api/contracts/schemas";
+import { WebhookEndpoint } from "@framerfordevs/api/contracts/webhooks";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -35,6 +36,11 @@ import { PublicationCard, RenameEntryDialog } from "./entry-editor";
 import { CreateCollectionDialog } from "./project-collections";
 import { PublishCard } from "./schema-builder";
 import { SchemaWorkbench } from "./schema-workbench";
+import {
+  CreateInvalidationMappingDialog,
+  CreateWebhookEndpointDialog,
+  WebhookEndpointActions,
+} from "./webhook-controls";
 import { orpc } from "@/utils/orpc";
 
 const locale = Schema.decodeUnknownSync(ProjectLocale)({
@@ -92,6 +98,25 @@ const project = Schema.decodeUnknownSync(Project)({
     createdAt: "2026-07-29T00:00:00.000Z",
   },
   capabilities: [],
+});
+
+const webhookEndpoint = Schema.decodeUnknownSync(WebhookEndpoint)({
+  id: "019fae8b-1234-7000-8000-000000000071",
+  projectId: project.id,
+  environmentId: project.environment.id,
+  name: "Publication receiver",
+  state: "enabled",
+  version: 1,
+  destinationOrigin: "https://hooks.example.test",
+  subscriptions: ["cms.schema.published", "cms.entry.published"],
+  rotationState: "active",
+  rotationEndsAt: null,
+  lastOutcome: null,
+  deadLetterCount: 0,
+  enabledAt: "2026-08-12T00:00:00.000Z",
+  disabledAt: null,
+  createdAt: "2026-08-12T00:00:00.000Z",
+  updatedAt: "2026-08-12T00:00:00.000Z",
 });
 
 const collectionDraft = Schema.decodeUnknownSync(CollectionDraftSchema)({
@@ -223,6 +248,32 @@ describe("platform management accessibility", () => {
     expect(screen.getByText("Legacy Preview credential blocked")).toBeTruthy();
     expect(screen.getByText(/fails authentication and cannot rotate/i)).toBeTruthy();
     expect((await axe.run(container)).violations).toEqual([]);
+  });
+
+  it("has accessible webhook creation and secret-rotation semantics", async () => {
+    const create = renderWithQueryClient(
+      <CreateWebhookEndpointDialog projectId={project.id} environmentId={project.environment.id} />,
+    );
+    await expectOpenDialogToHaveNoViolations(/new endpoint/i);
+    create.unmount();
+
+    const mapping = renderWithQueryClient(
+      <CreateInvalidationMappingDialog
+        projectId={project.id}
+        environmentId={project.environment.id}
+      />,
+    );
+    await expectOpenDialogToHaveNoViolations(/new mapping/i);
+    mapping.unmount();
+
+    renderWithQueryClient(
+      <WebhookEndpointActions
+        projectId={project.id}
+        environmentId={project.environment.id}
+        endpoint={webhookEndpoint}
+      />,
+    );
+    await expectOpenDialogToHaveNoViolations(/rotate secret/i);
   });
 
   it("has accessible locale creation semantics", async () => {
