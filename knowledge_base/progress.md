@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 11 automated criteria complete; awaiting developer manual review
-**Active milestone:** Milestone 11 — Publication events, webhooks, retries, and invalidation
-**Last updated:** 2026-08-13
+**Overall status:** Milestone 11 developer-approved and committed; repository structure normalization ready for developer review before Milestone 12
+**Active milestone:** None — post-M11 repository structure normalization review
+**Last updated:** 2026-08-21
 
 ## Status legend
 
@@ -28,7 +28,7 @@
 | 8   | Per-locale publication and snapshots     | `[A]`  | 627 passing     | Approved      | `ad3cd5e` |
 | 9   | Delivery API                             | `[A]`  | 712 passing     | Approved      | `8559aa4` |
 | 10  | Preview API                              | `[A]`  | 780 passing     | Approved      | `aa177b5` |
-| 11  | Events, webhooks, invalidation           | `[R]`  | 868 passing     | Requested     | None      |
+| 11  | Events, webhooks, invalidation           | `[A]`  | 868 passing     | Approved      | `fef7205` |
 | 12  | Developer portal and generated tooling   | `[ ]`  | Not run         | Pending       | None      |
 | 13  | Client handover                          | `[ ]`  | Not run         | Pending       | None      |
 | 14  | Production hardening                     | `[ ]`  | Not run         | Pending       | None      |
@@ -438,7 +438,17 @@
 - `[x]` Complete the public event payload minimization review. Keep version 1 unchanged: every field supports CloudEvents interoperability, direct scope, idempotency/ordering, exact publication/schema lookup, compatibility, changed-field processing, or action-ready invalidation; bounded duplicate IDs avoid URI parsing and no content, actor, display-name, credential, destination, or request authority is exposed.
 - `[x]` Assign production webhook-worker egress filtering, cloud metadata hardening, and validator-bypass production-topology tests to M14 without weakening M11 application controls.
 - `[x]` Pass final `pnpm run ready` with 613 API, 109 server, 117 web, 15 external-receiver, 12 environment, and 2 worker tests (868 total), 90.14% API statement/74.44% branch coverage, formatting/lint, all package type checks, coverage, and production builds. Production/full audits report no vulnerabilities; rebuilt server/web/worker images exclude the receiver and are healthy, return HTTP 200 readiness, contain no secret/load environment files, and the delivery-enabled worker has zero pending supported outbox rows, queued work, started attempts, expired leases, or known test users.
-- `[R]` Automated M11 criteria and temporary public Cloudflare validation are complete. Developer manual review remains; a stable named Cloudflare hostname is optional and not an M11 completion blocker. Do not commit or advance milestones.
+- `[A]` The developer completed manual review, approved M11, and committed it as `fef7205` (`feat(m11): publication events, webhooks, retries, and invalidation`) on 2026-08-21. A stable named Cloudflare hostname remains optional and is not an M11 completion requirement.
+
+## Post-M11 repository structure normalization
+
+- `[x]` Record the developer-authorized hybrid test-placement decision in `knowledge_base/decisions/repository-test-structure.md`: focused single-owner tests remain colocated, broader integration/contract/accessibility suites use categorized workspace-owned `test/` directories, and future cross-workspace suites use private `tools/*` workspaces.
+- `[x]` Move all 12 API PostgreSQL/Redis integration files to `packages/api/test/integration/services/`, all three server HTTP/application suites to `apps/server/test/integration/`, the broad web suite to `apps/web/test/accessibility/`, and classify the receiver as one colocated unit file plus contract/integration/support directories. The repository now has 91 colocated focused tests, 17 integration tests, two contract tests, one broad accessibility test, and zero integration tests under `src/`.
+- `[x]` Add package-owned targeted `test:unit`, `test:integration`, `test:contract`, and `test:accessibility` commands with root Turborepo delegation while preserving complete `test`/coverage behavior.
+- `[x]` Add the repo-wide `check:structure` gate to enforce singular categorized test directories, reject integration tests under `src/`, reject anonymous root test trees, and prevent production source imports from test-only modules.
+- `[x]` Keep production outputs test-free, including an explicit receiver build exclusion; the receiver build contains zero test artifacts.
+- `[x]` Pass targeted type, unit, integration, contract, and accessibility gates plus final `pnpm run ready` with the unchanged 868-test total, formatting/lint, structure enforcement, coverage, production builds, and `git diff --check`. The external worker remained stopped throughout database integration/coverage, and final reconciliation reports zero pending supported outbox rows, active deliveries, or started attempts.
+- `[R]` Repository structure normalization is complete and awaiting developer review before Milestone 12.
 
 ## Current blockers
 

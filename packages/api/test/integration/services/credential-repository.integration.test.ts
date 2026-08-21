@@ -27,33 +27,36 @@ import {
   ListApiCredentialsInput,
   RevokeApiCredentialInput,
   RotateApiCredentialInput,
-} from "../contracts/access";
-import { TelemetryLive } from "../observability/telemetry";
+} from "../../../src/contracts/access";
+import { TelemetryLive } from "../../../src/observability/telemetry";
 import {
   issueApiCredential,
   listApiCredentials,
   revokeApiCredential,
   rotateApiCredential,
-} from "../operations/credentials";
-import { CredentialAttemptLimiterLive } from "./credential-attempt-limiter";
-import { makeRateLimitManagerLive } from "./rate-limit-manager";
-import { MemoryRateLimitFallbackStoreLive, MemoryRateLimitStoreLive } from "./rate-limit-store";
+} from "../../../src/operations/credentials";
+import { CredentialAttemptLimiterLive } from "../../../src/services/credential-attempt-limiter";
+import { makeRateLimitManagerLive } from "../../../src/services/rate-limit-manager";
+import {
+  MemoryRateLimitFallbackStoreLive,
+  MemoryRateLimitStoreLive,
+} from "../../../src/services/rate-limit-store";
 import {
   type AuthenticateCredentialInput,
   CredentialAuthenticator,
   CredentialAuthenticatorLive,
-} from "./credential-authenticator";
-import { CredentialRepositoryLive } from "./credential-repository";
-import { makePlatformRepository } from "./platform-repository";
-import { PolicyServiceLive } from "./policy";
-import { SecretGeneratorLive } from "./secret-generator";
+} from "../../../src/services/credential-authenticator";
+import { CredentialRepositoryLive } from "../../../src/services/credential-repository";
+import { makePlatformRepository } from "../../../src/services/platform-repository";
+import { PolicyServiceLive } from "../../../src/services/policy";
+import { SecretGeneratorLive } from "../../../src/services/secret-generator";
 import {
   AuthUserId,
   CreateProjectInput,
   CreateWorkspaceInput,
   type Project as ProjectModel,
   type Workspace as WorkspaceModel,
-} from "../contracts/platform";
+} from "../../../src/contracts/platform";
 
 const suffix = randomUUID();
 const ownerId = `m3-credential-owner-${suffix}`;

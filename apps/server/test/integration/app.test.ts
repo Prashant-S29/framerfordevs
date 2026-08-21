@@ -8,7 +8,7 @@ import { and, eq, like, sql } from "drizzle-orm";
 import request from "supertest";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { createApp } from "./app";
+import { createApp } from "../../src/app";
 
 const app = createApp();
 const testEmailPattern = "m0-%@example.test";

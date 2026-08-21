@@ -18,7 +18,7 @@ import {
 } from "@framerfordevs/db/schema/webhooks";
 import { Effect, Schema } from "effect";
 
-import { AuthUserId } from "../contracts/platform";
+import { AuthUserId } from "../../../src/contracts/platform";
 import {
   ChangeWebhookSecretRotationInput,
   CreateInvalidationRouteMappingInput,
@@ -33,8 +33,8 @@ import {
   SetWebhookEndpointStateInput,
   UpdateInvalidationRouteMappingInput,
   UpdateWebhookEndpointInput,
-} from "../contracts/webhooks";
-import { makeWebhookRepository } from "./webhook-repository";
+} from "../../../src/contracts/webhooks";
+import { makeWebhookRepository } from "../../../src/services/webhook-repository";
 
 interface FixtureScope {
   readonly actorId: string;

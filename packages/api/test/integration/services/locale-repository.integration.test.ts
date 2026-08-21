@@ -19,7 +19,7 @@ import {
   ListProjectMembersInput,
   UpdateProjectMemberLocaleAccessInput,
   type ProjectMember,
-} from "../contracts/access";
+} from "../../../src/contracts/access";
 import {
   CreateProjectLocaleInput,
   ListProjectLocalesInput,
@@ -27,17 +27,17 @@ import {
   ReorderProjectLocalesInput,
   UpdateProjectLocaleDisplayNameInput,
   UpdateProjectLocaleStatusInput,
-} from "../contracts/locales";
+} from "../../../src/contracts/locales";
 import {
   AuthUserId,
   CreateProjectInput,
   CreateWorkspaceInput,
   type Project as ProjectModel,
   type Workspace as WorkspaceModel,
-} from "../contracts/platform";
-import { makeAccessRepository } from "./access-repository";
-import { makeLocaleRepository } from "./locale-repository";
-import { makePlatformRepository } from "./platform-repository";
+} from "../../../src/contracts/platform";
+import { makeAccessRepository } from "../../../src/services/access-repository";
+import { makeLocaleRepository } from "../../../src/services/locale-repository";
+import { makePlatformRepository } from "../../../src/services/platform-repository";
 
 const suffix = randomUUID();
 const ownerId = `m4-locale-owner-${suffix}`;

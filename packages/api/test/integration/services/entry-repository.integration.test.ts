@@ -41,8 +41,8 @@ import {
   RenameEntryInput,
   RestoreEntryRevisionInput,
   SaveEntryDraftInput,
-} from "../contracts/entries";
-import { CreateProjectLocaleInput } from "../contracts/locales";
+} from "../../../src/contracts/entries";
+import { CreateProjectLocaleInput } from "../../../src/contracts/locales";
 import {
   AuthUserId,
   CreateProjectInput,
@@ -50,7 +50,7 @@ import {
   EnableCapabilityInput,
   type Project as ProjectModel,
   type Workspace as WorkspaceModel,
-} from "../contracts/platform";
+} from "../../../src/contracts/platform";
 import {
   CreateCollectionFieldInput,
   CreateCollectionInput,
@@ -59,11 +59,11 @@ import {
   ValidateCollectionSchemaInput,
   type CmsCollection,
   type PublishedSchemaRevision,
-} from "../contracts/schemas";
-import { makeEntryRepository } from "./entry-repository";
-import { makeLocaleRepository } from "./locale-repository";
-import { makePlatformRepository } from "./platform-repository";
-import { makeSchemaRepository } from "./schema-repository";
+} from "../../../src/contracts/schemas";
+import { makeEntryRepository } from "../../../src/services/entry-repository";
+import { makeLocaleRepository } from "../../../src/services/locale-repository";
+import { makePlatformRepository } from "../../../src/services/platform-repository";
+import { makeSchemaRepository } from "../../../src/services/schema-repository";
 
 const suffix = randomUUID();
 const ownerId = `m7-entry-owner-${suffix}`;

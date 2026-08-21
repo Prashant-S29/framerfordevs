@@ -580,6 +580,8 @@ Expose drafts securely without weakening production isolation.
 
 ## Milestone 11 — Publication events, webhooks, retries, and invalidation
 
+**Status:** Developer approved and committed as `fef7205` on 2026-08-21.
+
 ### Goal
 
 Reliably notify external frontends exactly what publication state changed.

@@ -23,7 +23,7 @@ import {
   RemoveProjectMemberInput,
   UpdateProjectMemberLocaleAccessInput,
   UpdateProjectMemberRoleInput,
-} from "../contracts/access";
+} from "../../../src/contracts/access";
 import {
   ArchiveProjectInput,
   AuthUserId,
@@ -35,9 +35,9 @@ import {
   type Project as ProjectModel,
   UpdateProjectInput,
   type Workspace as WorkspaceModel,
-} from "../contracts/platform";
-import { makePlatformRepository } from "./platform-repository";
-import { makeAccessRepository } from "./access-repository";
+} from "../../../src/contracts/platform";
+import { makePlatformRepository } from "../../../src/services/platform-repository";
+import { makeAccessRepository } from "../../../src/services/access-repository";
 
 const suffix = randomUUID();
 const ownerId = `m3-owner-${suffix}`;

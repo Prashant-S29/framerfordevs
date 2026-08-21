@@ -8,5 +8,5 @@
     "sourceMap": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["test", "scripts"]
+  "exclude": ["src/**/*.test.ts", "test", "scripts"]
 }

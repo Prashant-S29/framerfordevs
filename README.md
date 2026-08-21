@@ -124,11 +124,19 @@ framerfordevs/
     └── webhook-test-receiver/ # Developer-only external receiver harness
 ```
 
+Each workspace owns its source, tests, dependencies, configuration, and Turbo tasks. Focused unit/component tests stay beside their single source owner as `src/**/*.test.*`; database, HTTP, filesystem, and multi-module tests live under `test/integration/`; independent protocol tests use `test/contract/`; broad accessibility suites use `test/accessibility/`; and workspace-local fixtures/helpers use `test/support/`. Cross-workspace system or performance suites belong in private `tools/*` workspaces rather than an anonymous root test directory.
+
+See [`knowledge_base/decisions/repository-test-structure.md`](knowledge_base/decisions/repository-test-structure.md) for the complete placement and boundary rules.
+
 ## Available Scripts
 
 - `pnpm run dev`: Start all applications in development mode
 - `pnpm run build`: Build all applications
 - `pnpm run test`: Run all automated tests
+- `pnpm run test:unit`: Run focused unit/component tests
+- `pnpm run test:integration`: Run workspace integration suites (stop external workers sharing the database first)
+- `pnpm run test:contract`: Run independent protocol contract suites
+- `pnpm run test:accessibility`: Run broad accessibility suites
 - `pnpm run test:coverage`: Run tests with coverage
 - `pnpm run ready`: Format, lint, type-check, test, collect coverage, and build
 - `pnpm run dev:web`: Start only the web application

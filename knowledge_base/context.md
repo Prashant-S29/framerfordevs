@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-08-13
-**Current phase:** Milestone 11 security and temporary public Cloudflare validation complete; awaiting developer manual review
-**Active milestone:** Milestone 11 — Publication events, webhooks, retries, and invalidation
+**Last updated:** 2026-08-21
+**Current phase:** Post-M11 repository structure normalization ready for developer review
+**Active milestone:** None — Milestone 12 has not started
 
 ## What this project is
 
@@ -179,11 +179,12 @@ The repository currently has:
 - The collection route now uses a visual field tree plus persistent inspector, a synchronized versioned field-schema JSON view, and a separate bounded sample-JSON inference flow; every field configuration and editor role setting is exposed without adopting code or architecture from the UX reference repository
 - One optimistic `fields.replace` operation atomically validates and replaces the complete active tree, preserves active stable IDs, generates IDs for new nodes, rejects identity reparenting, reconciles layout placements, and exposes precise validation details without any database schema or migration change
 - Property, Effect service, PostgreSQL concurrency/isolation/index-plan, API, UI validation, and automated accessibility tests
-- M11 now includes the reconciled Webhooks workspace: complete endpoint/subscription/rotation controls and summaries, editable exact-scope invalidation mappings with system-tag preview, URL-backed delivery filters and keyset pagination, safe canonical event/attempt detail, dead-letter replay confirmation, and consequence-aware destructive actions. Final refreshed readiness passes with 868 tests, 90.14% API statement coverage, clean audits, and current healthy server/web/worker images.
+- M11 includes the reconciled Webhooks workspace: complete endpoint/subscription/rotation controls and summaries, editable exact-scope invalidation mappings with system-tag preview, URL-backed delivery filters and keyset pagination, safe canonical event/attempt detail, dead-letter replay confirmation, and consequence-aware destructive actions. Final refreshed readiness passes with 868 tests, 90.14% API statement coverage, clean audits, and current healthy server/web/worker images. The developer approved and committed M11 as `fef7205` on 2026-08-21.
 - The webhook boundary now has typed retryable resolver failures, a two-second DNS bound, a separate three-second TCP/TLS establishment bound, the existing ten-second total request bound, and integrated DNS-mutation proof that the validated address—not a later ambient answer—is used.
 - The private developer-only `tools/webhook-test-receiver` workspace package provides strict signed content-free event reception, deterministic receiver behaviors, atomic secret-safe captures/reports, Docker health, and named/Quick Cloudflare Tunnel configuration. Deterministic tests participate in root readiness while live network checks remain opt-in; production Docker contexts/manifests exclude the harness. A free temporary Quick Tunnel passed public A/AAAA, Cloudflare edge TLS, synthetic signing, and one real worker publication at verified HTTP 204; its endpoint/tunnel/secret/captures were then disabled or removed. A stable named hostname remains optional and requires a developer-owned domain.
 - The version-1 webhook payload review found no field suitable for removal: bounded duplicate scope/aggregate identity avoids string parsing, while the remaining fields support interoperability, idempotency, ordering, exact schema/publication use, compatibility, changed-field processing, and invalidation without exposing content or actor/credential/destination/request data.
 - M14 owns production worker egress firewalling, cloud metadata hardening, and deployment-topology tests that bypass application validation to prove the independent network control.
+- The post-M11 repository normalization follows `knowledge_base/decisions/repository-test-structure.md`: 91 focused tests remain colocated, while 17 integration, two contract, and one broad accessibility suite use categorized workspace-owned `test/` directories. Package-owned targeted Turbo commands and a repo-wide structural import/placement gate are present. Final readiness retains all 868 tests and production builds contain no receiver test artifacts.
 - First-party project memberships, fixed default-deny role policies, invitations, and last-owner protection
 - Environment-bound management/delivery/preview credentials with one-time keys, immediate revocation, rotation, bounded attempt limiting, and security telemetry
 - Permission-aware project access management and fragment-safe invitation acceptance UI
@@ -193,7 +194,8 @@ The repository currently has:
 
 The repository does not yet have:
 
-- Developer-approved M11 completion or commit; every automated, load, resilience, coverage, audit, Docker, and catalog gate now passes, while the runtime remains unapproved and uncommitted pending developer manual review
+- Developer approval/commit of the completed post-M11 repository structure normalization
+- Milestone 12 design approval or implementation
 - Optional stable named Cloudflare Tunnel activation; the prepared temporary Quick Tunnel path is validated, but no developer-owned domain is available for a durable hostname
 - Production telemetry backend/collector deployment
 

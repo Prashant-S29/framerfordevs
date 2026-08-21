@@ -7,7 +7,7 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["test/setup.ts"],
     testTimeout: 10_000,
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "test/**/*.test.ts"],
     coverage: {
       include: [
         "src/contracts/**/*.ts",

@@ -23,6 +23,8 @@
     "webhook:load-contention": "tsx src/scripts/webhook-contention-load.ts",
     "webhook:key-continuity": "tsx src/scripts/webhook-key-continuity.ts",
     "test": "vitest run",
+    "test:unit": "vitest run src",
+    "test:integration": "vitest run test/integration",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {

@@ -16,6 +16,18 @@
     "test": {
       "dependsOn": ["^test"]
     },
+    "test:unit": {
+      "dependsOn": ["^test:unit"]
+    },
+    "test:integration": {
+      "dependsOn": ["^test:integration"]
+    },
+    "test:contract": {
+      "dependsOn": ["^test:contract"]
+    },
+    "test:accessibility": {
+      "dependsOn": ["^test:accessibility"]
+    },
     "test:coverage": {
       "dependsOn": ["^test:coverage"],
       "outputs": ["coverage/**"]

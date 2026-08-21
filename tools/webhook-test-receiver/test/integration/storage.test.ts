@@ -6,9 +6,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { createCapture, finalizeCapture, reserveAcceptedEvent } from "../src/storage.js";
-import type { CaptureRecord } from "../src/types.js";
-import { testEvent, testEventId } from "./helpers.js";
+import { createCapture, finalizeCapture, reserveAcceptedEvent } from "../../src/storage.js";
+import type { CaptureRecord } from "../../src/types.js";
+import { testEvent, testEventId } from "../support/helpers.js";
 
 /** Creates one safe capture record without signatures, secrets, or arbitrary headers. */
 function captureRecord(): CaptureRecord {

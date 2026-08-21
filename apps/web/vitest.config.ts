@@ -12,7 +12,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}"],
     coverage: {
       include: [
         "src/components/entry-preview.tsx",

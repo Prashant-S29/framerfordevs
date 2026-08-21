@@ -17,8 +17,8 @@ import {
 } from "@framerfordevs/db/schema/webhooks";
 import { Effect } from "effect";
 
-import { projectPublicationEvent } from "../lib/publication-event";
-import { makeWebhookWorkerRepository } from "./webhook-worker-repository";
+import { projectPublicationEvent } from "../../../src/lib/publication-event";
+import { makeWebhookWorkerRepository } from "../../../src/services/webhook-worker-repository";
 
 interface FixtureScope {
   readonly workspaceId: string;

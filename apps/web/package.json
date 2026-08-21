@@ -6,6 +6,8 @@
     "build": "vite build",
     "check-types": "tsc --noEmit",
     "test": "vitest run",
+    "test:unit": "vitest run src",
+    "test:accessibility": "vitest run test/accessibility",
     "test:coverage": "vitest run --coverage",
     "serve": "vite preview",
     "dev": "vite dev"

@@ -1,5 +1,7 @@
 /** @vitest-environment jsdom */
 
+// Verifies accessible semantics across platform management controls without owning component behavior.
+
 import { ApiCredential, ProjectMember } from "@framerfordevs/api/contracts/access";
 import { ProjectLocale } from "@framerfordevs/api/contracts/locales";
 import { Project } from "@framerfordevs/api/contracts/platform";
@@ -19,28 +21,28 @@ import { Schema } from "effect";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ArchiveProjectDialog } from "./archive-project-dialog";
-import { CreateProjectDialog } from "./create-project-dialog";
-import { CreateWorkspaceDialog } from "./create-workspace-dialog";
-import { EditProjectDialog } from "./edit-project-dialog";
-import { LocaleTabs } from "./locale-tabs";
+import { ArchiveProjectDialog } from "@/components/archive-project-dialog";
+import { CreateProjectDialog } from "@/components/create-project-dialog";
+import { CreateWorkspaceDialog } from "@/components/create-workspace-dialog";
+import { EditProjectDialog } from "@/components/edit-project-dialog";
+import { LocaleTabs } from "@/components/locale-tabs";
 import {
   CredentialRow,
   InviteMemberDialog,
   IssueCredentialDialog,
   LocaleAccessDialog,
-} from "./project-access-settings";
-import { AddLocaleDialog } from "./project-locale-settings";
-import { CreateEntryDialog } from "./collection-entries";
-import { PublicationCard, RenameEntryDialog } from "./entry-editor";
-import { CreateCollectionDialog } from "./project-collections";
-import { PublishCard } from "./schema-builder";
-import { SchemaWorkbench } from "./schema-workbench";
+} from "@/components/project-access-settings";
+import { AddLocaleDialog } from "@/components/project-locale-settings";
+import { CreateEntryDialog } from "@/components/collection-entries";
+import { PublicationCard, RenameEntryDialog } from "@/components/entry-editor";
+import { CreateCollectionDialog } from "@/components/project-collections";
+import { PublishCard } from "@/components/schema-builder";
+import { SchemaWorkbench } from "@/components/schema-workbench";
 import {
   CreateInvalidationMappingDialog,
   CreateWebhookEndpointDialog,
   WebhookEndpointActions,
-} from "./webhook-controls";
+} from "@/components/webhook-controls";
 import { orpc } from "@/utils/orpc";
 
 const locale = Schema.decodeUnknownSync(ProjectLocale)({

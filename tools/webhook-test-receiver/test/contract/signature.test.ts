@@ -3,8 +3,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { verifyWebhook } from "../src/signature.js";
-import { testBody, testEventId, testSecret, testSignature } from "./helpers.js";
+import { verifyWebhook } from "../../src/signature.js";
+import { testBody, testEventId, testSecret, testSignature } from "../support/helpers.js";
 
 const now = 1_776_945_600;
 

@@ -1,6 +1,6 @@
 # Milestone 11 publication events, webhooks, retries, and invalidation design
 
-**Status:** Approved — implementation authorized
+**Status:** Approved — implemented and committed as `fef7205` on 2026-08-21
 
 **Date:** 2026-08-13
 

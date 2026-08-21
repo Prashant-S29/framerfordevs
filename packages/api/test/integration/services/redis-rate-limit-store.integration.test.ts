@@ -5,8 +5,8 @@ import { randomUUID } from "node:crypto";
 import { assert, describe, layer } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { makeRedisRateLimitStoreLive } from "./redis-rate-limit-store";
-import { RateLimitStore, type RateLimitStoreRequest } from "./rate-limit-store";
+import { makeRedisRateLimitStoreLive } from "../../../src/services/redis-rate-limit-store";
+import { RateLimitStore, type RateLimitStoreRequest } from "../../../src/services/rate-limit-store";
 
 const RedisRateLimitTestLive = makeRedisRateLimitStoreLive({
   url: process.env.RATE_LIMIT_REDIS_URL ?? "redis://127.0.0.1:6379",

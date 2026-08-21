@@ -29,7 +29,7 @@ import { Cause, Effect, Exit, Option, Schema } from "effect";
 import {
   GetDeliveryConfigurationInput,
   UpdateDeliveryConfigurationInput,
-} from "../contracts/delivery";
+} from "../../../src/contracts/delivery";
 import {
   AuthUserId,
   CreateProjectInput,
@@ -37,7 +37,7 @@ import {
   EnableCapabilityInput,
   type Project as ProjectModel,
   type Workspace as WorkspaceModel,
-} from "../contracts/platform";
+} from "../../../src/contracts/platform";
 import {
   CreateCollectionFieldInput,
   CreateCollectionInput,
@@ -58,10 +58,10 @@ import {
   UpdateEditorLayoutInput,
   ValidateCollectionSchemaInput,
   type CmsCollection as CmsCollectionModel,
-} from "../contracts/schemas";
-import { makeDeliveryRepository } from "./delivery-repository";
-import { makePlatformRepository } from "./platform-repository";
-import { makeSchemaRepository } from "./schema-repository";
+} from "../../../src/contracts/schemas";
+import { makeDeliveryRepository } from "../../../src/services/delivery-repository";
+import { makePlatformRepository } from "../../../src/services/platform-repository";
+import { makeSchemaRepository } from "../../../src/services/schema-repository";
 
 const suffix = randomUUID();
 const ownerId = `m5-schema-owner-${suffix}`;

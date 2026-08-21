@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { planScenario } from "../src/scenarios.js";
+import { planScenario } from "./scenarios.js";
 
 test("retry-twice fails twice and then accepts", () => {
   assert.equal(planScenario("retry-twice", 1).status, 503);

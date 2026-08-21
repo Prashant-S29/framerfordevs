@@ -68,7 +68,7 @@ vi.mock("@framerfordevs/api/operations/preview-public", async (importOriginal) =
 });
 
 const { applicationRuntime } = await import("@framerfordevs/api/runtime");
-const { createApp } = await import("./app");
+const { createApp } = await import("../../src/app");
 
 const app = createApp({ previewApiEnabled: true });
 const ids = {

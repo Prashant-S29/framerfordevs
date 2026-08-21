@@ -41,15 +41,15 @@ import {
 } from "@framerfordevs/db/schema/platform";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
 
-import { CreateEntryInput, SaveEntryDraftInput } from "../contracts/entries";
-import { CreateProjectLocaleInput } from "../contracts/locales";
+import { CreateEntryInput, SaveEntryDraftInput } from "../../../src/contracts/entries";
+import { CreateProjectLocaleInput } from "../../../src/contracts/locales";
 import {
   GetEntryPublicationStatusInput,
   ListEntryPublicationsInput,
   PublishEntryInput,
   UnpublishEntryInput,
   ValidateEntryPublicationInput,
-} from "../contracts/publications";
+} from "../../../src/contracts/publications";
 import {
   AuthUserId,
   CreateProjectInput,
@@ -57,7 +57,7 @@ import {
   EnableCapabilityInput,
   type Project as ProjectModel,
   type Workspace as WorkspaceModel,
-} from "../contracts/platform";
+} from "../../../src/contracts/platform";
 import {
   CreateCollectionFieldInput,
   CreateCollectionInput,
@@ -66,14 +66,17 @@ import {
   ValidateCollectionSchemaInput,
   type CmsCollection,
   type PublishedSchemaRevision,
-} from "../contracts/schemas";
-import { makeDeliveryCursorSignerLive } from "./delivery-cursor-signer";
-import { makeDeliveryReadRepository } from "./delivery-read-repository";
-import { makeEntryRepository } from "./entry-repository";
-import { makeLocaleRepository } from "./locale-repository";
-import { makePlatformRepository } from "./platform-repository";
-import { makePublicationRepository, type PublicationFailureStage } from "./publication-repository";
-import { makeSchemaRepository } from "./schema-repository";
+} from "../../../src/contracts/schemas";
+import { makeDeliveryCursorSignerLive } from "../../../src/services/delivery-cursor-signer";
+import { makeDeliveryReadRepository } from "../../../src/services/delivery-read-repository";
+import { makeEntryRepository } from "../../../src/services/entry-repository";
+import { makeLocaleRepository } from "../../../src/services/locale-repository";
+import { makePlatformRepository } from "../../../src/services/platform-repository";
+import {
+  makePublicationRepository,
+  type PublicationFailureStage,
+} from "../../../src/services/publication-repository";
+import { makeSchemaRepository } from "../../../src/services/schema-repository";
 
 const suffix = randomUUID();
 const ownerId = `m8-publication-owner-${suffix}`;

@@ -12,8 +12,11 @@
     "report": "tsx scripts/report.ts",
     "smoke:tunnel": "tsx scripts/send-smoke.ts",
     "start": "node dist/index.js",
-    "test": "tsx --test test/**/*.test.ts",
-    "test:coverage": "tsx --test --experimental-test-coverage test/**/*.test.ts"
+    "test": "tsx --test src/**/*.test.ts test/**/*.test.ts",
+    "test:unit": "tsx --test src/**/*.test.ts",
+    "test:contract": "tsx --test test/contract/**/*.test.ts",
+    "test:integration": "tsx --test test/integration/**/*.test.ts",
+    "test:coverage": "tsx --test --experimental-test-coverage src/**/*.test.ts test/**/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "catalog:",

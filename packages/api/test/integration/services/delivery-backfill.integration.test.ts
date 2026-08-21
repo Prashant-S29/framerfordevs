@@ -3,7 +3,7 @@
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Exit } from "effect";
 
-import { runDeliveryBackfill } from "./delivery-backfill";
+import { runDeliveryBackfill } from "../../../src/services/delivery-backfill";
 
 describe("Delivery backfill integration", () => {
   it.effect(

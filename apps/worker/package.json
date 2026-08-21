@@ -13,6 +13,7 @@
     "load:key-continuity": "bash load/run-key-continuity.sh",
     "start": "node dist/index.mjs",
     "test": "vitest run --passWithNoTests",
+    "test:unit": "vitest run src --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests"
   },
   "dependencies": {

@@ -3,8 +3,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { parseWebhookEvent } from "../src/event.js";
-import { testEvent, testEventId } from "./helpers.js";
+import { parseWebhookEvent } from "../../src/event.js";
+import { testEvent, testEventId } from "../support/helpers.js";
 
 /** Encodes one mutated fixture without changing the signed event identity under test. */
 function body(value: unknown): Buffer {

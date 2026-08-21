@@ -522,7 +522,7 @@ Record a learning when an implementation or decision:
 
 **Prevention:** PostgreSQL integration now covers initial claim, concurrent claim exclusion, stale recovery, stale-token finalization, active-to-retiring-before-pending-to-active rotation, ciphertext destruction, and complete endpoint/mapping lifecycle. Claims persist the fixed `attempt_started` outcome, and cancellation uses a database expression that preserves null for zero-attempt deliveries.
 
-**Status:** Resolved in the uncommitted M11 implementation.
+**Status:** Resolved in the M11 implementation committed as `fef7205`.
 
 ---
 
@@ -554,7 +554,7 @@ Record a learning when an implementation or decision:
 
 **Prevention:** Transport tests now cover Node's `all: true` array callback. The controlled-TLS gates exercise SNI/certificate verification and exact receiver counts. The transport uses `keepAlive: false` with at most 100 cached TLS sessions; every request still creates a connection and invokes its validated pinned lookup. The accepted single-endpoint profile now sustains 25.61 attempts/s at 20 ms receiver latency.
 
-**Status:** Resolved in the uncommitted M11 implementation.
+**Status:** Resolved in the M11 implementation committed as `fef7205`.
 
 ---
 
@@ -570,7 +570,7 @@ Record a learning when an implementation or decision:
 
 **Prevention:** Before requesting manual review, enumerate each Dashboard UX bullet against a concrete rendered control and interaction test. M11 now covers endpoint/subscription/rotation summaries and consequences, editable exact-scope mappings and system tags, URL-bound filters, keyset pagination, complete delivery/event/attempt detail, and confirmed replay semantics.
 
-**Status:** Resolved in the uncommitted M11 implementation; refreshed readiness and Docker health pass.
+**Status:** Resolved in the M11 implementation committed as `fef7205`; refreshed readiness and Docker health pass.
 
 ---
 
@@ -592,4 +592,4 @@ Record a learning when an implementation or decision:
 
 ## Current implementation learnings
 
-The platform authorization, locale foundations, versioned schema engine, field system, schema-authoring workbench, stable entries, multilingual drafts, revision history, independent locale publication, immutable Delivery snapshots, Production Delivery API, and Preview API are developer-approved and committed through Milestone 10 at `aa177b5`; completion documentation is committed at `14881fe`. The amended M11 publication-event/webhook design is approved, migrations `0010` and `0011` are developer-applied and read-only verified, and the runtime remains uncommitted pending developer manual review. Additional entries should be added only when consequential drift or rework occurs.
+The platform authorization, locale foundations, versioned schema engine, field system, schema-authoring workbench, stable entries, multilingual drafts, revision history, independent locale publication, immutable Delivery snapshots, Production Delivery API, Preview API, publication events, webhooks, retries, and invalidation are developer-approved and committed through Milestone 11 at `fef7205`. M11 migrations `0010` and `0011` are developer-applied and read-only verified. Additional entries should be added only when consequential drift or rework occurs.

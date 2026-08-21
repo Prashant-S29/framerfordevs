@@ -30,23 +30,26 @@ import {
 } from "@framerfordevs/db/schema/platform";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
 
-import { CredentialPrincipal } from "../contracts/access";
+import { CredentialPrincipal } from "../../../src/contracts/access";
 import {
   GetCurrentUserPreviewInput,
   GetRevisionCredentialPreviewInput,
   GetRevisionUserPreviewInput,
   PreviewRouteScope,
-} from "../contracts/preview";
-import { AuthUserId } from "../contracts/platform";
-import { CollectionFieldDefinition, defaultFieldEditorMetadata } from "../contracts/schemas";
-import { compilePreviewDocument } from "../lib/preview-document";
-import { PreviewDocumentEngineLive } from "./preview-document-engine";
-import { hashSchemaContract } from "./schema-engine";
+} from "../../../src/contracts/preview";
+import { AuthUserId } from "../../../src/contracts/platform";
+import {
+  CollectionFieldDefinition,
+  defaultFieldEditorMetadata,
+} from "../../../src/contracts/schemas";
+import { compilePreviewDocument } from "../../../src/lib/preview-document";
+import { PreviewDocumentEngineLive } from "../../../src/services/preview-document-engine";
+import { hashSchemaContract } from "../../../src/services/schema-engine";
 import {
   makePreviewRepository,
   PreviewRepository,
   PreviewRepositoryLive,
-} from "./preview-repository";
+} from "../../../src/services/preview-repository";
 
 const suffix = randomUUID();
 const ids = {

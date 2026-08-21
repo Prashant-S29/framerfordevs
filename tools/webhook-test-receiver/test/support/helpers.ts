@@ -2,7 +2,7 @@
 
 import { createHmac } from "node:crypto";
 
-import type { VerifiedEvent } from "../src/types.js";
+import type { VerifiedEvent } from "../../src/types.js";
 
 export const testSecret = `whsec_${Buffer.alloc(32, 7).toString("base64url")}`;
 export const testEventId = "019fae8b-1234-7000-8000-000000000006";

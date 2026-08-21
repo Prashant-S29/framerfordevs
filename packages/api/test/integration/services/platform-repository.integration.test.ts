@@ -28,8 +28,8 @@ import {
   type Project as ProjectModel,
   UpdateProjectInput,
   type Workspace as WorkspaceModel,
-} from "../contracts/platform";
-import { makePlatformRepository } from "./platform-repository";
+} from "../../../src/contracts/platform";
+import { makePlatformRepository } from "../../../src/services/platform-repository";
 
 const repository = makePlatformRepository();
 const suffix = randomUUID();

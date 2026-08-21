@@ -22,7 +22,7 @@ import {
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { createApp } from "./app";
+import { createApp } from "../../src/app";
 
 const app = createApp();
 const suffix = randomUUID();

@@ -6,8 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { createReceiverServer } from "../src/server.js";
-import { testBody, testEventId, testSecret, testSignature } from "./helpers.js";
+import { createReceiverServer } from "../../src/server.js";
+import { testBody, testEventId, testSecret, testSignature } from "../support/helpers.js";
 
 const deliveryId = "019fae8b-1234-7000-8000-000000000007";
 const attemptId = "019fae8b-1234-7000-8000-000000000008";
