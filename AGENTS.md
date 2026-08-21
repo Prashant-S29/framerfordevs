@@ -2,10 +2,12 @@
 
 ## Required context
 
-- Before changing code, read `knowledge_base/rules/index.md` and every linked rule in order.
-- Read `knowledge_base/context.md`, `knowledge_base/progress.md`, `knowledge_base/learnings.md`, the active milestone in `knowledge_base/milestone.md`, and its approved decision record.
+- Before changing code, inspect Git, then read `knowledge_base/product.md`, `knowledge_base/prd/cms.md`, `knowledge_base/rules/index.md` and every linked rule, and `knowledge_base/context.md`.
+- Read the status/tracker/current-work portions of `knowledge_base/progress.md` and the active section of `knowledge_base/milestone.md`.
+- Inspect the owning code, tests, package manifest, exports, and configuration before planning changes.
+- Search `knowledge_base/learnings.md` by the task domain. Read only decisions that the current task changes, consumes, or must preserve; use the selective map in `knowledge_base/context.md` and expand when actual dependencies cross domains.
 - Work only on the active milestone unless the developer explicitly changes scope.
-- Treat the product requirements and approved decision records as authoritative according to the source-of-truth rules.
+- Treat committed code/tests/configuration/migration history as executable implementation truth and product requirements/rules/relevant approved decisions as governing intent. Report drift instead of silently choosing one.
 
 ## Skills and local references
 

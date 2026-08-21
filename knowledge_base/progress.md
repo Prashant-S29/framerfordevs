@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 11 developer-approved and committed; repository structure normalization ready for developer review before Milestone 12
-**Active milestone:** None — post-M11 repository structure normalization review
+**Overall status:** Milestone 11 and repository structure normalization approved; agent context normalization ready for review
+**Active milestone:** None — post-M11 documentation refinement
 **Last updated:** 2026-08-21
 
 ## Status legend
@@ -448,11 +448,18 @@
 - `[x]` Add the repo-wide `check:structure` gate to enforce singular categorized test directories, reject integration tests under `src/`, reject anonymous root test trees, and prevent production source imports from test-only modules.
 - `[x]` Keep production outputs test-free, including an explicit receiver build exclusion; the receiver build contains zero test artifacts.
 - `[x]` Pass targeted type, unit, integration, contract, and accessibility gates plus final `pnpm run ready` with the unchanged 868-test total, formatting/lint, structure enforcement, coverage, production builds, and `git diff --check`. The external worker remained stopped throughout database integration/coverage, and final reconciliation reports zero pending supported outbox rows, active deliveries, or started attempts.
-- `[R]` Repository structure normalization is complete and awaiting developer review before Milestone 12.
+- `[A]` The developer reviewed, approved, committed, and pushed the repository structure normalization as `fe69a76` (`refactor(repo): normalize test structure and ownership`) on 2026-08-21. Milestone 12 remains unstarted.
+
+## Post-M11 agent context normalization
+
+- `[x]` Replace the accumulated milestone journal in `context.md` with a concise zero-context entrypoint containing discovery order, truth reconciliation, stack/workspace boundaries, non-negotiable invariants, one precise M0–M11 capability table, architecture landmarks, a selective decision map, validation baseline, and next scope.
+- `[x]` Update session, source-of-truth, decision, documentation, and repository-agent rules so agents inspect current implementation first and read only decisions/learnings relevant to the task's actual dependencies.
+- `[x]` Preserve the authority distinction: code/tests/configuration/migration history describe current executable behavior, while product/PRD/rules/active criteria/relevant approved decisions govern intended behavior and constraints; drift must be reported rather than hidden.
+- `[R]` Documentation normalization is complete and awaiting developer review before Milestone 12.
 
 ## Current blockers
 
-No known database blocker remains. Management and worker implementation continues against the developer-applied, read-only-verified schema.
+No known database or implementation blocker remains. Milestone 12 has not started and requires developer direction plus design approval.
 
 ## Database migration state
 
