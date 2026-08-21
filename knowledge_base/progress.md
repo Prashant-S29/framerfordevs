@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 11 and repository structure normalization approved; agent context normalization ready for review
-**Active milestone:** None — post-M11 documentation refinement
+**Overall status:** Milestone 11 and both post-M11 repository/documentation normalizations approved and committed
+**Active milestone:** None — Milestone 12 has not started
 **Last updated:** 2026-08-21
 
 ## Status legend
@@ -455,7 +455,7 @@
 - `[x]` Replace the accumulated milestone journal in `context.md` with a concise zero-context entrypoint containing discovery order, truth reconciliation, stack/workspace boundaries, non-negotiable invariants, one precise M0–M11 capability table, architecture landmarks, a selective decision map, validation baseline, and next scope.
 - `[x]` Update session, source-of-truth, decision, documentation, and repository-agent rules so agents inspect current implementation first and read only decisions/learnings relevant to the task's actual dependencies.
 - `[x]` Preserve the authority distinction: code/tests/configuration/migration history describe current executable behavior, while product/PRD/rules/active criteria/relevant approved decisions govern intended behavior and constraints; drift must be reported rather than hidden.
-- `[R]` Documentation normalization is complete and awaiting developer review before Milestone 12.
+- `[A]` The developer reviewed, approved, committed, and pushed the agent context normalization as `18618d4` (`docs: streamline agent context and exploration rules`) on 2026-08-21. Milestone 12 remains unstarted.
 
 ## Current blockers
 

@@ -1,7 +1,7 @@
 # Agent Session Context
 
 **Last updated:** 2026-08-21
-**Current phase:** Agent context and exploration rules normalized; awaiting developer review
+**Current phase:** Milestone 11 and post-M11 normalization work approved and committed; awaiting Milestone 12 direction
 **Active milestone:** None — Milestone 12 has not started
 
 ## Product in one paragraph
@@ -94,7 +94,7 @@ All milestones below are developer-approved and committed.
 | M10       | Bearer-only Preview API v1, current/historical draft projection, expiring Preview credentials, no-store isolation, audits, and dashboard preview                       | `aa177b5` |
 | M11       | Canonical publication events, signed webhook endpoints/subscriptions, SSRF-safe worker delivery, retries/dead letters/replay, invalidation mappings, and management UI | `fef7205` |
 
-Post-M11 test normalization is committed at `fe69a76`: focused tests remain colocated; integration, contract, and broad accessibility suites live in categorized workspace-owned `test/` directories; `pnpm run check:structure` enforces the boundary.
+Post-M11 test normalization is committed at `fe69a76`: focused tests remain colocated; integration, contract, and broad accessibility suites live in categorized workspace-owned `test/` directories; `pnpm run check:structure` enforces the boundary. The concise agent-context and selective-exploration rules are committed at `18618d4`.
 
 ## Architecture landmarks
 
