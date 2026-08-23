@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 12 developer-approved, committed, and pushed
-**Active milestone:** None — Milestone 13 discovery/design awaits explicit authorization
+**Overall status:** Milestone 13 design developer-approved; implementation is not authorized
+**Active milestone:** None — M13 dependency evidence and implementation require separate developer direction
 **Last updated:** 2026-08-23
 
 ## Status legend
@@ -15,25 +15,25 @@
 
 ## Milestone tracker
 
-| #   | Milestone                                | Status | Automated tests | Manual review  | Commit    |
-| --- | ---------------------------------------- | ------ | --------------- | -------------- | --------- |
-| 0   | Validate existing foundation             | `[A]`  | 26 passing      | Approved       | `7d5a312` |
-| 1   | Effect foundation, errors, observability | `[A]`  | 90 passing      | Approved       | `c28f6fa` |
-| 2   | Platform kernel                          | `[A]`  | 163 passing     | Approved       | `60adb39` |
-| 3   | Membership, policies, credentials        | `[A]`  | 381 passing     | Approved       | `a74aeb8` |
-| 4   | Project locales                          | `[A]`  | 453 passing     | Approved       | `68b6f6e` |
-| 5   | Versioned schema engine                  | `[A]`  | 509 passing     | Approved       | `28ca04d` |
-| 6   | Field system and generated forms         | `[A]`  | 551 passing     | Approved       | `fbb4767` |
-| 7   | Entries and multilingual drafts          | `[A]`  | 603 passing     | Approved       | `60bd96f` |
-| 8   | Per-locale publication and snapshots     | `[A]`  | 627 passing     | Approved       | `ad3cd5e` |
-| 9   | Delivery API                             | `[A]`  | 712 passing     | Approved       | `8559aa4` |
-| 10  | Preview API                              | `[A]`  | 780 passing     | Approved       | `aa177b5` |
-| 11  | Events, webhooks, invalidation           | `[A]`  | 868 passing     | Approved       | `fef7205` |
-| 12  | Developer portal and generated tooling   | `[A]`  | 962 passing     | Approved       | `4e87908` |
-| 13  | Code-first authoring and local editor    | `[ ]`  | Proposal stored | Design pending | None      |
-| 14  | Client handover                          | `[ ]`  | Not run         | Pending        | None      |
-| 15  | Production hardening                     | `[ ]`  | Not run         | Pending        | None      |
-| 16  | Visual-builder readiness contracts       | `[ ]`  | Not run         | Pending        | None      |
+| #   | Milestone                                | Status | Automated tests | Manual review | Commit    |
+| --- | ---------------------------------------- | ------ | --------------- | ------------- | --------- |
+| 0   | Validate existing foundation             | `[A]`  | 26 passing      | Approved      | `7d5a312` |
+| 1   | Effect foundation, errors, observability | `[A]`  | 90 passing      | Approved      | `c28f6fa` |
+| 2   | Platform kernel                          | `[A]`  | 163 passing     | Approved      | `60adb39` |
+| 3   | Membership, policies, credentials        | `[A]`  | 381 passing     | Approved      | `a74aeb8` |
+| 4   | Project locales                          | `[A]`  | 453 passing     | Approved      | `68b6f6e` |
+| 5   | Versioned schema engine                  | `[A]`  | 509 passing     | Approved      | `28ca04d` |
+| 6   | Field system and generated forms         | `[A]`  | 551 passing     | Approved      | `fbb4767` |
+| 7   | Entries and multilingual drafts          | `[A]`  | 603 passing     | Approved      | `60bd96f` |
+| 8   | Per-locale publication and snapshots     | `[A]`  | 627 passing     | Approved      | `ad3cd5e` |
+| 9   | Delivery API                             | `[A]`  | 712 passing     | Approved      | `8559aa4` |
+| 10  | Preview API                              | `[A]`  | 780 passing     | Approved      | `aa177b5` |
+| 11  | Events, webhooks, invalidation           | `[A]`  | 868 passing     | Approved      | `fef7205` |
+| 12  | Developer portal and generated tooling   | `[A]`  | 962 passing     | Approved      | `4e87908` |
+| 13  | Code-first authoring and local editor    | `[~]`  | Design approved | Not started   | None      |
+| 14  | Client handover                          | `[ ]`  | Not run         | Pending       | None      |
+| 15  | Production hardening                     | `[ ]`  | Not run         | Pending       | None      |
+| 16  | Visual-builder readiness contracts       | `[ ]`  | Not run         | Pending       | None      |
 
 ## Documentation completed
 
@@ -516,9 +516,24 @@
 - `[x]` Retain API-server Scalar UIs as non-canonical compatibility/diagnostic references for now rather than remove a working public path during M12. The Fumadocs portal is canonical; M15 may add redirects after final production origins are approved. Machine-readable API-server OpenAPI endpoints remain unchanged.
 - `[A]` The developer completed renewed manual review, approved M12 with OAuth intentionally rollout-disabled, committed it as `4e87908` (`feat(m12): developer portal and generated tooling`), and pushed it to `origin/main` on 2026-08-23.
 
+## Milestone 13 checklist — design approval gate
+
+- `[x]` Receive explicit developer authorization to begin M13 discovery and design without implementing feature code.
+- `[x]` Verify clean `main` at `3478101` and reconcile the approved M12 baseline.
+- `[x]` Re-read the product, CMS PRD, mandatory rules, context, M13 milestone/proposal, status tracker, relevant learnings, and M1–M12 decisions consumed by M13.
+- `[x]` Load and apply materially relevant Effect, Better Auth, security, Drizzle/PostgreSQL, Express, TanStack, React, shadcn, Portable Text, Turborepo, and accessibility guidance.
+- `[x]` Inspect current schema/field/layout, entry/revision, publication, policy/credential, OAuth/Tooling, CLI/SDK, generated-form, package/export, test, and database seams.
+- `[x]` Confirm Sanity's useful code-schema/local-hosted-content model and explicitly retain Framer for Devs' stronger server validation, versioning, classification, and acknowledgement gates.
+- `[x]` Report implementation drift: user-only CMS attribution, read-only hard-coded Tooling authority, absent public writes/source identity, web-owned incomplete form extraction, incomplete layout GUI, and layout activation coupled to later schema publication.
+- `[x]` Draft the complete M13 authority, schema DSL/source identity, structural hash, plan/apply, Authoring API, OAuth/credential actor, SDK/CLI, local editor, form extraction, presentation publication, migration, security, performance, observability, test, rollout, and manual-review design in `knowledge_base/decisions/m13-code-first-authoring-and-local-editor-design.md`.
+- `[x]` Incorporate security review feedback by rejecting arbitrary local TypeScript execution, replacing the scrubbed-child evaluator with a closed static TypeScript extractor, and making its no-side-effect adversarial bypass corpus a release-blocking security gate.
+- `[x]` Amend the design with optional credential-blind `ffd schema build`, committed Tier 1 output, callable compose helpers, explicit no-third-party-import v1 scope, named TypeScript/QuickJS/Oxc/Javy candidates, release-blocking dependency evidence, and measured cold performance budgets.
+- `[A]` Developer approved all 19 M13 design decisions on 2026-08-23 and explicitly withheld implementation authorization.
+- `[!]` Do not start the dependency evidence slice, edit feature code, add packages, change Drizzle schemas, generate/apply migrations, publish packages, retire dashboard routes, or begin implementation without separate developer direction. Exact dependency/performance evidence and second approval remain mandatory before implementation authorization.
+
 ## Current blockers
 
-No active implementation blocker. M12 is approved and committed. OAuth remains intentionally rollout-disabled and does not block M13; production enablement can be decided during M15 or through separate explicit authorization. SDK/CLI version application and publication remain developer-controlled. M13 discovery/design is not active and requires explicit developer direction.
+M13 has no active work. The design is approved, but implementation remains blocked on separate developer authorization. Before implementation, a separately started evidence slice must review/select exact parser/transpiler/isolate versions, prove credential isolation, record schema-build performance, and receive second dependency/performance approval. M12 OAuth production enablement, migration generation/application, SDK/CLI/schema package versioning/publication, commits, and milestone acceptance remain developer-controlled.
 
 ## Database migration state
 

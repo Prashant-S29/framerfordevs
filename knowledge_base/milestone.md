@@ -697,7 +697,7 @@ Make public integrations discoverable and strongly typed while detecting contrac
 
 ## Milestone 13 — Code-first schema and content authoring with a local agent-first editor
 
-**Status:** Proposal only in `proposals/m13-code-first-schema-and-local-agent-editor.md`. M12 is complete; discovery and design remain inactive until the developer explicitly authorizes them.
+**Status:** The developer approved `decisions/m13-code-first-authoring-and-local-editor-design.md` on 2026-08-23 without authorizing implementation. The critical dependency/performance evidence and second-approval gate must complete before separate implementation authorization; no feature code, migration, package publication, or dashboard-builder removal is authorized.
 
 ### Goal
 

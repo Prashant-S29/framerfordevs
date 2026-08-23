@@ -1,8 +1,8 @@
 # Agent Session Context
 
 **Last updated:** 2026-08-23
-**Current phase:** Milestone 12 developer-approved, committed, and pushed; awaiting explicit direction for the next milestone
-**Active milestone:** None — Milestone 13 discovery/design has not been authorized
+**Current phase:** Milestone 13 design developer-approved; implementation is not authorized
+**Active milestone:** None — M13 dependency evidence and implementation require separate developer direction
 
 ## Product in one paragraph
 
@@ -132,6 +132,7 @@ Read a decision only when the task changes, consumes, or must preserve that doma
 | Preview API and UX                     | `knowledge_base/decisions/m10-preview-api-and-ux-design.md`                           |
 | Publication events and webhooks        | `knowledge_base/decisions/m11-publication-events-webhooks-and-invalidation-design.md` |
 | Developer portal and generated tooling | `knowledge_base/decisions/m12-developer-portal-and-generated-tooling-design.md`       |
+| Code-first authoring and local editor  | `knowledge_base/decisions/m13-code-first-authoring-and-local-editor-design.md`        |
 | Test placement and ownership           | `knowledge_base/decisions/repository-test-structure.md`                               |
 
 For cross-cutting work, follow imports and invariants to identify every genuinely affected row. Do not read unrelated milestone records merely because they are older prerequisites.
@@ -159,7 +160,7 @@ Treat this as the renewed M12 review baseline, not proof that later working-tree
 - M12 migration `0012_add_cli_oauth_device_authorization.sql` is developer-applied and read-only verified. OAuth/device/Tooling-principal integration and the closed four-family public contract registry with canonical artifacts/baselines are implemented. The developer selected the no-migration Tooling integrity authority: verify the reconstructed immutable revision against stored full `schema_hash`, then derive the public contract and `contractHash` only through `compileCollectionContract`. OAuth remains intentionally rollout-disabled; that deployment decision does not block later development.
 - The Tooling repository/HTTP boundary, signed cursors, full-revision hash verification, deterministic generator/lock/diff/filesystem transaction, public SDK, OAuth/keychain CLI, Changesets release staging, and separate prerendered developer portal are implemented with focused passing checks. The developer selected MIT for the first SDK/CLI releases. Reviewed tarballs and a clean isolated NodeNext fixture pass; no package has been published.
 - OAuth, public registry/artifacts, Tooling API, generator, SDK/CLI, release staging, Tooling readiness, audits, Docker proof, and the Fumadocs correction are developer-approved and committed at `4e87908`. The portal contains 27 source-controlled MDX pages, local static search, and 3 canonical OpenAPI plus 1 canonical webhook reference under one origin. OAuth remains rollout-disabled by the approved deployment choice.
-- The future code-first schema/content authoring and local agent-editor proposal is stored at `knowledge_base/proposals/m13-code-first-schema-and-local-agent-editor.md`. It is not an approved design. M12 is complete, but M13 discovery/design must not start without explicit developer direction.
+- The developer approved all 19 decisions in `knowledge_base/decisions/m13-code-first-authoring-and-local-editor-design.md` on 2026-08-23 without authorizing implementation; the original `knowledge_base/proposals/m13-code-first-schema-and-local-agent-editor.md` remains proposal input. Before implementation, a separately initiated evidence slice must review/select exact TypeScript/parser/QuickJS candidates, prove credential isolation, measure schema-build budgets, update the record, and receive second dependency/performance approval. No evidence slice, feature implementation, dependency, Drizzle, migration, package-publication, schema-builder removal, or commit action starts without separate developer direction.
 - Client handover is now M14, production hardening is M15, and visual-builder readiness is M16.
 - M15 owns production host/ingress separation, worker egress firewalling, cloud metadata hardening, and production-topology validator-bypass tests.
 
