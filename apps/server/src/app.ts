@@ -10,10 +10,30 @@ import {
   type ApiResponse,
 } from "@framerfordevs/api/contracts/api-response";
 import type { DeliveryAccessPrincipal } from "@framerfordevs/api/contracts/delivery";
-import { deliveryOpenApiDocument } from "@framerfordevs/api/contracts/delivery-openapi";
-import { previewOpenApiDocument } from "@framerfordevs/api/contracts/preview-openapi";
+import { toolingLimits } from "@framerfordevs/api/contracts/tooling";
+import {
+  generatePublicArtifacts,
+  type PublicContractRegistryKey,
+} from "@framerfordevs/public-contracts";
 import type { RateLimitDecision } from "@framerfordevs/api/contracts/rate-limit";
 import { selectCanonicalNetworkSource } from "@framerfordevs/api/lib/network-source";
+import {
+  authenticateToolingRequest,
+  decodeToolingCollectionRevisionScope,
+  decodeToolingEnvironmentScope,
+  decodeToolingProjectScope,
+  evaluateToolingGlobalRateLimit,
+  evaluateToolingPrincipalRateLimit,
+  getToolingCollectionRevision,
+  getToolingManifestPage,
+  listToolingEnvironments,
+  listToolingProjects,
+  parseToolingPageQuery,
+  toolingManifestCost,
+  toolingRevisionCost,
+  validateToolingEmptyQuery,
+} from "@framerfordevs/api/operations/tooling-public";
+import type { ToolingPrincipal } from "@framerfordevs/api/services/tooling-principal-authenticator";
 import {
   authenticatePreviewRequest,
   evaluatePreviewCredentialRateLimit,
@@ -40,10 +60,18 @@ import type {
 } from "@framerfordevs/api/services/delivery-read-repository";
 import { readinessCheck, healthCheck } from "@framerfordevs/api/operations/system";
 import { makeRequestContext } from "@framerfordevs/api/observability/request-context";
-import type { PreviewQueryRejectionCategory } from "@framerfordevs/api/observability/telemetry";
+import {
+  toolingPageCountBucket,
+  toolingResponseSizeBucket,
+  toStatusFamily,
+  type PreviewQueryRejectionCategory,
+  type ToolingEndpoint,
+  type ToolingSubject,
+} from "@framerfordevs/api/observability/telemetry";
 import {
   observeHttpRequest,
   observePreviewQueryRejection,
+  observeToolingRequest,
   reportBoundaryDefect,
 } from "@framerfordevs/api/runtime";
 import { appRouter } from "@framerfordevs/api/routers/index";
@@ -63,6 +91,18 @@ import express, {
   type Response,
   type Router,
 } from "express";
+
+const generatedPublicArtifacts = generatePublicArtifacts();
+
+function publicArtifactBytes(key: PublicContractRegistryKey): string {
+  const artifact = generatedPublicArtifacts.find((candidate) => candidate.key === key);
+  if (artifact === undefined) throw new Error(`Missing public contract artifact: ${key}`);
+  return artifact.bytes;
+}
+
+const deliveryOpenApiBytes = publicArtifactBytes("delivery/v1");
+const previewOpenApiBytes = publicArtifactBytes("preview/v1");
+const toolingOpenApiBytes = publicArtifactBytes("tooling/v1");
 
 const rpcHandler = new RPCHandler(appRouter);
 
@@ -434,7 +474,7 @@ function createDeliveryRouter(deliveryApiEnabled: boolean): Router {
     "/projects/:projectId/environments/:environmentKey/collections/:collectionKey";
   router.get("/openapi.json", (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=300");
-    res.json(deliveryOpenApiDocument);
+    res.type("application/json").send(deliveryOpenApiBytes);
   });
   router.get(
     "/docs",
@@ -799,7 +839,7 @@ function createPreviewRouter(previewApiEnabled: boolean): Router {
 
   router.get("/openapi.json", (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=300");
-    res.json(previewOpenApiDocument);
+    res.type("application/json").send(previewOpenApiBytes);
   });
   router.get(
     "/docs",
@@ -908,6 +948,410 @@ function createPreviewRouter(previewApiEnabled: boolean): Router {
   return router;
 }
 
+function setToolingHeaders(res: Response): void {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Vary", "Authorization");
+}
+
+function sendToolingFailure(
+  req: Request,
+  res: Response,
+  status: number,
+  response: ApiResponse<ApiData>,
+): void {
+  if (status === 401) res.setHeader("WWW-Authenticate", 'Bearer realm="tooling"');
+  res.setHeader("Cache-Control", "no-store");
+  sendApplicationResponse(req, res, status, response);
+}
+
+function sendToolingSuccess(
+  req: Request,
+  res: Response,
+  response: ApiResponse<ApiData>,
+  immutable: boolean,
+): void {
+  const body = Buffer.from(JSON.stringify(response), "utf8");
+  if (body.byteLength > toolingLimits.responseBytes) {
+    sendToolingFailure(
+      req,
+      res,
+      413,
+      apiFailure({
+        code: "TOOLING_RESPONSE_TOO_LARGE",
+        message: "The Tooling response is too large.",
+        requestId: requestContext(req).requestId,
+        retryable: false,
+      }),
+    );
+    return;
+  }
+  const etag = `"${createHash("sha256").update(body).digest("base64url")}"`;
+  res.setHeader("ETag", etag);
+  res.setHeader(
+    "Cache-Control",
+    immutable ? "private, max-age=31536000, immutable" : "private, no-cache",
+  );
+  if (etagMatches(req.headers["if-none-match"], etag)) {
+    res.status(304).end();
+    return;
+  }
+  res.status(200).setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Content-Length", String(body.byteLength));
+  if (req.method === "HEAD") {
+    res.end();
+    return;
+  }
+  res.end(body);
+}
+
+async function enforceToolingQuota(
+  req: Request,
+  res: Response,
+  context: Context,
+  principal: ToolingPrincipal | null,
+  cost: number,
+): Promise<boolean> {
+  const operation =
+    principal === null
+      ? evaluateToolingGlobalRateLimit(cost)
+      : evaluateToolingPrincipalRateLimit(principal, cost);
+  const result = await context.execute(
+    principal === null ? "api.tooling.rate_limit.global" : "api.tooling.rate_limit.principal",
+    operation,
+    "Tooling quota evaluated.",
+  );
+  const decision = stepData(req, res, result);
+  if (decision === null) return false;
+  setRateLimitHeaders(res, decision);
+  if (decision.allowed) return true;
+  sendToolingFailure(
+    req,
+    res,
+    429,
+    apiFailure({
+      code: "RATE_LIMITED",
+      message: "Too many requests. Try again later.",
+      requestId: context.request.requestId,
+      retryable: true,
+    }),
+  );
+  return false;
+}
+
+async function prepareToolingRequest(
+  req: Request,
+  res: Response,
+  context: Context,
+  cost: number,
+  onPrincipal?: (principal: ToolingPrincipal) => void,
+): Promise<ToolingPrincipal | undefined> {
+  if (!(await enforceToolingQuota(req, res, context, null, cost))) return undefined;
+  const principalResult = await context.execute(
+    "api.tooling.authenticate",
+    authenticateToolingRequest(
+      req.headers.authorization ?? null,
+      selectCanonicalNetworkSource(req.ip, req.socket.remoteAddress),
+    ),
+    "Tooling principal authenticated.",
+  );
+  if (!principalResult.response.ok) {
+    sendToolingFailure(req, res, principalResult.status, principalResult.response);
+    return undefined;
+  }
+  const principal = principalResult.response.data;
+  onPrincipal?.(principal);
+  if (!(await enforceToolingQuota(req, res, context, principal, cost))) return undefined;
+  return principal;
+}
+
+interface ToolingHttpObservation {
+  readonly endpoint: ToolingEndpoint;
+  readonly startedAt: number;
+  subject: ToolingSubject;
+  pageCount: number;
+}
+
+function classifyToolingEndpoint(path: string): ToolingEndpoint | null {
+  if (path === "/projects") return "projects";
+  if (/^\/projects\/[^/]+\/environments$/u.test(path)) return "environments";
+  if (path.endsWith("/schema/manifest")) return "manifest";
+  if (/\/schema\/collections\/[^/]+\/revisions\/[^/]+$/u.test(path)) return "revision";
+  return null;
+}
+
+function responseContentLength(res: Response): number {
+  const value = res.getHeader("Content-Length");
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : 0;
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function createToolingRouter(): Router {
+  const router = express.Router();
+  const observations = new WeakMap<Response, ToolingHttpObservation>();
+  const markPrincipal = (res: Response, principal: ToolingPrincipal) => {
+    const observation = observations.get(res);
+    if (observation !== undefined) observation.subject = principal.kind;
+  };
+  const markPageCount = (res: Response, count: number) => {
+    const observation = observations.get(res);
+    if (observation !== undefined) observation.pageCount = count;
+  };
+
+  router.use((req, res, next) => {
+    const endpoint = classifyToolingEndpoint(req.path);
+    if (endpoint !== null) {
+      const observation: ToolingHttpObservation = {
+        endpoint,
+        startedAt: performance.now(),
+        subject: "unknown",
+        pageCount: 0,
+      };
+      observations.set(res, observation);
+      res.once("finish", () => {
+        const durationMs = Math.max(0, performance.now() - observation.startedAt);
+        void observeToolingRequest({
+          endpoint: observation.endpoint,
+          subject: observation.subject,
+          outcome: res.statusCode < 400 ? "success" : "failure",
+          statusFamily: toStatusFamily(res.statusCode),
+          responseSizeBucket: toolingResponseSizeBucket(responseContentLength(res)),
+          pageCountBucket: toolingPageCountBucket(observation.pageCount),
+          durationMs,
+        }).catch(() => undefined);
+      });
+    }
+
+    setToolingHeaders(res);
+    setToolingHeaders(res);
+    const specificationRoute = req.path === "/openapi.json" || req.path === "/docs";
+    if (specificationRoute) {
+      next();
+      return;
+    }
+    if (req.headers.origin !== undefined || req.method === "OPTIONS") {
+      sendToolingFailure(
+        req,
+        res,
+        403,
+        apiFailure({
+          code: "FORBIDDEN",
+          message: "Browser-origin Tooling requests are not allowed.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    next();
+  });
+
+  router.get("/openapi.json", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.type("application/json").send(toolingOpenApiBytes);
+  });
+  router.get(
+    "/docs",
+    (_req, res, next) => {
+      res.setHeader("Cache-Control", "public, max-age=300");
+      next();
+    },
+    apiReference({
+      pageTitle: "Framer for Devs Tooling API",
+      url: "/api/tooling/v1/openapi.json",
+    }),
+  );
+
+  const projectsHandler = async (req: Request, res: Response) => {
+    const context = createContext({ req });
+    const queryResult = await context.execute(
+      "api.tooling.projects.query",
+      parseToolingPageQuery(req.originalUrl.split("?", 2)[1] ?? ""),
+      "Tooling project query decoded.",
+    );
+    const query = stepData(req, res, queryResult);
+    if (query === null) return;
+    const principal = await prepareToolingRequest(req, res, context, 1, (current) =>
+      markPrincipal(res, current),
+    );
+    if (principal === undefined) return;
+    const result = await context.execute(
+      "api.tooling.projects.list",
+      listToolingProjects(principal, query),
+      "Tooling projects loaded.",
+    );
+    if (!result.response.ok) {
+      sendToolingFailure(req, res, result.status, result.response);
+      return;
+    }
+    markPageCount(res, result.response.data.items.length);
+    sendToolingSuccess(req, res, result.response, false);
+  };
+  router.get("/projects", projectsHandler);
+  router.head("/projects", projectsHandler);
+
+  const environmentsHandler = async (req: Request, res: Response) => {
+    const context = createContext({ req });
+    const queryResult = await context.execute(
+      "api.tooling.environments.query",
+      parseToolingPageQuery(req.originalUrl.split("?", 2)[1] ?? ""),
+      "Tooling environment query decoded.",
+    );
+    const query = stepData(req, res, queryResult);
+    if (query === null) return;
+    const scopeResult = await context.execute(
+      "api.tooling.environments.scope",
+      decodeToolingProjectScope(routeParameter(req, "projectId")),
+      "Tooling project scope decoded.",
+    );
+    const scope = stepData(req, res, scopeResult);
+    if (scope === null) return;
+    const principal = await prepareToolingRequest(req, res, context, 1, (current) =>
+      markPrincipal(res, current),
+    );
+    if (principal === undefined) return;
+    const result = await context.execute(
+      "api.tooling.environments.list",
+      listToolingEnvironments(principal, scope, query),
+      "Tooling environments loaded.",
+    );
+    if (!result.response.ok) {
+      sendToolingFailure(req, res, result.status, result.response);
+      return;
+    }
+    markPageCount(res, result.response.data.items.length);
+    sendToolingSuccess(req, res, result.response, false);
+  };
+  router.get("/projects/:projectId/environments", environmentsHandler);
+  router.head("/projects/:projectId/environments", environmentsHandler);
+
+  const manifestHandler = async (req: Request, res: Response) => {
+    const context = createContext({ req });
+    const queryResult = await context.execute(
+      "api.tooling.manifest.query",
+      parseToolingPageQuery(req.originalUrl.split("?", 2)[1] ?? ""),
+      "Tooling manifest query decoded.",
+    );
+    const query = stepData(req, res, queryResult);
+    if (query === null) return;
+    const scopeResult = await context.execute(
+      "api.tooling.manifest.scope",
+      decodeToolingEnvironmentScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentKey"),
+      ),
+      "Tooling environment scope decoded.",
+    );
+    const scope = stepData(req, res, scopeResult);
+    if (scope === null) return;
+    const principal = await prepareToolingRequest(
+      req,
+      res,
+      context,
+      toolingManifestCost(query.limit),
+      (current) => markPrincipal(res, current),
+    );
+    if (principal === undefined) return;
+    const result = await context.execute(
+      "api.tooling.manifest.get",
+      getToolingManifestPage(principal, scope, query, context.request.requestId),
+      "Tooling schema manifest loaded.",
+    );
+    if (!result.response.ok) {
+      sendToolingFailure(req, res, result.status, result.response);
+      return;
+    }
+    markPageCount(res, result.response.data.collections.length);
+    sendToolingSuccess(req, res, result.response, false);
+  };
+  const manifestPath = "/projects/:projectId/environments/:environmentKey/schema/manifest";
+  router.get(manifestPath, manifestHandler);
+  router.head(manifestPath, manifestHandler);
+
+  const revisionHandler = async (req: Request, res: Response) => {
+    const context = createContext({ req });
+    const queryResult = await context.execute(
+      "api.tooling.revision.query",
+      validateToolingEmptyQuery(req.originalUrl.split("?", 2)[1] ?? ""),
+      "Tooling revision query decoded.",
+    );
+    if (stepData(req, res, queryResult) === null) return;
+    const scopeResult = await context.execute(
+      "api.tooling.revision.scope",
+      decodeToolingCollectionRevisionScope({
+        projectId: routeParameter(req, "projectId"),
+        environmentKey: routeParameter(req, "environmentKey"),
+        collectionKey: routeParameter(req, "collectionKey"),
+        revisionId: routeParameter(req, "revisionId"),
+      }),
+      "Tooling revision scope decoded.",
+    );
+    const scope = stepData(req, res, scopeResult);
+    if (scope === null) return;
+    const principal = await prepareToolingRequest(req, res, context, 1, (current) =>
+      markPrincipal(res, current),
+    );
+    if (principal === undefined) return;
+    const result = await context.execute(
+      "api.tooling.revision.get",
+      getToolingCollectionRevision(principal, scope),
+      "Tooling collection contract loaded.",
+    );
+    if (!result.response.ok) {
+      sendToolingFailure(req, res, result.status, result.response);
+      return;
+    }
+    const bytes = Buffer.byteLength(JSON.stringify(result.response), "utf8");
+    const additionalCost = toolingRevisionCost(bytes) - 1;
+    if (
+      additionalCost > 0 &&
+      (!(await enforceToolingQuota(req, res, context, null, additionalCost)) ||
+        !(await enforceToolingQuota(req, res, context, principal, additionalCost)))
+    ) {
+      return;
+    }
+    sendToolingSuccess(req, res, result.response, true);
+  };
+  const revisionPath =
+    "/projects/:projectId/environments/:environmentKey/schema/collections/:collectionKey/revisions/:revisionId";
+  router.get(revisionPath, revisionHandler);
+  router.head(revisionPath, revisionHandler);
+
+  router.use((req, res) => {
+    res.setHeader("Allow", "GET, HEAD, OPTIONS");
+    sendToolingFailure(
+      req,
+      res,
+      req.method === "GET" || req.method === "HEAD" ? 404 : 405,
+      apiFailure({
+        code: "NOT_FOUND",
+        message: "The requested resource was not found.",
+        requestId: requestContext(req).requestId,
+        retryable: false,
+      }),
+    );
+  });
+  router.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      next(error);
+      return;
+    }
+    const context = requestContext(req);
+    void reportBoundaryDefect(context, error).catch(() => undefined);
+    sendToolingFailure(
+      req,
+      res,
+      500,
+      apiFailure({
+        code: "INTERNAL_ERROR",
+        message: "An unexpected error occurred.",
+        requestId: context.requestId,
+        retryable: false,
+      }),
+    );
+  });
+  return router;
+}
+
 export interface CreateAppOptions {
   readonly deliveryApiEnabled?: boolean;
   readonly previewApiEnabled?: boolean;
@@ -938,6 +1382,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
 
   app.use("/api/delivery/v1", createDeliveryRouter(deliveryApiEnabled));
   app.use("/api/preview/v1", createPreviewRouter(previewApiEnabled));
+  app.use("/api/tooling/v1", createToolingRouter());
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;

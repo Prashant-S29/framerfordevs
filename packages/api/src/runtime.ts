@@ -21,6 +21,7 @@ import {
   TelemetryLive,
   toStatusFamily,
   type PreviewQueryRejectionCategory,
+  type ToolingRequestMetric,
 } from "./observability/telemetry";
 import { AccessRepository, AccessRepositoryLive } from "./services/access-repository";
 import { AuthSessionLive, AuthSessionService } from "./services/auth-session";
@@ -68,6 +69,14 @@ import {
 import { SchemaEngine, SchemaEngineLive } from "./services/schema-engine";
 import { SchemaRepository, SchemaRepositoryLive } from "./services/schema-repository";
 import { SecretGenerator, SecretGeneratorLive } from "./services/secret-generator";
+import { ToolingCursorSigner, makeToolingCursorSignerLive } from "./services/tooling-cursor-signer";
+import {
+  ToolingOAuthTokenVerifier,
+  ToolingOAuthTokenVerifierLive,
+  ToolingPrincipalAuthenticator,
+  ToolingPrincipalAuthenticatorLive,
+} from "./services/tooling-principal-authenticator";
+import { ToolingRepository, ToolingRepositoryLive } from "./services/tooling-repository";
 import {
   WebhookCrypto,
   WebhookCryptoUnavailableLive,
@@ -106,6 +115,10 @@ export type ApplicationServices =
   | FieldEngine
   | SchemaEngine
   | SchemaRepository
+  | ToolingCursorSigner
+  | ToolingOAuthTokenVerifier
+  | ToolingPrincipalAuthenticator
+  | ToolingRepository
   | WebhookCrypto
   | WebhookDestinationValidator
   | WebhookRepository;
@@ -130,6 +143,12 @@ const rateLimitFingerprintSecret =
   env.RATE_LIMIT_FINGERPRINT_SECRET ?? randomBytes(32).toString("base64url");
 const deliveryCursorSecret = env.DELIVERY_CURSOR_SECRET ?? randomBytes(32).toString("base64url");
 const DeliveryCursorSignerLive = makeDeliveryCursorSignerLive({
+  activeSecret: deliveryCursorSecret,
+  ...(env.DELIVERY_CURSOR_PREVIOUS_SECRET === undefined
+    ? {}
+    : { previousSecret: env.DELIVERY_CURSOR_PREVIOUS_SECRET }),
+});
+const ToolingCursorSignerLive = makeToolingCursorSignerLive({
   activeSecret: deliveryCursorSecret,
   ...(env.DELIVERY_CURSOR_PREVIOUS_SECRET === undefined
     ? {}
@@ -162,6 +181,8 @@ const InfrastructureLive = Layer.mergeAll(
   DatabaseLive,
   DeliveryCursorSignerLive,
   DeliveryReadRepositoryLive,
+  ToolingCursorSignerLive,
+  ToolingRepositoryLive,
   DeliveryRepositoryLive,
   PlatformRepositoryLive,
   LocaleRepositoryLive,
@@ -181,6 +202,8 @@ const InfrastructureLive = Layer.mergeAll(
   FieldEngineLive,
   SchemaEngineLive,
   SchemaRepositoryLive,
+  ToolingOAuthTokenVerifierLive,
+  ToolingPrincipalAuthenticatorLive,
   WebhookCryptoLive,
   WebhookDestinationValidatorLive,
   WebhookRepositoryLive,
@@ -402,6 +425,12 @@ export function observeHttpRequest(
   durationMs: number,
 ): Promise<void> {
   return applicationRuntime.runPromise(recordHttpRequest(request, status, durationMs));
+}
+
+export function observeToolingRequest(event: ToolingRequestMetric): Promise<void> {
+  return applicationRuntime.runPromise(
+    Effect.flatMap(Telemetry, (telemetry) => telemetry.recordToolingRequest(event)),
+  );
 }
 
 /** Records a closed parser category without retaining the raw Preview query. */

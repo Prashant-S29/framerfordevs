@@ -75,6 +75,8 @@ function telemetry(
       Effect.sync(() => {
         auditFailures.push(true);
       }),
+    recordToolingRequest: () => Effect.void,
+    recordToolingOAuthVerification: () => Effect.void,
     recordRateLimitDecision: () => Effect.void,
     recordRateLimitStore: () => Effect.void,
   };

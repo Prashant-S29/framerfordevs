@@ -84,6 +84,21 @@ export interface PreviewReadMetric {
   readonly durationMs: number;
 }
 
+export type ToolingEndpoint = "projects" | "environments" | "manifest" | "revision";
+export type ToolingSubject = "oauth_user" | "management_credential" | "unknown";
+export type ToolingResponseSizeBucket = "none" | "small" | "medium" | "large" | "near_limit";
+export type ToolingPageCountBucket = "0" | "1-10" | "11-20" | "21-50";
+
+export interface ToolingRequestMetric {
+  readonly endpoint: ToolingEndpoint;
+  readonly subject: ToolingSubject;
+  readonly outcome: "success" | "failure";
+  readonly statusFamily: StatusFamily;
+  readonly responseSizeBucket: ToolingResponseSizeBucket;
+  readonly pageCountBucket: ToolingPageCountBucket;
+  readonly durationMs: number;
+}
+
 export interface RateLimitDecisionMetric {
   readonly policy: RateLimitPolicy;
   readonly enforcementMode: RateLimitEnforcementMode;
@@ -122,6 +137,10 @@ export interface TelemetryService {
     category: PreviewQueryRejectionCategory,
   ) => Effect.Effect<void>;
   readonly recordPreviewAuditFailure: () => Effect.Effect<void>;
+  readonly recordToolingRequest: (event: ToolingRequestMetric) => Effect.Effect<void>;
+  readonly recordToolingOAuthVerification: (
+    outcome: "success" | "invalid" | "failure",
+  ) => Effect.Effect<void>;
   readonly recordRateLimitDecision: (event: RateLimitDecisionMetric) => Effect.Effect<void>;
   readonly recordRateLimitStore: (event: RateLimitStoreMetric) => Effect.Effect<void>;
 }
@@ -210,6 +229,23 @@ const previewReadLatency = Metric.histogram(
   MetricBoundaries.exponential({ start: 1, factor: 2, count: 16 }),
   "Preview read duration in milliseconds",
 );
+
+const toolingRequestCount = Metric.counter("tooling_requests_total", {
+  description:
+    "Tooling request outcomes by bounded endpoint, subject, status, response size, and page count",
+  incremental: true,
+});
+
+const toolingRequestLatency = Metric.histogram(
+  "tooling_request_duration_ms",
+  MetricBoundaries.exponential({ start: 1, factor: 2, count: 12 }),
+  "Tooling request duration in milliseconds",
+);
+
+const toolingOAuthVerificationCount = Metric.counter("tooling_oauth_verifications_total", {
+  description: "Tooling OAuth access-token verification outcomes",
+  incremental: true,
+});
 
 const rateLimitDecisionCount = Metric.counter("rate_limit_decisions_total", {
   description: "Rate-limit decisions by closed policy, enforcement mode, and outcome",
@@ -344,6 +380,37 @@ export const TelemetryLive = Layer.succeed(Telemetry, {
   recordPreviewQueryRejection: (category) =>
     Metric.update(Metric.tagged(previewQueryRejectionCount, "category", category), 1),
   recordPreviewAuditFailure: () => Metric.update(previewAuditFailureCount, 1),
+  recordToolingRequest: (event) => {
+    const label = <Type, In, Out>(metric: Metric.Metric<Type, In, Out>) =>
+      Metric.tagged(
+        Metric.tagged(
+          Metric.tagged(
+            Metric.tagged(
+              Metric.tagged(metric, "endpoint", event.endpoint),
+              "subject",
+              event.subject,
+            ),
+            "outcome",
+            event.outcome,
+          ),
+          "status_family",
+          event.statusFamily,
+        ),
+        "response_size",
+        event.responseSizeBucket,
+      );
+    const count = Metric.tagged(label(toolingRequestCount), "page_count", event.pageCountBucket);
+    const latency = Metric.tagged(
+      label(toolingRequestLatency),
+      "page_count",
+      event.pageCountBucket,
+    );
+    return Effect.all([Metric.update(count, 1), Metric.update(latency, event.durationMs)]).pipe(
+      Effect.asVoid,
+    );
+  },
+  recordToolingOAuthVerification: (outcome) =>
+    Metric.update(Metric.tagged(toolingOAuthVerificationCount, "outcome", outcome), 1),
   recordRateLimitDecision: (event) =>
     Metric.update(
       Metric.tagged(
@@ -366,6 +433,21 @@ export const TelemetryLive = Layer.succeed(Telemetry, {
     ]).pipe(Effect.asVoid);
   },
 });
+
+export function toolingResponseSizeBucket(bytes: number): ToolingResponseSizeBucket {
+  if (bytes <= 0) return "none";
+  if (bytes <= 64 * 1_024) return "small";
+  if (bytes <= 256 * 1_024) return "medium";
+  if (bytes <= 1_024 * 1_024) return "large";
+  return "near_limit";
+}
+
+export function toolingPageCountBucket(count: number): ToolingPageCountBucket {
+  if (count <= 0) return "0";
+  if (count <= 10) return "1-10";
+  if (count <= 20) return "11-20";
+  return "21-50";
+}
 
 export function toStatusFamily(status: number): StatusFamily {
   if (status < 200) return "1xx";

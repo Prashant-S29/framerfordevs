@@ -45,6 +45,7 @@ services:
     environment:
       CORS_ORIGIN: http://localhost:3001
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/framerfordevs
+      TOOLING_API_RESOURCE: ${TOOLING_API_RESOURCE:-https://localhost:3000/api/tooling/v1}
     healthcheck:
       test:
         [
@@ -74,6 +75,7 @@ services:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/framerfordevs
       DATABASE_POOL_MAX: 5
       OTEL_SERVICE_NAME: framerfordevs-worker
+      TOOLING_API_RESOURCE: ${TOOLING_API_RESOURCE:-https://localhost:3000/api/tooling/v1}
       WEBHOOK_WORKER_PORT: 3002
     healthcheck:
       test:

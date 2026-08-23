@@ -13,6 +13,11 @@ const validatedEnv = createEnv({
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_URL: z.url(),
     CORS_ORIGIN: z.url(),
+    TOOLING_API_RESOURCE: z.url().default("http://localhost:3000/api/tooling/v1"),
+    OAUTH_DEVICE_AUTHORIZATION_ENABLED: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.url().optional(),
     OTEL_SERVICE_NAME: z.string().min(1).default("framerfordevs-server"),
     OTEL_SERVICE_VERSION: z.string().min(1).default("0.0.0"),
@@ -52,6 +57,29 @@ const validatedEnv = createEnv({
   skipValidation: process.env.SKIP_ENV_VALIDATION === "true",
   emptyStringAsUndefined: true,
 });
+
+const toolingApiResource = new URL(validatedEnv.TOOLING_API_RESOURCE);
+const toolingResourceUsesLocalHttp =
+  toolingApiResource.protocol === "http:" &&
+  ["localhost", "127.0.0.1", "[::1]"].includes(toolingApiResource.hostname);
+
+if (
+  toolingApiResource.pathname !== "/api/tooling/v1" ||
+  toolingApiResource.search !== "" ||
+  toolingApiResource.hash !== "" ||
+  toolingApiResource.username !== "" ||
+  toolingApiResource.password !== ""
+) {
+  throw new Error("The Tooling API OAuth resource must be the canonical Tooling v1 URL.");
+}
+
+if (toolingApiResource.protocol !== "https:" && !toolingResourceUsesLocalHttp) {
+  throw new Error("The Tooling API OAuth resource requires HTTPS outside local development.");
+}
+
+if (validatedEnv.NODE_ENV === "production" && toolingApiResource.protocol !== "https:") {
+  throw new Error("The production Tooling API OAuth resource requires HTTPS.");
+}
 
 if (
   validatedEnv.RATE_LIMIT_STORE === "redis" &&

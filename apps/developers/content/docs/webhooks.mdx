@@ -1,0 +1,72 @@
+---
+title: Publication Webhooks
+description: Verify signed publication events, prevent replay, handle retries, and invalidate precise frontend dependencies.
+---
+
+{/* Explains the webhook consumer lifecycle while canonical JSON Schema remains payload authority. */}
+
+Publication webhooks tell your infrastructure when production content or schema state changes. Draft saves do not emit production publication events.
+
+Framer for Devs delivers at least once. Consumers must verify raw bytes, reserve each event ID atomically, and make side effects idempotent.
+
+## Consumer Flow
+
+```text
+Receive raw request bytes
+→ Verify signature and timestamp
+→ Decode the public event schema
+→ Reserve the event ID
+→ Perform idempotent work
+→ Return success
+```
+
+## Verify Before Parsing
+
+Pass the exact request bytes and Standard Webhooks-compatible headers to the SDK verifier. Parsing and reserializing JSON before verification changes the signed bytes and must fail.
+
+```ts
+import { verifyWebhookRequest } from "@framerfordevs/sdk/webhooks";
+
+const verified = await verifyWebhookRequest({
+  webhookId,
+  webhookTimestamp,
+  webhookSignature,
+  body: rawBody,
+  secrets,
+  nowEpochSeconds,
+  reserveEventId,
+});
+```
+
+The verifier checks timestamp tolerance, signature candidates during bounded rotation overlap, body/event identity, event schema, and the injected replay reservation.
+
+## Idempotency and Retries
+
+Return a success response only after durable processing. Transport failures and non-success responses can be retried, so every side effect must tolerate duplicate delivery.
+
+Use the globally unique event ID as the idempotency key. Reservation must be atomic across concurrent workers; an in-memory set is insufficient for distributed consumers.
+
+## Event Families
+
+Webhook data v1 reports:
+
+- Entry publication
+- Entry unpublication
+- Entry deletion where applicable
+- Schema publication
+
+The canonical event JSON Schema defines the exact envelope and data variants. The documentation reference will render that artifact directly rather than maintaining a second field table.
+
+## Cache Invalidation
+
+Verified events include stable project, environment, collection, entry, field, and locale identities plus exact routes where known. Use the SDK invalidation helper to normalize those values into cache tags and paths.
+
+Invalidate only registered dependencies. A publication for one locale should not evict unrelated locales or collections unless your frontend explicitly shares that dependency.
+
+## Secret Rotation
+
+Keep one active signing secret and a bounded retiring overlap when rotating. Remove the retiring secret after the overlap window and never log either value, request authorization, or full payload bodies.
+
+## Testing
+
+Test valid delivery, tampering, stale timestamps, wrong secrets, duplicate events, raw-body changes, rotation overlap, transient failure, and eventual success before relying on the endpoint in production.

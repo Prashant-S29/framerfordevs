@@ -83,7 +83,7 @@ No Effect, Drizzle, or Better Auth version change is proposed. Drizzle remains P
 - Multiple user-visible environments
 - Public Delivery and Preview API content endpoints
 - Distributed credential-verification cache
-- Production-wide distributed abuse controls, which are revisited in Milestone 14
+- Production-wide distributed abuse controls, which are revisited in Milestone 15
 
 The initial invitation UI returns a copyable one-time invitation link. A future mail service can deliver the same link without changing invitation identity or acceptance semantics.
 
@@ -601,7 +601,7 @@ First-party boundaries avoid duplicate tenant models. Code-owned presets and an 
 - `pnpm run ready` passes with 381 tests across 28 files. API/domain coverage is 93.62% statements and 81.85% branches; server and web production builds pass.
 - Read-only database verification after the complete test run reports two expected active owner memberships, zero projects without an owner, zero invitations, zero credentials, and zero leaked test audit rows.
 
-The process-local credential attempt limiter remains an explicit M3 limitation; distributed abuse control and production telemetry backend deployment remain deferred to Milestone 14 as designed.
+The process-local credential attempt limiter remains an explicit M3 limitation; distributed abuse control and production telemetry backend deployment remain deferred to Milestone 15 as designed.
 
 ## Database gate
 

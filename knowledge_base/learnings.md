@@ -440,9 +440,9 @@ Record a learning when an implementation or decision:
 
 **Learning:** Public contract status must be explicit and allowlisted. Delivery/Preview/webhook APIs are portable supported integrations; dashboard RPC remains session-authenticated application infrastructure; management references and operator endpoints remain internal even when their schemas are generated and tested.
 
-**Prevention:** M9 now exposes only a schema-reconciled Delivery specification, disables the aggregate management reference by default, and forbids it in production. M12 owns an allowlisted public contract registry and developer portal; M14 must prove host/ingress separation and route non-exposure. Management RPC still relies on authentication, authorization, tenant isolation, and browser security rather than obscurity.
+**Prevention:** M9 now exposes only a schema-reconciled Delivery specification, disables the aggregate management reference by default, and forbids it in production. M12 owns an allowlisted public contract registry and developer portal; M15 must prove host/ingress separation and route non-exposure. Management RPC still relies on authentication, authorization, tenant isolation, and browser security rather than obscurity.
 
-**Status:** Resolved for M9; consolidated portal and production host verification are assigned to M12 and M14.
+**Status:** Resolved for M9; consolidated portal and production host verification are assigned to M12 and M15.
 
 ---
 
@@ -587,6 +587,38 @@ Record a learning when an implementation or decision:
 **Prevention:** Stop the local worker before PostgreSQL integration/coverage gates, verify it is stopped, remove only explicitly identified test fixtures if an accidental claim occurs, and restart it only after validation. Production workers and tests should use isolated databases in deployment/CI topology.
 
 **Status:** Resolved for the current M11 validation run; durable database isolation remains an environment concern.
+
+---
+
+## 2026-08-22 — Register integration-fixture cleanup before the first persistent write
+
+**Context:** The final M12 OAuth Tooling HTTP readiness suite created a realistic user/project/published-schema fixture in PostgreSQL.
+
+**Incorrect assumption or decision:** Its first implementation assigned the teardown function only after the complete fixture and OAuth token had been created. An early device-approval assertion failure therefore occurred before teardown existed. Later, Turbo canceled a concurrently running readiness process when an unrelated workspace coverage test failed, interrupting `afterAll` even after teardown registration.
+
+**Cost or risk:** Two uniquely prefixed test graphs containing projects, schema revisions, and audits survived failed/canceled runs and required developer-approved, transactionally scoped cleanup after proving they contained no content publications. A green rerun alone would not reveal or remove prior residue.
+
+**Learning:** Persistent integration fixtures need cleanup authority registered before their first write, but process-level cancellation can still bypass framework teardown. Final database-backed readiness must include an explicit read-only residue reconciliation after all parallel gates, not rely only on `afterAll`.
+
+**Prevention:** Register idempotent fixture cleanup before sign-up/insertion, use unique test namespaces, stop external consumers, keep destructive cleanup scoped and developer-approved, and perform a final read-only namespace/outbox/work verification after the complete gate. Avoid treating a canceled parallel suite as clean merely because its next isolated rerun passes.
+
+**Status:** Resolved for M12; teardown is registered before setup, both exact stale graphs were transactionally removed with developer approval, and final reconciliation reports zero matching users, pending outbox rows, active deliveries, or started attempts.
+
+---
+
+## 2026-08-23 — Public-boundary proof is not developer-documentation acceptance
+
+**Context:** The first M12 portal implementation passed closed-route, artifact-byte, prerender, security-header, accessibility, and bundle gates, but represented documentation as 10 short TypeScript objects and reference pages as artifact metadata.
+
+**Incorrect assumption or decision:** Automated proof that a portal published only safe contracts was treated as evidence that it delivered the complete developer learning experience. The implementation optimized the boundary and contract download before validating the developer's expected Better Auth/Next.js-style onboarding, concepts, SDK, CLI, webhook, guide, troubleshooting, and secondary-reference journey.
+
+**Cost or risk:** Manual review reopened M12 after complete automated readiness. The custom content shell and registry had to be replaced, dependencies and bundle budgets changed, and the final gate had to be rerun.
+
+**Learning:** Documentation has two independent acceptance dimensions: public-surface correctness and developer task success. Both must be designed and manually reviewed. Wire-contract references are secondary support; they do not substitute for product-oriented onboarding and workflows.
+
+**Prevention:** Define the first-success journey and complete information architecture before implementing the portal shell. Use source-controlled MDX for authored teaching, canonical generated artifacts for structural reference, compiling examples for code, self-hosted public-only search, and a bounded compatibility slice before broad content migration.
+
+**Status:** Resolved in M12 with self-hosted Fumadocs on the existing TanStack Start app, 27 MDX pages, static search, canonical secondary references, renewed readiness, and a pending developer manual review.
 
 ---
 

@@ -279,7 +279,7 @@ The receipt is written in the same transaction after all resulting revisions/hea
 
 ### Command-receipt retention clarification
 
-Recorded during M8 design: `cms_entry_draft_command` receipts are retained for the lifetime of the project. M7 has no expiry, cleanup job, or ordinary delete path. Receipts contain bounded operational provenance and no draft values. Deleting them without a replacement expiry/tombstone contract would weaken durable changed/no-op replay, so M14 owns the cross-system retention review before any cleanup is introduced.
+Recorded during M8 design: `cms_entry_draft_command` receipts are retained for the lifetime of the project. M7 has no expiry, cleanup job, or ordinary delete path. Receipts contain bounded operational provenance and no draft values. Deleting them without a replacement expiry/tombstone contract would weaken durable changed/no-op replay, so M15 owns the cross-system retention review before any cleanup is introduced.
 
 No M7 table is read by a delivery credential or Delivery API procedure.
 

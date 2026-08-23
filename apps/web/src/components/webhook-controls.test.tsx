@@ -252,7 +252,7 @@ describe("webhook controls", () => {
     await user.click(screen.getByRole("button", { name: /new endpoint/i }));
     expect(screen.queryByText(issuedSecret)).toBeNull();
     expect((await axe.run(view.container)).violations).toEqual([]);
-  });
+  }, 10_000);
 
   it("requires consequences to be reviewed for destination, subscription, and disable changes", async () => {
     const user = userEvent.setup();

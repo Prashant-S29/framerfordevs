@@ -1,0 +1,24 @@
+---
+title: Versioning and Compatibility
+description: Understand independent API, event, package, generator, lock, and project-schema versions.
+---
+
+{/* Documents independent public version axes and deprecation expectations. */}
+
+Framer for Devs does not use one global version number.
+
+| Surface                    | Version authority                                  |
+| -------------------------- | -------------------------------------------------- |
+| Delivery, Preview, Tooling | Independent HTTP path major such as `v1`           |
+| Webhook payload            | Explicit data version                              |
+| SDK and CLI                | Independent SemVer                                 |
+| Generator and schema lock  | Explicit format/compatibility version              |
+| Project schema             | Immutable collection revision ID and contract hash |
+
+Additive changes may remain within an API major and can produce an SDK minor release. Breaking HTTP changes require a parallel family major; breaking SDK APIs require a SemVer major even when HTTP paths do not change.
+
+## Deprecation
+
+A future major runs beside its predecessor. Deprecation requires a changelog, migration guide, notice date, concrete sunset date, support-matrix update, portal warning, and continued predecessor artifact availability until sunset.
+
+Date-based per-request behavior versioning is not part of the first public release.

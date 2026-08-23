@@ -23,6 +23,7 @@ export const RouteFamilySchema = Schema.Literal(
   "auth",
   "rpc",
   "openapi",
+  "tooling",
   "other",
 );
 
@@ -102,6 +103,7 @@ export function classifyRoute(path: string): RouteFamily {
   if (path.startsWith("/api/auth")) return "auth";
   if (path.startsWith("/rpc")) return "rpc";
   if (path.startsWith("/api-reference")) return "openapi";
+  if (path.startsWith("/api/tooling/v1")) return "tooling";
   return "other";
 }
 

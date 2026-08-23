@@ -1,0 +1,39 @@
+---
+title: Delivery
+description: Consume exact-locale published snapshots from production applications.
+---
+
+{/* Introduces production content consumption without leading with endpoint tables. */}
+
+Delivery v1 serves only immutable published snapshots. It never reads mutable drafts or compiles authoring state during a request.
+
+## Before You Start
+
+You need:
+
+- A CMS-enabled project
+- A published collection schema
+- At least one published entry locale
+- The project ID and environment key
+- Delivery authority appropriate for the collection
+
+Create a Delivery client with `@framerfordevs/sdk/client` or use the HTTP contract directly. Every operation requires an explicit locale.
+
+## Read Model
+
+Delivery supports:
+
+- Stable bounded collection lists
+- Current entry lookup by stable ID
+- Current lookup through a configured unique field
+- Immutable lookup by entry and publication ID
+- Supported filters, sorting, and bounded reference expansion
+- `GET` and bodyless `HEAD` validators
+
+Current reads resolve one latest publication pointer. Immutable publication URLs reproduce one exact prior snapshot.
+
+## What Responses Contain
+
+Published responses include stable resource identity, exact locale, schema revision, publication authority, and compiled data. They exclude draft values, actor information, authoring labels, editor layout, and management state.
+
+Continue with [reading content](/docs/delivery/reads), [caching and pagination](/docs/delivery/caching-and-pagination), and [errors and security](/docs/delivery/errors-and-security).

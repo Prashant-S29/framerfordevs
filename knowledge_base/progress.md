@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 11 and both post-M11 repository/documentation normalizations approved and committed
-**Active milestone:** None — Milestone 12 has not started
-**Last updated:** 2026-08-21
+**Overall status:** Milestone 12 renewed implementation and automated readiness complete; awaiting developer manual review
+**Active milestone:** Milestone 12 — self-hosted developer documentation, generated tooling, and review handoff
+**Last updated:** 2026-08-22
 
 ## Status legend
 
@@ -15,24 +15,25 @@
 
 ## Milestone tracker
 
-| #   | Milestone                                | Status | Automated tests | Manual review | Commit    |
-| --- | ---------------------------------------- | ------ | --------------- | ------------- | --------- |
-| 0   | Validate existing foundation             | `[A]`  | 26 passing      | Approved      | `7d5a312` |
-| 1   | Effect foundation, errors, observability | `[A]`  | 90 passing      | Approved      | `c28f6fa` |
-| 2   | Platform kernel                          | `[A]`  | 163 passing     | Approved      | `60adb39` |
-| 3   | Membership, policies, credentials        | `[A]`  | 381 passing     | Approved      | `a74aeb8` |
-| 4   | Project locales                          | `[A]`  | 453 passing     | Approved      | `68b6f6e` |
-| 5   | Versioned schema engine                  | `[A]`  | 509 passing     | Approved      | `28ca04d` |
-| 6   | Field system and generated forms         | `[A]`  | 551 passing     | Approved      | `fbb4767` |
-| 7   | Entries and multilingual drafts          | `[A]`  | 603 passing     | Approved      | `60bd96f` |
-| 8   | Per-locale publication and snapshots     | `[A]`  | 627 passing     | Approved      | `ad3cd5e` |
-| 9   | Delivery API                             | `[A]`  | 712 passing     | Approved      | `8559aa4` |
-| 10  | Preview API                              | `[A]`  | 780 passing     | Approved      | `aa177b5` |
-| 11  | Events, webhooks, invalidation           | `[A]`  | 868 passing     | Approved      | `fef7205` |
-| 12  | Developer portal and generated tooling   | `[ ]`  | Not run         | Pending       | None      |
-| 13  | Client handover                          | `[ ]`  | Not run         | Pending       | None      |
-| 14  | Production hardening                     | `[ ]`  | Not run         | Pending       | None      |
-| 15  | Visual-builder readiness contracts       | `[ ]`  | Not run         | Pending       | None      |
+| #   | Milestone                                | Status | Automated tests | Manual review  | Commit    |
+| --- | ---------------------------------------- | ------ | --------------- | -------------- | --------- |
+| 0   | Validate existing foundation             | `[A]`  | 26 passing      | Approved       | `7d5a312` |
+| 1   | Effect foundation, errors, observability | `[A]`  | 90 passing      | Approved       | `c28f6fa` |
+| 2   | Platform kernel                          | `[A]`  | 163 passing     | Approved       | `60adb39` |
+| 3   | Membership, policies, credentials        | `[A]`  | 381 passing     | Approved       | `a74aeb8` |
+| 4   | Project locales                          | `[A]`  | 453 passing     | Approved       | `68b6f6e` |
+| 5   | Versioned schema engine                  | `[A]`  | 509 passing     | Approved       | `28ca04d` |
+| 6   | Field system and generated forms         | `[A]`  | 551 passing     | Approved       | `fbb4767` |
+| 7   | Entries and multilingual drafts          | `[A]`  | 603 passing     | Approved       | `60bd96f` |
+| 8   | Per-locale publication and snapshots     | `[A]`  | 627 passing     | Approved       | `ad3cd5e` |
+| 9   | Delivery API                             | `[A]`  | 712 passing     | Approved       | `8559aa4` |
+| 10  | Preview API                              | `[A]`  | 780 passing     | Approved       | `aa177b5` |
+| 11  | Events, webhooks, invalidation           | `[A]`  | 868 passing     | Approved       | `fef7205` |
+| 12  | Developer portal and generated tooling   | `[R]`  | 962 passing     | Pending        | None      |
+| 13  | Code-first authoring and local editor    | `[ ]`  | Proposal stored | Design pending | None      |
+| 14  | Client handover                          | `[ ]`  | Not run         | Pending        | None      |
+| 15  | Production hardening                     | `[ ]`  | Not run         | Pending        | None      |
+| 16  | Visual-builder readiness contracts       | `[ ]`  | Not run         | Pending        | None      |
 
 ## Documentation completed
 
@@ -50,6 +51,7 @@
 - `[x]` Created mandatory agent rules, session context, and product/architecture learnings log.
 - `[x]` Split mandatory rules into a discoverable `knowledge_base/rules/` index with one focused file per concern.
 - `[x]` Added mandatory Git-state verification and structured source-code comment rules.
+- `[x]` Added a mandatory implementation-reporting structure covering status, implemented work, measurable validation, developer-testable flows, unavailable/blocked flows, remaining work, and developer-controlled actions.
 
 ## Tooling/research completed
 
@@ -167,7 +169,7 @@
 - `[x]` Review current platform/access schemas, contracts, policy, repositories, operations, runtime, router, tests, query composition, and project UI.
 - `[x]` Research BCP 47 canonicalization, case-insensitive identity, runtime behavior, and documented length limits.
 - `[x]` Propose the complete locale domain, lifecycle, ordering, permission, strict-contract, audit, observability, UI, threat, and test design in `knowledge_base/decisions/m4-project-locales-design.md`.
-- `[x]` Incorporate first developer review: defer database-level `en` existence enforcement to M14, specify owner-demotion locale access, make the shared version-conflict wording correction explicit/tested, document durable configured allowlists, and require draft-lockout confirmation copy.
+- `[x]` Incorporate first developer review: defer database-level `en` existence enforcement to M15, specify owner-demotion locale access, make the shared version-conflict wording correction explicit/tested, document durable configured allowlists, and require draft-lockout confirmation copy.
 - `[A]` Developer approved the M4 design and authorized implementation.
 - `[x]` Add the `project_locale` and `project_membership_locale_access` Drizzle models plus membership locale-access mode, constraints, tenant foreign keys, and query-path indexes.
 - `[x]` Add canonical BCP 47, strict explicit-locale, locale management, member locale-access, and locale error contracts.
@@ -337,7 +339,7 @@
 - `[x]` Pass all three approved production-topology capacity scenarios and post-run connection/Redis/database invariants.
 - `[x]` Pass the separate conditional-304, weighted hot-credential cross-process 429, hard Redis outage/degraded-memory/recovery, and oversized-response rejection/memory-stability gates; restore all current boundary fixture heads/drafts and verify final invariants.
 - `[x]` Complete the schema-reconciled Delivery-only OpenAPI 3.1 document and interactive reference, snapshot-lock all four GET/HEAD/OPTIONS surfaces and protocol headers, exclude internal contracts, and disable the complete management oRPC reference by default and unconditionally in production.
-- `[x]` Amend M12 to own the allowlisted developer portal/generated tooling and M14 to prove production marketing/application/API/developer/operator host separation.
+- `[x]` Amend M12 to own the allowlisted developer portal/generated tooling and M15 to prove production marketing/application/API/developer/operator host separation.
 - `[A]` Developer approved and committed M9 as `8559aa4` (`feat(m9): production delivery API`).
 
 ## Milestone 10 checklist — approved completion
@@ -436,7 +438,7 @@
 - `[x]` Validate live delivery through Webhook.site, then harden the adjacent network boundary without relaxing SSRF policy: typed retryable DNS-resolution failures, a two-second resolver deadline, an independent three-second TCP/TLS establishment deadline inside the existing ten-second total bound, send-time pinned-address lookup, and explicit DNS-mutation/rebinding coverage. The 31-test focused destination/transport/attempt suite and API type check pass.
 - `[x]` Create the private developer-only `tools/webhook-test-receiver` workspace package with raw-byte Standard Webhooks verification, active/retiring secret overlap, exact allowlisted content-free event validation, deterministic success/retry/rate-limit/permanent/redirect/slow/idempotency scenarios, atomic signature-free capture storage, reports, Docker health, and named/Quick Cloudflare Tunnel configuration/scripts. Its 15 local deterministic tests and 94.00% line/71.58% branch coverage participate in root readiness while live tunnel checks remain opt-in; package checks/build/audit, the in-repository Docker build, container health, and image secret/data-absence inspection pass. A free temporary Quick Tunnel passed public A/AAAA, Cloudflare edge TLS, synthetic signed delivery, and one real worker `cms.entry.published` delivery with exact verified/responded HTTP 204 receiver evidence and one succeeded database attempt. The temporary endpoint was disabled, the tunnel removed, and local secret/capture artifacts cleaned. The package is excluded from production Docker contexts/manifests; stable named activation still requires a developer-owned domain.
 - `[x]` Complete the public event payload minimization review. Keep version 1 unchanged: every field supports CloudEvents interoperability, direct scope, idempotency/ordering, exact publication/schema lookup, compatibility, changed-field processing, or action-ready invalidation; bounded duplicate IDs avoid URI parsing and no content, actor, display-name, credential, destination, or request authority is exposed.
-- `[x]` Assign production webhook-worker egress filtering, cloud metadata hardening, and validator-bypass production-topology tests to M14 without weakening M11 application controls.
+- `[x]` Assign production webhook-worker egress filtering, cloud metadata hardening, and validator-bypass production-topology tests to M15 without weakening M11 application controls.
 - `[x]` Pass final `pnpm run ready` with 613 API, 109 server, 117 web, 15 external-receiver, 12 environment, and 2 worker tests (868 total), 90.14% API statement/74.44% branch coverage, formatting/lint, all package type checks, coverage, and production builds. Production/full audits report no vulnerabilities; rebuilt server/web/worker images exclude the receiver and are healthy, return HTTP 200 readiness, contain no secret/load environment files, and the delivery-enabled worker has zero pending supported outbox rows, queued work, started attempts, expired leases, or known test users.
 - `[A]` The developer completed manual review, approved M11, and committed it as `fef7205` (`feat(m11): publication events, webhooks, retries, and invalidation`) on 2026-08-21. A stable named Cloudflare hostname remains optional and is not an M11 completion requirement.
 
@@ -457,9 +459,65 @@
 - `[x]` Preserve the authority distinction: code/tests/configuration/migration history describe current executable behavior, while product/PRD/rules/active criteria/relevant approved decisions govern intended behavior and constraints; drift must be reported rather than hidden.
 - `[A]` The developer reviewed, approved, committed, and pushed the agent context normalization as `18618d4` (`docs: streamline agent context and exploration rules`) on 2026-08-21. Milestone 12 remains unstarted.
 
+## Milestone 12 checklist — design approval gate
+
+- `[x]` Re-read the product vision, CMS PRD, every mandatory rule, current context, M12 criteria, status/tracker, and relevant implementation learnings.
+- `[x]` Verify clean synchronized Git state and reconcile the committed M11/post-M11 baseline at `f06ae1c`.
+- `[x]` Load and apply materially relevant Effect, Better Auth, Express, security, Drizzle/PostgreSQL, TanStack, shadcn, React, Turborepo, Portable Text, and accessibility guidance.
+- `[x]` Read the approved M1–M6 and M9–M11 contracts that M12 consumes, plus the repository test-ownership decision.
+- `[x]` Inspect current public Delivery/Preview OpenAPI generation and HTTP routes, webhook event/verifier contracts, published-schema authority, credential/auth boundaries, runtime Layers, package exports/manifests, portal absence, and test seams.
+- `[x]` Research OAuth device authorization, Better Auth OAuth Provider compatibility, explicit JSON Schema/OpenAPI targets, package release/provenance, compatibility checking, and secure CLI credential storage.
+- `[A]` Developer selected scoped OAuth device authorization for CLI login, accepting an aligned Better Auth 1.7.x/OAuth Provider design subject to migration and regression gates.
+- `[A]` Developer selected release-ready SDK/CLI packages, pack/dry-run tests, Changesets, and trusted-publishing-ready configuration without an automatic first npm publication in M12.
+- `[x]` Reconcile the missing public schema surface by proposing an explicitly allowlisted Tooling API v1 rather than exposing dashboard oRPC.
+- `[x]` Propose the complete portal, public registry, OAuth, Tooling API, schema projection, CLI, generator, lock, SDK, webhook helper, versioning, release, security, observability, migration, and test design in `knowledge_base/decisions/m12-developer-portal-and-generated-tooling-design.md`.
+- `[A]` Developer approved the complete M12 design and explicitly authorized implementation on 2026-08-22.
+- `[x]` Upgrade all catalog consumers from Better Auth 1.6.26 to 1.7.1 through pnpm and add the official `@better-auth/oauth-provider` 1.7.1 plus its exact required peer dependencies; deduplicate compatible transitive versions so plugin/core types share one authority.
+- `[x]` Review package provenance, MIT licensing, publish contents/scripts, installed declarations, OAuth/device/JWT options, Better Auth's 1.7 issuer migration guide, and production TLS/device-approval requirements. Production and full dependency audits report no known vulnerabilities.
+- `[x]` Add a disabled-by-default OAuth device rollout gate, canonical Tooling resource validation, 10-minute access/device lifetimes, 30-day rotating refresh authority, exact scopes/resource, fixed official CLI identity, closed dynamic/client/resource management, JWT signing, and source-controlled browser routes.
+- `[x]` Update Drizzle authority for all 13 merged Better Auth models: the 1.7 account issuer/compound identity, seven OAuth Provider models, device codes, and JWT keys. A read-only schema comparison confirms every required plugin field plus nullability/default/field uniqueness.
+- `[x]` Keep OAuth/device routes disabled until migration and explicit rollout, preventing pre-migration OAuth-table access. Environment tests pass (16), all workspace type checks pass, formatting/structure checks pass, and production/full audits pass; Better Auth core database tests now wait on the required issuer migration.
+- `[x]` Complete the developer-controlled `0012_add_cli_oauth_device_authorization.sql` migration gate. The developer generated, manually corrected from the ignored draft, and applied the reinspected migration; the agent did not modify the real artifact or generate/apply migration commands. Post-application read-only verification reports 13 migration records, all 9 expected OAuth/device/JWT tables, all 7 existing accounts mapped to non-null `local:credential`, zero identity mismatches/collisions, zero unvalidated constraints, zero invalid/unready indexes, and empty OAuth/device/key authorities. The obsolete temporary draft was removed.
+- `[x]` Restore the complete post-migration regression baseline: all 872 tests pass (API 613, server 109, web 117, environment 16, worker 2, webhook receiver 15).
+- `[x]` Implement idempotent startup reconciliation for the fixed secretless native CLI client and its sole Tooling resource link, including exact device/refresh grants, source-controlled scopes, 10-minute access tokens, 30-day refresh authority, and fail-closed startup before listening.
+- `[x]` Implement local JWT access-token verification and the shared Effect Tooling-principal authenticator: exact issuer/audience/client/authorized-party/scope/expiry checks, management-only `schema.read` fallback, and explicit Delivery/Preview credential denial.
+- `[x]` Implement the authenticated `/device` approval UI with same-code/client/scope/resource display, phishing warning, explicit approve/deny, safe same-origin login return paths, and no plaintext token handling.
+- `[x]` Cover rollout-disabled routes, idempotent client/resource authority, dynamic-registration denial, pending/approval/device exchange, audience-bound token verification, tamper rejection, refresh rotation/replay denial, typed OAuth dependency errors, and credential-family isolation. Workspace checks/types, web production build, production audit, and all 887 tests pass (API 617, server 113, web 124, environment 16, worker 2, webhook receiver 15). Read-only cleanup verification reports one exact official client/resource/link, one signing key, and zero device/token/consent/test-user residue.
+- `[x]` Add the private `@framerfordevs/public-contracts` workspace with a closed four-entry Delivery/Preview/Tooling/webhook v1 registry, canonical OpenAPI 3.1/JSON Schema 2020-12 generation, local-reference/duplicate-operation/non-finite/internal-surface rejection, SHA-256 baseline authority, generated artifacts, immutable initial baselines, root drift checks, and server byte-equality delivery for existing public OpenAPI routes.
+- `[x]` Define the Tooling v1 Effect response/error contracts and canonical four-route OpenAPI artifact without exposing workspace, dashboard oRPC, Better Auth, credential management, health, metrics, authoring, or operator surfaces. Registry, targeted API/server tests, formatting/structure, and all workspace type checks pass.
+- `[x]` Resolve Tooling integrity-authority drift without another migration: reconstruct each immutable published revision, fail closed unless its canonical full-schema hash matches stored `schema_hash`, and only then derive the public projection and `contractHash` through `compileCollectionContract`. This verifies a superset of the public contract and avoids duplicate persisted authority.
+- `[x]` Store the developer's future code-first schema/content authoring and local agent-editor proposal at `knowledge_base/proposals/m13-code-first-schema-and-local-agent-editor.md` without treating it as an approved design.
+- `[x]` Sequence that proposal as future M13 and renumber client handover, production hardening, and visual-builder readiness to M14, M15, and M16. M13 discovery/design remains blocked until M12 is complete and the developer explicitly starts it.
+- `[x]` Implement signed, principal/scope-bound Tooling cursors; OAuth-user and management-credential project/environment discovery; tenant/environment/CMS authorization; enabled-locale manifests; immutable revision reads; full-revision integrity verification; bounded repeatable-read transactions; content-free first-page audits; and closed Tooling quotas/errors.
+- `[x]` Serve the exact four-route Tooling v1 HTTP boundary with GET/HEAD semantics, private ETags, no-store errors, bearer-only browser isolation, strict query/path decoding, bounded response serialization, released OpenAPI paths, and targeted operation/repository/HTTP tests. Authenticated management-credential HTTP coverage proves an empty published manifest, bodyless HEAD, stable private ETag/304, one content-free audit per first-page access, discovery denial, cross-project denial, revocation, and secret-free responses.
+- `[x]` Add the public `@framerfordevs/sdk` workspace with bounded Delivery v1 and Preview v1 clients, exact Effect transport schemas, immutable-revision recognition, typed envelopes/errors, Standard Webhooks-compatible raw-byte verification, rotation/replay controls, and invalidation normalization. Its 10 focused tests, type check, and production build pass.
+- `[x]` Add the public `@framerfordevs/cli` workspace with strict ancestor config discovery, bounded Tooling HTTP reconciliation, deterministic six-file generation and lock authority, stable-ID drift categories, transactional owned-directory commits/rollback, native OS keychain-only OAuth authority, RFC 8628 polling/refresh rotation, management-token CI fallback, strict commands/flags/JSON modes, and 32 focused tests including strict command parsing, generated TypeScript compilation and injected filesystem failures.
+- `[A]` Developer selected MIT for the first public SDK/CLI releases on 2026-08-22; both packages now carry aligned MIT files/metadata, support matrices, public-only READMEs, ESM declarations/exports, Node 22 engines, provenance-ready publish metadata, and prepack build/type/test gates.
+- `[x]` Add Changesets with one initial minor-release record while keeping version application and first publication developer-controlled. Reviewed local tarballs contain only dist declarations/modules, README, LICENSE, and package metadata; a clean isolated fixture resolves all exports, compiles under NodeNext, and executes the packaged `ffd` binary.
+- `[x]` Add the separate prerendered `apps/developers` TanStack Start portal with an explicit public-content/search registry, overview/guides/security/versioning/changelog, lazy reference routes, closed route probes, security headers, responsive accessible navigation, and build-time exact public artifact emission guarded by immutable SHA-256 baselines. Fifteen public routes prerender and the landing bundle excludes internal contract source packages.
+- `[x]` Complete real OAuth-user Tooling HTTP readiness with a dynamically rollout-enabled isolated fixture: device approval/token issuance, signed two-project continuation, environment discovery, a two-collection non-empty manifest, signed manifest continuation, immutable revision GET/HEAD/ETag/304, authorization before 304, exact first-page-only content-free auditing, and complete teardown all pass.
+- `[x]` Add bounded Tooling observability: a dedicated low-cardinality HTTP route family; request metrics by closed endpoint, principal kind, outcome/status family, response-size bucket, manifest/list count bucket, and duration; plus OAuth-verification outcomes. No tenant, user, token, cursor, collection, locale, path, schema hash, or body becomes a metric label.
+- `[x]` Record the deterministic local Tooling readiness baseline in `apps/server/load/m12-baseline-2026-08-22.md`: 10 alternating authenticated manifest/revision reads, 10/10 HTTP 200, every response within 1.5 MiB, and p95 357.01 ms under the complete server coverage run, below the existing 750 ms statement/readiness ceiling.
+- `[x]` Complete the pre-amendment M12 automated readiness baseline. `pnpm run ready` passes with 957 tests and all participating coverage/build gates; contracts, formatting/lint/structure, type checks, production/full audits, Changesets status, and `git diff --check` pass. Rebuilt server/web/worker Docker images are healthy; root/readiness/login and exact Tooling artifact checks pass; OAuth remains rollout-disabled. The production Compose smoke now supplies an HTTPS Tooling resource identifier instead of restart-looping on the production TLS invariant.
+
+### M12 developer-documentation amendment
+
+- `[A]` Developer manual review rejected the prototype portal as the final developer experience: the canonical schemas and API-server Scalar references exist, but the portal's short custom pages do not provide a Better Auth/Next.js-style onboarding, concept, SDK, CLI, webhook, guide, troubleshooting, and reference journey.
+- `[A]` Developer selected self-hosted Fumadocs integrated into the existing TanStack Start `apps/developers` application, source-controlled MDX, self-hosted static search, and canonical-artifact-backed secondary API references. Managed documentation/search/CMS services and a new Next.js/Astro application are excluded.
+- `[x]` Research current Fumadocs TanStack Start, Vite MDX, static prerender, self-hosted search, OpenAPI, package/license, and dependency compatibility. Current releases align with repository React 19.2, TanStack Router 1.x, Vite 8, and Tailwind 4; Fumadocs is MIT licensed.
+- `[x]` Amend the approved M12 design, milestone criteria, progress state, and current context before implementation.
+- `[x]` Complete the bounded Fumadocs compatibility slice in the existing TanStack Start app. Reviewed MIT packages are pinned in the developer workspace; React 19.2/TanStack Router 1/Vite 8/Tailwind 4 types align; providers, Tailwind, typed async MDX, prerender, and self-hosted static search build successfully. Production/full audits report no known vulnerabilities.
+- `[x]` Replace the prototype custom shell and `docs.ts` registry with Fumadocs MDX navigation, TOC, search, code components, responsive layout, and accessible loading/not-found behavior. The initial authored pages cover introduction, first-success setup, SDK, CLI/generation, and webhooks; the old custom content components and route are removed.
+- `[x]` Prove the compatibility build and runtime slice: 15 routes/assets prerender, all 10 requested landing/docs/reference/search/spec URLs return HTTP 200 with expected content types, the local static index is 177,809 bytes, all four artifact routes remain emitted, developer types and 3 public-boundary tests pass, and contract drift checks pass.
+- `[x]` Author and validate 27 current-product MDX pages across Get Started, Core Concepts, Content Modeling, Delivery, Preview, SDK, CLI and Code Generation, Webhooks, Guides, Troubleshooting, Reference, and API Contracts. Internal links are checked against the closed docs/reference route sets.
+- `[x]` Add secondary lazy Delivery/Preview/Tooling OpenAPI references from exact canonical artifacts and a webhook reference rendered from canonical JSON Schema; all raw `/specs/**` bytes still match immutable baselines. Browser playgrounds are disabled for the read-only contract area.
+- `[x]` Keep structural wire facts generated: API source tests prove all 3 rendered OpenAPI page path sets equal their canonical documents, the webhook page derives event types and complete schema from the canonical JSON artifact, and existing SDK/CLI/package compilation gates remain authority for exported code examples.
+- `[x]` Pass public-only route/search/link probes, MDX compilation, 36-route prerender, 571,523-byte self-hosted search export, CSP/security runtime smoke, representative axe coverage, canonical artifact equality, bundle measurement, dependency audits, and complete `pnpm run ready` with 962 tests.
+- `[x]` Retain API-server Scalar UIs as non-canonical compatibility/diagnostic references for now rather than remove a working public path during M12. The Fumadocs portal is canonical; M15 may add redirects after final production origins are approved. Machine-readable API-server OpenAPI endpoints remain unchanged.
+
 ## Current blockers
 
-No known database or implementation blocker remains. Milestone 12 has not started and requires developer direction plus design approval.
+No implementation or automated-readiness blocker remains. The Fumadocs correction is complete and M12 awaits renewed developer manual portal and clean CLI/SDK integration review. The measured landing route starts with 592,825 bytes uncompressed/182,334 bytes gzip across its CSS/JS assets; heavy OpenAPI/Shiki chunks remain isolated to secondary references. Shiki's Nitro build uses its documented module fallback after an unavailable WASM environment import, and the pinned Vite/Rolldown graph reports an optional WASM peer warning; builds, runtime references, frozen lock authority, and production/full audits pass. OAuth remains rollout-disabled until renewed review and explicit rollout approval. Package publication, version application, commit, and M13 initiation remain developer-controlled; M13 stays blocked.
 
 ## Database migration state
 
@@ -480,6 +538,18 @@ The developer generated and applied `packages/db/src/migrations/0007_add_entry_d
 The developer generated, corrected, and applied `packages/db/src/migrations/0009_add_production_delivery_api_read_model.sql`. The first application failed transactionally because current-head unique authority followed its referencing foreign key; read-only verification proved complete rollback. The developer replaced it with the reviewed order and applied it successfully. Live verification confirms four M9 tables, protected configuration for all existing collections, validated constraints, valid/ready indexes, and no unintended public configuration. The agent neither generated nor applied the migration.
 
 ## Test results
+
+### Milestone 12 current automated gate
+
+- Formatting/lint/repository structure, contract baseline drift, all 13 package type-check tasks, `git diff --check`, Changesets status, production audit, and full audit pass.
+- The complete workspace test run passes 962 tests: API 630, server 120, dashboard web 124, environment 16, worker 2, webhook receiver 15, public contracts 4, SDK 10, CLI 32, and developer portal 9.
+- Coverage passes across all participating workspaces. API coverage is 89.97% statements and 74.70% branches; SDK is 82.69% statements/71.35% branches; CLI is 78.02% statements/83.85% branches with generator statements at 99.29%; dashboard web is 74.50% statements/79.58% branches; developer public-content authority is 99.11% statements. One earlier highly parallel API coverage run exposed an existing webhook integration isolation race, while standalone and final dependency-filtered coverage pass all 630 API tests.
+- The full Turborepo production build passes for server, worker, dashboard web, SDK, CLI, webhook receiver, and developer portal. The portal prerenders 36 routes spanning 27 MDX documents, local search, landing, API-reference overview, 3 OpenAPI families, webhook schema, and exact static artifacts. Emitted artifact SHA-256 values equal all four immutable registry baselines.
+- Developer-portal runtime smoke checks pass for landing, representative onboarding/concept/Delivery/Preview/SDK/CLI/webhook/troubleshooting pages, all 4 API references, local search, all 4 raw specs, CSP, Permissions-Policy, Referrer-Policy, nosniff, and frame denial. Focused axe coverage finds no detectable violations in the compiled first-success guide; accessible code regions receive content-derived labels.
+- The measured Fumadocs landing initial CSS/JS asset set is 592,825 bytes minified/182,334 bytes gzip; the main docs page is 663,476/202,977 bytes and the read-only Delivery contract is 1,095,222/339,123 bytes. OpenAPI/Shiki weight remains route-specific and does not enter the landing route. The self-hosted static search export is 571,523 bytes for 27 MDX pages.
+- Final SDK/CLI prepack gates pass. Reviewed tarballs contain 14 SDK and 12 CLI files, restricted to ESM dist modules/declarations plus README, LICENSE, and package metadata; no source maps, tests, fixtures, environment files, migration/knowledge-base content, or source files are present. A clean isolated NodeNext fixture installs both local tarballs, compiles every documented export family, and executes `ffd help --json`.
+- The complete standard test/build/check/audit/package gate is green. The first final `ready` attempt exposed an unrelated five-second web accessibility-test timeout under concurrent coverage; its explicit ten-second test budget passes standalone and in the complete rerun. Turbo cancellation interrupted the concurrently starting Tooling fixture before teardown, so developer-approved transactional cleanup removed the two exact canceled/failed `m12-tooling` test graphs only after proving zero content publications; final read-only verification reports zero matching residue. The Tooling fixture now registers its idempotent teardown before its first write.
+- All M12 automated proof is complete. Remaining work is developer manual portal and clean CLI/SDK integration review, followed by explicit OAuth rollout/milestone approval and developer-controlled commit/publication decisions.
 
 ### Milestone 10 approved completion gate
 

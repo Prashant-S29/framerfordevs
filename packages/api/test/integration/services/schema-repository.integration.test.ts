@@ -62,6 +62,7 @@ import {
 import { makeDeliveryRepository } from "../../../src/services/delivery-repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 import { makeSchemaRepository } from "../../../src/services/schema-repository";
+import { makeToolingRepository } from "../../../src/services/tooling-repository";
 
 const suffix = randomUUID();
 const ownerId = `m5-schema-owner-${suffix}`;
@@ -73,6 +74,7 @@ const readerActor = Schema.decodeUnknownSync(AuthUserId)(readerId);
 const platform = makePlatformRepository();
 const schemas = makeSchemaRepository();
 const delivery = makeDeliveryRepository();
+const tooling = makeToolingRepository();
 
 let workspaceModel: WorkspaceModel | undefined;
 let projectModel: ProjectModel | undefined;
@@ -1373,6 +1375,140 @@ describe.sequential("schema repository PostgreSQL integration", () => {
           1,
         );
       }),
+  );
+
+  it.effect("serves authorized Tooling discovery and exact immutable public contracts", () =>
+    Effect.gen(function* () {
+      const currentProject = required(projectModel, "project");
+      const collection = required(firstCollection, "collection");
+      const principal = {
+        kind: "oauth_user" as const,
+        userId: ownerId,
+        clientId: "framerfordevs-cli" as const,
+        scopes: ["tooling:read"],
+        expiresAtEpochSeconds: 1_900_000_000,
+      };
+      const projects = yield* tooling.listProjects(ownerId, { afterId: null, limit: 50 });
+      const environments = yield* tooling.listEnvironments({
+        userId: ownerId,
+        projectId: currentProject.id,
+        afterId: null,
+        limit: 50,
+      });
+      const manifest = yield* tooling.getManifestPage({
+        principal,
+        requestId: `request-m12-tooling-manifest-${suffix}`,
+        projectId: currentProject.id,
+        environmentKey: currentProject.environment.key,
+        afterId: null,
+        limit: 50,
+      });
+      const currentSummary = manifest.collections.find((item) => item.id === collection.id);
+      if (!currentSummary) throw new Error("Current Tooling collection was not found.");
+      const revision = yield* tooling.getCollectionRevision({
+        principal,
+        projectId: currentProject.id,
+        environmentKey: currentProject.environment.key,
+        collectionKey: currentSummary.key,
+        revisionId: currentSummary.revisionId,
+      });
+      yield* tooling.getManifestPage({
+        principal,
+        requestId: `request-m12-tooling-continuation-${suffix}`,
+        projectId: currentProject.id,
+        environmentKey: currentProject.environment.key,
+        afterId: collection.id,
+        limit: 50,
+      });
+      const audits = yield* Effect.promise(() =>
+        db
+          .select()
+          .from(auditEvent)
+          .where(
+            or(
+              eq(auditEvent.requestId, `request-m12-tooling-manifest-${suffix}`),
+              eq(auditEvent.requestId, `request-m12-tooling-continuation-${suffix}`),
+            ),
+          ),
+      );
+      const disabled = required(disabledProject, "disabled project");
+      const disabledResult = yield* Effect.exit(
+        tooling.getManifestPage({
+          principal,
+          requestId: `request-m12-tooling-disabled-${suffix}`,
+          projectId: disabled.id,
+          environmentKey: disabled.environment.key,
+          afterId: null,
+          limit: 20,
+        }),
+      );
+
+      assert.isTrue(projects.items.some((item) => item.id === currentProject.id));
+      assert.isTrue(environments.items.some((item) => item.id === currentProject.environment.id));
+      assert.deepEqual(
+        manifest.locales.map((locale) => locale.tag),
+        ["en"],
+      );
+      assert.strictEqual(revision.contractHash, currentSummary.contractHash);
+      assert.strictEqual(revision.collectionId, collection.id);
+      assert.strictEqual(revision.collectionKey, currentSummary.key);
+      assert.notInclude(JSON.stringify(revision), "displayLabel");
+      assert.notInclude(JSON.stringify(revision), "workspaceId");
+      assert.deepEqual(
+        audits.map((audit) => audit.requestId),
+        [`request-m12-tooling-manifest-${suffix}`],
+      );
+      assert.strictEqual(audits[0]?.action, "tooling.schema_manifest.read");
+      assert.strictEqual(failureTag(disabledResult), "CmsCapabilityRequiredFailure");
+    }),
+  );
+
+  it.effect("fails closed when persisted immutable schema integrity no longer matches", () =>
+    Effect.gen(function* () {
+      const currentProject = required(projectModel, "project");
+      const collection = required(firstCollection, "collection");
+      const published = yield* schemas.getLatestPublished(
+        ownerActor,
+        yield* Schema.decodeUnknown(GetLatestPublishedSchemaInput)({
+          projectId: currentProject.id,
+          environmentId: currentProject.environment.id,
+          collectionId: collection.id,
+        }),
+      );
+      yield* Effect.promise(() =>
+        db
+          .update(cmsSchemaRevision)
+          .set({ schemaHash: "0".repeat(64) })
+          .where(eq(cmsSchemaRevision.id, published.id)),
+      );
+      const corruptedRead = yield* tooling
+        .getCollectionRevision({
+          principal: {
+            kind: "oauth_user",
+            userId: ownerId,
+            clientId: "framerfordevs-cli",
+            scopes: ["tooling:read"],
+            expiresAtEpochSeconds: 1_900_000_000,
+          },
+          projectId: currentProject.id,
+          environmentKey: currentProject.environment.key,
+          collectionKey: published.collectionApiKey,
+          revisionId: published.id,
+        })
+        .pipe(
+          Effect.exit,
+          Effect.ensuring(
+            Effect.promise(() =>
+              db
+                .update(cmsSchemaRevision)
+                .set({ schemaHash: published.schemaHash })
+                .where(eq(cmsSchemaRevision.id, published.id)),
+            ),
+          ),
+        );
+
+      assert.strictEqual(failureTag(corruptedRead), "DatabaseFailure");
+    }),
   );
 
   it.effect(

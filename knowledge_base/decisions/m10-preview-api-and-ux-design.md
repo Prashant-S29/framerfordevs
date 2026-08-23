@@ -124,7 +124,7 @@ M10 extends these committed seams rather than replacing them:
 - Live collaboration, presence, streaming preview updates, or websocket subscriptions
 - Scheduled preview expiration separate from the existing credential expiry
 - Generated Preview clients and consolidated public portal navigation, owned by M12
-- Production public-API host/ingress separation, owned by M14
+- Production public-API host/ingress separation, owned by M15
 
 ## Core invariants
 
@@ -824,7 +824,7 @@ No tenant/resource/credential/user/locale/revision ID or tag becomes a metric la
 - Exact final serialization prevents response-limit drift.
 - Transactions contain no external calls and hold no content locks.
 - The rate limiter protects process/Redis/DB/audit capacity.
-- Audit growth is intentional, bounded to successful Preview reads, and remains part of the M14 retention review.
+- Audit growth is intentional, bounded to successful Preview reads, and remains part of the M15 retention review.
 - Telemetry failure cannot fail Preview or create unbounded buffering.
 
 Proposed local production-build baseline with PostgreSQL/Redis on the same Docker host, pool max 10, representative 4–64 KiB drafts, and Preview auditing enabled:

@@ -51,7 +51,7 @@ Locales are project-scoped, not environment-scoped. The current and future envir
 - Invitation-time locale restrictions; accepted memberships initially retain the existing `all` behavior and can be restricted by an owner
 - Environment-specific locale configuration
 - Automatic language negotiation or fallback of any kind
-- A database constraint trigger or scheduled invariant monitor for required `en`; reconsidered in Milestone 14 hardening
+- A database constraint trigger or scheduled invariant monitor for required `en`; reconsidered in Milestone 15 hardening
 
 Per-locale credential restrictions remain a later credential-contract extension. A locale-limited user cannot issue or rotate credentials, preventing the user's selected-locale restriction from being widened through a new or rotated machine credential.
 
@@ -178,7 +178,7 @@ No application delete path exists. Soft removal keeps stable IDs available to fu
 
 The database check can require an existing `en` row to remain enabled but cannot prove that every project has an `en` child without a cyclic foreign key or trigger. For M4, this is an explicitly accepted risk because production database writes are owned by the application repository and developer-controlled migrations. Project creation, the backfill, restricted write APIs, post-migration verification, and invariant integration tests enforce existence. Locale rows use restrictive foreign keys and no direct deletion workflow.
 
-A deferred database constraint trigger or periodic invariant monitor is intentionally deferred to Milestone 14 production hardening. The hardening review must reconsider direct database access, operational repair paths, alerting, and whether prevention through a custom PostgreSQL trigger is preferable to scheduled detection. M4 will keep a reusable read-only invariant query so deployment and hardening checks can detect a project without exactly one enabled `en`.
+A deferred database constraint trigger or periodic invariant monitor is intentionally deferred to Milestone 15 production hardening. The hardening review must reconsider direct database access, operational repair paths, alerting, and whether prevention through a custom PostgreSQL trigger is preferable to scheduled detection. M4 will keep a reusable read-only invariant query so deployment and hardening checks can detect a project without exactly one enabled `en`.
 
 ### Extend `project_membership`
 
@@ -516,7 +516,7 @@ Transactional audit events, named spans, request correlation, bounded operation 
 
 ### Maintainability and future compatibility
 
-A focused locale repository, normalized allowlists, restrictive FKs, soft lifecycle, and pure transition/policy functions let Milestones 5–15 attach schemas, drafts, publications, delivery, permissions, and visual bindings without changing locale identity or copying data.
+A focused locale repository, normalized allowlists, restrictive FKs, soft lifecycle, and pure transition/policy functions let Milestones 5–16 attach schemas, drafts, publications, delivery, permissions, and visual bindings without changing locale identity or copying data.
 
 ## Database gate
 

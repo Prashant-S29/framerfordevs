@@ -1,0 +1,30 @@
+---
+title: Preview
+description: Render current and historical drafts in trusted server-side preview environments.
+---
+
+{/* Introduces Preview as a server-only draft inspection surface. */}
+
+Preview v1 lets trusted tools inspect evolving entry drafts without publishing them or weakening Delivery.
+
+## Use Preview For
+
+- Authenticated editorial preview sites
+- Current draft rendering
+- Historical schema-revision inspection
+- Field-level validation feedback
+- Comparing draft and published behavior
+
+Preview is not production delivery. Its responses are always `no-store`, require a scoped Preview credential, and may contain incomplete or temporarily invalid values.
+
+## Required Context
+
+Every read identifies project, environment, collection, entry, and locale. Historical reads also identify an explicit schema revision.
+
+Use the SDK Preview client from server-side code. Keep Delivery and Preview clients separate so a production path cannot accidentally receive draft authority.
+
+## Draft Interpretation
+
+The response carries the schema revision used to interpret known fields plus bounded validation issues. Generic transport validation accepts valid protocol responses even when the project lock does not recognize an older revision.
+
+Continue with [drafts and revisions](/docs/preview/drafts-and-revisions) and [Preview security](/docs/preview/security).

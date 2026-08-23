@@ -52,6 +52,17 @@ export interface SchemaDraftState {
   readonly editorLayout: PublishedSchemaRevision["editorLayout"];
 }
 
+export interface PublishedSchemaHashState {
+  readonly formatVersion: number;
+  readonly validationProfile: string;
+  readonly currencyRegistryProfile: CurrencyRegistryProfile | null;
+  readonly collectionApiKey: string;
+  readonly collectionDisplayName: string;
+  readonly collectionDescription: string | null;
+  readonly fields: ReadonlyArray<CollectionFieldDefinition>;
+  readonly editorLayout: PublishedSchemaRevision["editorLayout"];
+}
+
 export interface SchemaValidationResult {
   readonly valid: boolean;
   readonly issues: ReadonlyArray<SchemaValidationIssue>;
@@ -92,19 +103,43 @@ function plainJsonData(value: unknown): unknown {
   return output;
 }
 
+/** Reconstructs the M5 hash document retained by migrated format-v1 revisions. */
+function canonicalLegacyManagementDocument(state: PublishedSchemaHashState): object {
+  return {
+    formatVersion: 1,
+    collection: {
+      apiKey: state.collectionApiKey,
+      displayName: state.collectionDisplayName,
+      description: state.collectionDescription,
+    },
+    fields: [...state.fields].sort(compareFields).map((field) => ({
+      id: field.id,
+      apiKey: field.apiKey,
+      displayLabel: field.displayLabel,
+      kind: field.kind,
+      required: field.required,
+      localization: field.localization,
+      deprecated: field.deprecated,
+      position: field.position,
+      configuration: plainJsonData(field.configuration),
+    })),
+  };
+}
+
 /** Produces the complete management document used for the schema hash and aggregate limit. */
-function canonicalManagementDocument(draft: SchemaDraftState): object {
+function canonicalManagementDocument(state: PublishedSchemaHashState): object {
+  if (state.formatVersion === 1) return canonicalLegacyManagementDocument(state);
   return {
     formatVersion: 2,
-    validationProfile: draft.validationProfile,
-    currencyRegistryProfile: draft.currencyRegistryProfile,
+    validationProfile: state.validationProfile,
+    currencyRegistryProfile: state.currencyRegistryProfile,
     collection: {
-      apiKey: draft.collection.apiKey,
-      displayName: draft.collection.displayName,
-      description: draft.collection.description,
+      apiKey: state.collectionApiKey,
+      displayName: state.collectionDisplayName,
+      description: state.collectionDescription,
     },
-    fields: plainJsonData([...draft.fields].sort(compareFields)),
-    editorLayout: plainJsonData(draft.editorLayout),
+    fields: plainJsonData([...state.fields].sort(compareFields)),
+    editorLayout: plainJsonData(state.editorLayout),
   };
 }
 
@@ -190,9 +225,27 @@ export function compileCollectionContract(state: SchemaContractState): object {
   };
 }
 
+function publishedHashStateFromDraft(draft: SchemaDraftState): PublishedSchemaHashState {
+  return {
+    formatVersion: draft.formatVersion,
+    validationProfile: draft.validationProfile,
+    currencyRegistryProfile: draft.currencyRegistryProfile,
+    collectionApiKey: draft.collection.apiKey,
+    collectionDisplayName: draft.collection.displayName,
+    collectionDescription: draft.collection.description,
+    fields: draft.fields,
+    editorLayout: draft.editorLayout,
+  };
+}
+
+/** Computes the full immutable published-revision schema hash. */
+export function hashPublishedSchemaRevision(state: PublishedSchemaHashState): SchemaHash {
+  return SchemaHash.make(sha256(canonicalStringify(canonicalManagementDocument(state))));
+}
+
 /** Computes the full management schema hash. */
 export function hashCollectionDraft(draft: SchemaDraftState): SchemaHash {
-  return SchemaHash.make(sha256(canonicalStringify(canonicalManagementDocument(draft))));
+  return hashPublishedSchemaRevision(publishedHashStateFromDraft(draft));
 }
 
 /** Computes one value/API contract hash independently from editor presentation. */
@@ -286,7 +339,9 @@ export function validateCollectionDraft(
   );
   for (const value of layout.issues) push(value);
 
-  const aggregate = validateAggregateSchemaDocument(canonicalManagementDocument(draft));
+  const aggregate = validateAggregateSchemaDocument(
+    canonicalManagementDocument(publishedHashStateFromDraft(draft)),
+  );
   for (const value of aggregate.issues) push(value);
 
   return { valid: issues.length === 0, issues };

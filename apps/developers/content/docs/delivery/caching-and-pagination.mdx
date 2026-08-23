@@ -1,0 +1,30 @@
+---
+title: Caching and Pagination
+description: Revalidate current content, cache immutable publications, and follow scoped opaque cursors safely.
+---
+
+{/* Explains Delivery caching and cursor invariants for frontend integrations. */}
+
+## Current Reads
+
+Current reads can change after a new publication or unpublication. Store their `ETag` and `Last-Modified` validators, then send conditional requests. A valid `304 Not Modified` has no response body.
+
+Cache keys must include API family, project, environment, collection, locale, selector, query, and expansion authority. Never share protected responses across credentials with different access.
+
+## Immutable Reads
+
+A publication-addressed response never changes. Cache it long term after successful authorization and validation. Keep current pointers separate from immutable publication payloads.
+
+## Opaque Cursors
+
+Delivery cursors are signed, short-lived continuation authority bound to the original scope and query. Do not parse, alter, persist indefinitely, or reuse them for another locale, collection, filter, sort, expansion, or page size.
+
+A list loop should:
+
+1. Start without a cursor.
+2. Process the returned items.
+3. Stop when `nextCursor` is `null`.
+4. Pass the exact non-null cursor to the next request.
+5. Reject repeated cursors to prevent loops.
+
+If publication changes make a cursor stale, restart intentionally from page one rather than silently mixing two collection states.

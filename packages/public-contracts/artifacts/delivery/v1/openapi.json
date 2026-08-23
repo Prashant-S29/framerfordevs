@@ -1,0 +1,3937 @@
+{
+  "components": {
+    "headers": {
+      "CacheControl": {
+        "description": "Public/protected and mutable/immutable cache policy.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ETag": {
+        "description": "Strong validator for the exact response bytes.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "LastModified": {
+        "description": "Latest authority timestamp represented by the response.",
+        "schema": {
+          "format": "http-date",
+          "type": "string"
+        }
+      },
+      "RateLimitLimit": {
+        "description": "Limit for the policy governing the response.",
+        "schema": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "RateLimitRemaining": {
+        "description": "Whole weighted tokens currently available.",
+        "schema": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "RateLimitReset": {
+        "description": "Unix timestamp in seconds when the bucket is fully replenished.",
+        "schema": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "RequestId": {
+        "description": "Bounded request correlation identifier.",
+        "schema": {
+          "maxLength": 128,
+          "type": "string"
+        }
+      },
+      "RetryAfter": {
+        "description": "Whole seconds before the rejected weighted request can retry.",
+        "schema": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      }
+    },
+    "schemas": {
+      "ApiErrorDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "description": "a string at most 64 character(s) long",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "maxLength(64)",
+            "type": "string"
+          },
+          "currentRevisionId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUID"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currentVersion": {
+            "description": "a non-negative number",
+            "minimum": 0,
+            "title": "greaterThanOrEqualTo(0)",
+            "type": "integer"
+          },
+          "expectedVersion": {
+            "description": "a non-negative number",
+            "minimum": 0,
+            "title": "greaterThanOrEqualTo(0)",
+            "type": "integer"
+          },
+          "message": {
+            "description": "a string at most 512 character(s) long",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "maxLength(512)",
+            "type": "string"
+          },
+          "path": {
+            "description": "a string at most 256 character(s) long",
+            "maxLength": 256,
+            "title": "maxLength(256)",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "shared",
+              "localized"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "DeliveryApiError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "VALIDATION_ERROR",
+              "UNAUTHORIZED",
+              "FORBIDDEN",
+              "NOT_FOUND",
+              "LOCALE_UNAVAILABLE",
+              "DELIVERY_QUERY_INVALID",
+              "DELIVERY_CURSOR_INVALID",
+              "DELIVERY_CURSOR_STALE",
+              "DELIVERY_RESPONSE_TOO_LARGE",
+              "CREDENTIAL_INVALID",
+              "RATE_LIMITED",
+              "SERVICE_UNAVAILABLE",
+              "INTERNAL_ERROR"
+            ],
+            "type": "string"
+          },
+          "details": {
+            "description": "an array of at most 50 item(s)",
+            "items": {
+              "$ref": "#/components/schemas/ApiErrorDetail"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "maxItems(50)",
+            "type": "array"
+          },
+          "message": {
+            "description": "a string at most 512 character(s) long",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "maxLength(512)",
+            "type": "string"
+          },
+          "requestId": {
+            "description": "a string matching the pattern ^[A-Za-z0-9._:-]+$",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:-]+$",
+            "title": "maxLength(128)",
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "retryable",
+          "requestId"
+        ],
+        "type": "object"
+      },
+      "DeliveryApiFailure": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "null"
+          },
+          "error": {
+            "$ref": "#/components/schemas/DeliveryApiError"
+          },
+          "message": {
+            "description": "a string at most 512 character(s) long",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "maxLength(512)",
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              false
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "DeliveryItem": {
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "type": "string"
+          },
+          "collectionId": {
+            "description": "a Universally Unique Identifier",
+            "format": "uuid",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": {
+              "$id": "/schemas/unknown",
+              "title": "unknown"
+            },
+            "properties": {},
+            "required": [],
+            "type": "object"
+          },
+          "id": {
+            "description": "a Universally Unique Identifier",
+            "format": "uuid",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "publication": {
+            "$ref": "#/components/schemas/DeliveryPublicationMetadata"
+          }
+        },
+        "required": [
+          "id",
+          "collectionId",
+          "collection",
+          "locale",
+          "publication",
+          "data"
+        ],
+        "type": "object"
+      },
+      "DeliveryItemResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DeliveryItem"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "description": "a string at most 512 character(s) long",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "maxLength(512)",
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "DeliveryPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "description": "an array of at most 50 item(s)",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryItem"
+            },
+            "maxItems": 50,
+            "title": "maxItems(50)",
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/DeliveryPageMetadata"
+          }
+        },
+        "required": [
+          "items",
+          "page"
+        ],
+        "type": "object"
+      },
+      "DeliveryPageMetadata": {
+        "additionalProperties": false,
+        "properties": {
+          "hasMore": {
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "a number between 1 and 50",
+            "maximum": 50,
+            "minimum": 1,
+            "title": "between(1, 50)",
+            "type": "integer"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "title": "maxLength(1024)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "limit",
+          "nextCursor",
+          "hasMore"
+        ],
+        "type": "object"
+      },
+      "DeliveryPageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DeliveryPage"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "description": "a string at most 512 character(s) long",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "maxLength(512)",
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "DeliveryPublicationMetadata": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "a Universally Unique Identifier",
+            "format": "uuid",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "type": "string"
+          },
+          "publishedAt": {
+            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+            "type": "string"
+          },
+          "schemaRevisionId": {
+            "description": "a Universally Unique Identifier",
+            "format": "uuid",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "type": "string"
+          },
+          "sequence": {
+            "description": "a number greater than or equal to 1",
+            "minimum": 1,
+            "title": "greaterThanOrEqualTo(1)",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "sequence",
+          "schemaRevisionId",
+          "publishedAt"
+        ],
+        "type": "object"
+      },
+      "UUID": {
+        "description": "a Universally Unique Identifier",
+        "format": "uuid",
+        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+        "type": "string"
+      }
+    },
+    "securitySchemes": {
+      "DeliveryBearer": {
+        "bearerFormat": "ffd_del_…",
+        "description": "Optional only for public collections. Protected collections require an environment-scoped `delivery.read` credential. A supplied invalid credential is rejected even when a collection is public. Never place credentials in URLs.",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "Interactive Delivery API reference",
+    "url": "/api/delivery/v1/docs"
+  },
+  "info": {
+    "description": "Portable, versioned HTTP/JSON access to exact-locale published CMS snapshots. Drafts and locale fallback are never exposed.",
+    "license": {
+      "name": "Proprietary"
+    },
+    "title": "Framer for Devs Delivery API",
+    "version": "1.0.0"
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "openapi": "3.1.0",
+  "paths": {
+    "/projects/{projectId}/environments/{environmentKey}/collections/{collectionKey}/entries": {
+      "get": {
+        "description": "Returns a stable keyset page. The query string is limited to 8,192 bytes and rejects unknown or duplicate parameters. Up to five configured filters use `filter.{fieldKey}.{operator}`; equality kinds support `eq|ne`, while ordered kinds support `eq|ne|gt|gte|lt|lte`. A collection-locale publication change can return `DELIVERY_CURSOR_STALE`; restart from page one. Successful continuations receive a fresh 15-minute cursor. Total counts and page numbers are intentionally omitted.",
+        "operationId": "listDeliveryEntries",
+        "parameters": [
+          {
+            "description": "Stable project UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000001",
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Canonical environment key.",
+            "example": "main",
+            "in": "path",
+            "name": "environmentKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9-]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Published collection API key.",
+            "example": "posts",
+            "in": "path",
+            "name": "collectionKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "One explicit enabled canonical BCP 47 locale. Delivery never falls back to another locale.",
+            "example": "en",
+            "in": "query",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Opaque continuation cursor bound to collection, locale, generation, and query.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "One configured sortable root field. Prefix `-` for descending order.",
+            "example": "-published_at",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "pattern": "^-?[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Dynamic configured filter; at most five unique predicates.",
+            "example": "guide",
+            "in": "query",
+            "name": "filter.{fieldKey}.{operator}",
+            "required": false,
+            "schema": {
+              "maxLength": 2048,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated configured reference paths. At most 10 unique paths, each one or two field-key segments. Expansion follows pinned publication references and never silently truncates.",
+            "example": "author,related_entry.author",
+            "in": "query",
+            "name": "expand",
+            "required": false,
+            "schema": {
+              "maxLength": 639,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Strong or weak ETag validator. Takes precedence over If-Modified-Since.",
+            "in": "header",
+            "name": "If-None-Match",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Conservative HTTP-date validator used only when If-None-Match is absent.",
+            "in": "header",
+            "name": "If-Modified-Since",
+            "required": false,
+            "schema": {
+              "format": "http-date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "items": [
+                      {
+                        "collection": "posts",
+                        "collectionId": "019fae8b-1234-7000-8000-000000000002",
+                        "data": {
+                          "slug": "delivery-api-quickstart",
+                          "title": "Delivery API quickstart"
+                        },
+                        "id": "019fae8b-1234-7000-8000-000000000003",
+                        "locale": "en",
+                        "publication": {
+                          "id": "019fae8b-1234-7000-8000-000000000004",
+                          "publishedAt": "2026-08-11T12:00:00.000Z",
+                          "schemaRevisionId": "019fae8b-1234-7000-8000-000000000005",
+                          "sequence": 3
+                        }
+                      }
+                    ],
+                    "page": {
+                      "hasMore": true,
+                      "limit": 20,
+                      "nextCursor": "eyJ2IjoxLCJleHAiOjE3ODY0NTY4MDB9.example"
+                    }
+                  },
+                  "error": null,
+                  "message": "Delivery entries loaded.",
+                  "ok": true
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPageResponse"
+                }
+              }
+            },
+            "description": "A generation-stable page. Total counts and page numbers are intentionally omitted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "304": {
+            "description": "The authenticated representation has not changed. 304 never includes a body.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_QUERY_INVALID",
+                    "message": "The request path or strict query grammar is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The request path or strict query grammar is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The request path or strict query grammar is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 400
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "CREDENTIAL_INVALID",
+                    "message": "A required or supplied Delivery credential is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "A required or supplied Delivery credential is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required or supplied Delivery credential is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 401
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The exact project, environment, collection, locale, or publication is unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 404
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_CURSOR_STALE",
+                    "message": "The collection-locale generation changed; restart pagination from page one.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The collection-locale generation changed; restart pagination from page one.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The collection-locale generation changed; restart pagination from page one.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 409
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_RESPONSE_TOO_LARGE",
+                    "message": "The requested representation exceeds 4 MiB.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The requested representation exceeds 4 MiB.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The requested representation exceeds 4 MiB.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 413
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "RATE_LIMITED",
+                    "message": "Too many requests. Try again later.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "Too many requests. Try again later.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "Too many requests. Try again later.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 429
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected internal error occurred.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "An unexpected internal error occurred.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 500
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "SERVICE_UNAVAILABLE",
+                    "message": "A required service is temporarily unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "A required service is temporarily unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 503
+          }
+        },
+        "security": [
+          {
+            "DeliveryBearer": []
+          },
+          {}
+        ],
+        "summary": "List current exact-locale publications",
+        "tags": [
+          "Entries"
+        ]
+      },
+      "head": {
+        "description": "Uses the same strict query, authentication, authorization, and rate-limit behavior as GET.",
+        "operationId": "headDeliveryEntries",
+        "parameters": [
+          {
+            "description": "Stable project UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000001",
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Canonical environment key.",
+            "example": "main",
+            "in": "path",
+            "name": "environmentKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9-]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Published collection API key.",
+            "example": "posts",
+            "in": "path",
+            "name": "collectionKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "One explicit enabled canonical BCP 47 locale. Delivery never falls back to another locale.",
+            "example": "en",
+            "in": "query",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Dynamic configured filter; at most five unique predicates.",
+            "in": "query",
+            "name": "filter.{fieldKey}.{operator}",
+            "required": false,
+            "schema": {
+              "maxLength": 2048,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated configured reference paths. At most 10 unique paths, each one or two field-key segments. Expansion follows pinned publication references and never silently truncates.",
+            "example": "author,related_entry.author",
+            "in": "query",
+            "name": "expand",
+            "required": false,
+            "schema": {
+              "maxLength": 639,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Strong or weak ETag validator. Takes precedence over If-Modified-Since.",
+            "in": "header",
+            "name": "If-None-Match",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Conservative HTTP-date validator used only when If-None-Match is absent.",
+            "in": "header",
+            "name": "If-Modified-Since",
+            "required": false,
+            "schema": {
+              "format": "http-date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page metadata only. HEAD never includes a response body.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "304": {
+            "description": "The authenticated representation has not changed. 304 never includes a body.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_QUERY_INVALID",
+                    "message": "The request path or strict query grammar is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The request path or strict query grammar is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The request path or strict query grammar is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 400
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "CREDENTIAL_INVALID",
+                    "message": "A required or supplied Delivery credential is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "A required or supplied Delivery credential is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required or supplied Delivery credential is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 401
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The exact project, environment, collection, locale, or publication is unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 404
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_CURSOR_STALE",
+                    "message": "The collection-locale generation changed; restart pagination from page one.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The collection-locale generation changed; restart pagination from page one.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The collection-locale generation changed; restart pagination from page one.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 409
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_RESPONSE_TOO_LARGE",
+                    "message": "The requested representation exceeds 4 MiB.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The requested representation exceeds 4 MiB.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The requested representation exceeds 4 MiB.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 413
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "RATE_LIMITED",
+                    "message": "Too many requests. Try again later.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "Too many requests. Try again later.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "Too many requests. Try again later.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 429
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected internal error occurred.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "An unexpected internal error occurred.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 500
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "SERVICE_UNAVAILABLE",
+                    "message": "A required service is temporarily unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "A required service is temporarily unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 503
+          }
+        },
+        "security": [
+          {
+            "DeliveryBearer": []
+          },
+          {}
+        ],
+        "summary": "Inspect page validators without a body",
+        "tags": [
+          "Entries"
+        ]
+      },
+      "options": {
+        "description": "Delivery permits wildcard, non-credentialed CORS for GET and HEAD. Authorization is accepted as a request header but browser credentials mode is not enabled.",
+        "responses": {
+          "204": {
+            "description": "The requested GET or HEAD preflight is allowed.",
+            "headers": {
+              "Access-Control-Allow-Headers": {
+                "description": "The closed Delivery request-header allowlist.",
+                "schema": {
+                  "example": "Authorization, If-None-Match, If-Modified-Since, Traceparent, X-Request-Id",
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Methods": {
+                "description": "Supported Delivery methods.",
+                "schema": {
+                  "example": "GET, HEAD, OPTIONS",
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "description": "Always `*` for Delivery.",
+                "schema": {
+                  "const": "*",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "FORBIDDEN",
+                    "message": "The requested Delivery preflight is not allowed.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The requested Delivery preflight is not allowed.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The requested Delivery preflight is not allowed.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 403
+          }
+        },
+        "security": [],
+        "summary": "Inspect Delivery cross-origin request support"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentKey}/collections/{collectionKey}/entries/{entryId}": {
+      "get": {
+        "description": "Returns the current publication for exactly the requested locale.",
+        "operationId": "getDeliveryEntryById",
+        "parameters": [
+          {
+            "description": "Stable project UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000001",
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Canonical environment key.",
+            "example": "main",
+            "in": "path",
+            "name": "environmentKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9-]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Published collection API key.",
+            "example": "posts",
+            "in": "path",
+            "name": "collectionKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "One explicit enabled canonical BCP 47 locale. Delivery never falls back to another locale.",
+            "example": "en",
+            "in": "query",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Stable entry UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000003",
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated configured reference paths. At most 10 unique paths, each one or two field-key segments. Expansion follows pinned publication references and never silently truncates.",
+            "example": "author,related_entry.author",
+            "in": "query",
+            "name": "expand",
+            "required": false,
+            "schema": {
+              "maxLength": 639,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Strong or weak ETag validator. Takes precedence over If-Modified-Since.",
+            "in": "header",
+            "name": "If-None-Match",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Conservative HTTP-date validator used only when If-None-Match is absent.",
+            "in": "header",
+            "name": "If-Modified-Since",
+            "required": false,
+            "schema": {
+              "format": "http-date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "collection": "posts",
+                    "collectionId": "019fae8b-1234-7000-8000-000000000002",
+                    "data": {
+                      "slug": "delivery-api-quickstart",
+                      "title": "Delivery API quickstart"
+                    },
+                    "id": "019fae8b-1234-7000-8000-000000000003",
+                    "locale": "en",
+                    "publication": {
+                      "id": "019fae8b-1234-7000-8000-000000000004",
+                      "publishedAt": "2026-08-11T12:00:00.000Z",
+                      "schemaRevisionId": "019fae8b-1234-7000-8000-000000000005",
+                      "sequence": 3
+                    }
+                  },
+                  "error": null,
+                  "message": "Delivery entry loaded.",
+                  "ok": true
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryItemResponse"
+                }
+              }
+            },
+            "description": "The exact-locale published entry.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "304": {
+            "description": "The authenticated representation has not changed. 304 never includes a body.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_QUERY_INVALID",
+                    "message": "The request path or strict query grammar is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The request path or strict query grammar is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The request path or strict query grammar is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 400
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "CREDENTIAL_INVALID",
+                    "message": "A required or supplied Delivery credential is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "A required or supplied Delivery credential is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required or supplied Delivery credential is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 401
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The exact project, environment, collection, locale, or publication is unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 404
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_RESPONSE_TOO_LARGE",
+                    "message": "The requested representation exceeds 4 MiB.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The requested representation exceeds 4 MiB.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The requested representation exceeds 4 MiB.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 413
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "RATE_LIMITED",
+                    "message": "Too many requests. Try again later.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "Too many requests. Try again later.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "Too many requests. Try again later.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 429
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected internal error occurred.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "An unexpected internal error occurred.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 500
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "SERVICE_UNAVAILABLE",
+                    "message": "A required service is temporarily unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "A required service is temporarily unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 503
+          }
+        },
+        "security": [
+          {
+            "DeliveryBearer": []
+          },
+          {}
+        ],
+        "summary": "Get the current entry by ID",
+        "tags": [
+          "Entries"
+        ]
+      },
+      "head": {
+        "description": "Authentication, authorization, rate limits, and conditional validators are identical to GET.",
+        "operationId": "headDeliveryEntryById",
+        "parameters": [
+          {
+            "description": "Stable project UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000001",
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Canonical environment key.",
+            "example": "main",
+            "in": "path",
+            "name": "environmentKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9-]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Published collection API key.",
+            "example": "posts",
+            "in": "path",
+            "name": "collectionKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "One explicit enabled canonical BCP 47 locale. Delivery never falls back to another locale.",
+            "example": "en",
+            "in": "query",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Stable entry UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000003",
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated configured reference paths. At most 10 unique paths, each one or two field-key segments. Expansion follows pinned publication references and never silently truncates.",
+            "example": "author,related_entry.author",
+            "in": "query",
+            "name": "expand",
+            "required": false,
+            "schema": {
+              "maxLength": 639,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Strong or weak ETag validator. Takes precedence over If-Modified-Since.",
+            "in": "header",
+            "name": "If-None-Match",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Conservative HTTP-date validator used only when If-None-Match is absent.",
+            "in": "header",
+            "name": "If-Modified-Since",
+            "required": false,
+            "schema": {
+              "format": "http-date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entry metadata only. HEAD never includes a response body.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "304": {
+            "description": "The authenticated representation has not changed. 304 never includes a body.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_QUERY_INVALID",
+                    "message": "The request path or strict query grammar is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The request path or strict query grammar is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The request path or strict query grammar is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 400
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "CREDENTIAL_INVALID",
+                    "message": "A required or supplied Delivery credential is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "A required or supplied Delivery credential is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required or supplied Delivery credential is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 401
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The exact project, environment, collection, locale, or publication is unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 404
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_RESPONSE_TOO_LARGE",
+                    "message": "The requested representation exceeds 4 MiB.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The requested representation exceeds 4 MiB.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The requested representation exceeds 4 MiB.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 413
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "RATE_LIMITED",
+                    "message": "Too many requests. Try again later.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "Too many requests. Try again later.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "Too many requests. Try again later.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 429
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected internal error occurred.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "An unexpected internal error occurred.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 500
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "SERVICE_UNAVAILABLE",
+                    "message": "A required service is temporarily unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "A required service is temporarily unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 503
+          }
+        },
+        "security": [
+          {
+            "DeliveryBearer": []
+          },
+          {}
+        ],
+        "summary": "Inspect entry validators without a body",
+        "tags": [
+          "Entries"
+        ]
+      },
+      "options": {
+        "description": "Delivery permits wildcard, non-credentialed CORS for GET and HEAD. Authorization is accepted as a request header but browser credentials mode is not enabled.",
+        "responses": {
+          "204": {
+            "description": "The requested GET or HEAD preflight is allowed.",
+            "headers": {
+              "Access-Control-Allow-Headers": {
+                "description": "The closed Delivery request-header allowlist.",
+                "schema": {
+                  "example": "Authorization, If-None-Match, If-Modified-Since, Traceparent, X-Request-Id",
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Methods": {
+                "description": "Supported Delivery methods.",
+                "schema": {
+                  "example": "GET, HEAD, OPTIONS",
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "description": "Always `*` for Delivery.",
+                "schema": {
+                  "const": "*",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "FORBIDDEN",
+                    "message": "The requested Delivery preflight is not allowed.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The requested Delivery preflight is not allowed.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The requested Delivery preflight is not allowed.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 403
+          }
+        },
+        "security": [],
+        "summary": "Inspect Delivery cross-origin request support"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentKey}/collections/{collectionKey}/entries/{entryId}/publications/{publicationId}": {
+      "get": {
+        "description": "Returns one exact immutable publication artifact. Later publish or unpublish operations never change this URL.",
+        "operationId": "getDeliveryEntryByPublication",
+        "parameters": [
+          {
+            "description": "Stable project UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000001",
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Canonical environment key.",
+            "example": "main",
+            "in": "path",
+            "name": "environmentKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9-]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Published collection API key.",
+            "example": "posts",
+            "in": "path",
+            "name": "collectionKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "One explicit enabled canonical BCP 47 locale. Delivery never falls back to another locale.",
+            "example": "en",
+            "in": "query",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Stable entry UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000003",
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Immutable publication UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000004",
+            "in": "path",
+            "name": "publicationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated configured reference paths. At most 10 unique paths, each one or two field-key segments. Expansion follows pinned publication references and never silently truncates.",
+            "example": "author,related_entry.author",
+            "in": "query",
+            "name": "expand",
+            "required": false,
+            "schema": {
+              "maxLength": 639,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Strong or weak ETag validator. Takes precedence over If-Modified-Since.",
+            "in": "header",
+            "name": "If-None-Match",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Conservative HTTP-date validator used only when If-None-Match is absent.",
+            "in": "header",
+            "name": "If-Modified-Since",
+            "required": false,
+            "schema": {
+              "format": "http-date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "collection": "posts",
+                    "collectionId": "019fae8b-1234-7000-8000-000000000002",
+                    "data": {
+                      "slug": "delivery-api-quickstart",
+                      "title": "Delivery API quickstart"
+                    },
+                    "id": "019fae8b-1234-7000-8000-000000000003",
+                    "locale": "en",
+                    "publication": {
+                      "id": "019fae8b-1234-7000-8000-000000000004",
+                      "publishedAt": "2026-08-11T12:00:00.000Z",
+                      "schemaRevisionId": "019fae8b-1234-7000-8000-000000000005",
+                      "sequence": 3
+                    }
+                  },
+                  "error": null,
+                  "message": "Delivery entry loaded.",
+                  "ok": true
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryItemResponse"
+                }
+              }
+            },
+            "description": "The exact-locale published entry.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "304": {
+            "description": "The authenticated representation has not changed. 304 never includes a body.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_QUERY_INVALID",
+                    "message": "The request path or strict query grammar is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The request path or strict query grammar is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The request path or strict query grammar is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 400
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "CREDENTIAL_INVALID",
+                    "message": "A required or supplied Delivery credential is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "A required or supplied Delivery credential is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required or supplied Delivery credential is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 401
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The exact project, environment, collection, locale, or publication is unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 404
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_RESPONSE_TOO_LARGE",
+                    "message": "The requested representation exceeds 4 MiB.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The requested representation exceeds 4 MiB.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The requested representation exceeds 4 MiB.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 413
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "RATE_LIMITED",
+                    "message": "Too many requests. Try again later.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "Too many requests. Try again later.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "Too many requests. Try again later.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 429
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected internal error occurred.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "An unexpected internal error occurred.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 500
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "SERVICE_UNAVAILABLE",
+                    "message": "A required service is temporarily unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "A required service is temporarily unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 503
+          }
+        },
+        "security": [
+          {
+            "DeliveryBearer": []
+          },
+          {}
+        ],
+        "summary": "Get an immutable publication",
+        "tags": [
+          "Entries"
+        ]
+      },
+      "head": {
+        "description": "Authentication, authorization, rate limits, and conditional validators are identical to GET.",
+        "operationId": "headDeliveryEntryByPublication",
+        "parameters": [
+          {
+            "description": "Stable project UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000001",
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Canonical environment key.",
+            "example": "main",
+            "in": "path",
+            "name": "environmentKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9-]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Published collection API key.",
+            "example": "posts",
+            "in": "path",
+            "name": "collectionKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "One explicit enabled canonical BCP 47 locale. Delivery never falls back to another locale.",
+            "example": "en",
+            "in": "query",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Stable entry UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000003",
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Immutable publication UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000004",
+            "in": "path",
+            "name": "publicationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated configured reference paths. At most 10 unique paths, each one or two field-key segments. Expansion follows pinned publication references and never silently truncates.",
+            "example": "author,related_entry.author",
+            "in": "query",
+            "name": "expand",
+            "required": false,
+            "schema": {
+              "maxLength": 639,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Strong or weak ETag validator. Takes precedence over If-Modified-Since.",
+            "in": "header",
+            "name": "If-None-Match",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Conservative HTTP-date validator used only when If-None-Match is absent.",
+            "in": "header",
+            "name": "If-Modified-Since",
+            "required": false,
+            "schema": {
+              "format": "http-date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entry metadata only. HEAD never includes a response body.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "304": {
+            "description": "The authenticated representation has not changed. 304 never includes a body.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_QUERY_INVALID",
+                    "message": "The request path or strict query grammar is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The request path or strict query grammar is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The request path or strict query grammar is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 400
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "CREDENTIAL_INVALID",
+                    "message": "A required or supplied Delivery credential is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "A required or supplied Delivery credential is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required or supplied Delivery credential is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 401
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The exact project, environment, collection, locale, or publication is unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 404
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_RESPONSE_TOO_LARGE",
+                    "message": "The requested representation exceeds 4 MiB.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The requested representation exceeds 4 MiB.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The requested representation exceeds 4 MiB.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 413
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "RATE_LIMITED",
+                    "message": "Too many requests. Try again later.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "Too many requests. Try again later.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "Too many requests. Try again later.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 429
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected internal error occurred.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "An unexpected internal error occurred.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 500
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "SERVICE_UNAVAILABLE",
+                    "message": "A required service is temporarily unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "A required service is temporarily unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 503
+          }
+        },
+        "security": [
+          {
+            "DeliveryBearer": []
+          },
+          {}
+        ],
+        "summary": "Inspect entry validators without a body",
+        "tags": [
+          "Entries"
+        ]
+      },
+      "options": {
+        "description": "Delivery permits wildcard, non-credentialed CORS for GET and HEAD. Authorization is accepted as a request header but browser credentials mode is not enabled.",
+        "responses": {
+          "204": {
+            "description": "The requested GET or HEAD preflight is allowed.",
+            "headers": {
+              "Access-Control-Allow-Headers": {
+                "description": "The closed Delivery request-header allowlist.",
+                "schema": {
+                  "example": "Authorization, If-None-Match, If-Modified-Since, Traceparent, X-Request-Id",
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Methods": {
+                "description": "Supported Delivery methods.",
+                "schema": {
+                  "example": "GET, HEAD, OPTIONS",
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "description": "Always `*` for Delivery.",
+                "schema": {
+                  "const": "*",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "FORBIDDEN",
+                    "message": "The requested Delivery preflight is not allowed.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The requested Delivery preflight is not allowed.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The requested Delivery preflight is not allowed.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 403
+          }
+        },
+        "security": [],
+        "summary": "Inspect Delivery cross-origin request support"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentKey}/collections/{collectionKey}/entries/by/{fieldKey}": {
+      "get": {
+        "description": "Resolves exactly one current publication through a configured unique field in the requested locale.",
+        "operationId": "getDeliveryEntryByUniqueField",
+        "parameters": [
+          {
+            "description": "Stable project UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000001",
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Canonical environment key.",
+            "example": "main",
+            "in": "path",
+            "name": "environmentKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9-]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Published collection API key.",
+            "example": "posts",
+            "in": "path",
+            "name": "collectionKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "One explicit enabled canonical BCP 47 locale. Delivery never falls back to another locale.",
+            "example": "en",
+            "in": "query",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "description": "A configured unique-lookup field key.",
+            "example": "slug",
+            "in": "path",
+            "name": "fieldKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The exact typed unique value. At most 2,048 characters.",
+            "example": "delivery-api-quickstart",
+            "in": "query",
+            "name": "value",
+            "required": true,
+            "schema": {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated configured reference paths. At most 10 unique paths, each one or two field-key segments. Expansion follows pinned publication references and never silently truncates.",
+            "example": "author,related_entry.author",
+            "in": "query",
+            "name": "expand",
+            "required": false,
+            "schema": {
+              "maxLength": 639,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Strong or weak ETag validator. Takes precedence over If-Modified-Since.",
+            "in": "header",
+            "name": "If-None-Match",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Conservative HTTP-date validator used only when If-None-Match is absent.",
+            "in": "header",
+            "name": "If-Modified-Since",
+            "required": false,
+            "schema": {
+              "format": "http-date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "collection": "posts",
+                    "collectionId": "019fae8b-1234-7000-8000-000000000002",
+                    "data": {
+                      "slug": "delivery-api-quickstart",
+                      "title": "Delivery API quickstart"
+                    },
+                    "id": "019fae8b-1234-7000-8000-000000000003",
+                    "locale": "en",
+                    "publication": {
+                      "id": "019fae8b-1234-7000-8000-000000000004",
+                      "publishedAt": "2026-08-11T12:00:00.000Z",
+                      "schemaRevisionId": "019fae8b-1234-7000-8000-000000000005",
+                      "sequence": 3
+                    }
+                  },
+                  "error": null,
+                  "message": "Delivery entry loaded.",
+                  "ok": true
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryItemResponse"
+                }
+              }
+            },
+            "description": "The exact-locale published entry.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "304": {
+            "description": "The authenticated representation has not changed. 304 never includes a body.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_QUERY_INVALID",
+                    "message": "The request path or strict query grammar is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The request path or strict query grammar is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The request path or strict query grammar is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 400
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "CREDENTIAL_INVALID",
+                    "message": "A required or supplied Delivery credential is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "A required or supplied Delivery credential is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required or supplied Delivery credential is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 401
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The exact project, environment, collection, locale, or publication is unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 404
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_RESPONSE_TOO_LARGE",
+                    "message": "The requested representation exceeds 4 MiB.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The requested representation exceeds 4 MiB.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The requested representation exceeds 4 MiB.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 413
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "RATE_LIMITED",
+                    "message": "Too many requests. Try again later.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "Too many requests. Try again later.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "Too many requests. Try again later.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 429
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected internal error occurred.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "An unexpected internal error occurred.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 500
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "SERVICE_UNAVAILABLE",
+                    "message": "A required service is temporarily unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "A required service is temporarily unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 503
+          }
+        },
+        "security": [
+          {
+            "DeliveryBearer": []
+          },
+          {}
+        ],
+        "summary": "Get the current entry by unique field",
+        "tags": [
+          "Entries"
+        ]
+      },
+      "head": {
+        "description": "Authentication, authorization, rate limits, and conditional validators are identical to GET.",
+        "operationId": "headDeliveryEntryByUniqueField",
+        "parameters": [
+          {
+            "description": "Stable project UUID.",
+            "example": "019fae8b-1234-7000-8000-000000000001",
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Canonical environment key.",
+            "example": "main",
+            "in": "path",
+            "name": "environmentKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9-]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Published collection API key.",
+            "example": "posts",
+            "in": "path",
+            "name": "collectionKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "One explicit enabled canonical BCP 47 locale. Delivery never falls back to another locale.",
+            "example": "en",
+            "in": "query",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "description": "A configured unique-lookup field key.",
+            "example": "slug",
+            "in": "path",
+            "name": "fieldKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The exact typed unique value. At most 2,048 characters.",
+            "example": "delivery-api-quickstart",
+            "in": "query",
+            "name": "value",
+            "required": true,
+            "schema": {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated configured reference paths. At most 10 unique paths, each one or two field-key segments. Expansion follows pinned publication references and never silently truncates.",
+            "example": "author,related_entry.author",
+            "in": "query",
+            "name": "expand",
+            "required": false,
+            "schema": {
+              "maxLength": 639,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Strong or weak ETag validator. Takes precedence over If-Modified-Since.",
+            "in": "header",
+            "name": "If-None-Match",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Conservative HTTP-date validator used only when If-None-Match is absent.",
+            "in": "header",
+            "name": "If-Modified-Since",
+            "required": false,
+            "schema": {
+              "format": "http-date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entry metadata only. HEAD never includes a response body.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "304": {
+            "description": "The authenticated representation has not changed. 304 never includes a body.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_QUERY_INVALID",
+                    "message": "The request path or strict query grammar is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The request path or strict query grammar is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The request path or strict query grammar is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 400
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "CREDENTIAL_INVALID",
+                    "message": "A required or supplied Delivery credential is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "A required or supplied Delivery credential is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required or supplied Delivery credential is invalid.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 401
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The exact project, environment, collection, locale, or publication is unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The exact project, environment, collection, locale, or publication is unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 404
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "DELIVERY_RESPONSE_TOO_LARGE",
+                    "message": "The requested representation exceeds 4 MiB.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The requested representation exceeds 4 MiB.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The requested representation exceeds 4 MiB.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 413
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "RATE_LIMITED",
+                    "message": "Too many requests. Try again later.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "Too many requests. Try again later.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "Too many requests. Try again later.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Last-Modified": {
+                "$ref": "#/components/headers/LastModified"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 429
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected internal error occurred.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "An unexpected internal error occurred.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 500
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "SERVICE_UNAVAILABLE",
+                    "message": "A required service is temporarily unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "A required service is temporarily unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 503
+          }
+        },
+        "security": [
+          {
+            "DeliveryBearer": []
+          },
+          {}
+        ],
+        "summary": "Inspect entry validators without a body",
+        "tags": [
+          "Entries"
+        ]
+      },
+      "options": {
+        "description": "Delivery permits wildcard, non-credentialed CORS for GET and HEAD. Authorization is accepted as a request header but browser credentials mode is not enabled.",
+        "responses": {
+          "204": {
+            "description": "The requested GET or HEAD preflight is allowed.",
+            "headers": {
+              "Access-Control-Allow-Headers": {
+                "description": "The closed Delivery request-header allowlist.",
+                "schema": {
+                  "example": "Authorization, If-None-Match, If-Modified-Since, Traceparent, X-Request-Id",
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Methods": {
+                "description": "Supported Delivery methods.",
+                "schema": {
+                  "example": "GET, HEAD, OPTIONS",
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "description": "Always `*` for Delivery.",
+                "schema": {
+                  "const": "*",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "FORBIDDEN",
+                    "message": "The requested Delivery preflight is not allowed.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The requested Delivery preflight is not allowed.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryApiFailure"
+                }
+              }
+            },
+            "description": "The requested Delivery preflight is not allowed.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 403
+          }
+        },
+        "security": [],
+        "summary": "Inspect Delivery cross-origin request support"
+      }
+    }
+  },
+  "security": [
+    {
+      "DeliveryBearer": []
+    },
+    {}
+  ],
+  "servers": [
+    {
+      "description": "Current installation",
+      "url": "/api/delivery/v1"
+    }
+  ],
+  "tags": [
+    {
+      "description": "Published exact-locale content reads.",
+      "name": "Entries"
+    }
+  ]
+}

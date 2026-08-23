@@ -1,0 +1,19 @@
+// Defines the source-controlled MDX collection and public documentation page tree.
+
+import { loader } from "fumadocs-core/source";
+import { defineDocs } from "fumadocs-mdx/macro";
+
+export const docs = defineDocs({
+  dir: "content/docs",
+  docs: {
+    async: true,
+    postprocess: {
+      includeProcessedMarkdown: true,
+    },
+  },
+});
+
+export const source = loader({
+  baseUrl: "/docs",
+  source: docs.toFumadocsSource(),
+});

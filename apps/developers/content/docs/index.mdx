@@ -1,0 +1,53 @@
+---
+title: Introduction
+description: Understand the Framer for Devs content lifecycle and choose the right integration path.
+---
+
+{/* Introduces the public product model without duplicating wire-level API contracts. */}
+
+Framer for Devs is a structured content platform for teams that want a safe authoring experience without giving up control of their frontend code, rendering, deployment, or infrastructure.
+
+The platform turns one versioned content model into client-friendly forms, independent locale drafts, immutable publications, typed developer tooling, and reliable publication events.
+
+## How the Product Works
+
+```text
+Model content
+→ Author localized drafts
+→ Publish one locale
+→ Read an immutable snapshot
+→ React to a signed publication event
+```
+
+A **project** contains optional capabilities. Its initial `main` environment contains required English (`en`) plus any additional locales you enable. Collections define stable content contracts, entries hold shared and localized drafts, and each locale publishes independently.
+
+## Choose an Integration Path
+
+- **Start building** if you want to create a project and retrieve your first publication.
+- **SDK** if your project already has published content and you want a typed client.
+- **CLI** if you want to pull published schemas and generate project-specific types and validators.
+- **Webhooks** if your frontend needs precise cache invalidation or build triggers.
+
+## Public Surfaces
+
+Framer for Devs keeps each public surface independent:
+
+- **Delivery v1** serves published locale snapshots.
+- **Preview v1** lets trusted server-side tools inspect current and historical drafts.
+- **Tooling v1** lets the official CLI discover projects and retrieve immutable published schemas.
+- **Webhook data v1** reports publication state changes.
+
+You can build without reading their wire schemas. When exact protocol details matter, use the secondary API contract reference linked from the documentation navigation.
+
+## Core Guarantees
+
+- Draft changes never appear in Delivery.
+- Every content read names an explicit locale; there is no silent fallback.
+- Publishing one locale does not publish another.
+- Shared values are copied into each immutable locale publication.
+- Public schemas and generated code come only from published schema revisions.
+- Credentials remain scoped to their intended API family and environment.
+
+## Next Step
+
+Follow [Start Building](/docs/get-started) to understand the complete first-success path.

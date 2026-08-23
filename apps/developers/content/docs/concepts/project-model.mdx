@@ -1,0 +1,32 @@
+---
+title: Projects and Environments
+description: Understand project capability boundaries, the initial main environment, and scoped authority.
+---
+
+{/* Explains project and environment scope without exposing private management contracts. */}
+
+A **project** is the stable container for content, members, credentials, events, and future site capabilities. Enabling CMS adds content resources without converting the project into a separate project type.
+
+## The Initial Environment
+
+Every project starts with one visible environment named `main`. Environment identity is nevertheless present in credentials, API routes, publications, events, generated locks, and cache tags so additional environments can be introduced without rewriting public contracts.
+
+Never treat `main` as a global environment. It belongs to exactly one project.
+
+## Scoped Authority
+
+Credentials and authorization are checked against project and environment scope on every protected request. A valid credential for one project or environment cannot enumerate or read another.
+
+Different credential families have different purposes:
+
+- Delivery credentials read published snapshots.
+- Preview credentials inspect drafts from trusted servers.
+- Management credentials can provide narrowly scoped CI schema access.
+- OAuth device tokens let an interactive CLI act with the current user's membership.
+- Webhook secrets verify outbound publication events.
+
+These authorities are not interchangeable.
+
+## Capabilities
+
+CMS can be enabled or disabled independently of future capabilities. Public content and tooling endpoints fail closed when required project capability or lifecycle authority is unavailable.

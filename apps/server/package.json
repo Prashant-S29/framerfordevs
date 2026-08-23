@@ -18,6 +18,7 @@
     "@framerfordevs/auth": "workspace:*",
     "@framerfordevs/db": "workspace:*",
     "@framerfordevs/env": "workspace:*",
+    "@framerfordevs/public-contracts": "workspace:*",
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",

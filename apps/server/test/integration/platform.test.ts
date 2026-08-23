@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
 import { db } from "@framerfordevs/db";
-import { eq, or } from "@framerfordevs/db/query";
+import { and, eq, or } from "@framerfordevs/db/query";
 import {
   apiCredential,
   apiCredentialScope,
@@ -70,7 +70,13 @@ beforeAll(async () => {
 afterAll(async () => {
   await db
     .delete(auditEvent)
-    .where(or(eq(auditEvent.actorId, firstUserId), eq(auditEvent.actorId, secondUserId)));
+    .where(
+      or(
+        eq(auditEvent.actorId, firstUserId),
+        eq(auditEvent.actorId, secondUserId),
+        eq(auditEvent.projectId, projectId),
+      ),
+    );
   const credentialRows = await db
     .select({ id: apiCredential.id })
     .from(apiCredential)
@@ -1026,6 +1032,76 @@ describe.sequential("platform API contracts", () => {
     expect(revoked.status).toBe(200);
     expect(revoked.body.json.data.revokedAt).toBeTypeOf("string");
     expect(JSON.stringify(revoked.body)).not.toContain(key);
+
+    const management = await rpc(firstAgent, "platform/projects/credentials/issue", {
+      projectId,
+      environmentId,
+      family: "management",
+      name: "Tooling CI key",
+      scopes: ["schema.read"],
+      expiresAt: null,
+    });
+    const managementKey = management.body.json.data.key;
+    const managementCredential = management.body.json.data.credential;
+    const manifestPath = `/api/tooling/v1/projects/${projectId}/environments/main/schema/manifest?limit=20`;
+    const manifest = await request(app)
+      .get(manifestPath)
+      .set("Authorization", `Bearer ${managementKey}`);
+    const manifestEtag = manifest.headers.etag;
+    if (typeof manifestEtag !== "string") throw new Error("Tooling manifest ETag is missing.");
+    const head = await request(app)
+      .head(manifestPath)
+      .set("Authorization", `Bearer ${managementKey}`);
+    const notModified = await request(app)
+      .get(manifestPath)
+      .set("Authorization", `Bearer ${managementKey}`)
+      .set("If-None-Match", manifestEtag);
+    const discoveryDenied = await request(app)
+      .get("/api/tooling/v1/projects?limit=1")
+      .set("Authorization", `Bearer ${managementKey}`);
+    const otherTenant = await request(app)
+      .get(`/api/tooling/v1/projects/${randomUUID()}/environments/main/schema/manifest?limit=20`)
+      .set("Authorization", `Bearer ${managementKey}`);
+
+    expect(management.status).toBe(200);
+    expect(managementKey).toMatch(/^ffd_mgmt_[0-9a-f-]{36}_[A-Za-z0-9_-]{43}$/u);
+    expect(manifest.status).toBe(200);
+    expect(manifest.body.data).toMatchObject({
+      projectId,
+      environmentId,
+      environmentKey: "main",
+      collections: [],
+      nextCursor: null,
+    });
+    expect(manifest.headers["cache-control"]).toBe("private, no-cache");
+    expect(manifest.headers.vary).toContain("Authorization");
+    expect(manifest.headers.etag).toBeTypeOf("string");
+    expect(head.status).toBe(200);
+    expect(head.text).toBeUndefined();
+    expect(head.headers.etag).toBe(manifestEtag);
+    expect(notModified.status).toBe(304);
+    expect(notModified.text).toBe("");
+    expect(discoveryDenied.status).toBe(403);
+    expect(otherTenant.status).toBe(403);
+
+    const manifestAudits = await db
+      .select({ id: auditEvent.id })
+      .from(auditEvent)
+      .where(
+        and(
+          eq(auditEvent.actorId, managementCredential.id),
+          eq(auditEvent.action, "tooling.schema_manifest.read"),
+        ),
+      );
+    expect(manifestAudits).toHaveLength(3);
+    await db.delete(auditEvent).where(eq(auditEvent.actorId, managementCredential.id));
+
+    const managementRevoked = await rpc(firstAgent, "platform/projects/credentials/revoke", {
+      credentialId: managementCredential.id,
+      version: managementCredential.version,
+    });
+    expect(managementRevoked.status).toBe(200);
+    expect(JSON.stringify(managementRevoked.body)).not.toContain(managementKey);
   });
 
   it("archives into the archived cursor list and blocks future mutations", async () => {

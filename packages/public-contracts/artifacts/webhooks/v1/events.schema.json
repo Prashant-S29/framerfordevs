@@ -1,0 +1,631 @@
+{
+  "$defs": {
+    "CollectionWebhookAggregateAuthority": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "sequence": {
+          "description": "a number greater than or equal to 1",
+          "minimum": 1,
+          "title": "greaterThanOrEqualTo(1)",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "cms.collection"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "sequence"
+      ],
+      "type": "object"
+    },
+    "EntryPublishedWebhookData": {
+      "additionalProperties": false,
+      "properties": {
+        "aggregate": {
+          "$ref": "#/$defs/EntryWebhookAggregateAuthority"
+        },
+        "changes": {
+          "$ref": "#/$defs/WebhookChangeAuthority"
+        },
+        "collectionId": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "entryId": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "environmentId": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "invalidation": {
+          "$ref": "#/$defs/WebhookInvalidationAuthority"
+        },
+        "locale": {
+          "$ref": "#/$defs/WebhookLocaleAuthority"
+        },
+        "projectId": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "publication": {
+          "$ref": "#/$defs/WebhookPublicationAuthority"
+        },
+        "schema": {
+          "$ref": "#/$defs/EntryWebhookSchemaAuthority"
+        },
+        "version": {
+          "enum": [
+            1
+          ],
+          "type": "number"
+        }
+      },
+      "required": [
+        "version",
+        "projectId",
+        "environmentId",
+        "collectionId",
+        "entryId",
+        "locale",
+        "publication",
+        "aggregate",
+        "schema",
+        "changes",
+        "invalidation"
+      ],
+      "type": "object"
+    },
+    "EntryPublishedWebhookEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/EntryPublishedWebhookData"
+        },
+        "datacontenttype": {
+          "enum": [
+            "application/json"
+          ],
+          "type": "string"
+        },
+        "id": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "source": {
+          "description": "a string matching the pattern ^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
+          "title": "maxLength(160)",
+          "type": "string"
+        },
+        "specversion": {
+          "enum": [
+            "1.0"
+          ],
+          "type": "string"
+        },
+        "subject": {
+          "description": "a string matching the pattern ^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
+          "maxLength": 64,
+          "minLength": 46,
+          "pattern": "^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
+          "title": "maxLength(64)",
+          "type": "string"
+        },
+        "time": {
+          "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "cms.entry.published"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "specversion",
+        "id",
+        "source",
+        "subject",
+        "time",
+        "datacontenttype",
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "EntryUnpublishedWebhookData": {
+      "additionalProperties": false,
+      "properties": {
+        "aggregate": {
+          "$ref": "#/$defs/EntryWebhookAggregateAuthority"
+        },
+        "changes": {
+          "$ref": "#/$defs/WebhookChangeAuthority"
+        },
+        "collectionId": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "entryId": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "environmentId": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "invalidation": {
+          "$ref": "#/$defs/WebhookInvalidationAuthority"
+        },
+        "locale": {
+          "$ref": "#/$defs/WebhookLocaleAuthority"
+        },
+        "projectId": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "publication": {
+          "$ref": "#/$defs/WebhookPublicationAuthority"
+        },
+        "schema": {
+          "$ref": "#/$defs/EntryWebhookSchemaAuthority"
+        },
+        "version": {
+          "enum": [
+            1
+          ],
+          "type": "number"
+        }
+      },
+      "required": [
+        "version",
+        "projectId",
+        "environmentId",
+        "collectionId",
+        "entryId",
+        "locale",
+        "publication",
+        "aggregate",
+        "schema",
+        "changes",
+        "invalidation"
+      ],
+      "type": "object"
+    },
+    "EntryUnpublishedWebhookEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/EntryUnpublishedWebhookData"
+        },
+        "datacontenttype": {
+          "enum": [
+            "application/json"
+          ],
+          "type": "string"
+        },
+        "id": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "source": {
+          "description": "a string matching the pattern ^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
+          "title": "maxLength(160)",
+          "type": "string"
+        },
+        "specversion": {
+          "enum": [
+            "1.0"
+          ],
+          "type": "string"
+        },
+        "subject": {
+          "description": "a string matching the pattern ^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
+          "maxLength": 64,
+          "minLength": 46,
+          "pattern": "^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
+          "title": "maxLength(64)",
+          "type": "string"
+        },
+        "time": {
+          "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "cms.entry.unpublished"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "specversion",
+        "id",
+        "source",
+        "subject",
+        "time",
+        "datacontenttype",
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "EntryWebhookAggregateAuthority": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "sequence": {
+          "description": "a number greater than or equal to 1",
+          "minimum": 1,
+          "title": "greaterThanOrEqualTo(1)",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "cms.entry"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "sequence"
+      ],
+      "type": "object"
+    },
+    "EntryWebhookSchemaAuthority": {
+      "additionalProperties": false,
+      "properties": {
+        "contractHash": {
+          "description": "a string matching the pattern ^[0-9a-f]{64}$",
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "length(64)",
+          "type": "string"
+        },
+        "revisionId": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "revisionId",
+        "contractHash"
+      ],
+      "type": "object"
+    },
+    "PublishedWebhookSchemaAuthority": {
+      "additionalProperties": false,
+      "properties": {
+        "contractHash": {
+          "description": "a string matching the pattern ^[0-9a-f]{64}$",
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "length(64)",
+          "type": "string"
+        },
+        "revisionId": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "schemaHash": {
+          "description": "a string matching the pattern ^[0-9a-f]{64}$",
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "length(64)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "revisionId",
+        "schemaHash",
+        "contractHash"
+      ],
+      "type": "object"
+    },
+    "SchemaPublishedWebhookData": {
+      "additionalProperties": false,
+      "properties": {
+        "aggregate": {
+          "$ref": "#/$defs/CollectionWebhookAggregateAuthority"
+        },
+        "changes": {
+          "$ref": "#/$defs/WebhookChangeAuthority"
+        },
+        "collectionId": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "environmentId": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "invalidation": {
+          "$ref": "#/$defs/WebhookInvalidationAuthority"
+        },
+        "projectId": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "schema": {
+          "$ref": "#/$defs/PublishedWebhookSchemaAuthority"
+        },
+        "version": {
+          "enum": [
+            1
+          ],
+          "type": "number"
+        }
+      },
+      "required": [
+        "version",
+        "projectId",
+        "environmentId",
+        "collectionId",
+        "aggregate",
+        "schema",
+        "changes",
+        "invalidation"
+      ],
+      "type": "object"
+    },
+    "SchemaPublishedWebhookEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/SchemaPublishedWebhookData"
+        },
+        "datacontenttype": {
+          "enum": [
+            "application/json"
+          ],
+          "type": "string"
+        },
+        "id": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "source": {
+          "description": "a string matching the pattern ^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
+          "title": "maxLength(160)",
+          "type": "string"
+        },
+        "specversion": {
+          "enum": [
+            "1.0"
+          ],
+          "type": "string"
+        },
+        "subject": {
+          "description": "a string matching the pattern ^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
+          "maxLength": 64,
+          "minLength": 46,
+          "pattern": "^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
+          "title": "maxLength(64)",
+          "type": "string"
+        },
+        "time": {
+          "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "cms.schema.published"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "specversion",
+        "id",
+        "source",
+        "subject",
+        "time",
+        "datacontenttype",
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "WebhookChangeAuthority": {
+      "additionalProperties": false,
+      "properties": {
+        "fieldIds": {
+          "description": "an array of at most 1000 item(s)",
+          "items": {
+            "description": "a Universally Unique Identifier",
+            "format": "uuid",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "type": "string"
+          },
+          "maxItems": 1000,
+          "title": "maxItems(1000)",
+          "type": "array"
+        }
+      },
+      "required": [
+        "fieldIds"
+      ],
+      "type": "object"
+    },
+    "WebhookInvalidationAuthority": {
+      "additionalProperties": false,
+      "properties": {
+        "routes": {
+          "description": "an array of at most 100 item(s)",
+          "items": {
+            "description": "a string at most 512 character(s) long",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "maxLength(512)",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "maxItems(100)",
+          "type": "array"
+        },
+        "semanticTags": {
+          "description": "an array of at most 100 item(s)",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "maxItems(100)",
+          "type": "array"
+        },
+        "systemTags": {
+          "description": "an array of at most 1005 item(s)",
+          "items": {
+            "description": "a string matching the pattern ^(?:project|environment|collection|entry|locale|field):[0-9a-f-]{36}$",
+            "maxLength": 64,
+            "minLength": 38,
+            "pattern": "^(?:project|environment|collection|entry|locale|field):[0-9a-f-]{36}$",
+            "title": "maxLength(64)",
+            "type": "string"
+          },
+          "maxItems": 1005,
+          "title": "maxItems(1005)",
+          "type": "array"
+        }
+      },
+      "required": [
+        "systemTags",
+        "semanticTags",
+        "routes"
+      ],
+      "type": "object"
+    },
+    "WebhookLocaleAuthority": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "tag"
+      ],
+      "type": "object"
+    },
+    "WebhookPublicationAuthority": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "a Universally Unique Identifier",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "type": "string"
+        },
+        "sequence": {
+          "description": "a number greater than or equal to 1",
+          "minimum": 1,
+          "title": "greaterThanOrEqualTo(1)",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "sequence"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://developers.framerfordevs.example/specs/webhooks/v1/events.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/SchemaPublishedWebhookEvent"
+    },
+    {
+      "$ref": "#/$defs/EntryPublishedWebhookEvent"
+    },
+    {
+      "$ref": "#/$defs/EntryUnpublishedWebhookEvent"
+    }
+  ],
+  "title": "Framer for Developers publication webhook event",
+  "x-webhook-protocol": {
+    "headers": {
+      "id": "webhook-id",
+      "signature": "webhook-signature",
+      "timestamp": "webhook-timestamp"
+    },
+    "maximumOverlappingSignatures": 2,
+    "rawBodyRequired": true,
+    "signatureScheme": "Standard Webhooks compatible HMAC-SHA256",
+    "toleranceSeconds": 300
+  }
+}

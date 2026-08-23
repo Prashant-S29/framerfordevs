@@ -630,6 +630,8 @@ Likely migration name: `add_webhook_delivery_system`.
 
 ## Milestone 12 — Developer portal and generated tooling
 
+**Status:** Implementation and renewed automated readiness complete. The self-hosted Fumadocs/MDX developer experience, canonical secondary API references, OAuth, registry, Tooling API, generator, SDK/CLI, and release staging await renewed developer manual review.
+
 ### Goal
 
 Make public integrations discoverable and strongly typed while detecting contract drift without exposing internal application APIs.
@@ -637,6 +639,9 @@ Make public integrations discoverable and strongly typed while detecting contrac
 ### Deliverables
 
 - Public developer documentation portal (target: `developers.<product-domain>`)
+- Self-hosted Fumadocs on the existing TanStack Start application with source-controlled MDX, static search, prerendering, and no managed documentation dependency
+- Task-oriented getting-started, concepts, content-modeling, Delivery, Preview, SDK, CLI/generation, webhook, guide, troubleshooting, and product-reference documentation
+- Secondary versioned API-contract references generated from the exact canonical OpenAPI/JSON Schema artifacts rather than duplicate schema definitions
 - Explicit allowlisted public contract registry for Delivery, Preview, and webhook specifications
 - Versioned public OpenAPI/JSON Schema publication, guides, quickstarts, examples, changelog, and deprecation policy
 - CLI login and project linking
@@ -654,6 +659,10 @@ Make public integrations discoverable and strongly typed while detecting contrac
 ### Automated success criteria
 
 - The developer portal publishes only explicitly allowlisted public API families and versions.
+- The primary portal journey teaches a developer to configure, publish, consume, preview, generate, and react to content without requiring wire-contract knowledge.
+- Source-controlled MDX drives guide content and typed navigation; generated facts such as API operations, schemas, CLI command contracts, and SDK signatures are not manually redefined as a second authority.
+- Documentation, search, and API-reference assets are self-hosted and readable without a database, authentication service, API runtime, hosted search provider, or documentation SaaS.
+- API-contract references consume the exact canonical registry artifacts, remain secondary to task-oriented documentation, and lazy-load their heavy renderer.
 - Dashboard oRPC, Better Auth, workspace, authoring, membership, credential-management, and operator contracts never appear in public specifications, navigation, search, or generated clients.
 - Published OpenAPI/JSON Schema artifacts match their source contract snapshots and remain byte-stable for unchanged versions.
 - Delivery, Preview, and webhook guides use their canonical public API host and contain no tenant data or credential material.
@@ -679,11 +688,41 @@ Make public integrations discoverable and strongly typed while detecting contrac
 
 ### Manual review
 
-- Developer navigates the public portal and integrates a clean example app using only public documentation and generated tooling.
+- Developer follows the primary getting-started journey from project setup through first published-content read without opening an API contract.
+- Developer navigates the MDX portal on desktop and mobile, uses self-hosted search and page navigation, and verifies concepts, SDK, CLI, Preview, webhook, troubleshooting, and reference sections are coherent.
+- Developer opens the secondary Delivery, Preview, Tooling, and webhook contract references and confirms they derive from canonical artifacts without displacing the main documentation journey.
+- Developer integrates a clean example app using only public documentation and generated tooling.
 
 ---
 
-## Milestone 13 — Client handover and editorial safety
+## Milestone 13 — Code-first schema and content authoring with a local agent-first editor
+
+**Status:** Proposal only in `proposals/m13-code-first-schema-and-local-agent-editor.md`. Discovery and design begin only after M12 is complete and the developer explicitly authorizes them.
+
+### Goal
+
+Make schema and content authoring agent-first without weakening the existing versioned schema, validation, publication, and concurrency authorities.
+
+### Proposed direction — not yet approved design
+
+- Define collection schemas as code in the developer's repository.
+- Push schema changes through the existing validate, classify, breaking-change acknowledgment, and publish lifecycle.
+- Add scoped CLI/scripted entry draft and locale publication operations.
+- Extract and reuse the M6 generated content-form renderer in a localhost editor connected to the real hosted project.
+- Retire the dashboard's collection-structure builder while retaining GUI-editable editor layout, help text, grouping, tabs, and role visibility.
+- Preserve the database as content authority and the published code schema as collection-structure authority.
+- Preserve server-side validation, optimistic concurrency, immutable schema revisions, stable IDs, exact numeric handling, independent locale publication, audits, and outbox events.
+
+### Design gate
+
+- Do not treat the proposal as an implementation design or reopen M9–M12.
+- After M12 approval and completion, re-run full discovery against then-current requirements, rules, code, tests, package configuration, migrations, decisions, learnings, and applicable skills.
+- Produce M13 deliverables, automated success criteria, manual review, security/performance/observability gates, migration impact, and an explicit approval-requested list.
+- Do not remove the dashboard schema builder, add write APIs/scopes, publish packages, or implement the local editor before the M13 design receives explicit developer approval.
+
+---
+
+## Milestone 14 — Client handover and editorial safety
 
 ### Goal
 
@@ -722,7 +761,7 @@ Make the CMS safe and comfortable for non-technical clients.
 
 ---
 
-## Milestone 14 — Production hardening and operational readiness
+## Milestone 15 — Production hardening and operational readiness
 
 ### Goal
 
@@ -779,7 +818,7 @@ Prove the CMS can operate production websites safely and predictably.
 
 ---
 
-## Milestone 15 — Visual-builder readiness contracts
+## Milestone 16 — Visual-builder readiness contracts
 
 ### Goal
 

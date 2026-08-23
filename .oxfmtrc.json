@@ -1,3 +1,10 @@
 {
-  "ignorePatterns": [".agents/**", ".repos/**", "packages/db/src/migrations/**"]
+  "ignorePatterns": [
+    ".agents/**",
+    ".repos/**",
+    "apps/*/src/routeTree.gen.ts",
+    "packages/db/src/migrations/**",
+    "packages/public-contracts/artifacts/**",
+    "packages/public-contracts/baselines/**"
+  ]
 }

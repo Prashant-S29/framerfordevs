@@ -1,0 +1,26 @@
+---
+title: Drafts and Revisions
+description: Read current draft heads and explicit historical schema interpretations safely.
+---
+
+{/* Explains current and historical Preview selectors and validation semantics. */}
+
+## Current Draft
+
+A current Preview read resolves the entry's latest shared and exact-locale draft heads, then interprets them with current schema authority. Concurrent saves can change a later current read.
+
+Use current Preview for editorial feedback loops where the latest saved draft is desired.
+
+## Explicit Revision
+
+A historical Preview read names one schema revision. Use it when reproducing how a draft was interpreted at a known contract point or when a generated client encounters a revision it does not currently lock.
+
+Historical revision identity does not imply published content. Delivery remains the only production snapshot authority.
+
+## Validation Issues
+
+Drafts can preserve partial authoring state that is not publishable yet. Preview returns bounded path-aware validation issues so a trusted UI can explain what remains incomplete.
+
+A transport-valid Preview response must not be rejected merely because its draft value fails a publication constraint such as minimum length. Generated Preview validators therefore preserve structural safety while leaving publishability to response validation metadata.
+
+For exact selectors and response models, inspect the [Preview v1 contract](/api-reference/preview/v1).

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { assert, describe, it, layer } from "@effect/vitest";
 import { Effect, Exit, Schema } from "effect";
 
@@ -39,6 +41,7 @@ import {
   fingerprintSchemaPublication,
   hashCollectionContract,
   hashCollectionDraft,
+  hashPublishedSchemaRevision,
   requiredAcknowledgementChanges,
   validateCollectionDraft,
   type SchemaDraftState,
@@ -252,6 +255,55 @@ describe("schema draft validation", () => {
     const reversed = makeDraft([requiredSummary, optionalTitle]);
 
     assert.strictEqual(hashCollectionDraft(ordered), hashCollectionDraft(reversed));
+  });
+
+  it("reconstructs current and legacy persisted schema-hash authority", () => {
+    const draft = makeDraft([optionalTitle]);
+    const current = hashPublishedSchemaRevision({
+      formatVersion: draft.formatVersion,
+      validationProfile: draft.validationProfile,
+      currencyRegistryProfile: draft.currencyRegistryProfile,
+      collectionApiKey: draft.collection.apiKey,
+      collectionDisplayName: draft.collection.displayName,
+      collectionDescription: draft.collection.description,
+      fields: draft.fields,
+      editorLayout: draft.editorLayout,
+    });
+    const legacyDocument = JSON.stringify({
+      collection: {
+        apiKey: "blog_posts",
+        description: "Editorial posts",
+        displayName: "Blog posts",
+      },
+      fields: [
+        {
+          apiKey: "title",
+          configuration: {},
+          deprecated: false,
+          displayLabel: "Title",
+          id: firstFieldId,
+          kind: "short_text",
+          localization: "localized",
+          position: 0,
+          required: false,
+        },
+      ],
+      formatVersion: 1,
+    });
+    const expectedLegacy = createHash("sha256").update(legacyDocument, "utf8").digest("hex");
+    const legacy = hashPublishedSchemaRevision({
+      formatVersion: 1,
+      validationProfile: "legacy-m5",
+      currencyRegistryProfile: null,
+      collectionApiKey: draft.collection.apiKey,
+      collectionDisplayName: draft.collection.displayName,
+      collectionDescription: draft.collection.description,
+      fields: draft.fields,
+      editorLayout: draft.editorLayout,
+    });
+
+    assert.strictEqual(current, hashCollectionDraft(draft));
+    assert.strictEqual(legacy, expectedLegacy);
   });
 
   it("keeps the contract hash stable for layout-only management changes", () => {

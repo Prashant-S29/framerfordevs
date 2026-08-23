@@ -10,6 +10,9 @@ export const rateLimitPolicyValues = [
   "preview.credential",
   "preview.global",
   "preview.user",
+  "tooling.credential",
+  "tooling.global",
+  "tooling.user",
   "webhook.replay.user",
 ] as const;
 
@@ -89,6 +92,24 @@ export const rateLimitPolicies = {
     limitPerInterval: 300,
     intervalMs: 60_000,
     capacity: 50,
+  },
+  "tooling.credential": {
+    policy: "tooling.credential",
+    limitPerInterval: 600,
+    intervalMs: 60_000,
+    capacity: 100,
+  },
+  "tooling.global": {
+    policy: "tooling.global",
+    limitPerInterval: 12_000,
+    intervalMs: 60_000,
+    capacity: 1_000,
+  },
+  "tooling.user": {
+    policy: "tooling.user",
+    limitPerInterval: 600,
+    intervalMs: 60_000,
+    capacity: 100,
   },
   "webhook.replay.user": {
     policy: "webhook.replay.user",

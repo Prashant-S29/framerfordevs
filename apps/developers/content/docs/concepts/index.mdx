@@ -1,0 +1,39 @@
+---
+title: Core Concepts
+description: Learn the stable resources and lifecycle boundaries shared by every Framer for Devs integration.
+---
+
+{/* Introduces the durable product model that connects authoring, publication, and delivery. */}
+
+Framer for Devs separates authoring state from production delivery while keeping both attached to stable project resources.
+
+## The Resource Model
+
+```text
+Workspace
+└── Project
+    └── Environment (`main` initially)
+        ├── Locales
+        ├── Collections and schema revisions
+        ├── Entries and draft revisions
+        ├── Locale publications
+        ├── Credentials
+        └── Webhook subscriptions
+```
+
+A project is a capability container rather than a permanent CMS-only type. Content created today can later power visual sites and deployment capabilities without migrating to a second project.
+
+## Stable Identity and Editable Names
+
+Resources use immutable IDs internally. Collections and fields additionally have developer-facing API keys, while labels and entry names remain authoring concerns. Changing a label does not change the delivery contract; changing a published API key can.
+
+## Separate Lifecycles
+
+Schemas and entries have independent draft and publication lifecycles:
+
+- Schema drafts become immutable published schema revisions.
+- Entry drafts become immutable exact-locale publications.
+- Draft saves never alter existing publications.
+- Production events describe publication changes, not ordinary edits.
+
+Continue with the [project model](/docs/concepts/project-model), [localization](/docs/concepts/localization), and [publication lifecycle](/docs/concepts/publication-lifecycle).

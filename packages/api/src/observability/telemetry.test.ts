@@ -1,7 +1,12 @@
 import { assert, describe, layer } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { Telemetry, TelemetryLive } from "./telemetry";
+import {
+  Telemetry,
+  TelemetryLive,
+  toolingPageCountBucket,
+  toolingResponseSizeBucket,
+} from "./telemetry";
 
 describe("Effect metrics", () => {
   layer(TelemetryLive)((it) => {
@@ -44,6 +49,16 @@ describe("Effect metrics", () => {
         });
         yield* telemetry.recordPreviewQueryRejection("credential_in_query");
         yield* telemetry.recordPreviewAuditFailure();
+        yield* telemetry.recordToolingRequest({
+          endpoint: "manifest",
+          subject: "oauth_user",
+          outcome: "success",
+          statusFamily: "2xx",
+          responseSizeBucket: "small",
+          pageCountBucket: "11-20",
+          durationMs: 20,
+        });
+        yield* telemetry.recordToolingOAuthVerification("success");
         yield* telemetry.recordRateLimitDecision({
           policy: "delivery.credential",
           enforcementMode: "redis",
@@ -51,7 +66,21 @@ describe("Effect metrics", () => {
         });
         yield* telemetry.recordRateLimitStore({ result: "success", durationMs: 2 });
 
-        assert.isTrue(true);
+        assert.deepStrictEqual([0, 1, 10, 11, 20, 21, 50].map(toolingPageCountBucket), [
+          "0",
+          "1-10",
+          "1-10",
+          "11-20",
+          "11-20",
+          "21-50",
+          "21-50",
+        ]);
+        assert.deepStrictEqual(
+          [0, 1, 65_536, 65_537, 262_144, 262_145, 1_048_576, 1_048_577].map(
+            toolingResponseSizeBucket,
+          ),
+          ["none", "small", "small", "medium", "medium", "large", "large", "near_limit"],
+        );
       }),
     );
   });

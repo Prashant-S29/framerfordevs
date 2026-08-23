@@ -290,7 +290,7 @@ A publication whose canonical hash equals the current published revision is a no
 
 ### Command-provenance retention clarification
 
-Recorded during M8 design: state-changing schema-publication command identity/fingerprint is embedded in the immutable schema revision and follows schema-history retention; there is no separate M5 command-receipt table or cleanup path. M5 no-op command IDs are not durable and retain only the narrower hash-unchanged idempotency described above. M14 owns any holistic change to schema-history, command, audit, outbox, backup, or privacy retention.
+Recorded during M8 design: state-changing schema-publication command identity/fingerprint is embedded in the immutable schema revision and follows schema-history retention; there is no separate M5 command-receipt table or cleanup path. M5 no-op command IDs are not durable and retain only the narrower hash-unchanged idempotency described above. M15 owns any holistic change to schema-history, command, audit, outbox, backup, or privacy retention.
 
 ## Database model
 

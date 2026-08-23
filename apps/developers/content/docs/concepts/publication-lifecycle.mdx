@@ -1,0 +1,40 @@
+---
+title: Publication Lifecycle
+description: Follow schemas and content from mutable drafts to immutable production authority.
+---
+
+{/* Explains the independent schema and content publication state machines. */}
+
+Framer for Devs publishes immutable records instead of turning mutable drafts into production rows.
+
+## Schema Publication
+
+```text
+Edit schema draft
+→ Validate
+→ Classify changes
+→ Acknowledge risky changes
+→ Publish immutable schema revision
+```
+
+Published schema revisions remain addressable. They determine validation and generated contract authority but do not rewrite prior content publications.
+
+## Content Publication
+
+```text
+Edit shared and locale drafts
+→ Validate exact locale and references
+→ Create immutable locale publication
+→ Update current locale pointer
+→ Commit audit and outbox event
+```
+
+Publication is atomic. The immutable snapshot, current pointer, audit, and publication event either commit together or do not commit.
+
+## Current and Historical Reads
+
+Current Delivery routes resolve the latest published pointer for one locale. Immutable routes address one publication ID and never change. Preview can inspect current drafts or an explicit historical schema revision without weakening Delivery.
+
+## Production Events
+
+Publish and unpublish operations emit canonical events through a transactional outbox. The API server does not deliver webhooks; a dedicated worker signs and retries outbound delivery.

@@ -5,11 +5,14 @@ import { authClient } from "@/lib/auth-client";
 export const Route = createFileRoute("/_auth")({
   ssr: false,
   component: AuthLayout,
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     const session = await authClient.getSession();
     if (!session.data) {
       throw redirect({
         to: "/login",
+        search: {
+          returnTo: `${location.pathname}${location.searchStr}`,
+        },
       });
     }
     return { session };

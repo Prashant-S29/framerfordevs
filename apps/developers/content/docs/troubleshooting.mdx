@@ -1,0 +1,42 @@
+---
+title: Troubleshooting
+description: Diagnose common publication, Delivery, Preview, CLI, generation, and webhook integration problems.
+---
+
+{/* Gives actionable recovery paths without exposing internal implementation details. */}
+
+## Content Is Missing from Delivery
+
+Confirm the exact locale is published, the collection schema is published, the entry is active, and your credential can read that project and environment. Draft saves do not change Delivery.
+
+## A Reference Blocks Publication
+
+Every present reference requires a current target publication in the exact source locale. Publish the target locale or remove/correct the draft reference; the platform never falls back to another locale.
+
+## A Cursor Is Invalid or Stale
+
+Do not edit or reuse cursors across queries. Restart intentionally from page one after a collection-locale publication change and reject repeated cursors in pagination loops.
+
+## Preview Works but Delivery Does Not
+
+Preview can show unpublished or soft-invalid drafts. Resolve returned validation issues and publish the exact locale before expecting Delivery to change.
+
+## CLI Login Cannot Persist
+
+Unlock or configure the native operating-system credential store. The CLI intentionally has no plaintext refresh-token fallback.
+
+## Schema Pull Reports Concurrent Authority
+
+A schema publication changed the manifest during reconciliation. Wait for publication to finish and retry. The CLI refuses to generate a mixed lock.
+
+## Generated Files Were Modified
+
+Review local changes and restore the owned output before regenerating. Ordinary generation will not silently overwrite unexpected edits or an unowned directory.
+
+## Webhook Signatures Fail
+
+Verify against exact raw request bytes, preserve all Standard Webhooks headers, use the correct active or retiring secret, and check clock skew. Do not parse and reserialize the body first.
+
+## Need Support Correlation
+
+Retain the response `requestId` and safe operation context. Never send credentials, authorization headers, signing secrets, or complete private content in support logs.

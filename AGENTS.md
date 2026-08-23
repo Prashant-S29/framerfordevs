@@ -26,9 +26,10 @@
 
 ## Database migrations
 
-- Never generate, apply, push, execute, edit, or rewrite a database migration.
-- After an approved Drizzle schema change, stop at the developer-controlled migration gate and provide the exact migration name and commands.
-- Applied migration files and snapshots are immutable. Inspect them and the live database read-only after developer confirmation.
+- Never generate, apply, push, or execute a database migration, and never modify a real migration or snapshot under `packages/db/src/migrations/`.
+- After an approved Drizzle schema change, stop at each developer-controlled gate and provide the exact migration name and generation/application commands.
+- Inspect developer-generated SQL, snapshots, and journal metadata before application. If an unapplied migration needs an agreed correction, an agent may prepare only a non-authoritative gitignored draft under `tmp/migrations/`; the developer manually replaces the real file, which the agent then reinspects completely.
+- Applied migration files and snapshots are immutable. Inspect the live database read-only only after developer confirmation.
 
 ## Validation and handoff
 

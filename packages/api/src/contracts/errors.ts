@@ -156,6 +156,18 @@ export class PreviewDocumentCorruptFailure extends Schema.TaggedError<PreviewDoc
   "PreviewDocumentCorruptFailure",
 )("PreviewDocumentCorruptFailure", {}) {}
 
+export class ToolingCursorInvalidFailure extends Schema.TaggedError<ToolingCursorInvalidFailure>(
+  "ToolingCursorInvalidFailure",
+)("ToolingCursorInvalidFailure", {}) {}
+
+export class ToolingConcurrentSchemaChangeFailure extends Schema.TaggedError<ToolingConcurrentSchemaChangeFailure>(
+  "ToolingConcurrentSchemaChangeFailure",
+)("ToolingConcurrentSchemaChangeFailure", {}) {}
+
+export class ToolingResponseTooLargeFailure extends Schema.TaggedError<ToolingResponseTooLargeFailure>(
+  "ToolingResponseTooLargeFailure",
+)("ToolingResponseTooLargeFailure", {}) {}
+
 export class WebhookDestinationUnsafeFailure extends Schema.TaggedError<WebhookDestinationUnsafeFailure>(
   "WebhookDestinationUnsafeFailure",
 )("WebhookDestinationUnsafeFailure", {}) {}
@@ -252,6 +264,9 @@ export type ApplicationError =
   | PreviewRevisionIncompatibleFailure
   | PreviewResponseTooLargeFailure
   | PreviewDocumentCorruptFailure
+  | ToolingCursorInvalidFailure
+  | ToolingConcurrentSchemaChangeFailure
+  | ToolingResponseTooLargeFailure
   | WebhookDestinationUnsafeFailure
   | WebhookDestinationResolutionFailure
   | WebhookEndpointLimitReachedFailure
@@ -296,6 +311,9 @@ export const apiErrorHttpStatus = {
   PREVIEW_QUERY_INVALID: 400,
   PREVIEW_REVISION_INCOMPATIBLE: 409,
   PREVIEW_RESPONSE_TOO_LARGE: 413,
+  TOOLING_CURSOR_INVALID: 400,
+  TOOLING_CONCURRENT_SCHEMA_CHANGE: 409,
+  TOOLING_RESPONSE_TOO_LARGE: 413,
   WEBHOOK_DESTINATION_UNSAFE: 422,
   WEBHOOK_ENDPOINT_LIMIT_REACHED: 409,
   WEBHOOK_SECRET_ROTATION_CONFLICT: 409,
@@ -577,6 +595,24 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
       return {
         code: "SERVICE_UNAVAILABLE",
         message: "The selected Preview source is temporarily unavailable.",
+        retryable: false,
+      };
+    case "ToolingCursorInvalidFailure":
+      return {
+        code: "TOOLING_CURSOR_INVALID",
+        message: "The Tooling cursor is invalid, expired, or does not match this request.",
+        retryable: false,
+      };
+    case "ToolingConcurrentSchemaChangeFailure":
+      return {
+        code: "TOOLING_CONCURRENT_SCHEMA_CHANGE",
+        message: "Published schema authority changed during reconciliation. Retry the pull.",
+        retryable: true,
+      };
+    case "ToolingResponseTooLargeFailure":
+      return {
+        code: "TOOLING_RESPONSE_TOO_LARGE",
+        message: "The Tooling response exceeds the maximum size.",
         retryable: false,
       };
     case "WebhookDestinationUnsafeFailure":

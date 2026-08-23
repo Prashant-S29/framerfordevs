@@ -1,0 +1,21 @@
+{
+  "pages": [
+    "index",
+    "---Start Building---",
+    "get-started",
+    "concepts",
+    "content-modeling",
+    "---Consume Content---",
+    "delivery",
+    "preview",
+    "---Developer Tools---",
+    "sdk",
+    "cli",
+    "webhooks",
+    "guides",
+    "troubleshooting",
+    "---Reference---",
+    "reference",
+    "api-contracts"
+  ]
+}

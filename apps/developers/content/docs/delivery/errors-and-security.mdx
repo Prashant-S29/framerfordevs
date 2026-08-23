@@ -1,0 +1,29 @@
+---
+title: Delivery Errors and Security
+description: Handle typed failures, credential boundaries, public collections, limits, and safe retries.
+---
+
+{/* Documents consumer error behavior and Delivery-specific security boundaries. */}
+
+Application failures use the discriminated `{ ok, data, error, message }` envelope with meaningful HTTP status codes.
+
+Branch application logic on `error.code`, not message text. Preserve `requestId` for support correlation and use `retryable` only as one input to a bounded retry policy.
+
+## Common Failure Classes
+
+- Validation failures indicate invalid path or query input.
+- Unauthorized or forbidden failures indicate missing or insufficient authority.
+- Not found can represent a missing, unpublished, inaccessible, or foreign-tenant resource without revealing which.
+- Invalid or stale cursor failures require a deliberate pagination restart.
+- Rate limits require bounded backoff and respect for returned protocol guidance.
+- Internal or unavailable failures should not expose infrastructure details.
+
+## Credentials
+
+Use only Delivery authority for Delivery. Preview, management, OAuth, and webhook secrets are different credential families.
+
+Keep protected credentials in server or deployment secrets. A collection explicitly configured for public delivery may be read according to its public contract; public behavior is never inferred merely because a request lacks a token.
+
+## Safe Retries
+
+Do not add hidden unbounded retries. Respect caller cancellation, apply a short request timeout, retry only documented transient failures, and cap attempts and elapsed time.

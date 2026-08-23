@@ -1,0 +1,46 @@
+---
+title: Build a Type-Safe Content Integration
+description: Connect published schema authority to runtime validation and honest historical-revision handling.
+---
+
+{/* Combines SDK and generator behavior into one task-oriented integration guide. */}
+
+Use the CLI when your application needs collection-specific TypeScript and runtime validation rather than generic JSON values.
+
+## 1. Publish the Schema
+
+Finish and publish each collection schema in the dashboard. Generation never consumes schema drafts.
+
+## 2. Link and Pull
+
+```bash
+ffd link --api https://api.example.com --project PROJECT_ID --environment main
+ffd schema pull
+```
+
+The pull reconciles two complete manifest passes around immutable revision reads. Commit the non-secret configuration and reviewed schema lock according to your team's policy.
+
+## 3. Generate
+
+```bash
+ffd generate
+```
+
+The owned output includes TypeScript, Effect Schema, JSON Schema, project OpenAPI, metadata, and project-bound client helpers.
+
+## 4. Handle Revision Recognition
+
+A current list can contain immutable publications created under older schema revisions. Generated results therefore distinguish:
+
+- `recognized_contract`: the revision matches a locked contract and data is narrowed.
+- `unrecognized_revision`: the transport remains valid, but data stays bounded unknown JSON with its stable revision ID.
+
+Do not cast the second branch to the latest type. Pull updated authority or handle the historical revision explicitly.
+
+## 5. Check Drift in CI
+
+```bash
+FFD_MANAGEMENT_TOKEN="$CI_SECRET" ffd schema check --json
+```
+
+Fail CI on stale generated output. Content-only publication does not cause type drift; published schema or locale authority can.

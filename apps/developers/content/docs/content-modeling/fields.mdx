@@ -1,0 +1,41 @@
+---
+title: Fields
+description: Choose supported field kinds, localization boundaries, validation, and generated value shapes.
+---
+
+{/* Summarizes supported field capabilities while generated contracts remain exact schema authority. */}
+
+Framer for Devs supports 18 field kinds:
+
+| Category   | Field kinds                               |
+| ---------- | ----------------------------------------- |
+| Text       | Short text, long text, email, slug, URL   |
+| Numeric    | Number, exact decimal, money              |
+| Time       | Date, date and time                       |
+| Choice     | Boolean, enum/select                      |
+| Structured | JSON, object, list, structured rich text  |
+| Relations  | Entry reference, external asset reference |
+
+## Exact Values
+
+Exact decimal values use canonical base-10 strings and never pass through binary floating-point conversion. Money combines an exact amount with an allowed currency code and does not silently round or convert currency.
+
+Dates and date-times have separate contracts. Use date for a calendar value and date-time for one exact timestamp.
+
+## Structured Values
+
+Objects may contain shared and localized children. Lists and their item subtrees use one atomic localization mode. Structured rich text remains validated renderer-independent JSON; generated HTML is never its source of truth.
+
+JSON fields allow bounded unknown JSON when a more specific object model is not appropriate. Prefer explicit fields when consumers need stable generated types.
+
+## References and Assets
+
+Entry references store stable entry identities and validate the configured target collection. Publication requires referenced targets to have a current publication in the exact source locale.
+
+External assets are structured links. The initial CMS does not upload, transform, or guarantee remote files.
+
+## Validation
+
+Available configuration depends on field kind and can include required state, defaults, uniqueness, length/range constraints, patterns, enum values, currency constraints, list bounds, and reference targets.
+
+For exact generated JSON and runtime schemas, use the CLI-generated project contract rather than copying this overview into application types.

@@ -1,0 +1,26 @@
+---
+title: Preview Security
+description: Protect draft content with server-side credentials, no-store handling, and isolated preview routes.
+---
+
+{/* Defines the non-browser Preview credential and cache boundary. */}
+
+Preview credentials expose unpublished work and must remain in trusted server infrastructure.
+
+## Never Ship Preview Authority to Browsers
+
+Do not embed Preview credentials in JavaScript, public environment variables, URLs, source maps, logs, analytics, or generated static assets. Do not build an unauthenticated proxy that turns a browser request into a reusable Preview read.
+
+A preview application should authenticate its viewer, authorize the requested project and entry, and call Preview from a protected server boundary.
+
+## Cache Isolation
+
+Preview responses and failures use `no-store`. Do not place them in shared CDN caches or mix them with Delivery cache keys. Strip Preview authority before forwarding errors to browser clients.
+
+## Origin and Redirect Safety
+
+Preview is bearer-only and rejects browser-origin use. SDK transport rejects unexpected redirects so a credential is not forwarded to another host.
+
+## Auditing and Limits
+
+Successful Preview access is audited according to server policy. Respect request, response-size, query, and rate limits; never compensate with unbounded retries or broad credential scopes.

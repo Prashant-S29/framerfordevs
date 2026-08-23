@@ -1,0 +1,30 @@
+---
+title: Reading Content
+description: Choose list, stable-ID, unique-field, current, and immutable Delivery reads.
+---
+
+{/* Teaches read selection while the canonical OpenAPI artifact owns parameters and response schemas. */}
+
+## List a Collection
+
+Use a list when rendering feeds, indexes, or server-generated route inventories. Select an explicit locale and bounded page size, then follow the returned cursor until it is `null`.
+
+Only configured fields can participate in supported filters and sorting. Unknown, duplicate, oversized, or unsupported query parameters fail instead of being ignored.
+
+## Read by Stable ID
+
+Use stable entry IDs when your application already persists content relationships or receives IDs from verified webhook events. Stable IDs do not change when labels, names, or slug values change.
+
+## Read by Unique Field
+
+Use a configured unique field such as `slug` for human-facing routes. Uniqueness is collection and locale aware according to its published field contract.
+
+## Read an Immutable Publication
+
+Use entry and publication IDs when a build, audit, preview comparison, or rollback workflow must reproduce one exact prior payload. Later publication and unpublication do not mutate immutable reads.
+
+## Reference Expansion
+
+Request only documented expansions and keep depth bounded. Unexpanded references remain stable IDs. Expanded values retain their own collection, locale, publication, and schema identity; consumers must not assume every historical target matches the latest generated contract.
+
+For exact query parameters and schemas, open the [Delivery v1 contract](/api-reference/delivery/v1).

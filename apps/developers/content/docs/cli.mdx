@@ -1,0 +1,82 @@
+---
+title: CLI and Code Generation
+description: Authenticate, link a project, pull published schema authority, detect drift, and generate deterministic code.
+---
+
+{/* Documents the safe CLI workflow without redefining command-parser authority or secret formats. */}
+
+The `ffd` CLI connects a local codebase to one project environment and generates deterministic developer contracts from immutable published schemas.
+
+> The CLI is release-ready but not yet published to the npm registry. Build and run the local package during M12 review.
+
+## Interactive Workflow
+
+```bash
+ffd login --api https://api.example.com --open
+ffd link --api https://api.example.com --project PROJECT_ID --environment main
+ffd schema pull
+ffd generate
+ffd schema check
+```
+
+Interactive login uses OAuth Device Authorization. The CLI displays the verification URI and user code, and opens a browser only when you request `--open`. Rotating authority is stored only in the native operating-system credential store.
+
+If secure storage is unavailable, login fails closed instead of writing a refresh token to plaintext configuration.
+
+## Headless CI
+
+CI uses an environment-bound management credential with the exact `schema.read` permission:
+
+```bash
+FFD_MANAGEMENT_TOKEN="$CI_SECRET" ffd schema check --json
+```
+
+Do not run interactive login in CI and never write the management token into repository configuration.
+
+## Project Configuration
+
+`ffd link` writes bounded, non-secret `framerfordevs.config.json` authority containing:
+
+- API origin
+- Project ID
+- Environment key
+- Generated output directory
+
+The CLI searches parent directories for exactly one configuration, rejects unknown keys and unsafe paths, and never executes project configuration as code.
+
+## Pull and Reconciliation
+
+`ffd schema pull` reads the complete paginated manifest, fetches each named immutable revision, and reads the manifest again. It accepts the result only when collection, revision, contract, and locale authority remain coherent across both passes.
+
+A concurrent schema publication restarts reconciliation once and then fails explicitly rather than creating a mixed lock.
+
+## Generated Output
+
+`ffd generate` owns one configured directory and produces:
+
+```text
+client.ts
+schema.ts
+schema.json
+openapi.json
+metadata.json
+index.ts
+```
+
+The lock lives at `.framerfordevs/schema.lock.json`. Outputs contain no credentials, actor identities, content entries, machine paths, or wall-clock timestamps.
+
+Generation plans and validates every byte before replacing the owned directory. It refuses unsafe symlinks, unowned output, and unexpected modifications.
+
+## Drift Checks
+
+`ffd schema check` distinguishes additive, potentially breaking, breaking, locale, metadata-only, generated-file, collection, and concurrent-authority drift. Exact up-to-date output is the default CI success state.
+
+Content-only publication never reports type drift because generated authority comes from published schemas rather than entry values.
+
+## Troubleshooting
+
+- **Credential store unavailable:** unlock or configure the native OS credential service.
+- **Browser did not open:** repeat login without `--open` and open the displayed localhost-or-HTTPS verification URL yourself.
+- **Authority changed during pull:** wait for schema publication to finish and retry.
+- **Generated files modified:** review local edits and restore or use an explicitly reviewed recovery path.
+- **Schema check failed in CI:** run pull and generate locally, inspect the stable-ID diff, and commit the reviewed output.

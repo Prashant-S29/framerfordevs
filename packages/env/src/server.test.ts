@@ -8,6 +8,8 @@ const environmentKeys = [
   "BETTER_AUTH_SECRET",
   "BETTER_AUTH_URL",
   "CORS_ORIGIN",
+  "TOOLING_API_RESOURCE",
+  "OAUTH_DEVICE_AUTHORIZATION_ENABLED",
   "OTEL_EXPORTER_OTLP_ENDPOINT",
   "OTEL_SERVICE_NAME",
   "OTEL_SERVICE_VERSION",
@@ -40,6 +42,8 @@ beforeEach(() => {
   process.env.BETTER_AUTH_SECRET = "test-secret-that-is-at-least-32-characters";
   process.env.BETTER_AUTH_URL = "http://localhost:3000";
   process.env.CORS_ORIGIN = "http://localhost:3001";
+  delete process.env.TOOLING_API_RESOURCE;
+  delete process.env.OAUTH_DEVICE_AUTHORIZATION_ENABLED;
   delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   delete process.env.OTEL_SERVICE_NAME;
   delete process.env.OTEL_SERVICE_VERSION;
@@ -85,6 +89,8 @@ describe("server environment", () => {
     expect(env.BETTER_AUTH_SECRET.length).toBeGreaterThanOrEqual(32);
     expect(new URL(env.BETTER_AUTH_URL)).toBeInstanceOf(URL);
     expect(new URL(env.CORS_ORIGIN)).toBeInstanceOf(URL);
+    expect(env.TOOLING_API_RESOURCE).toBe("http://localhost:3000/api/tooling/v1");
+    expect(env.OAUTH_DEVICE_AUTHORIZATION_ENABLED).toBe(false);
     expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
     expect(env.OTEL_SERVICE_NAME).toBe("framerfordevs-server");
     expect(env.OTEL_SERVICE_VERSION).toBe("0.0.0");
@@ -167,8 +173,43 @@ describe("server environment", () => {
     expect(String(failure)).not.toContain("redis://localhost:6379");
   });
 
+  it("accepts the canonical HTTPS Tooling API OAuth resource and explicit rollout gate", async () => {
+    process.env.TOOLING_API_RESOURCE = "https://api.example.com/api/tooling/v1";
+    process.env.OAUTH_DEVICE_AUTHORIZATION_ENABLED = "true";
+
+    const { env } = await import("./server");
+
+    expect(env.TOOLING_API_RESOURCE).toBe("https://api.example.com/api/tooling/v1");
+    expect(env.OAUTH_DEVICE_AUTHORIZATION_ENABLED).toBe(true);
+  });
+
+  it("rejects a non-canonical Tooling API OAuth resource", async () => {
+    process.env.TOOLING_API_RESOURCE = "https://api.example.com/api/tooling/v1?tenant=unsafe";
+
+    await expect(import("./server")).rejects.toThrow(
+      "Tooling API OAuth resource must be the canonical Tooling v1 URL",
+    );
+  });
+
+  it("rejects a remotely insecure Tooling API OAuth resource", async () => {
+    process.env.TOOLING_API_RESOURCE = "http://api.example.com/api/tooling/v1";
+
+    await expect(import("./server")).rejects.toThrow(
+      "Tooling API OAuth resource requires HTTPS outside local development",
+    );
+  });
+
+  it("rejects an HTTP Tooling API OAuth resource in production", async () => {
+    process.env.NODE_ENV = "production";
+
+    await expect(import("./server")).rejects.toThrow(
+      "production Tooling API OAuth resource requires HTTPS",
+    );
+  });
+
   it("rejects a public management reference in production", async () => {
     process.env.NODE_ENV = "production";
+    process.env.TOOLING_API_RESOURCE = "https://api.example.com/api/tooling/v1";
     process.env.MANAGEMENT_API_REFERENCE_ENABLED = "true";
 
     const failure = await import("./server").then(
@@ -199,6 +240,7 @@ describe("server environment", () => {
     process.env.BETTER_AUTH_SECRET = invalidSecret;
     process.env.BETTER_AUTH_URL = "not-a-url";
     process.env.CORS_ORIGIN = "not-a-url";
+    process.env.TOOLING_API_RESOURCE = "not-a-url";
     process.env.NODE_ENV = "invalid";
     process.env.SKIP_ENV_VALIDATION = "false";
 

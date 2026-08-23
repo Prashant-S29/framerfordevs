@@ -64,7 +64,7 @@ This amendment therefore:
 - Requires Effect Schema encoding to inert transport JSON before replay fingerprints
 - Names every new invalidation-mapping failure boundary in schema publish, entry publish, and entry unpublish
 - Adds Docker server/worker decrypt-and-rotation continuity and combined dispatcher/attempt contention profiles
-- Records workspace quotas and weighted tenant scheduling as evidence-gated M14 work rather than inventing billing/governance semantics or allowing a hard delivery cap to drop events
+- Records workspace quotas and weighted tenant scheduling as evidence-gated M15 work rather than inventing billing/governance semantics or allowing a hard delivery cap to drop events
 - Keeps one in-flight attempt per endpoint as an intentional initial isolation/throughput trade-off
 
 The amendment does not change the event contract, SSRF model, worker architecture, authorization boundary, retry semantics, migration ownership, or milestone scope. M10's compiler extraction is correctly treated as behavior-neutral shared-code work, not another write stage inside the M8 publication transaction; M9 and M11 are the relevant transaction-path extensions.
@@ -115,16 +115,16 @@ The existing outbox lifecycle is insufficient by itself for fan-out. One event m
 - Provider-specific Vercel/Netlify/Cloudflare/CDN purge adapters
 - A managed build/deployment system
 - Dynamic path templates, slug extraction, content-value interpolation, or remote route discovery
-- Field-level route selectors and dependency-manifest-derived route invalidation; M15 owns dependency manifests
+- Field-level route selectors and dependency-manifest-derived route invalidation; M16 owns dependency manifests
 - Webhook payload transformation, custom scripts, plugins, or arbitrary code execution
 - Public webhook endpoint-management REST/OpenAPI; M11 uses protected dashboard oRPC
 - Consolidated public webhook documentation and packaged verification/invalidation SDKs; M12 owns the developer portal and generated tooling
 - Exactly-once delivery or strict network delivery ordering
 - Kafka, RabbitMQ, Redis Streams, or another broker before PostgreSQL evidence requires one
 - Cross-region active-active worker coordination
-- Workspace-wide endpoint/billing quotas, hard delivery-row quotas, and weighted tenant scheduling across the global worker pool. M11 uses the approved per-environment fan-out cap and work-conserving endpoint isolation; M14 owns evidence-based noisy-neighbor SLOs and quota/fairness policy. No future quota may silently discard an accepted publication event.
-- Finite deletion of event/delivery/attempt/audit history; M14 owns holistic retention
-- Production network-layer webhook-worker egress filtering and cloud metadata hardening; M11 keeps complete application-layer send-time validation and pinning, while M14 must add and exercise the independent deployment control without replacing or relaxing it
+- Workspace-wide endpoint/billing quotas, hard delivery-row quotas, and weighted tenant scheduling across the global worker pool. M11 uses the approved per-environment fan-out cap and work-conserving endpoint isolation; M15 owns evidence-based noisy-neighbor SLOs and quota/fairness policy. No future quota may silently discard an accepted publication event.
+- Finite deletion of event/delivery/attempt/audit history; M15 owns holistic retention
+- Production network-layer webhook-worker egress filtering and cloud metadata hardening; M11 keeps complete application-layer send-time validation and pinning, while M15 must add and exercise the independent deployment control without replacing or relaxing it
 
 ## Core invariants
 
@@ -279,7 +279,7 @@ Matching behavior:
 
 Publication/schema repositories load matching mappings inside the existing authoritative transaction immediately before the outbox insert. Mapping rows are bounded and indexed. The exact routes/tags are inserted into the outbox payload atomically with the publication state. A concurrent mapping transaction linearizes according to normal PostgreSQL visibility/row locks; the publication records precisely the mapping state it observed. Worker timing never changes an event's invalidation metadata.
 
-M15 may derive richer route/dependency mappings from visual bindings. It must extend this provider-neutral event contract rather than replacing system tag identity.
+M16 may derive richer route/dependency mappings from visual bindings. It must extend this provider-neutral event contract rather than replacing system tag identity.
 
 ## Endpoint, subscription, destination, and secret model
 
@@ -327,7 +327,7 @@ Every attempt repeats hostname and DNS validation. The HTTP transport then pins 
 
 DNS resolution is bounded to two seconds, TCP/TLS establishment through `secureConnect` is independently bounded to three seconds, and the complete request remains bounded to ten seconds. Response bodies are canceled/drained without storage and never exceed a small transport safety cap. Raw network errors are mapped to fixed categories without host/path leakage. The Node transport uses one private non-keepalive agent with a bounded 100-session TLS cache: every attempt opens a new socket and invokes its attempt-specific pinned lookup, while safe TLS session resumption preserves the approved one-endpoint throughput target. It never uses the ambient/global agent or reuses a connection across DNS validations.
 
-A DNS answer that becomes non-public is a terminal security failure for that delivery and no connection is attempted. The endpoint remains visible so a developer can replace/disable it; future events also fail closed until corrected. M14 alerting will make repeated security failures operationally actionable.
+A DNS answer that becomes non-public is a terminal security failure for that delivery and no connection is attempted. The endpoint remains visible so a developer can replace/disable it; future events also fail closed until corrected. M15 alerting will make repeated security failures operationally actionable.
 
 Implementation may add a small reviewed IP-address parsing dependency through pnpm if Node's standard library cannot correctly classify all IPv4/IPv6 forms. It must not implement ad hoc string-prefix IP security checks.
 
@@ -355,7 +355,7 @@ Two-phase endpoint secret rotation:
 
 Only one pending and one retiring secret may exist per endpoint. A new rotation cannot begin until the prior rotation is canceled/completed. Canceling a pending rotation destroys its ciphertext. Rotation lifecycle operations are optimistic, acknowledged, audited, and secret-free.
 
-Encryption-key rewrapping is an operator concern, not endpoint secret rotation. M11 will document a dry-run/explicit-apply rewrap utility or runbook if needed; the agent will not mutate production rows without developer control. M14 owns final key-rotation operations review.
+Encryption-key rewrapping is an operator concern, not endpoint secret rotation. M11 will document a dry-run/explicit-apply rewrap utility or runbook if needed; the agent will not mutate production rows without developer control. M15 owns final key-rotation operations review.
 
 ## Signature and verification protocol
 
@@ -796,7 +796,7 @@ Bounded metrics include:
 - Replay request outcome
 - Worker active slots, poll result, and graceful-shutdown outcome
 
-No tenant/resource/host/route/tag identity appears as a metric label. Queue age, dead letters, repeated destination-policy failures, and worker/database readiness are designed for M14 alert thresholds.
+No tenant/resource/host/route/tag identity appears as a metric label. Queue age, dead letters, repeated destination-policy failures, and worker/database readiness are designed for M15 alert thresholds.
 
 Worker readiness requires database connectivity, schema availability, and all referenced encryption key IDs. Liveness does not perform external DNS/HTTP. Detailed diagnostics remain internal/operator-only.
 
@@ -833,7 +833,7 @@ Worker readiness requires database connectivity, schema availability, and all re
 - Dispatcher and claims select only bounded columns and use partial indexes.
 - Worker transactions contain no DNS/HTTP and hold row locks only during claim/materialize/finalize.
 - One endpoint cannot occupy more than one in-flight slot per worker cluster. This intentionally limits a 20 ms single destination to a theoretical ceiling near 50 attempts/s; the initial acceptance target of at least 25 attempts/s reserves operational headroom. Raising per-endpoint concurrency changes receiver pressure, lease recovery, fairness, and ordering behavior and requires measured evidence plus a design amendment.
-- The 32-slot scheduler is work-conserving but offers no workspace-weighted QoS in M11. A workspace with many projects/endpoints may temporarily occupy a disproportionate share; M14 owns measured multi-tenant SLOs and any weighted scheduling/quota design.
+- The 32-slot scheduler is work-conserving but offers no workspace-weighted QoS in M11. A workspace with many projects/endpoints may temporarily occupy a disproportionate share; M15 owns measured multi-tenant SLOs and any weighted scheduling/quota design.
 - Event projection is done once; retries read exact stored bytes.
 - Attempts store metadata only, preventing response/log amplification.
 - Worker and API database pools are separately bounded and observed.
@@ -850,7 +850,7 @@ Proposed local production-build baselines with PostgreSQL on the Docker host, wo
 | Retry storm             |                       5,000 retryable failures | all scheduled once with bounded jitter; no hot polling    |
 | Crash recovery          |      repeated kills before/after send/finalize | no lost event; duplicates retain event ID; leases recover |
 
-These numbers are approval items and will be recorded as separate gates rather than collapsed into one headline result. M14 later validates combined authoring/publication/Delivery/webhook soak behavior and production SLOs.
+These numbers are approval items and will be recorded as separate gates rather than collapsed into one headline result. M15 later validates combined authoring/publication/Delivery/webhook soak behavior and production SLOs.
 
 ## Test and coverage plan
 
@@ -1070,7 +1070,7 @@ No direct data backfill invents endpoint subscriptions or sends historical event
 
 ## Retention and privacy
 
-Until M14 approves a cross-system policy:
+Until M15 approves a cross-system policy:
 
 - Outbox, canonical publication events, deliveries, attempts, replay commands, audits, destination revisions, and lifecycle metadata have project-lifetime retention.
 - No cleanup job deletes event/delivery/attempt records in M11.
@@ -1078,7 +1078,7 @@ Until M14 approves a cross-system policy:
 - Destination ciphertext remains while referenced by immutable delivery history; access remains restricted.
 - Response bodies, request/response headers, signatures, DNS answers, and raw errors are never retained.
 
-M14 must reconcile outbox/event/delivery/attempt/audit retention with backups, privacy deletion, command idempotency, dead-letter operations, and incident forensics before finite cleanup is enabled.
+M15 must reconcile outbox/event/delivery/attempt/audit retention with backups, privacy deletion, command idempotency, dead-letter operations, and incident forensics before finite cleanup is enabled.
 
 ## Decision-standard review
 
@@ -1139,7 +1139,7 @@ Developer approval authorizes these material decisions before implementation:
 15. Immutable attempts, dead letters, and authorized command-idempotent manual replay
 16. Owner/unrestricted-developer-only environment-wide webhook authority
 17. Proposed endpoint, mapping, concurrency, timeout, pool, and load limits, including intentional one-in-flight single-endpoint throughput and no M11 workspace-weighted scheduler SLO
-18. Project-lifetime provisional event/delivery/attempt retention, with workspace quotas, tenant fairness, and holistic cleanup deferred to M14 without permitting silent event loss
+18. Project-lifetime provisional event/delivery/attempt retention, with workspace quotas, tenant fairness, and holistic cleanup deferred to M15 without permitting silent event loss
 19. Developer-controlled migration `add_webhook_delivery_system`, generated and inspected for FK dependency order before separate developer application
 20. Plain transport-JSON replay fingerprints, named publication invalidation failure stages, Docker key-ring continuity, and simultaneous dispatcher/attempt contention gates
 21. Complete maximum-coverage/security/concurrency/accessibility/load gates described above

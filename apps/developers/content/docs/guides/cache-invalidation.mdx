@@ -1,0 +1,30 @@
+---
+title: Invalidate Frontend Caches from Webhooks
+description: Turn verified publication events into precise project, collection, entry, locale, and route invalidation.
+---
+
+{/* Connects verified events to framework-independent cache invalidation. */}
+
+Framer for Devs emits framework-independent invalidation authority. Your application decides whether that becomes tag eviction, path revalidation, regeneration, a build hook, or a CDN purge.
+
+## 1. Verify and Reserve
+
+Verify the exact raw webhook bytes and headers before parsing. Atomically reserve the event ID before side effects so concurrent duplicate delivery cannot process twice.
+
+## 2. Normalize Authority
+
+Use `@framerfordevs/sdk/invalidation` only after verification. The helper returns normalized stable system tags, optional semantic tags, and exact known routes without performing a network call.
+
+## 3. Map to Your Cache
+
+Include project, environment, collection, entry, and locale boundaries in cache keys. Invalidate the narrowest registered dependency set.
+
+Publishing one Gujarati entry should not evict unrelated English pages. Broader invalidation is appropriate only when your frontend has registered a shared dependency such as global navigation.
+
+## 4. Commit Before Success
+
+Persist the reservation and complete required invalidation work before returning success. If work fails, return a retryable failure and rely on idempotent handling when the event is delivered again.
+
+## 5. Observe Outcomes
+
+Track event ID, safe stable resource IDs, attempt outcome, duration, and chosen invalidation count. Never log signing secrets, authorization headers, or complete content payloads.

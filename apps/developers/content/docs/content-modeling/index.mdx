@@ -1,0 +1,36 @@
+---
+title: Content Modeling
+description: Define stable collections and field contracts that generate safe authoring and developer tooling.
+---
+
+{/* Introduces collection modeling and stable field identity. */}
+
+A collection describes a reusable content entity such as posts, authors, testimonials, navigation, or FAQs. Its published schema drives validation, generated forms, Delivery snapshots, Preview interpretation, and project-specific tooling.
+
+## Collection Identity
+
+Each collection has:
+
+- An immutable stable ID
+- A developer-facing API key
+- Editable display metadata
+- A mutable schema draft
+- An immutable published-revision history
+
+Use the API key in integrations. Labels and descriptions can evolve without changing delivered JSON.
+
+## Field Identity
+
+Every field separates:
+
+- **Stable ID** for dependencies and change tracking
+- **API key** for JSON and generated code
+- **Display label** for editors
+
+This distinction lets you improve authoring copy without creating accidental API breaks.
+
+## Model for Consumers
+
+Choose field configuration based on the contract your frontend needs, not only the form control you want. Decide required state, localization, bounds, enum values, reference targets, defaults, and supported query behavior before publication.
+
+Continue with [field types](/docs/content-modeling/fields) and the [schema lifecycle](/docs/content-modeling/schema-lifecycle).

@@ -1,0 +1,64 @@
+---
+title: SDK
+description: Configure framework-independent Delivery and Preview clients, transport validation, and webhook helpers.
+---
+
+{/* Teaches supported SDK workflows while package exports and tests remain signature authority. */}
+
+`@framerfordevs/sdk` is a framework-independent ESM package for Node.js 22 and modern standards-based runtimes. It uses standard `fetch`, preserves the public response envelope, and exposes each API family explicitly.
+
+> The package is release-ready but not yet published to the npm registry. Local tarball installation is available during M12 review.
+
+## Package Exports
+
+| Export                            | Purpose                                                |
+| --------------------------------- | ------------------------------------------------------ |
+| `@framerfordevs/sdk/client`       | Delivery v1 and Preview v1 clients                     |
+| `@framerfordevs/sdk/effect`       | Exact Effect transport schemas and decoders            |
+| `@framerfordevs/sdk/webhooks`     | Raw-byte signature verification and replay reservation |
+| `@framerfordevs/sdk/invalidation` | Normalized cache invalidation tags and routes          |
+
+## Delivery Client
+
+Create the client with an API origin, project, environment, and Delivery credential. Every content operation requires an explicit locale.
+
+Delivery supports:
+
+- Bounded collection lists
+- Stable entry ID reads
+- Configured unique-field reads
+- Immutable publication reads
+- Opaque cursor pagination
+- Conditional request validators
+- Bounded reference expansion
+
+The client does not hide the `{ ok, data, error, message }` response contract or perform unbounded retries.
+
+## Preview Client
+
+Preview is for trusted server-side tools. Configure a separate Preview client with a Preview credential and never expose it to browser JavaScript.
+
+Preview supports current drafts and explicit historical schema revisions. Responses are always `no-store` and may describe incomplete drafts, so their validation metadata remains part of the application workflow.
+
+## Runtime Validation
+
+Use the Effect export when transport data crosses an untrusted boundary. Generic transport schemas accept valid older revisions, while generated project contracts narrow data only when the returned schema revision is recognized by the current lock.
+
+This avoids mislabeling a valid historical response as malformed or casting it to the latest project type.
+
+## Errors and Cancellation
+
+SDK results retain:
+
+- HTTP status
+- Stable public error code
+- Structured details
+- Request ID
+- Retryability
+- Documented protocol headers
+
+Pass an `AbortSignal` or bounded timeout where supported. Pagination fails on repeated, invalid, or stale cursors instead of silently restarting.
+
+## Continue
+
+Use the [CLI and code generator](/docs/cli) when you want collection-specific TypeScript, Effect Schema, JSON Schema, and client helpers.

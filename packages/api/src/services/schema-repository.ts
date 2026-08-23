@@ -70,6 +70,7 @@ import {
   fingerprintSchemaPublication,
   hashCollectionContract,
   hashCollectionDraft,
+  hashPublishedSchemaRevision,
   hashSchemaContract,
   requiredAcknowledgementChanges,
   validateCollectionDraft,
@@ -435,9 +436,10 @@ async function loadPublishedRevisionRows(
   return { revision, fields };
 }
 
-function decodePublishedSync(
-  rows: NonNullable<Awaited<ReturnType<typeof loadPublishedRevisionRows>>>,
-) {
+export function decodePublishedSchemaRevisionSync(rows: {
+  readonly revision: typeof cmsSchemaRevision.$inferSelect;
+  readonly fields: ReadonlyArray<typeof cmsSchemaRevisionField.$inferSelect>;
+}) {
   const { revision, fields: fieldRows } = rows;
   const fields = decodeFieldTreeSync(fieldRows);
   const editorLayout =
@@ -451,7 +453,7 @@ function decodePublishedSync(
     collectionApiKey: revision.collectionApiKey,
     fields,
   });
-  return Schema.decodeUnknownSync(PublishedSchemaRevision)({
+  const published = Schema.decodeUnknownSync(PublishedSchemaRevision)({
     id: revision.id,
     workspaceId: revision.workspaceId,
     projectId: revision.projectId,
@@ -476,6 +478,20 @@ function decodePublishedSync(
     fields,
     editorLayout,
   });
+  const reconstructedHash = hashPublishedSchemaRevision({
+    formatVersion: published.formatVersion,
+    validationProfile: published.validationProfile,
+    currencyRegistryProfile: published.currencyRegistryProfile,
+    collectionApiKey: published.collectionApiKey,
+    collectionDisplayName: published.collectionDisplayName,
+    collectionDescription: published.collectionDescription,
+    fields: published.fields,
+    editorLayout: published.editorLayout,
+  });
+  if (reconstructedHash !== published.schemaHash) {
+    throw new Error("Published schema revision integrity check failed.");
+  }
+  return published;
 }
 
 function referenceCollectionId(
@@ -2208,7 +2224,9 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
           const rows = await loadPublishedRevisionRows(database, input);
           if (!rows || rows.revision.workspaceId !== collection.workspaceId)
             return outcome("not_found");
-          return outcomeWith("success", { revision: decodePublishedSync(rows) });
+          return outcomeWith("success", {
+            revision: decodePublishedSchemaRevisionSync(rows),
+          });
         },
         catch: (cause) => databaseFailure("schema.published.get_revision", cause),
       });
@@ -2247,7 +2265,9 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
             revisionId: collection.currentPublishedRevisionId,
           });
           if (!rows) return outcome("not_found");
-          return outcomeWith("success", { revision: decodePublishedSync(rows) });
+          return outcomeWith("success", {
+            revision: decodePublishedSchemaRevisionSync(rows),
+          });
         },
         catch: (cause) => databaseFailure("schema.published.get_latest", cause),
       });
@@ -2329,7 +2349,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
           const rows = await loadPublishedRevisionRows(database, { ...input, revisionId });
           if (!rows || rows.revision.workspaceId !== collection.workspaceId)
             return outcome("not_found");
-          const revision = decodePublishedSync(rows);
+          const revision = decodePublishedSchemaRevisionSync(rows);
           return outcomeWith("success", {
             form: generatedFormDefinition({
               source: "published",
@@ -2386,7 +2406,8 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 });
           return outcomeWith("success", {
             draft,
-            published: publishedRows === null ? null : decodePublishedSync(publishedRows),
+            published:
+              publishedRows === null ? null : decodePublishedSchemaRevisionSync(publishedRows),
           });
         },
         catch: (cause) => databaseFailure("schema.validate", cause),
@@ -2452,7 +2473,9 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 revisionId: existing.id,
               });
               if (!rows) throw new Error("Published command revision could not be loaded.");
-              return outcomeWith("success", { revision: decodePublishedSync(rows) });
+              return outcomeWith("success", {
+                revision: decodePublishedSchemaRevisionSync(rows),
+              });
             }
             if (
               collection.draftVersion !== input.draftVersion ||
@@ -2517,7 +2540,8 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                     ...input,
                     revisionId: collection.currentPublishedRevisionId,
                   });
-            const published = publishedRows === null ? null : decodePublishedSync(publishedRows);
+            const published =
+              publishedRows === null ? null : decodePublishedSchemaRevisionSync(publishedRows);
             if (published !== null && published.schemaHash === schemaHash)
               return outcomeWith("success", { revision: published });
             const changes = classifyCollectionSchemaChanges(published, draft);
@@ -2682,7 +2706,9 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               revisionId: revisionRow.id,
             });
             if (!rows) throw new Error("Published revision could not be loaded.");
-            return outcomeWith("success", { revision: decodePublishedSync(rows) });
+            return outcomeWith("success", {
+              revision: decodePublishedSchemaRevisionSync(rows),
+            });
           }),
         catch: (cause) => databaseFailure("schema.publish", cause),
       });

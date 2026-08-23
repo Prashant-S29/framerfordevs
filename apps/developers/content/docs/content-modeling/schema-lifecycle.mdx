@@ -1,0 +1,32 @@
+---
+title: Schema Versions and Changes
+description: Publish immutable revisions and understand additive, risky, breaking, and metadata-only evolution.
+---
+
+{/* Explains schema compatibility without duplicating the generator's drift algorithm. */}
+
+Schema editing is optimistic and versioned. Saving a draft does not alter the current published schema or generated tooling.
+
+## Change Classification
+
+Before publication, the platform compares the draft with the current published revision. Typical outcomes include:
+
+- Adding an optional field: additive
+- Renaming a display label: metadata-only
+- Adding a required field: potentially breaking
+- Tightening validation: potentially breaking
+- Renaming a published API key: breaking
+- Removing a field or enum value: breaking
+- Changing to an incompatible field kind: breaking
+
+Risky publication requires explicit acknowledgement. The server remains the classification authority.
+
+## Immutable Revision Authority
+
+A successful publication creates a new immutable schema revision and updates the collection's current published head. Existing content publications retain the revision against which they were compiled.
+
+## Generated Tooling
+
+Tooling reconstructs and integrity-checks the complete published revision before projecting its public contract. A layout-, help-, or role-only change may advance revision metadata without changing generated type bytes.
+
+Run `ffd schema check` in CI to detect stale generated output. Entry content changes never create schema drift.

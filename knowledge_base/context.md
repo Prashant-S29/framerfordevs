@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-08-21
-**Current phase:** Milestone 11 and post-M11 normalization work approved and committed; awaiting Milestone 12 direction
-**Active milestone:** None — Milestone 12 has not started
+**Last updated:** 2026-08-22
+**Current phase:** Milestone 12 renewed automated readiness complete; developer manual review pending
+**Active milestone:** Milestone 12 — self-hosted developer documentation and generated tooling review handoff
 
 ## Product in one paragraph
 
@@ -71,7 +71,7 @@ Apps may depend on package exports. Packages must not depend on apps, and code m
 - External input is untrusted. Validation is bounded, SQL is parameterized, and logs/metrics/errors exclude secrets and content bodies.
 - Business workflows use stable Effect v3. Promise/throwing libraries are translated at adapters; `Effect.run*` stays at process/framework boundaries.
 - The API server never sends webhooks. Only `apps/worker` performs outbound delivery.
-- Database migrations are developer-controlled. Agents never generate, apply, execute, edit, or rewrite them.
+- Database migration generation/application and every real artifact are developer-controlled. Agents never run migration tooling or modify `packages/db/src/migrations/`; for an agreed correction to an unapplied generated migration, they may prepare only a gitignored `tmp/migrations/` draft for developer replacement, then must reinspect the real artifact before application.
 - Stop independently running workers before integration or coverage tests that share the development database.
 - Agents never commit. Developer review and commits are manual.
 
@@ -117,43 +117,50 @@ Use these as discovery entrypoints, not as an exhaustive file list:
 
 Read a decision only when the task changes, consumes, or must preserve that domain:
 
-| Domain                                | Decision record                                                                       |
-| ------------------------------------- | ------------------------------------------------------------------------------------- |
-| Effect runtime, errors, observability | `knowledge_base/decisions/m1-effect-boundaries.md`                                    |
-| Workspaces/projects/capabilities      | `knowledge_base/decisions/m2-platform-kernel-design.md`                               |
-| Membership, policy, credentials       | `knowledge_base/decisions/m3-access-and-credentials-design.md`                        |
-| Locales and locale access             | `knowledge_base/decisions/m4-project-locales-design.md`                               |
-| Collection schema lifecycle           | `knowledge_base/decisions/m5-versioned-schema-engine-design.md`                       |
-| Fields, rich text, assets, forms      | `knowledge_base/decisions/m6-field-system-and-generated-forms-design.md`              |
-| Entries, drafts, revisions            | `knowledge_base/decisions/m7-entries-multilingual-drafts-and-revisions-design.md`     |
-| Publication and immutable snapshots   | `knowledge_base/decisions/m8-independent-locale-publication-and-snapshots-design.md`  |
-| Delivery API and caching              | `knowledge_base/decisions/m9-production-delivery-api-design.md`                       |
-| Preview API and UX                    | `knowledge_base/decisions/m10-preview-api-and-ux-design.md`                           |
-| Publication events and webhooks       | `knowledge_base/decisions/m11-publication-events-webhooks-and-invalidation-design.md` |
-| Test placement and ownership          | `knowledge_base/decisions/repository-test-structure.md`                               |
+| Domain                                 | Decision record                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------------------- |
+| Effect runtime, errors, observability  | `knowledge_base/decisions/m1-effect-boundaries.md`                                    |
+| Workspaces/projects/capabilities       | `knowledge_base/decisions/m2-platform-kernel-design.md`                               |
+| Membership, policy, credentials        | `knowledge_base/decisions/m3-access-and-credentials-design.md`                        |
+| Locales and locale access              | `knowledge_base/decisions/m4-project-locales-design.md`                               |
+| Collection schema lifecycle            | `knowledge_base/decisions/m5-versioned-schema-engine-design.md`                       |
+| Fields, rich text, assets, forms       | `knowledge_base/decisions/m6-field-system-and-generated-forms-design.md`              |
+| Entries, drafts, revisions             | `knowledge_base/decisions/m7-entries-multilingual-drafts-and-revisions-design.md`     |
+| Publication and immutable snapshots    | `knowledge_base/decisions/m8-independent-locale-publication-and-snapshots-design.md`  |
+| Delivery API and caching               | `knowledge_base/decisions/m9-production-delivery-api-design.md`                       |
+| Preview API and UX                     | `knowledge_base/decisions/m10-preview-api-and-ux-design.md`                           |
+| Publication events and webhooks        | `knowledge_base/decisions/m11-publication-events-webhooks-and-invalidation-design.md` |
+| Developer portal and generated tooling | `knowledge_base/decisions/m12-developer-portal-and-generated-tooling-design.md`       |
+| Test placement and ownership           | `knowledge_base/decisions/repository-test-structure.md`                               |
 
 For cross-cutting work, follow imports and invariants to identify every genuinely affected row. Do not read unrelated milestone records merely because they are older prerequisites.
 
 ## Current validation baseline
 
-The last complete post-M11 gate passed:
+The renewed complete M12 automated readiness gate passes:
 
 - `pnpm run ready`
-- 868 tests: API 613, server 109, web 117, environment 12, worker 2, webhook receiver 15
-- API coverage: 90.14% statements and 74.44% branches
-- Production/full dependency audits with no known vulnerabilities
-- Production builds and healthy server/web/worker containers
-- Zero pending supported publication outbox rows, queued/retrying/delivering webhook work, or started attempts after final reconciliation
+- 962 tests: API 630, server 120, web 124, environment 16, worker 2, webhook receiver 15, public contracts 4, SDK 10, CLI 32, developer portal 9
+- API coverage: 89.97% statements and 74.68% branches; SDK 82.69%/71.35%; CLI 78.02%/83.85%; dashboard web 74.50%/79.58%; developer portal behavior tests cover public boundaries, links, canonical API source paths, and representative MDX accessibility
+- Production/full dependency audits with no known vulnerabilities; Changesets status and package dry-run evidence pass
+- Production builds and rebuilt healthy server/web/worker containers; exact Docker-served Tooling artifact bytes pass
+- Deterministic OAuth Tooling readiness passes signed discovery/manifest continuation, immutable revision cache semantics, first-page auditing, a 357.01 ms measured p95 below the 750 ms bound, and zero final fixture residue
+- Zero pending publication outbox rows, active webhook delivery work, or started attempts after final reconciliation
 
-Treat these as the comparison baseline, not proof that the current working tree still passes. Run task-appropriate checks after changes.
+Treat this as the renewed M12 review baseline, not proof that later working-tree changes still pass. Run task-appropriate checks after changes.
 
 ## Current state and next scope
 
-- Migrations `0010` and `0011` are applied and immutable; the live schema has 12 migration records.
+- Migrations `0010`, `0011`, and developer-applied `0012` are immutable; the live schema has 13 migration records.
 - Local ignored `apps/server/.env` contains the persistent webhook key ring and enables the worker. Never read or print its values.
 - The optional stable named Cloudflare Tunnel is not configured; temporary public Quick Tunnel delivery has already been validated and is not an M11 blocker.
-- M12 is next but has no approved design or implementation. Its goal is the public developer portal and generated tooling.
-- M14 owns production host/ingress separation, worker egress firewalling, cloud metadata hardening, and production-topology validator-bypass tests.
+- M12's approved design is `knowledge_base/decisions/m12-developer-portal-and-generated-tooling-design.md`. Better Auth 1.7.1, OAuth Provider dependencies/configuration, Tooling resource validation, and the complete Drizzle auth/OAuth/device/JWT schema authority are implemented.
+- M12 migration `0012_add_cli_oauth_device_authorization.sql` is developer-applied and read-only verified. OAuth/device/Tooling-principal integration and the closed four-family public contract registry with canonical artifacts/baselines are implemented. The developer selected the no-migration Tooling integrity authority: verify the reconstructed immutable revision against stored full `schema_hash`, then derive the public contract and `contractHash` only through `compileCollectionContract`. OAuth remains disabled until the complete Tooling boundary passes its gates.
+- The Tooling repository/HTTP boundary, signed cursors, full-revision hash verification, deterministic generator/lock/diff/filesystem transaction, public SDK, OAuth/keychain CLI, Changesets release staging, and separate prerendered developer portal are implemented with focused passing checks. The developer selected MIT for the first SDK/CLI releases. Reviewed tarballs and a clean isolated NodeNext fixture pass; no package has been published.
+- OAuth, public registry/artifacts, Tooling API, generator, SDK/CLI, release staging, Tooling readiness, audits, and Docker proof are implemented. The reopened portal correction is complete: self-hosted Fumadocs runs in the existing TanStack Start app; 27 source-controlled MDX pages cover onboarding, concepts, modeling, Delivery, Preview, SDK, CLI, webhooks, guides, troubleshooting, and product reference; local static search and 3 canonical OpenAPI plus 1 canonical webhook reference are available under one origin. OAuth stays rollout-disabled until renewed review and explicit approval.
+- The future code-first schema/content authoring and local agent-editor proposal is stored at `knowledge_base/proposals/m13-code-first-schema-and-local-agent-editor.md`. It is not an approved design and must not start before M12 is complete plus explicit developer direction.
+- Client handover is now M14, production hardening is M15, and visual-builder readiness is M16.
+- M15 owns production host/ingress separation, worker egress firewalling, cloud metadata hardening, and production-topology validator-bypass tests.
 
 ## Documentation ownership
 
@@ -164,3 +171,4 @@ Treat these as the comparison baseline, not proof that the current working tree 
 - `context.md`: concise zero-context entrypoint and implementation map
 - `learnings.md`: consequential mistakes, risks, and prevention rules only
 - `decisions/*.md`: approved rationale and load-bearing domain constraints, read selectively
+- `proposals/*.md`: developer-supplied future direction only; not approved design or implementation authority

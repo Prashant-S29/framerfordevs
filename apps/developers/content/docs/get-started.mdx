@@ -1,0 +1,87 @@
+---
+title: Start Building
+description: Go from an empty project to your first explicit-locale published-content read.
+---
+
+{/* Defines the first-success journey while linking to generated references for exact contracts. */}
+
+This path takes you from a new project to one published entry consumed from developer-owned code.
+
+> The public SDK and CLI are currently release-ready local packages. Registry installation becomes available only after the developer-controlled first publication.
+
+## 1. Create a Project
+
+Sign in to the dashboard, create a project, and enable the CMS capability. Every project begins with an internal `main` environment and enabled English (`en`) locale.
+
+Enable additional locales before authoring localized content. Delivery always requires the exact locale you want and never fills missing values from another locale.
+
+## 2. Model Your Content
+
+Create a collection such as `posts`. Give every field a stable API key and choose whether its value is shared or localized.
+
+A practical first model contains:
+
+- `title`: required localized short text
+- `slug`: required localized slug with uniqueness enabled
+- `summary`: optional localized long text
+- `featured`: shared boolean
+
+Validate and publish the collection schema. Tooling and generated types use only immutable published schema revisions, never an unpublished draft.
+
+## 3. Create and Publish an Entry
+
+Create an entry, complete its English values, and publish the `en` locale.
+
+Publishing creates an immutable snapshot containing:
+
+- Current English localized values
+- Current shared values
+- The selected published schema revision
+- Stable entry and publication identities
+
+Editing the draft afterward does not change that publication. Publish again when you want new values to reach Delivery.
+
+## 4. Create Delivery Authority
+
+Create an environment-bound Delivery credential with only the access required by your frontend. Store it in your server or deployment secret manager.
+
+Do not place Preview, management, OAuth refresh, or webhook signing authority in browser bundles.
+
+## 5. Install and Configure the SDK
+
+After the first package publication:
+
+```bash
+pnpm add @framerfordevs/sdk effect
+```
+
+Create one Delivery client per API origin and credential:
+
+```ts
+import { deliveryV1 } from "@framerfordevs/sdk/client";
+
+const delivery = deliveryV1({
+  baseUrl: process.env.FFD_API_URL!,
+  projectId: process.env.FFD_PROJECT_ID!,
+  environment: "main",
+  token: process.env.FFD_DELIVERY_TOKEN!,
+});
+```
+
+Keep this client in trusted server-side code when it carries a protected credential.
+
+## 6. Read Published Content
+
+Request the collection and explicit locale. Preserve the typed success/failure envelope and branch on stable error codes rather than messages.
+
+Follow returned cursors exactly for lists and use ETags when revalidating current reads. Immutable publication reads can be cached for much longer because their bytes never change.
+
+## Expected Result
+
+Your application receives only the published English snapshot. Unpublished locales and draft-only changes remain unavailable through Delivery.
+
+## Next Steps
+
+- [Use the SDK](/docs/sdk)
+- [Generate project-specific contracts](/docs/cli)
+- [React to publication changes](/docs/webhooks)

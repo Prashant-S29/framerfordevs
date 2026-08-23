@@ -1,0 +1,32 @@
+---
+title: Delivery and Preview
+description: Choose published immutable content or trusted draft inspection without crossing security boundaries.
+---
+
+{/* Contrasts public production reads with trusted server-side draft inspection. */}
+
+Delivery and Preview expose different states and accept different credentials. Keep separate clients and credentials for each family.
+
+| Concern     | Delivery                                   | Preview                                      |
+| ----------- | ------------------------------------------ | -------------------------------------------- |
+| State       | Published snapshots only                   | Current or historical drafts                 |
+| Cache       | Current revalidation and immutable caching | Always `no-store`                            |
+| Browser use | Allowed only by the Delivery CORS contract | Server-side only                             |
+| Validation  | Strict published values                    | May report incomplete or soft-invalid drafts |
+| Credential  | Delivery                                   | Preview                                      |
+
+## Use Delivery When
+
+- Rendering production content
+- Building cacheable frontend reads
+- Looking up current or immutable publications
+- Listing entries with bounded cursor pagination
+
+## Use Preview When
+
+- Rendering an authenticated preview environment
+- Inspecting unsaved-to-production draft evolution
+- Comparing a draft under an explicit schema revision
+- Showing validation issues before publication
+
+Preview is not a way to bypass publication. Never proxy a reusable Preview credential through a public browser endpoint.

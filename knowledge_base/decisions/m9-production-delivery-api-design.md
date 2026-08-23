@@ -102,7 +102,7 @@ M9 extends, rather than replaces, these committed foundations:
 - Credential collection allowlists or locale allowlists beyond the existing environment scope
 - Full-text search, substring search, relevance ranking, OR/NOT groups, arbitrary JSONPath, nested-field filtering, multi-field sorting, aggregations, facets, offsets, and GraphQL
 - Server-side response-object caching
-- Multi-region active-active rate-limit replication, edge/WAF denial, tenant-defined quotas, billing tiers, and runtime-administered dynamic limits: M14 production hardening
+- Multi-region active-active rate-limit replication, edge/WAF denial, tenant-defined quotas, billing tiers, and runtime-administered dynamic limits: M15 production hardening
 - Compression-provider/CDN configuration
 - Locale fallback or `Accept-Language`
 - Repointing an old publication as current
@@ -590,7 +590,7 @@ Redis checks have a short bounded timeout. On timeout, connection failure, inval
 4. The request is never allowed without any limiter.
 5. Shared Redis enforcement resumes automatically after recovery.
 
-During an outage, each process has an independent fallback budget, so distributed strictness is temporarily weakened but every process remains protected and Delivery does not fail solely because the limiter store is unavailable. M14 must alert/test sustained degraded mode and multi-region behavior; it does not need to replace M9's central manager.
+During an outage, each process has an independent fallback budget, so distributed strictness is temporarily weakened but every process remains protected and Delivery does not fail solely because the limiter store is unavailable. M15 must alert/test sustained degraded mode and multi-region behavior; it does not need to replace M9's central manager.
 
 A limited response is the stable `RATE_LIMITED` envelope with HTTP 429, `Retry-After`, and bounded `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers. Redis credentials/URLs are validated environment secrets and use the existing recursive redaction rules.
 
@@ -1034,7 +1034,7 @@ Endpoint/query/cache/rate/size/DB behavior is measurable with bounded labels and
 
 ### Maintainability and future compatibility
 
-A separate Delivery config avoids rewriting historical schema hashes. Stable field IDs let API-key renames retain projection identity. One central policy manager prevents future API families from inventing incompatible limiter semantics, while generic Redis/memory stores preserve managed and self-hosted portability. Focused engines/services and provider-neutral cache/rate boundaries prepare M10-M15 without changing entry, locale, publication, or snapshot identity.
+A separate Delivery config avoids rewriting historical schema hashes. Stable field IDs let API-key renames retain projection identity. One central policy manager prevents future API families from inventing incompatible limiter semantics, while generic Redis/memory stores preserve managed and self-hosted portability. Focused engines/services and provider-neutral cache/rate boundaries prepare M10-M16 without changing entry, locale, publication, or snapshot identity.
 
 ## Approval requested
 
@@ -1073,6 +1073,6 @@ On 2026-08-11, the developer clarified the intended production surface and autho
 - The complete management oRPC OpenAPI reference is an internal development/operator artifact. It is disabled by default and cannot be enabled in production; it must never be used as the public developer specification.
 - Dashboard `/rpc` and Better Auth remain authenticated application backends on the future application origin, not public integration contracts.
 - M12 owns the consolidated public developer portal, versioned allowlisted public specifications, guides, generated clients, and schema-derived project tooling after Delivery, Preview, and webhook contracts exist.
-- M14 owns production host/ingress verification separating marketing, application, public API, developer documentation, and operator-only surfaces.
+- M15 owns production host/ingress verification separating marketing, application, public API, developer documentation, and operator-only surfaces.
 
 This amendment changes no database authority, public content route, credential scope, or Delivery response semantics.

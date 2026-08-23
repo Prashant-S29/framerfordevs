@@ -85,6 +85,13 @@
       "when": 1786649276910,
       "tag": "0011_raise_outbox_event_payload_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787400995570,
+      "tag": "0012_add_cli_oauth_device_authorization",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,27 @@
+---
+title: Field Type Reference
+description: Review the value semantics of every currently supported collection field kind.
+---
+
+{/* Points developers to generated exact schemas while summarizing stable value semantics. */}
+
+| Kind                              | Delivered value                                    |
+| --------------------------------- | -------------------------------------------------- |
+| Short/long text, email, slug, URL | String                                             |
+| Number                            | Finite JSON number; integer rules where configured |
+| Exact decimal                     | Canonical base-10 string                           |
+| Money                             | Exact amount string and allowed currency code      |
+| Boolean                           | Boolean                                            |
+| Date                              | Calendar-date string                               |
+| Date and time                     | Exact date-time string                             |
+| Enum/select                       | One active option literal                          |
+| JSON                              | Bounded JSON value                                 |
+| Object                            | Recursive exact object                             |
+| List                              | Bounded array with one item contract               |
+| Reference                         | Stable entry ID or documented expanded item        |
+| External asset                    | Structured external URL and nullable metadata      |
+| Structured rich text              | `ffd-portable-text@1` document JSON                |
+
+Optional field values are represented by property absence unless a documented compiler default materializes them. Fields do not invent application-level `null`; protocol metadata can still contain documented nullable members.
+
+Use generated `schema.ts` and `schema.json` for exact project constraints, required properties, enum values, nested children, and revision identity.

@@ -1,0 +1,29 @@
+---
+title: Localization
+description: Model shared and localized values while publishing every locale independently.
+---
+
+{/* Documents exact-locale behavior and shared-value snapshot semantics. */}
+
+English (`en`) is required and enabled by default. You can enable additional BCP 47 locale tags such as `hi` or `gu` for each project.
+
+## Localized and Shared Values
+
+Atomic field values are either:
+
+- **Localized:** authored independently for each enabled locale.
+- **Shared:** authored once but copied into each locale publication.
+
+Objects may contain both localized and shared descendants. Lists remain one atomic localization boundary so array positions never require ambiguous cross-locale merging.
+
+## Independent Publication
+
+Each locale has its own draft, revision, published state, and publication history. Publishing English does not publish Hindi. Unpublishing Gujarati does not remove English.
+
+A locale publication captures its current localized values plus the current shared values. Editing a shared draft later never mutates an existing publication. Publish each locale again when you want the new shared value to reach it.
+
+## No Delivery Fallback
+
+Every Delivery and Preview content operation names an explicit locale. Delivery never silently combines an unpublished locale with English or another fallback. An unavailable exact locale returns the documented failure instead.
+
+This makes cache keys, rendering, validation, and publication behavior predictable.

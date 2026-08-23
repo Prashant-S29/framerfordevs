@@ -110,7 +110,7 @@ M8 extends these committed M7/M5 seams rather than replacing them:
 - Preview API and preview credentials: M10
 - Outbox workers, webhook subscriptions, attempts, retries, replay, and dead-letter handling: M11
 - Generated clients and schema locks: M12
-- Editorial review/approval workflows and all-locale status dashboards: M13
+- Editorial review/approval workflows and all-locale status dashboards: M14
 - Entry archive/delete workflows and dependency-aware permanent deletion
 - Bulk or scheduled publication
 - Cross-entry transactional batch publication
@@ -494,7 +494,7 @@ This also makes the pre-existing command lifecycle explicit:
 - M5 state-changing schema-publication command identity is embedded in the immutable schema revision and therefore follows schema-history retention. M5 no-op publication commands are not persisted and were only defined as naturally idempotent while the schema hash remains unchanged.
 - M7 stores every accepted save/restore command, including no-ops, in `cms_entry_draft_command`. Those receipts remain project-lifetime records under the existing durable-replay contract; M8 does not introduce retroactive cleanup.
 
-M14 must review command receipts together with audit, outbox, backup, privacy, and historical-artifact retention. A future finite policy must define an explicit idempotency window, deterministic behavior for expired command IDs, a tombstone or equivalent that prevents expired IDs from being executed as fresh commands, safe bounded cleanup/indexing, and consistent M5/M7/M8 semantics before deleting any receipt.
+M15 must review command receipts together with audit, outbox, backup, privacy, and historical-artifact retention. A future finite policy must define an explicit idempotency window, deterministic behavior for expired command IDs, a tombstone or equivalent that prevents expired IDs from being executed as fresh commands, safe bounded cleanup/indexing, and consistent M5/M7/M8 semantics before deleting any receipt.
 
 ### Publish no-op
 
@@ -1041,7 +1041,7 @@ The action uses a specific label such as `Unpublish Hindi`, remains enabled unti
 - One locale-leading partial `(locale, collection, entry)` current index supports locale dependencies and explicit-locale collection traversal without duplicate write amplification.
 - Publication history uses descending keyset pagination.
 - JSONB snapshots are not over-indexed.
-- Publication-command receipts are bounded per row but grow with accepted commands; project-lifetime retention is explicit and M14 owns the cross-system retention review.
+- Publication-command receipts are bounded per row but grow with accepted commands; project-lifetime retention is explicit and M15 owns the cross-system retention review.
 - Transactions make no network/telemetry/cache calls and use stable short lock ordering.
 - No automatic fan-out update occurs after shared saves or schema publication.
 - Failure injection and concurrency tests verify no sequence gaps from rolled-back transactions and no partial artifacts.
@@ -1191,7 +1191,7 @@ Named Effect operations, publication duration/validation/size metrics, request c
 
 ### Maintainability and future compatibility
 
-A focused engine/repository, generic outbox extension, fixture-gated snapshot profile, normalized immutable references, explicit isolation, locale-leading indexing, and separation from public Delivery/Preview routes let M9–M15 extend behavior without replacing entry, locale, schema, publication, or event identity.
+A focused engine/repository, generic outbox extension, fixture-gated snapshot profile, normalized immutable references, explicit isolation, locale-leading indexing, and separation from public Delivery/Preview routes let M9–M16 extend behavior without replacing entry, locale, schema, publication, or event identity.
 
 ## Database gate
 
@@ -1222,5 +1222,5 @@ Developer approval authorizes implementation of these material decisions:
 13. Separate immutable publication and delivery-snapshot artifacts
 14. One-transaction publication/snapshot/pointer/audit/outbox/receipt behavior
 15. M8 management UI/API scope with public Delivery deferred to M9
-16. Project-lifetime M8 command-receipt retention, with any finite cross-system retention/idempotency policy deferred explicitly to M14
+16. Project-lifetime M8 command-receipt retention, with any finite cross-system retention/idempotency policy deferred explicitly to M15
 17. Proposed developer-controlled migration name

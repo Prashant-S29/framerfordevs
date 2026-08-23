@@ -64,7 +64,8 @@ describe("bounded HTTP metric dimensions", () => {
       classifyRoute("/api/auth/get-session"),
       classifyRoute("/rpc/privateData"),
       classifyRoute("/api-reference"),
-    ]).toEqual(["health", "readiness", "auth", "rpc", "openapi"]);
+      classifyRoute("/api/tooling/v1/projects/private-project-id"),
+    ]).toEqual(["health", "readiness", "auth", "rpc", "openapi", "tooling"]);
   });
 
   it("classifies status families", () => {

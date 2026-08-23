@@ -1,0 +1,35 @@
+{
+  "name": "@framerfordevs/public-contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./registry": "./src/registry.ts",
+    "./metadata": "./src/metadata.ts",
+    "./artifacts/delivery/v1/openapi.json": "./artifacts/delivery/v1/openapi.json",
+    "./artifacts/preview/v1/openapi.json": "./artifacts/preview/v1/openapi.json",
+    "./artifacts/tooling/v1/openapi.json": "./artifacts/tooling/v1/openapi.json",
+    "./artifacts/webhooks/v1/events.schema.json": "./artifacts/webhooks/v1/events.schema.json"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "contracts:generate": "tsx src/generate.ts --write",
+    "contracts:check": "tsx src/generate.ts --check",
+    "test": "vitest run",
+    "test:unit": "vitest run src",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@framerfordevs/api": "workspace:*",
+    "effect": "3.22.0"
+  },
+  "devDependencies": {
+    "@framerfordevs/config": "workspace:*",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "3.2.7",
+    "tsx": "4.23.1",
+    "typescript": "catalog:",
+    "vitest": "3.2.7"
+  }
+}

@@ -1,10 +1,32 @@
 import { randomUUID } from "node:crypto";
 
 import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
-import { getDefaultCookieAttributes } from "@framerfordevs/auth";
+import {
+  CLI_OAUTH_GRANT_TYPES,
+  CLI_OAUTH_SCOPES,
+  createAuth,
+  ensureOfficialCliOAuthAuthority,
+  getDefaultCookieAttributes,
+  makeToolingOAuthAccessTokenVerifier,
+  OFFICIAL_CLI_OAUTH_CLIENT_ID,
+} from "@framerfordevs/auth";
 import { createDb, db } from "@framerfordevs/db";
-import { session, user } from "@framerfordevs/db/schema/auth";
-import { and, eq, like, sql } from "drizzle-orm";
+import {
+  deviceCode,
+  oauthAccessToken,
+  oauthClient,
+  oauthClientResource,
+  oauthConsent,
+  oauthRefreshToken,
+  oauthResource,
+  session,
+  user,
+} from "@framerfordevs/db/schema/auth";
+import { env } from "@framerfordevs/env/server";
+import { generatePublicArtifacts } from "@framerfordevs/public-contracts";
+import { and, eq, inArray, like, sql } from "drizzle-orm";
+import { toNodeHandler } from "better-auth/node";
+import express from "express";
 import request from "supertest";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -13,6 +35,14 @@ import { createApp } from "../../src/app";
 const app = createApp();
 const testEmailPattern = "m0-%@example.test";
 const password = "M0-Test-Password-123!";
+const oauthTestUserIds = new Set<string>();
+const publicArtifacts = generatePublicArtifacts();
+
+function expectedPublicArtifact(key: "delivery/v1" | "preview/v1" | "tooling/v1"): string {
+  const artifact = publicArtifacts.find((candidate) => candidate.key === key);
+  if (artifact === undefined) throw new Error(`Missing test artifact: ${key}`);
+  return artifact.bytes;
+}
 
 function makeEmail() {
   return `m0-${randomUUID()}@example.test`;
@@ -34,6 +64,13 @@ async function createTestUser(email: string) {
 }
 
 afterAll(async () => {
+  const oauthUserIds = [...oauthTestUserIds];
+  if (oauthUserIds.length > 0) {
+    await db.delete(oauthAccessToken).where(inArray(oauthAccessToken.userId, oauthUserIds));
+    await db.delete(oauthRefreshToken).where(inArray(oauthRefreshToken.userId, oauthUserIds));
+    await db.delete(oauthConsent).where(inArray(oauthConsent.userId, oauthUserIds));
+  }
+  await db.delete(deviceCode).where(eq(deviceCode.oauthClientId, OFFICIAL_CLI_OAUTH_CLIENT_ID));
   await db.delete(user).where(like(user.email, testEmailPattern));
   await disposeApplicationRuntime();
 });
@@ -188,6 +225,7 @@ describe("CORS policy", () => {
     expect(response.headers["access-control-allow-origin"]).toBe("*");
     expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(response.text).toBe(expectedPublicArtifact("delivery/v1"));
     expect(response.body.info).toEqual(
       expect.objectContaining({
         title: "Framer for Devs Delivery API",
@@ -253,6 +291,75 @@ describe("CORS policy", () => {
   });
 });
 
+describe("Tooling HTTP isolation", () => {
+  const projectsPath = "/api/tooling/v1/projects";
+  const manifestPath =
+    "/api/tooling/v1/projects/019fae8b-1234-7000-8000-000000000001/environments/main/schema/manifest";
+
+  it("serves exact Tooling-only OpenAPI bytes without management CORS", async () => {
+    const specification = await request(app)
+      .get("/api/tooling/v1/openapi.json")
+      .set("Origin", "https://consumer.example");
+    const reference = await request(app).get("/api/tooling/v1/docs");
+
+    expect(specification.status).toBe(200);
+    expect(specification.text).toBe(expectedPublicArtifact("tooling/v1"));
+    expect(specification.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(specification.headers["access-control-allow-credentials"]).toBeUndefined();
+    expect(specification.headers["x-content-type-options"]).toBe("nosniff");
+    expect(specification.body.info.title).toBe("Framer for Developers Tooling API");
+    expect(Object.keys(specification.body.paths)).toHaveLength(4);
+    expect(JSON.stringify(specification.body)).not.toContain("workspaceId");
+    expect(JSON.stringify(specification.body)).not.toContain("register-client");
+    expect(reference.status).toBe(200);
+    expect(reference.text).toContain("Framer for Devs Tooling API");
+    expect(reference.text).toContain("/api/tooling/v1/openapi.json");
+  });
+
+  it("rejects browser origins and all data-route preflights without CORS headers", async () => {
+    const origin = await request(app).get(projectsPath).set("Origin", "http://localhost:3001");
+    const preflight = await request(app)
+      .options(manifestPath)
+      .set("Origin", "http://localhost:3001")
+      .set("Access-Control-Request-Method", "GET");
+
+    for (const response of [origin, preflight]) {
+      expect(response.status).toBe(403);
+      expect(response.body.error.code).toBe("FORBIDDEN");
+      expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+      expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
+      expect(response.headers["cache-control"]).toBe("no-store");
+    }
+  });
+
+  it("ignores cookies and requires one bearer authority on data routes", async () => {
+    const response = await request(app)
+      .get(projectsPath)
+      .set("Cookie", "better-auth.session_token=ignored");
+    const head = await request(app).head(projectsPath);
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe("UNAUTHORIZED");
+    expect(response.headers["www-authenticate"]).toBe('Bearer realm="tooling"');
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(head.status).toBe(401);
+    expect(head.text).toBeUndefined();
+  });
+
+  it("rejects malformed queries and unsupported methods on the closed route set", async () => {
+    const malformed = await request(app).get(`${projectsPath}?limit=20&limit=21`);
+    const unsupported = await request(app).post(projectsPath);
+
+    expect(malformed.status).toBe(400);
+    expect(malformed.body.error.code).toBe("VALIDATION_ERROR");
+    expect(malformed.headers["www-authenticate"]).toBeUndefined();
+    expect(unsupported.status).toBe(405);
+    expect(unsupported.headers.allow).toBe("GET, HEAD, OPTIONS");
+    expect(unsupported.body.error.code).toBe("NOT_FOUND");
+  });
+});
+
 describe("Preview HTTP isolation", () => {
   const path =
     "/api/preview/v1/projects/019fae8b-1234-7000-8000-000000000001/environments/main/collections/posts/entries/019fae8b-1234-7000-8000-000000000002/draft?locale=gu";
@@ -267,6 +374,7 @@ describe("Preview HTTP isolation", () => {
     expect(specification.headers["access-control-allow-origin"]).toBe("*");
     expect(specification.headers["access-control-allow-credentials"]).toBeUndefined();
     expect(specification.headers["referrer-policy"]).toBe("no-referrer");
+    expect(specification.text).toBe(expectedPublicArtifact("preview/v1"));
     expect(specification.body.info.title).toBe("Framer for Devs Preview API");
     expect(Object.keys(specification.body.paths)).toHaveLength(2);
     expect(JSON.stringify(specification.body)).not.toContain("DELIVERY_CURSOR_STALE");
@@ -518,6 +626,227 @@ describe.sequential("Better Auth foundation", () => {
     expect(refreshedSession).toBeDefined();
     expect(refreshedSession?.updatedAt.getTime()).toBeGreaterThan(staleTime.getTime());
     expect(refreshedSession?.expiresAt.getTime()).toBeGreaterThan(refreshThreshold.getTime());
+  });
+});
+
+describe.sequential("official CLI OAuth device authorization", () => {
+  it("keeps every device endpoint absent while the rollout flag is disabled", async () => {
+    const response = await request(app)
+      .post("/api/auth/device/code")
+      .send({
+        client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+        scope: CLI_OAUTH_SCOPES.join(" "),
+        resource: env.TOOLING_API_RESOURCE,
+      });
+
+    expect(response.status).toBe(404);
+  });
+
+  it("idempotently provisions one immutable public client and Tooling resource link", async () => {
+    const seededAt = new Date("2026-08-22T00:00:00.000Z");
+    await ensureOfficialCliOAuthAuthority({ enabled: true, now: seededAt });
+    await ensureOfficialCliOAuthAuthority({ enabled: true, now: seededAt });
+
+    const clients = await db
+      .select()
+      .from(oauthClient)
+      .where(eq(oauthClient.clientId, OFFICIAL_CLI_OAUTH_CLIENT_ID));
+    const resources = await db
+      .select()
+      .from(oauthResource)
+      .where(eq(oauthResource.identifier, env.TOOLING_API_RESOURCE));
+    const links = await db
+      .select()
+      .from(oauthClientResource)
+      .where(
+        and(
+          eq(oauthClientResource.clientId, OFFICIAL_CLI_OAUTH_CLIENT_ID),
+          eq(oauthClientResource.resourceId, env.TOOLING_API_RESOURCE),
+        ),
+      );
+
+    expect(clients).toHaveLength(1);
+    expect(clients[0]).toEqual(
+      expect.objectContaining({
+        clientId: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+        clientSecret: null,
+        disabled: false,
+        skipConsent: false,
+        tokenEndpointAuthMethod: "none",
+        applicationType: "native",
+        redirectUris: [],
+        scopes: [...CLI_OAUTH_SCOPES],
+        grantTypes: [...CLI_OAUTH_GRANT_TYPES],
+      }),
+    );
+    expect(resources).toHaveLength(1);
+    expect(resources[0]).toEqual(
+      expect.objectContaining({
+        identifier: env.TOOLING_API_RESOURCE,
+        accessTokenTtl: 600,
+        refreshTokenTtl: 2_592_000,
+        allowedScopes: [...CLI_OAUTH_SCOPES],
+        disabled: false,
+      }),
+    );
+    expect(links).toHaveLength(1);
+  });
+
+  it("denies dynamic OAuth client registration", async () => {
+    await ensureOfficialCliOAuthAuthority({ enabled: true });
+    const oauthAuth = createAuth({ oauthDeviceAuthorizationEnabled: true });
+    const oauthApp = express();
+    oauthApp.all("/api/auth{/*path}", toNodeHandler(oauthAuth));
+
+    const response = await request(oauthApp)
+      .post("/api/auth/oauth2/register")
+      .send({
+        client_name: "Untrusted client",
+        redirect_uris: ["http://127.0.0.1/callback"],
+        token_endpoint_auth_method: "none",
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe("access_denied");
+  });
+
+  it("issues only an explicitly approved scoped device token and verifies its Tooling claims", async () => {
+    await ensureOfficialCliOAuthAuthority({ enabled: true });
+    const oauthAuth = createAuth({ oauthDeviceAuthorizationEnabled: true });
+    const oauthApp = express();
+    oauthApp.all("/api/auth{/*path}", toNodeHandler(oauthAuth));
+
+    const code = await request(oauthApp)
+      .post("/api/auth/device/code")
+      .send({
+        client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+        scope: CLI_OAUTH_SCOPES.join(" "),
+        resource: env.TOOLING_API_RESOURCE,
+      });
+
+    expect(code.status).toBe(200);
+    expect(code.body).toEqual(
+      expect.objectContaining({
+        device_code: expect.any(String),
+        user_code: expect.any(String),
+        verification_uri: "http://localhost:3001/device",
+        expires_in: 600,
+        interval: 5,
+      }),
+    );
+
+    const pending = await request(oauthApp).post("/api/auth/oauth2/token").type("form").send({
+      grant_type: CLI_OAUTH_GRANT_TYPES[0],
+      device_code: code.body.device_code,
+      client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+    });
+    expect(pending.status).toBe(400);
+    expect(pending.body.error).toBe("authorization_pending");
+
+    const approvedCode = await request(oauthApp)
+      .post("/api/auth/device/code")
+      .send({
+        client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+        scope: CLI_OAUTH_SCOPES.join(" "),
+        resource: env.TOOLING_API_RESOURCE,
+      });
+    expect(approvedCode.status).toBe(200);
+
+    const email = makeEmail();
+    const browser = request.agent(oauthApp);
+    const signUp = await browser
+      .post("/api/auth/sign-up/email")
+      .set("Origin", "http://localhost:3001")
+      .send({ name: "M12 OAuth Test User", email, password });
+    expect(signUp.status).toBe(200);
+    oauthTestUserIds.add(signUp.body.user.id);
+
+    const verify = await browser
+      .get("/api/auth/device")
+      .query({ user_code: approvedCode.body.user_code });
+    expect(verify.status).toBe(200);
+    expect(verify.body).toEqual(
+      expect.objectContaining({
+        user_code: approvedCode.body.user_code,
+        status: "pending",
+        client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+        scope: CLI_OAUTH_SCOPES.join(" "),
+      }),
+    );
+
+    const approval = await browser
+      .post("/api/auth/device/approve")
+      .set("Origin", "http://localhost:3001")
+      .send({ userCode: approvedCode.body.user_code });
+    expect(approval.status).toBe(200);
+    expect(approval.body).toEqual({ success: true });
+
+    const token = await request(oauthApp).post("/api/auth/oauth2/token").type("form").send({
+      grant_type: CLI_OAUTH_GRANT_TYPES[0],
+      device_code: approvedCode.body.device_code,
+      client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+    });
+    expect(token.status).toBe(200);
+    expect(token.body).toEqual(
+      expect.objectContaining({
+        access_token: expect.any(String),
+        refresh_token: expect.any(String),
+        id_token: expect.any(String),
+        token_type: "Bearer",
+        expires_in: 600,
+      }),
+    );
+    expect(String(token.body.scope).split(" ")).toEqual(
+      expect.arrayContaining([...CLI_OAUTH_SCOPES]),
+    );
+
+    const verifyAccessToken = makeToolingOAuthAccessTokenVerifier({
+      authInstance: oauthAuth,
+      enabled: true,
+      issuer: "http://localhost:3000/api/auth",
+      resource: env.TOOLING_API_RESOURCE,
+    });
+    const principal = await verifyAccessToken(token.body.access_token);
+    expect(principal).toEqual(
+      expect.objectContaining({
+        kind: "oauth_user",
+        userId: signUp.body.user.id,
+        clientId: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+      }),
+    );
+    expect(principal?.scopes.includes("tooling:read")).toBe(true);
+
+    const [header, payload, signature] = String(token.body.access_token).split(".");
+    expect(header).toBeDefined();
+    expect(payload).toBeDefined();
+    expect(signature).toBeDefined();
+    if (header === undefined || payload === undefined || signature === undefined) return;
+    const tamperedSignature = `${signature.startsWith("A") ? "B" : "A"}${signature.slice(1)}`;
+    await expect(
+      verifyAccessToken(`${header}.${payload}.${tamperedSignature}`),
+    ).resolves.toBeNull();
+
+    const refreshed = await request(oauthApp).post("/api/auth/oauth2/token").type("form").send({
+      grant_type: "refresh_token",
+      refresh_token: token.body.refresh_token,
+      client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+      resource: env.TOOLING_API_RESOURCE,
+    });
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.body.refresh_token).toEqual(expect.any(String));
+    expect(refreshed.body.refresh_token).not.toBe(token.body.refresh_token);
+    await expect(verifyAccessToken(refreshed.body.access_token)).resolves.toEqual(
+      expect.objectContaining({ userId: signUp.body.user.id }),
+    );
+
+    const replay = await request(oauthApp).post("/api/auth/oauth2/token").type("form").send({
+      grant_type: "refresh_token",
+      refresh_token: token.body.refresh_token,
+      client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+      resource: env.TOOLING_API_RESOURCE,
+    });
+    expect(replay.status).toBe(400);
+    expect(replay.body.error).toBe("invalid_grant");
   });
 });
 
