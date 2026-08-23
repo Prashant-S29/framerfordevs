@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestone 12 renewed implementation and automated readiness complete; awaiting developer manual review
-**Active milestone:** Milestone 12 — self-hosted developer documentation, generated tooling, and review handoff
-**Last updated:** 2026-08-22
+**Overall status:** Milestone 12 developer-approved, committed, and pushed
+**Active milestone:** None — Milestone 13 discovery/design awaits explicit authorization
+**Last updated:** 2026-08-23
 
 ## Status legend
 
@@ -29,7 +29,7 @@
 | 9   | Delivery API                             | `[A]`  | 712 passing     | Approved       | `8559aa4` |
 | 10  | Preview API                              | `[A]`  | 780 passing     | Approved       | `aa177b5` |
 | 11  | Events, webhooks, invalidation           | `[A]`  | 868 passing     | Approved       | `fef7205` |
-| 12  | Developer portal and generated tooling   | `[R]`  | 962 passing     | Pending        | None      |
+| 12  | Developer portal and generated tooling   | `[A]`  | 962 passing     | Approved       | `4e87908` |
 | 13  | Code-first authoring and local editor    | `[ ]`  | Proposal stored | Design pending | None      |
 | 14  | Client handover                          | `[ ]`  | Not run         | Pending        | None      |
 | 15  | Production hardening                     | `[ ]`  | Not run         | Pending        | None      |
@@ -514,10 +514,11 @@
 - `[x]` Keep structural wire facts generated: API source tests prove all 3 rendered OpenAPI page path sets equal their canonical documents, the webhook page derives event types and complete schema from the canonical JSON artifact, and existing SDK/CLI/package compilation gates remain authority for exported code examples.
 - `[x]` Pass public-only route/search/link probes, MDX compilation, 36-route prerender, 571,523-byte self-hosted search export, CSP/security runtime smoke, representative axe coverage, canonical artifact equality, bundle measurement, dependency audits, and complete `pnpm run ready` with 962 tests.
 - `[x]` Retain API-server Scalar UIs as non-canonical compatibility/diagnostic references for now rather than remove a working public path during M12. The Fumadocs portal is canonical; M15 may add redirects after final production origins are approved. Machine-readable API-server OpenAPI endpoints remain unchanged.
+- `[A]` The developer completed renewed manual review, approved M12 with OAuth intentionally rollout-disabled, committed it as `4e87908` (`feat(m12): developer portal and generated tooling`), and pushed it to `origin/main` on 2026-08-23.
 
 ## Current blockers
 
-No implementation or automated-readiness blocker remains. The Fumadocs correction is complete and M12 awaits renewed developer manual portal and clean CLI/SDK integration review. The measured landing route starts with 592,825 bytes uncompressed/182,334 bytes gzip across its CSS/JS assets; heavy OpenAPI/Shiki chunks remain isolated to secondary references. Shiki's Nitro build uses its documented module fallback after an unavailable WASM environment import, and the pinned Vite/Rolldown graph reports an optional WASM peer warning; builds, runtime references, frozen lock authority, and production/full audits pass. OAuth remains rollout-disabled until renewed review and explicit rollout approval. Package publication, version application, commit, and M13 initiation remain developer-controlled; M13 stays blocked.
+No active implementation blocker. M12 is approved and committed. OAuth remains intentionally rollout-disabled and does not block M13; production enablement can be decided during M15 or through separate explicit authorization. SDK/CLI version application and publication remain developer-controlled. M13 discovery/design is not active and requires explicit developer direction.
 
 ## Database migration state
 
@@ -549,7 +550,7 @@ The developer generated, corrected, and applied `packages/db/src/migrations/0009
 - The measured Fumadocs landing initial CSS/JS asset set is 592,825 bytes minified/182,334 bytes gzip; the main docs page is 663,476/202,977 bytes and the read-only Delivery contract is 1,095,222/339,123 bytes. OpenAPI/Shiki weight remains route-specific and does not enter the landing route. The self-hosted static search export is 571,523 bytes for 27 MDX pages.
 - Final SDK/CLI prepack gates pass. Reviewed tarballs contain 14 SDK and 12 CLI files, restricted to ESM dist modules/declarations plus README, LICENSE, and package metadata; no source maps, tests, fixtures, environment files, migration/knowledge-base content, or source files are present. A clean isolated NodeNext fixture installs both local tarballs, compiles every documented export family, and executes `ffd help --json`.
 - The complete standard test/build/check/audit/package gate is green. The first final `ready` attempt exposed an unrelated five-second web accessibility-test timeout under concurrent coverage; its explicit ten-second test budget passes standalone and in the complete rerun. Turbo cancellation interrupted the concurrently starting Tooling fixture before teardown, so developer-approved transactional cleanup removed the two exact canceled/failed `m12-tooling` test graphs only after proving zero content publications; final read-only verification reports zero matching residue. The Tooling fixture now registers its idempotent teardown before its first write.
-- All M12 automated proof is complete. Remaining work is developer manual portal and clean CLI/SDK integration review, followed by explicit OAuth rollout/milestone approval and developer-controlled commit/publication decisions.
+- All M12 automated proof and manual review are complete. The developer approved, committed, and pushed M12 at `4e87908`; OAuth rollout and SDK/CLI publication remain intentionally deferred developer-controlled release decisions.
 
 ### Milestone 10 approved completion gate
 
@@ -818,3 +819,5 @@ Milestone 8 independent locale publication, immutable snapshots, exact-locale re
 Milestone 9 Delivery API was manually approved and committed by the developer as `8559aa4` (`feat(m9): production delivery API`).
 
 Milestone 10 Preview API passed all automated, security, credential-remediation, load/resilience, and invariant gates with 780 tests. The developer manually verified current and historical Gujarati Preview behavior, approved M10, and committed it as `aa177b5` (`feat(m10): preview API`). The developer also confirmed family-first independent API major versions and the initial M12 SDK/versioning policy.
+
+Milestone 12 passed its renewed 962-test readiness gate after the Fumadocs amendment. The developer reviewed and approved the developer portal and generated tooling with OAuth intentionally rollout-disabled, committed the milestone as `4e87908` (`feat(m12): developer portal and generated tooling`), and pushed it to `origin/main` on 2026-08-23.

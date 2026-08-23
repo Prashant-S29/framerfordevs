@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-08-22
-**Current phase:** Milestone 12 renewed automated readiness complete; developer manual review pending
-**Active milestone:** Milestone 12 — self-hosted developer documentation and generated tooling review handoff
+**Last updated:** 2026-08-23
+**Current phase:** Milestone 12 developer-approved, committed, and pushed; awaiting explicit direction for the next milestone
+**Active milestone:** None — Milestone 13 discovery/design has not been authorized
 
 ## Product in one paragraph
 
@@ -93,6 +93,7 @@ All milestones below are developer-approved and committed.
 | M9        | Public/protected Delivery API v1, typed query read model, strict locale, keyset cursors, bounded expansion, HTTP caching, rate limits, and isolated public docs        | `8559aa4` |
 | M10       | Bearer-only Preview API v1, current/historical draft projection, expiring Preview credentials, no-store isolation, audits, and dashboard preview                       | `aa177b5` |
 | M11       | Canonical publication events, signed webhook endpoints/subscriptions, SSRF-safe worker delivery, retries/dead letters/replay, invalidation mappings, and management UI | `fef7205` |
+| M12       | Self-hosted developer documentation, canonical public contracts, Tooling API, OAuth-capable CLI, deterministic generation, typed SDK, and release staging              | `4e87908` |
 
 Post-M11 test normalization is committed at `fe69a76`: focused tests remain colocated; integration, contract, and broad accessibility suites live in categorized workspace-owned `test/` directories; `pnpm run check:structure` enforces the boundary. The concise agent-context and selective-exploration rules are committed at `18618d4`.
 
@@ -155,10 +156,10 @@ Treat this as the renewed M12 review baseline, not proof that later working-tree
 - Local ignored `apps/server/.env` contains the persistent webhook key ring and enables the worker. Never read or print its values.
 - The optional stable named Cloudflare Tunnel is not configured; temporary public Quick Tunnel delivery has already been validated and is not an M11 blocker.
 - M12's approved design is `knowledge_base/decisions/m12-developer-portal-and-generated-tooling-design.md`. Better Auth 1.7.1, OAuth Provider dependencies/configuration, Tooling resource validation, and the complete Drizzle auth/OAuth/device/JWT schema authority are implemented.
-- M12 migration `0012_add_cli_oauth_device_authorization.sql` is developer-applied and read-only verified. OAuth/device/Tooling-principal integration and the closed four-family public contract registry with canonical artifacts/baselines are implemented. The developer selected the no-migration Tooling integrity authority: verify the reconstructed immutable revision against stored full `schema_hash`, then derive the public contract and `contractHash` only through `compileCollectionContract`. OAuth remains disabled until the complete Tooling boundary passes its gates.
+- M12 migration `0012_add_cli_oauth_device_authorization.sql` is developer-applied and read-only verified. OAuth/device/Tooling-principal integration and the closed four-family public contract registry with canonical artifacts/baselines are implemented. The developer selected the no-migration Tooling integrity authority: verify the reconstructed immutable revision against stored full `schema_hash`, then derive the public contract and `contractHash` only through `compileCollectionContract`. OAuth remains intentionally rollout-disabled; that deployment decision does not block later development.
 - The Tooling repository/HTTP boundary, signed cursors, full-revision hash verification, deterministic generator/lock/diff/filesystem transaction, public SDK, OAuth/keychain CLI, Changesets release staging, and separate prerendered developer portal are implemented with focused passing checks. The developer selected MIT for the first SDK/CLI releases. Reviewed tarballs and a clean isolated NodeNext fixture pass; no package has been published.
-- OAuth, public registry/artifacts, Tooling API, generator, SDK/CLI, release staging, Tooling readiness, audits, and Docker proof are implemented. The reopened portal correction is complete: self-hosted Fumadocs runs in the existing TanStack Start app; 27 source-controlled MDX pages cover onboarding, concepts, modeling, Delivery, Preview, SDK, CLI, webhooks, guides, troubleshooting, and product reference; local static search and 3 canonical OpenAPI plus 1 canonical webhook reference are available under one origin. OAuth stays rollout-disabled until renewed review and explicit approval.
-- The future code-first schema/content authoring and local agent-editor proposal is stored at `knowledge_base/proposals/m13-code-first-schema-and-local-agent-editor.md`. It is not an approved design and must not start before M12 is complete plus explicit developer direction.
+- OAuth, public registry/artifacts, Tooling API, generator, SDK/CLI, release staging, Tooling readiness, audits, Docker proof, and the Fumadocs correction are developer-approved and committed at `4e87908`. The portal contains 27 source-controlled MDX pages, local static search, and 3 canonical OpenAPI plus 1 canonical webhook reference under one origin. OAuth remains rollout-disabled by the approved deployment choice.
+- The future code-first schema/content authoring and local agent-editor proposal is stored at `knowledge_base/proposals/m13-code-first-schema-and-local-agent-editor.md`. It is not an approved design. M12 is complete, but M13 discovery/design must not start without explicit developer direction.
 - Client handover is now M14, production hardening is M15, and visual-builder readiness is M16.
 - M15 owns production host/ingress separation, worker egress firewalling, cloud metadata hardening, and production-topology validator-bypass tests.
 

@@ -630,7 +630,7 @@ Likely migration name: `add_webhook_delivery_system`.
 
 ## Milestone 12 — Developer portal and generated tooling
 
-**Status:** Implementation and renewed automated readiness complete. The self-hosted Fumadocs/MDX developer experience, canonical secondary API references, OAuth, registry, Tooling API, generator, SDK/CLI, and release staging await renewed developer manual review.
+**Status:** Developer approved and committed as `4e87908` on 2026-08-23. OAuth production rollout and SDK/CLI publication remain intentionally deferred developer-controlled release decisions.
 
 ### Goal
 
@@ -697,7 +697,7 @@ Make public integrations discoverable and strongly typed while detecting contrac
 
 ## Milestone 13 — Code-first schema and content authoring with a local agent-first editor
 
-**Status:** Proposal only in `proposals/m13-code-first-schema-and-local-agent-editor.md`. Discovery and design begin only after M12 is complete and the developer explicitly authorizes them.
+**Status:** Proposal only in `proposals/m13-code-first-schema-and-local-agent-editor.md`. M12 is complete; discovery and design remain inactive until the developer explicitly authorizes them.
 
 ### Goal
 
