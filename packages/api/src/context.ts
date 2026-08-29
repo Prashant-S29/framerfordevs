@@ -2,8 +2,8 @@ import { fromNodeHeaders } from "better-auth/node";
 import type { Effect } from "effect";
 import type { Request } from "express";
 
-import type { ApiData } from "./contracts/api-response";
-import type { ApplicationError } from "./contracts/errors";
+import type { ApiData } from "./contracts/response/api";
+import type { ApplicationError } from "./contracts/response/errors";
 import { makeRequestContext, type RequestContext } from "./observability/request-context";
 import { type ApplicationResult, type ApplicationServices, executeApplication } from "./runtime";
 

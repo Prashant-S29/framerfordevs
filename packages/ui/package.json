@@ -6,6 +6,12 @@
   "exports": {
     "./globals.css": "./src/styles/globals.css",
     "./lib/*": "./src/lib/*.ts",
+    "./components/alert": "./src/components/alert/index.tsx",
+    "./components/alert-dialog": "./src/components/alert/dialog.tsx",
+    "./components/input": "./src/components/input/index.tsx",
+    "./components/input-group": "./src/components/input/group.tsx",
+    "./components/message": "./src/components/message/index.tsx",
+    "./components/message-scroller": "./src/components/message/scroller.tsx",
     "./components/*": "./src/components/*.tsx",
     "./hooks/*": "./src/hooks/*.ts",
     "./postcss.config": "./postcss.config.mjs"

@@ -5,6 +5,9 @@
     ".": {
       "default": "./src/index.ts"
     },
+    "./schema/cms": {
+      "default": "./src/schema/cms/index.ts"
+    },
     "./*": {
       "default": "./src/*.ts"
     }

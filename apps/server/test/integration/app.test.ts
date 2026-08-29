@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { request as requestHttp } from "node:http";
 
-import { authoringLimits } from "@framerfordevs/api/contracts/authoring";
-import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
+import { authoringLimits } from "@framerfordevs/api/contracts/authoring/index";
+import { disposeApplicationRuntime } from "@framerfordevs/api/runtime/index";
 import {
   AUTHORING_SCHEMA_PUSH_SCOPE,
   CLI_OAUTH_GRANT_TYPES,

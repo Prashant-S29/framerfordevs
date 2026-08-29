@@ -41,15 +41,15 @@ import { AuthUserId } from "../../../src/contracts/platform";
 import {
   CollectionFieldDefinition,
   defaultFieldEditorMetadata,
-} from "../../../src/contracts/schemas";
-import { compilePreviewDocument } from "../../../src/lib/preview-document";
-import { PreviewDocumentEngineLive } from "../../../src/services/preview-document-engine";
-import { hashSchemaContract } from "../../../src/services/schema-engine";
+} from "../../../src/contracts/schema";
+import { compilePreviewDocument } from "../../../src/lib/preview/document";
+import { PreviewDocumentEngineLive } from "../../../src/services/preview/document-engine";
+import { hashSchemaContract } from "../../../src/services/schema/engine";
 import {
   makePreviewRepository,
   PreviewRepository,
   PreviewRepositoryLive,
-} from "../../../src/services/preview-repository";
+} from "../../../src/services/preview/repository";
 
 const suffix = randomUUID();
 const ids = {

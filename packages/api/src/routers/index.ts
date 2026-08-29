@@ -44,7 +44,7 @@ import {
   RestoreEntryRevisionInputSchema,
   SaveEntryDraftInputSchema,
   SaveEntryDraftResultOutputSchema,
-} from "../contracts/entries";
+} from "../contracts/entry";
 import {
   GetCurrentUserPreviewInputSchema,
   GetRevisionUserPreviewInputSchema,
@@ -61,7 +61,7 @@ import {
   UnpublishEntryInputSchema,
   UnpublishEntryResultOutputSchema,
   ValidateEntryPublicationInputSchema,
-} from "../contracts/publications";
+} from "../contracts/publication";
 import {
   CreateProjectLocaleInputSchema,
   ListProjectLocalesInputSchema,
@@ -70,13 +70,13 @@ import {
   ReorderProjectLocalesInputSchema,
   UpdateProjectLocaleDisplayNameInputSchema,
   UpdateProjectLocaleStatusInputSchema,
-} from "../contracts/locales";
+} from "../contracts/locale";
 import {
   CollectionPresentationOutputSchema,
   GetCollectionPresentationInputSchema,
   PublishCollectionPresentationInputSchema,
   PublishCollectionPresentationOutputSchema,
-} from "../contracts/management-presentation";
+} from "../contracts/presentation/management";
 import {
   CmsCollectionOutputSchema,
   CmsCollectionPageOutputSchema,
@@ -101,7 +101,7 @@ import {
   UpdateCollectionInputSchema,
   UpdateEditorLayoutInputSchema,
   ValidateCollectionSchemaInputSchema,
-} from "../contracts/schemas";
+} from "../contracts/schema";
 import {
   CreateInvalidationRouteMappingInputSchema,
   CreateWebhookEndpointInputSchema,
@@ -126,7 +126,7 @@ import {
   WebhookDeliveryPageOutputSchema,
   WebhookEndpointOutputSchema,
   WebhookEndpointPageOutputSchema,
-} from "../contracts/webhooks";
+} from "../contracts/webhook";
 import {
   ArchiveProjectInputSchema,
   CapabilityOutputSchema,
@@ -142,7 +142,7 @@ import {
   WorkspaceOutputSchema,
   WorkspacePageOutputSchema,
 } from "../contracts/platform";
-import { executeProcedure, protectedProcedure, publicProcedure } from "../index";
+import { executeProcedure, protectedProcedure, publicProcedure } from "..";
 import {
   acceptProjectInvitation,
   createProjectInvitation,
@@ -155,7 +155,7 @@ import {
   updateProjectMemberLocaleAccess,
   updateProjectMemberRole,
 } from "../operations/access";
-import { getDeliveryConfiguration, updateDeliveryConfiguration } from "../operations/delivery";
+import { getDeliveryConfiguration, updateDeliveryConfiguration } from "../operations/delivery/api";
 import {
   createEntry,
   getEntryDraft,
@@ -165,7 +165,7 @@ import {
   restoreEntryRevision,
   saveEntryDraft,
 } from "../operations/entries";
-import { getUserCurrentPreview, getUserRevisionPreview } from "../operations/preview";
+import { getUserCurrentPreview, getUserRevisionPreview } from "../operations/preview/api";
 import {
   getEntryPublicationStatus,
   listEntryPublications,
@@ -225,7 +225,7 @@ import {
   changeWebhookSecretRotation,
   updateInvalidationMapping,
   updateWebhookEndpoint,
-} from "../operations/webhooks";
+} from "../operations/webhook/api";
 
 export const appRouter = {
   healthCheck: publicProcedure.handler(({ context }) =>

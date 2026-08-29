@@ -25,7 +25,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { FolderKanbanIcon, MoveRightIcon } from "lucide-react";
 import { z } from "zod";
 
-import { CreateProjectDialog } from "@/components/create-project-dialog";
+import { CreateProjectDialog } from "@/components/project/create-dialog";
 import { CreateWorkspaceDialog } from "@/components/create-workspace-dialog";
 import { orpc } from "@/utils/orpc";
 

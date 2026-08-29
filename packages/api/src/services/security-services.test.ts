@@ -2,9 +2,9 @@ import { assert, describe, it, layer } from "@effect/vitest";
 import { Effect, TestClock } from "effect";
 
 import { ApiCredentialId, type CredentialFamily } from "../contracts/access";
-import { makeCredentialAttemptLimiter } from "./credential-attempt-limiter";
-import { makeRateLimitManager } from "./rate-limit-manager";
-import { makeMemoryRateLimitStore } from "./rate-limit-store";
+import { makeCredentialAttemptLimiter } from "./credential/attempt-limiter";
+import { makeRateLimitManager } from "./rate-limit/manager";
+import { makeMemoryRateLimitStore } from "./rate-limit/store";
 import { SecretGenerator, SecretGeneratorLive, parseCredentialKey } from "./secret-generator";
 import type { TelemetryService } from "../observability/telemetry";
 

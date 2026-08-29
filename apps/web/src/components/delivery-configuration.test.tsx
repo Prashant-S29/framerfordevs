@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
-import { DeliveryCollectionConfiguration } from "@framerfordevs/api/contracts/delivery";
-import { CollectionFieldDefinition } from "@framerfordevs/api/contracts/schemas";
+import { DeliveryCollectionConfiguration } from "@framerfordevs/api/contracts/delivery/index";
+import { CollectionFieldDefinition } from "@framerfordevs/api/contracts/schema/index";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

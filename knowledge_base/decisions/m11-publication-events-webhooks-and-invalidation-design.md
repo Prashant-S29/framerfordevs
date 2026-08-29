@@ -700,16 +700,16 @@ No error echoes a URL, host/path/query, DNS answer, event body, signature, secre
 ### Pure and boundary modules
 
 - `contracts/webhooks.ts`: event/subscription/endpoint/delivery/attempt/mapping schemas and management envelopes
-- `lib/publication-event.ts`: strict outbox-to-CloudEvents projection and canonical serialization
-- `lib/webhook-signature.ts`: signing and framework-neutral verification
-- `lib/webhook-destination.ts`: URL normalization and IP-policy decisions over injected DNS answers
-- `services/webhook-crypto.ts`: random secret generation and AES-GCM key-ring adapter
-- `services/webhook-transport.ts`: DNS/TLS/pinned HTTPS adapter
-- `services/webhook-repository.ts`: management and read persistence
-- `services/webhook-worker-repository.ts`: claim/lease/finalize persistence
-- `services/webhook-event-projector.ts`: replaceable Effect service over the pure projector
-- `operations/webhooks.ts`: named management/read/replay operations
-- `operations/webhook-worker.ts`: named dispatcher/attempt/recovery loops
+- `lib/publication/event.ts`: strict outbox-to-CloudEvents projection and canonical serialization
+- `lib/webhook/signature.ts`: signing and framework-neutral verification
+- `lib/webhook/destination.ts`: URL normalization and IP-policy decisions over injected DNS answers
+- `services/webhook/crypto.ts`: random secret generation and AES-GCM key-ring adapter
+- `services/webhook/transport.ts`: DNS/TLS/pinned HTTPS adapter
+- `services/webhook/repository.ts`: management and read persistence
+- `services/webhook/worker-repository.ts`: claim/lease/finalize persistence
+- `services/webhook/event-projector.ts`: replaceable Effect service over the pure projector
+- `operations/webhook/api.ts`: named management/read/replay operations
+- `operations/webhook/worker.ts`: named dispatcher/attempt/recovery loops
 
 Pure modules import no Drizzle, Express, Better Auth, environment config, React, or process-global runtime.
 

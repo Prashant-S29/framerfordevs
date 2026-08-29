@@ -91,7 +91,7 @@ Examples:
 - `i-klingon` becomes `tlh`
 - `en_US`, `en--US`, `doekdoek`, `oedll`, `xlw`, extensions, private-use tags, empty input, multiple tags, and values over 64 characters fail validation
 
-`packages/api/src/contracts/locale-registry.generated.ts` pins the official registry at `File-Date: 2026-06-14`. `pnpm locale-registry:update` regenerates and formats it from IANA; the generator can also accept a downloaded registry file path for deterministic offline reproduction. The generated snapshot is shared by browser and API validation, but the API remains authoritative. There is no runtime network, operating-system registry, `Intl.getCanonicalLocales()`, or third-party registry-data dependency.
+`packages/api/src/contracts/locale/registry/index.ts` pins the official registry at `File-Date: 2026-06-14`. `pnpm locale-registry:update` regenerates and formats it from IANA; the generator can also accept a downloaded registry file path for deterministic offline reproduction. The generated snapshot is shared by browser and API validation, but the API remains authoritative. There is no runtime network, operating-system registry, `Intl.getCanonicalLocales()`, or third-party registry-data dependency.
 
 Locale matching remains exact after canonicalization: `en`, `en-GB`, and `en-US` are three different project locale resources.
 

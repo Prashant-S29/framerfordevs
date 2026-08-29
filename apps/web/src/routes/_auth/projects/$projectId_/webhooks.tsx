@@ -4,7 +4,7 @@ import type {
   WebhookDelivery,
   WebhookDeliveryStatus,
   WebhookPublicEventType,
-} from "@framerfordevs/api/contracts/webhooks";
+} from "@framerfordevs/api/contracts/webhook/index";
 import {
   AlertDialog,
   AlertDialogAction,

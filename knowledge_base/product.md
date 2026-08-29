@@ -120,6 +120,17 @@ Future data-source providers may include:
 
 The internal CMS is the first built-in data-source provider.
 
+## Product surfaces
+
+The product uses separate interfaces over shared server authority:
+
+- **Marketing and documentation (`framerfordevs.com`):** product discovery, documentation, and authentication entry.
+- **Hosted control plane (`dashboard.framerfordevs.com`):** account, workspace, project, membership, credential, webhook, environment, billing, security, recovery, and Studio-registration administration. It remains available when a customer application is unavailable.
+- **Project Studio (developer-configured application path):** a framework-neutral, role-projected editorial application for content, localization, editorial layout, preview, and future visual editing. Developers mount it at a configured path such as `/studio`; clients and developers use the same Studio with different authority.
+- **CLI and SDK:** complete machine-readable access to every meaningful control-plane and project operation so developers and agents do not depend on browser workflows.
+
+These are multiple clients of common APIs, not separate business-rule authorities. Sensitive account and credential recovery remains in the hosted control plane; browser Studio code never owns unrestricted management credentials.
+
 ## Delivery modes
 
 The same project can be consumed in multiple ways.
@@ -215,6 +226,8 @@ When managed hosting is enabled:
 10. UX for clients and DX for developers are equally important.
 11. Performance and predictable delivery are core product requirements.
 12. Every capability must be designed to compose with future capabilities.
+13. Every meaningful UI operation must have a stable HTTP and CLI/SDK automation path.
+14. Hosted account administration and project-specific Studio editing are separate UX surfaces over shared authorization and audit authority.
 
 ## Primary users
 

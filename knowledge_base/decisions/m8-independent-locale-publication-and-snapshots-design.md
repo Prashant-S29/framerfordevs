@@ -334,7 +334,7 @@ The realistic large fixture must leave at least 25% headroom: combined canonical
 
 **Status:** Developer-confirmed; Drizzle schema and developer-generated migration applied
 
-The deterministic fixture at `packages/api/src/lib/publication-snapshot.fixture.test.ts` exercises 20 schema nodes across 15 root fields: a realistic multilingual long-form Portable Text article, eleven large shared/localized long-text values, nested mixed-localization objects, 12 inert external assets with long URLs and Unicode metadata, bounded structured JSON, long valid API keys, one singular reference, and 50 list-reference occurrences across 10 unique targets. The report locks these exact canonical measurements:
+The deterministic fixture at `packages/api/src/lib/publication/snapshot/fixture.test.ts` exercises 20 schema nodes across 15 root fields: a realistic multilingual long-form Portable Text article, eleven large shared/localized long-text values, nested mixed-localization objects, 12 inert external assets with long URLs and Unicode metadata, bounded structured JSON, long valid API keys, one singular reference, and 50 list-reference occurrences across 10 unique targets. The report locks these exact canonical measurements:
 
 | Measurement                 | Bytes     | Share of 1 MiB maximum |
 | --------------------------- | --------- | ---------------------- |
@@ -344,7 +344,7 @@ The deterministic fixture at `packages/api/src/lib/publication-snapshot.fixture.
 | Remaining maximum headroom  | `356,530` | `34.00%`               |
 | Margin below fixture gate   | `94,386`  | `9.00%` of maximum     |
 
-The combined result is `94,386` bytes below the `786,432`-byte fixture gate and is classified in the fixed `large` bucket. `packages/api/src/lib/publication-snapshot.test.ts` separately locks synthetic candidates at `1,048,575`, `1,048,576`, and `1,048,577` bytes: below-boundary and exact-boundary candidates pass, the one-byte-over candidate fails without truncation, and exact document/manifest bytes remain available for safe validation feedback.
+The combined result is `94,386` bytes below the `786,432`-byte fixture gate and is classified in the fixed `large` bucket. `packages/api/src/lib/publication/snapshot/index.test.ts` separately locks synthetic candidates at `1,048,575`, `1,048,576`, and `1,048,577` bytes: below-boundary and exact-boundary candidates pass, the one-byte-over candidate fails without truncation, and exact document/manifest bytes remain available for safe validation feedback.
 
 The report was reproduced with focused compiler, contract, and field-validation tests plus API type-checking. The developer explicitly confirmed these measurements and the provisional 1 MiB profile. The approved Drizzle schema is implemented; migration generation/application and append-only trigger insertion remain developer-controlled.
 
@@ -778,7 +778,7 @@ Stable Drizzle remains Promise-native in repository adapters and is wrapped with
 
 ### Operations and runtime
 
-Named operations live in `packages/api/src/operations/publications.ts`:
+Named operations live in `packages/api/src/operations/publications/index.ts`:
 
 - `getEntryPublicationStatus`
 - `validateEntryPublication`

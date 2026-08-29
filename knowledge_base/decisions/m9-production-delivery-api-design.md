@@ -727,7 +727,7 @@ For a live production rollout, Delivery routes stay disabled until schema applic
 
 ### Contracts
 
-`packages/api/src/contracts/delivery.ts` owns:
+`packages/api/src/contracts/delivery/index.ts` owns:
 
 - Route/query primitives
 - Delivery item/page/reference models

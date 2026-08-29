@@ -1,7 +1,7 @@
 import { db } from "@framerfordevs/db";
 import { Context, Effect, Layer } from "effect";
 
-import { DatabaseFailure } from "../contracts/errors";
+import { DatabaseFailure } from "../contracts/response/errors";
 
 export class Database extends Context.Tag("Database")<
   Database,

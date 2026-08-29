@@ -23,7 +23,7 @@ import { PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { workspaceFormSchema } from "@/lib/platform-validation";
+import { workspaceFormSchema } from "@/lib/validation/platform";
 import { orpc } from "@/utils/orpc";
 
 function errorMessage(error: unknown): string | undefined {

@@ -2,7 +2,7 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 
-import { CollectionEntries } from "@/components/collection-entries";
+import { CollectionEntries } from "@/components/entry/collection-entries";
 
 export const Route = createFileRoute(
   "/_auth/projects/$projectId_/collections/$collectionId_/entries",

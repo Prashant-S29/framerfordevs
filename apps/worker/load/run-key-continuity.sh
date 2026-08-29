@@ -19,7 +19,7 @@ run_fixture() {
     -e WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID="$active_key" \
     -e WEBHOOK_ENCRYPTION_KEYS="$ring" \
     "$service" \
-    pnpm --dir /app/packages/api exec tsx src/scripts/webhook-key-continuity.ts "$@"
+    pnpm --dir /app/packages/api exec tsx src/scripts/webhook/key-continuity.ts "$@"
 }
 
 remove_probe() {

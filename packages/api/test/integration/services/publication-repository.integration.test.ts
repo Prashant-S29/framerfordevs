@@ -51,15 +51,15 @@ import {
   CreateEntryInput,
   GetEntryDraftInput,
   SaveEntryDraftInput,
-} from "../../../src/contracts/entries";
-import { CreateProjectLocaleInput } from "../../../src/contracts/locales";
+} from "../../../src/contracts/entry";
+import { CreateProjectLocaleInput } from "../../../src/contracts/locale";
 import {
   GetEntryPublicationStatusInput,
   ListEntryPublicationsInput,
   PublishEntryInput,
   UnpublishEntryInput,
   ValidateEntryPublicationInput,
-} from "../../../src/contracts/publications";
+} from "../../../src/contracts/publication";
 import {
   AuthUserId,
   CreateProjectInput,
@@ -76,17 +76,17 @@ import {
   ValidateCollectionSchemaInput,
   type CmsCollection,
   type PublishedSchemaRevision,
-} from "../../../src/contracts/schemas";
-import { makeDeliveryCursorSignerLive } from "../../../src/services/delivery-cursor-signer";
-import { makeDeliveryReadRepository } from "../../../src/services/delivery-read-repository";
-import { makeEntryRepository } from "../../../src/services/entry-repository";
-import { makeLocaleRepository } from "../../../src/services/locale-repository";
+} from "../../../src/contracts/schema";
+import { makeDeliveryCursorSignerLive } from "../../../src/services/delivery/cursor-signer";
+import { makeDeliveryReadRepository } from "../../../src/services/delivery/read-repository";
+import { makeEntryRepository } from "../../../src/services/entry/repository";
+import { makeLocaleRepository } from "../../../src/services/locale/repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 import {
   makePublicationRepository,
   type PublicationFailureStage,
-} from "../../../src/services/publication-repository";
-import { makeSchemaRepository } from "../../../src/services/schema-repository";
+} from "../../../src/services/publication/repository";
+import { makeSchemaRepository } from "../../../src/services/schema/repository";
 
 const suffix = randomUUID();
 const ownerId = `m8-publication-owner-${suffix}`;

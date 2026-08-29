@@ -37,12 +37,12 @@ import { CmsActor } from "../../../src/contracts/authoring";
 import {
   AuthoringPublishPresentationRequest,
   AuthoringCollectionPresentation,
-} from "../../../src/contracts/authoring-presentation";
+} from "../../../src/contracts/authoring/presentation";
 import {
   AuthoringSchemaApplyInput,
   AuthoringSchemaExportInput,
   AuthoringSchemaPlanInput,
-} from "../../../src/contracts/authoring-schema";
+} from "../../../src/contracts/authoring/schema";
 import {
   AuthUserId,
   CreateProjectInput,
@@ -51,8 +51,8 @@ import {
   type Project as ProjectModel,
   type Workspace as WorkspaceModel,
 } from "../../../src/contracts/platform";
-import { makeAuthoringPresentationRepository } from "../../../src/services/authoring-presentation-repository";
-import { makeAuthoringSchemaRepository } from "../../../src/services/authoring-schema-repository";
+import { makeAuthoringPresentationRepository } from "../../../src/services/authoring/presentation-repository";
+import { makeAuthoringSchemaRepository } from "../../../src/services/authoring/schema/repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 
 const suffix = randomUUID();

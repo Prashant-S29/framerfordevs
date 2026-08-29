@@ -6,8 +6,8 @@ import {
   type ApiData,
   type ApiFailure,
   type ApiSuccess,
-} from "./contracts/api-response";
-import { type ApplicationError, ValidationFailure } from "./contracts/errors";
+} from "./contracts/response/api";
+import { type ApplicationError, ValidationFailure } from "./contracts/response/errors";
 import type { Context } from "./context";
 import { requireSession } from "./operations/system";
 import type { ApplicationServices } from "./runtime";

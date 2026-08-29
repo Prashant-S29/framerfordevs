@@ -31,7 +31,7 @@ import {
   decodeProjectMemberCursor,
   encodeProjectInvitationCursor,
   encodeProjectMemberCursor,
-} from "../contracts/access-cursor";
+} from "../contracts/access/page-cursor";
 import {
   DatabaseFailure,
   ForbiddenFailure,
@@ -42,7 +42,7 @@ import {
   LocaleUnavailableFailure,
   NotFoundFailure,
   VersionConflictFailure,
-} from "../contracts/errors";
+} from "../contracts/response/errors";
 import type { AuthUserId } from "../contracts/platform";
 import {
   type ApplicationDb,

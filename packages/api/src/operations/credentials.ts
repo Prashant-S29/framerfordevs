@@ -7,9 +7,9 @@ import {
   type RevokeApiCredentialInput,
   type RotateApiCredentialInput,
 } from "../contracts/access";
-import { UnauthorizedFailure } from "../contracts/errors";
+import { UnauthorizedFailure } from "../contracts/response/errors";
 import { AuthUserId } from "../contracts/platform";
-import { CredentialRepository } from "../services/credential-repository";
+import { CredentialRepository } from "../services/credential/repository";
 import { SecretGenerator } from "../services/secret-generator";
 
 const decodeActorId = (actorId: string) =>

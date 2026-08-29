@@ -11,5 +11,10 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
   },
-  plugins: [tailwindcss(), tanstackStart(), nitro(), viteReact()],
+  plugins: [
+    tailwindcss(),
+    tanstackStart({ router: { entry: "./router/index.tsx" } }),
+    nitro(),
+    viteReact(),
+  ],
 });

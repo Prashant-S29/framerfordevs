@@ -2,17 +2,17 @@
 
 // Verifies accessible semantics across platform management controls without owning component behavior.
 
-import { ApiCredential, ProjectMember } from "@framerfordevs/api/contracts/access";
-import { ProjectLocale } from "@framerfordevs/api/contracts/locales";
-import { Project } from "@framerfordevs/api/contracts/platform";
+import { ApiCredential, ProjectMember } from "@framerfordevs/api/contracts/access/index";
+import { ProjectLocale } from "@framerfordevs/api/contracts/locale/index";
+import { Project } from "@framerfordevs/api/contracts/platform/index";
 import {
   EntryPublicationPage,
   EntryPublicationPlan,
   EntryPublicationStatus,
   EntryPublicationSummary,
-} from "@framerfordevs/api/contracts/publications";
-import { CollectionDraftSchema } from "@framerfordevs/api/contracts/schemas";
-import { WebhookEndpoint } from "@framerfordevs/api/contracts/webhooks";
+} from "@framerfordevs/api/contracts/publication/index";
+import { CollectionDraftSchema } from "@framerfordevs/api/contracts/schema/index";
+import { WebhookEndpoint } from "@framerfordevs/api/contracts/webhook/index";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -21,20 +21,20 @@ import { Schema } from "effect";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ArchiveProjectDialog } from "@/components/archive-project-dialog";
-import { CreateProjectDialog } from "@/components/create-project-dialog";
+import { ArchiveProjectDialog } from "@/components/project/archive-dialog";
+import { CreateProjectDialog } from "@/components/project/create-dialog";
 import { CreateWorkspaceDialog } from "@/components/create-workspace-dialog";
-import { EditProjectDialog } from "@/components/edit-project-dialog";
-import { LocaleTabs } from "@/components/locale-tabs";
+import { EditProjectDialog } from "@/components/project/edit-dialog";
+import { LocaleTabs } from "@/components/entry/locale-tabs";
 import {
   CredentialRow,
   InviteMemberDialog,
   IssueCredentialDialog,
   LocaleAccessDialog,
-} from "@/components/project-access-settings";
-import { AddLocaleDialog } from "@/components/project-locale-settings";
-import { CreateEntryDialog } from "@/components/collection-entries";
-import { PublicationCard, RenameEntryDialog } from "@/components/entry-editor";
+} from "@/components/project/access-settings";
+import { AddLocaleDialog } from "@/components/project/locale-settings";
+import { CreateEntryDialog } from "@/components/entry/collection-entries";
+import { PublicationCard, RenameEntryDialog } from "@/components/entry/editor";
 import { CodeManagedStructureCard } from "@/components/schema-builder";
 import {
   CreateInvalidationMappingDialog,

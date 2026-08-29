@@ -1,6 +1,6 @@
 # Milestone 13 code-first authoring and local editor design
 
-**Status:** Complete and developer-accepted on 2026-08-27. Tier 1 and experimental/default-off Tier 2, Authoring API/SDK/CLI, secure local editor, dashboard builder retirement, all 13 manual scenarios, and final readiness are complete. The known QuickJS hard-memory gap continues to block only Tier 2 production/default enablement and its hard-memory proof. Package publication/versioning, production OAuth rollout, production configuration, commit, and deployment remain separate release actions.
+**Status:** Complete, developer-accepted, and committed as `9c68942`. Tier 1 and experimental/default-off Tier 2, Authoring API/SDK/CLI, secure local editor, dashboard builder retirement, all 13 manual scenarios, and final readiness are complete. The known QuickJS hard-memory gap continues to block only Tier 2 production/default enablement and its hard-memory proof. Package publication/versioning, production OAuth rollout, production configuration, and deployment remain separate release actions.
 
 **Date:** 2026-08-23
 
@@ -46,7 +46,7 @@ The design uses:
 - A dedicated dashboard presentation editor for labels, help, placeholders, field order, tabs, groups, sidebar placement, and role visibility
 - Removal of dashboard collection-structure mutation routes and controls after code export/adoption support is available
 
-The developer approved the original design and all 19 explicit decisions on 2026-08-23. Decisions 20 and 21 deferred Tier 2 and authorized the Tier 1 foundation. Decision 22 reintroduced experimental/default-off QuickJS Tier 2 and authorized continued M13 implementation. Decision 23 scoped issue #255 to Tier 2 production/default enablement and hard-memory proof only. The developer later generated/applied the two approved migrations, approved builder retirement after parity, accepted all 13 scenarios, and closed M13 on 2026-08-27. Package publication/versioning, production OAuth rollout, production configuration, commits, and deployment remain separately gated.
+The developer approved the original design and all 19 explicit decisions on 2026-08-23. Decisions 20 and 21 deferred Tier 2 and authorized the Tier 1 foundation. Decision 22 reintroduced experimental/default-off QuickJS Tier 2 and authorized continued M13 implementation. Decision 23 scoped issue #255 to Tier 2 production/default enablement and hard-memory proof only. The developer later generated/applied the two approved migrations, approved builder retirement after parity, accepted all 13 scenarios, closed M13, and committed it as `9c68942`. Package publication/versioning, production OAuth rollout, production configuration, and deployment remain separately gated.
 
 ## Tier 1 foundation implementation record — 2026-08-23
 
@@ -961,7 +961,7 @@ Task-appropriate format, lint, structure, type, unit, integration, contract, acc
 16. **Form extraction/local editor — complete:** dashboard package migration, hardened loopback editor, live drift/read-only projection, conflict/publication UX, axe, packaged launch, and controlled Firefox proof pass.
 17. **Builder retirement — complete and manually accepted:** manual scenarios 1–10 and 12–13 established accepted parity, the developer approved retirement, dashboard structure controls were removed, and legacy authenticated mutation routes return stable `410 DASHBOARD_SCHEMA_AUTHORING_RETIRED` without reaching mutation repositories. Scenario 11 then confirmed retained content, Presentation, Delivery, navigation, administration, and read-only current-structure authority.
 18. **Docs/public artifacts/release staging — complete:** task guides, exact Authoring reference, Changeset, compiled examples, tarball review, and Docker/package evidence pass. No package publication occurred.
-19. **Final automated and manual review — complete:** final full readiness passes 1,184 tests after retirement and locale-authority fixes, Tier 2 remains experimental/default-off, developer-approved exact stale-fixture cleanup plus post-run invariants pass, all 13 manual scenarios are accepted, and the developer closed M13. The commit remains developer-controlled.
+19. **Final automated and manual review — complete:** final full readiness passes 1,184 tests after retirement and locale-authority fixes, Tier 2 remains experimental/default-off, developer-approved exact stale-fixture cleanup plus post-run invariants pass, all 13 manual scenarios are accepted, and the developer closed and committed M13 as `9c68942`.
 
 A failed compatibility slice or migration review stops implementation and returns to design rather than forcing the selected architecture.
 

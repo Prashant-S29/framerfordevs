@@ -1,10 +1,10 @@
 // Declares the only public contract sources behind the browser-safe closed registry metadata.
 
-import { authoringOpenApiDocument } from "@framerfordevs/api/contracts/authoring-openapi";
-import { deliveryOpenApiDocument } from "@framerfordevs/api/contracts/delivery-openapi";
-import { previewOpenApiDocument } from "@framerfordevs/api/contracts/preview-openapi";
-import { toolingOpenApiDocument } from "@framerfordevs/api/contracts/tooling-openapi";
-import { PublicationWebhookEvent } from "@framerfordevs/api/contracts/webhooks";
+import { authoringOpenApiDocument } from "@framerfordevs/api/contracts/authoring/openapi/index";
+import { deliveryOpenApiDocument } from "@framerfordevs/api/contracts/delivery/openapi/index";
+import { previewOpenApiDocument } from "@framerfordevs/api/contracts/preview/openapi/index";
+import { toolingOpenApiDocument } from "@framerfordevs/api/contracts/tooling/openapi/index";
+import { PublicationWebhookEvent } from "@framerfordevs/api/contracts/webhook/index";
 import { JSONSchema } from "effect";
 
 import {

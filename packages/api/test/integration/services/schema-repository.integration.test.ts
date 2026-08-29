@@ -32,7 +32,7 @@ import { Cause, Effect, Exit, Option, Schema } from "effect";
 
 import { ApiCredentialId } from "../../../src/contracts/access";
 import { CmsActor } from "../../../src/contracts/authoring";
-import { AuthoringSchemaPlanInput } from "../../../src/contracts/authoring-schema";
+import { AuthoringSchemaPlanInput } from "../../../src/contracts/authoring/schema";
 import {
   GetDeliveryConfigurationInput,
   UpdateDeliveryConfigurationInput,
@@ -65,12 +65,12 @@ import {
   UpdateEditorLayoutInput,
   ValidateCollectionSchemaInput,
   type CmsCollection as CmsCollectionModel,
-} from "../../../src/contracts/schemas";
-import { makeAuthoringSchemaRepository } from "../../../src/services/authoring-schema-repository";
-import { makeDeliveryRepository } from "../../../src/services/delivery-repository";
+} from "../../../src/contracts/schema";
+import { makeAuthoringSchemaRepository } from "../../../src/services/authoring/schema/repository";
+import { makeDeliveryRepository } from "../../../src/services/delivery/repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
-import { makeSchemaRepository } from "../../../src/services/schema-repository";
-import { makeToolingRepository } from "../../../src/services/tooling-repository";
+import { makeSchemaRepository } from "../../../src/services/schema/repository";
+import { makeToolingRepository } from "../../../src/services/tooling/repository";
 
 const suffix = randomUUID();
 const ownerId = `m5-schema-owner-${suffix}`;

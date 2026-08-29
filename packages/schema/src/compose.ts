@@ -1,4 +1,4 @@
-import type { CollectionSchema, FieldSchema, ListItemSchema, ProjectSchema } from "./index";
+import type { CollectionSchema, FieldSchema, ListItemSchema, ProjectSchema } from "./core";
 
 export function defineField<const Field extends FieldSchema | ListItemSchema>(field: Field): Field {
   return field;

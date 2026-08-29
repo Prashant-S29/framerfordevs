@@ -1,11 +1,11 @@
 # Documentation and Learning Rules
 
-- Keep `knowledge_base/prd/cms.md` behavioral, not a dumping ground for temporary implementation notes.
-- Keep `knowledge_base/milestone.md` ordered and acceptance-focused.
-- Keep `knowledge_base/progress.md` current and factual.
-- Keep `knowledge_base/context.md` a concise zero-context entrypoint: current phase, discovery order, invariants, workspace/architecture map, one precise summary per completed milestone, selective decision map, validation baseline, and next scope.
-- Do not append milestone journals, migration inventories, exhaustive test evidence, or manual-review narratives to `context.md`; keep those in `progress.md`, decision records, migrations, tests, or focused runbooks.
-- Replace obsolete context instead of accumulating duplicate history. Every path or baseline in `context.md` must help a new agent discover current implementation safely.
-- Record only consequential product or architecture mistakes, discarded decisions, constraint violations, and their prevention rules in `knowledge_base/learnings.md`.
-- Do not record ordinary command failures, missing tools, typos, or harmless execution mistakes in `knowledge_base/learnings.md`.
-- Never erase a relevant lesson merely because the bug was fixed.
+- Keep `product.md` durable and directional; keep `prd/cms.md` behavioral and contract-focused.
+- Keep `milestone.md` ordered and acceptance-focused: completed summary, one active milestone in detail, and no speculative numbered milestones.
+- Keep `progress.md` ordered by milestone, current, factual, and concise. Preserve consequential outcomes, accepted evidence, migration ownership, manual corrections, commit IDs, blockers, and release state—not command-by-command journals.
+- Keep `context.md` a concise zero-context entrypoint: current phase, selective discovery, invariants, workspace/architecture map, completed capability summary, decision routing, validation baseline, and next scope. Replace obsolete context instead of appending history.
+- Keep `decisions/index.md` as the selective routing table. Decision records retain load-bearing rationale but are read only when current work changes, consumes, or must preserve their domain.
+- Record only consequential product/architecture mistakes, discarded assumptions, constraint violations, and prevention rules in `learnings.md`. Each entry contains `Incorrect assumption or decision`, `Learning`, and only when unresolved one concise `Status` line.
+- Do not record ordinary command failures, missing tools, typos, harmless execution mistakes, or duplicate milestone status in learnings.
+- Never erase a still-relevant lesson merely because the defect was fixed; compress it without removing the durable prevention rule.
+- Keep detailed load reports in owned runbooks, schema authority in migrations/contracts, and behavior proof in tests rather than duplicating them into session context.

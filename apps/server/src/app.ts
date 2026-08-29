@@ -7,35 +7,35 @@ import {
   createContext,
   type Context,
 } from "@framerfordevs/api/context";
-import { EffectSchemaToJsonSchemaConverter } from "@framerfordevs/api/contracts/effect-schema-converter";
+import { EffectSchemaToJsonSchemaConverter } from "@framerfordevs/api/contracts/response/effect-schema-converter/index";
 import {
   apiFailure,
   type ApiData,
   type ApiResponse,
-} from "@framerfordevs/api/contracts/api-response";
-import { authoringLimits } from "@framerfordevs/api/contracts/authoring";
+} from "@framerfordevs/api/contracts/response/api/index";
+import { authoringLimits } from "@framerfordevs/api/contracts/authoring/index";
 import type {
   AuthoringCreateEntryRequest,
   AuthoringRenameEntryRequest,
   AuthoringSaveEntryDraftRequest,
-} from "@framerfordevs/api/contracts/authoring-content";
+} from "@framerfordevs/api/contracts/authoring/content/index";
 import type {
   AuthoringPublishEntryRequest,
   AuthoringUnpublishEntryRequest,
-} from "@framerfordevs/api/contracts/authoring-publication";
-import type { AuthoringPublishPresentationRequest } from "@framerfordevs/api/contracts/authoring-presentation";
+} from "@framerfordevs/api/contracts/authoring/publication/index";
+import type { AuthoringPublishPresentationRequest } from "@framerfordevs/api/contracts/authoring/presentation/index";
 import type {
   AuthoringSchemaApplyRequest,
   AuthoringSchemaPlanRequest,
-} from "@framerfordevs/api/contracts/authoring-schema";
-import type { DeliveryAccessPrincipal } from "@framerfordevs/api/contracts/delivery";
-import { toolingLimits } from "@framerfordevs/api/contracts/tooling";
+} from "@framerfordevs/api/contracts/authoring/schema/index";
+import type { DeliveryAccessPrincipal } from "@framerfordevs/api/contracts/delivery/index";
+import { toolingLimits } from "@framerfordevs/api/contracts/tooling/index";
 import {
   generatePublicArtifacts,
   type PublicContractRegistryKey,
 } from "@framerfordevs/public-contracts";
-import type { RateLimitDecision } from "@framerfordevs/api/contracts/rate-limit";
-import { selectCanonicalNetworkSource } from "@framerfordevs/api/lib/network-source";
+import type { RateLimitDecision } from "@framerfordevs/api/contracts/rate-limit/index";
+import { selectCanonicalNetworkSource } from "@framerfordevs/api/lib/network-source/index";
 import {
   applyAuthoringProjectSchema,
   authenticateAuthoringRequest,
@@ -75,7 +75,7 @@ import {
   saveAuthoringEntryDraft,
   unpublishAuthoringEntry,
   validateAuthoringPublication,
-} from "@framerfordevs/api/operations/authoring-public";
+} from "@framerfordevs/api/operations/authoring/public/index";
 import {
   authenticateToolingRequest,
   decodeToolingCollectionRevisionScope,
@@ -91,8 +91,8 @@ import {
   toolingManifestCost,
   toolingRevisionCost,
   validateToolingEmptyQuery,
-} from "@framerfordevs/api/operations/tooling-public";
-import type { ToolingPrincipal } from "@framerfordevs/api/services/tooling-principal-authenticator";
+} from "@framerfordevs/api/operations/tooling-public/index";
+import type { ToolingPrincipal } from "@framerfordevs/api/services/tooling/principal-authenticator/index";
 import {
   authenticatePreviewRequest,
   evaluatePreviewCredentialRateLimit,
@@ -101,7 +101,7 @@ import {
   getCredentialRevisionPreview,
   makeCurrentPreviewRouteScope,
   makeRevisionPreviewRouteScope,
-} from "@framerfordevs/api/operations/preview-public";
+} from "@framerfordevs/api/operations/preview/public";
 import {
   authenticateDeliveryRequest,
   evaluateDeliveryGlobalRateLimit,
@@ -112,13 +112,13 @@ import {
   listDeliveryEntries,
   makeDeliveryRouteScope,
   resolveDeliveryScope,
-} from "@framerfordevs/api/operations/delivery-public";
+} from "@framerfordevs/api/operations/delivery/public";
 import type {
   DeliveryRouteScopeInput,
   ResolvedDeliveryScope,
-} from "@framerfordevs/api/services/delivery-read-repository";
-import { readinessCheck, healthCheck } from "@framerfordevs/api/operations/system";
-import { makeRequestContext } from "@framerfordevs/api/observability/request-context";
+} from "@framerfordevs/api/services/delivery/read-repository";
+import { readinessCheck, healthCheck } from "@framerfordevs/api/operations/system/index";
+import { makeRequestContext } from "@framerfordevs/api/observability/request-context/index";
 import {
   authoringCostBucket,
   authoringSizeBucket,
@@ -130,7 +130,7 @@ import {
   type PreviewQueryRejectionCategory,
   type ToolingEndpoint,
   type ToolingSubject,
-} from "@framerfordevs/api/observability/telemetry";
+} from "@framerfordevs/api/observability/telemetry/index";
 import {
   observeAuthoringAuthentication,
   observeAuthoringRequest,
@@ -138,7 +138,7 @@ import {
   observePreviewQueryRejection,
   observeToolingRequest,
   reportBoundaryDefect,
-} from "@framerfordevs/api/runtime";
+} from "@framerfordevs/api/runtime/index";
 import { appRouter } from "@framerfordevs/api/routers/index";
 import { auth } from "@framerfordevs/auth";
 import { env } from "@framerfordevs/env/server";

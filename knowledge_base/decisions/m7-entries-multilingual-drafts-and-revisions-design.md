@@ -363,7 +363,7 @@ A differing target always creates a new revision. Restoring the current canonica
 
 ## API and Effect architecture
 
-Add strict contracts under `packages/api/src/contracts/entries.ts`, a pure entry-value kernel under `packages/api/src/lib/`, an `EntryRepository` service/Layer, and named operations under `packages/api/src/operations/entries.ts`.
+Add strict contracts under `packages/api/src/contracts/entry/index.ts`, a pure entry-value kernel under `packages/api/src/lib/`, an `EntryRepository` service/Layer, and named operations under `packages/api/src/operations/entries/index.ts`.
 
 The repository owns authorization, tenant queries, lock order, command replay, transactional writes, batched references, audits, and database error translation. The pure kernel owns fragment partition/merge, stable-path mutation, storage validation, canonical hashing, role projection, and deterministic issue ordering. `FieldEngine` continues to own kind-specific value validation.
 

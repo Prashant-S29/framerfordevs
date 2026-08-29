@@ -5,8 +5,8 @@ set -euo pipefail
 docker compose build server >/dev/null
 docker compose run --rm --no-deps server \
   pnpm --dir /app/packages/api exec vitest run \
-  src/services/webhook-worker-repository.integration.test.ts \
-  src/services/webhook-repository.integration.test.ts >/dev/null
+  test/integration/services/webhook/worker-repository.integration.test.ts \
+  test/integration/services/webhook/repository.integration.test.ts >/dev/null
 
 unsafe_state="$(docker exec framerfordevs-postgres psql -U postgres -d framerfordevs -Atc "select
   (select count(*) from webhook_delivery) +

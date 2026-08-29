@@ -2,13 +2,13 @@ import { defineConfig } from "tsdown";
 
 export default defineConfig({
   entry: {
-    index: "./src/index.ts",
-    generator: "./src/generator.ts",
-    "schema-extractor": "./src/schema-extractor.ts",
-    "experimental-schema-build": "./src/experimental-schema-build.ts",
-    "experimental-schema-build-worker": "./src/experimental-schema-build-worker.ts",
-    "static-schema-extractor-worker": "./src/static-schema-extractor-worker.ts",
-    bin: "./src/bin.ts",
+    index: "./src/index",
+    generator: "./src/generator/index",
+    "schema-extractor": "./src/schema/extractor",
+    "experimental-schema-build": "./src/experimental-schema-build",
+    "experimental-schema-build-worker": "./src/schema/experimental-build/worker",
+    "static-schema-extractor-worker": "./src/schema/static-extractor/worker",
+    bin: "./src/bin",
   },
   format: "esm",
   outDir: "./dist",

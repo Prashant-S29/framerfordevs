@@ -62,7 +62,7 @@ beforeAll(async () => {
     effectModule,
   ] = await Promise.all([
     import("../../src/app"),
-    import("@framerfordevs/api/runtime"),
+    import("@framerfordevs/api/runtime/index"),
     import("@framerfordevs/db"),
     import("@framerfordevs/db/query"),
     import("@framerfordevs/db/schema/access"),
@@ -71,9 +71,9 @@ beforeAll(async () => {
     import("@framerfordevs/db/schema/locale"),
     import("@framerfordevs/db/schema/platform"),
     import("@framerfordevs/api/services/platform-repository"),
-    import("@framerfordevs/api/services/schema-repository"),
-    import("@framerfordevs/api/contracts/platform"),
-    import("@framerfordevs/api/contracts/schemas"),
+    import("@framerfordevs/api/services/schema/repository"),
+    import("@framerfordevs/api/contracts/platform/index"),
+    import("@framerfordevs/api/contracts/schema/index"),
     import("effect"),
   ]);
 

@@ -1,7 +1,7 @@
 import { auth } from "@framerfordevs/auth";
 import { Context, Effect, Layer } from "effect";
 
-import { AuthSessionFailure } from "../contracts/errors";
+import { AuthSessionFailure } from "../contracts/response/errors";
 
 export type AuthSession = Awaited<ReturnType<typeof auth.api.getSession>>;
 

@@ -42,5 +42,5 @@ for selected in "${profiles[@]}"; do
     -v "$directory:/run/m11-webhook-tls:ro" \
     -e WEBHOOK_LOAD_TLS_KEY_PATH=/run/m11-webhook-tls/key.pem \
     -e WEBHOOK_LOAD_TLS_CERTIFICATE_PATH=/run/m11-webhook-tls/certificate.pem \
-    server pnpm --dir /app/packages/api exec tsx src/scripts/webhook-attempt-load.ts "$selected"
+    server pnpm --dir /app/packages/api exec tsx src/scripts/webhook/attempt-load.ts "$selected"
 done

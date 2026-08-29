@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
-import SignInForm from "@/components/sign-in-form";
-import SignUpForm from "@/components/sign-up-form";
+import SignInForm from "@/components/auth/sign/in-form";
+import SignUpForm from "@/components/auth/sign/up-form";
 import { getUser } from "@/functions/get-user";
-import { getAuthenticatedRedirect, getSafeAuthenticatedReturnTo } from "@/lib/auth-navigation";
-import { buildInvitationAcceptancePath, parseInvitationTokenHash } from "@/lib/invitation-link";
+import { getAuthenticatedRedirect, getSafeAuthenticatedReturnTo } from "@/lib/auth/navigation";
+import {
+  buildInvitationAcceptancePath,
+  parseInvitationTokenHash,
+} from "@/lib/auth/invitation-link";
 
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>) => ({

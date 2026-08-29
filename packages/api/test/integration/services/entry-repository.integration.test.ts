@@ -48,8 +48,8 @@ import {
   RenameEntryInput,
   RestoreEntryRevisionInput,
   SaveEntryDraftInput,
-} from "../../../src/contracts/entries";
-import { CreateProjectLocaleInput } from "../../../src/contracts/locales";
+} from "../../../src/contracts/entry";
+import { CreateProjectLocaleInput } from "../../../src/contracts/locale";
 import {
   AuthUserId,
   CreateProjectInput,
@@ -67,13 +67,13 @@ import {
   ValidateCollectionSchemaInput,
   type CmsCollection,
   type PublishedSchemaRevision,
-} from "../../../src/contracts/schemas";
-import { resolveAuthoringMutations } from "../../../src/lib/authoring-mutations";
-import { makeAuthoringContentRepository } from "../../../src/services/authoring-content-repository";
-import { makeEntryRepository } from "../../../src/services/entry-repository";
-import { makeLocaleRepository } from "../../../src/services/locale-repository";
+} from "../../../src/contracts/schema";
+import { resolveAuthoringMutations } from "../../../src/lib/authoring/mutations";
+import { makeAuthoringContentRepository } from "../../../src/services/authoring/content-repository";
+import { makeEntryRepository } from "../../../src/services/entry/repository";
+import { makeLocaleRepository } from "../../../src/services/locale/repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
-import { makeSchemaRepository } from "../../../src/services/schema-repository";
+import { makeSchemaRepository } from "../../../src/services/schema/repository";
 
 const suffix = randomUUID();
 const ownerId = `m7-entry-owner-${suffix}`;

@@ -1,7 +1,7 @@
-// Enforces deterministic test placement and prevents production modules from importing test-only code.
+// Enforces deterministic test placement, domain ownership, and production/test import boundaries.
 
 import { access, readdir, readFile } from "node:fs/promises";
-import { join, sep } from "node:path";
+import { basename, dirname, join, sep } from "node:path";
 
 const workspaceParents = ["apps", "packages", "tools"];
 const ignoredDirectories = new Set([
@@ -108,6 +108,60 @@ async function checkSourceBoundary(workspaceRoot, violations) {
   }
 }
 
+/** Requires implementation/test families to live as index modules in a dedicated owner directory. */
+async function checkModulePairStructure(workspaceRoot, violations) {
+  const files = [];
+  await collectSourceFiles(workspaceRoot, files);
+  const implementations = new Set(
+    files
+      .filter((path) => !path.includes(".test."))
+      .map((path) => path.replace(/\.(?:cjs|js|jsx|mjs|ts|tsx)$/u, "")),
+  );
+  for (const path of files) {
+    if (!path.includes(".test.")) continue;
+    const implementation = path.replace(/\.test\.(?:cjs|js|jsx|mjs|ts|tsx)$/u, "");
+    if (!implementations.has(implementation)) continue;
+    const moduleName = implementation.slice(implementation.lastIndexOf(sep) + 1);
+    if (moduleName !== "index") {
+      report(
+        violations,
+        `${path}: colocated implementation/test families belong in module/index.*`,
+      );
+    }
+  }
+}
+
+/** Requires repeated sibling filename prefixes to be expressed as an owner directory. */
+async function checkRepeatedModuleFamilies(root, violations) {
+  if (!(await exists(root))) return;
+  const files = [];
+  await collectSourceFiles(root, files);
+  const filesByDirectory = Map.groupBy(files, dirname);
+  for (const [directory, siblingFiles] of filesByDirectory) {
+    const stemsByPrefix = new Map();
+    for (const path of siblingFiles) {
+      const stem = basename(path)
+        .replace(/\.(?:cjs|js|jsx|mjs|ts|tsx)$/u, "")
+        .replace(/\.(?:spec|test)$/u, "");
+      if (stem === "index" || stem === "setup" || stem.startsWith("$") || stem.startsWith("_")) {
+        continue;
+      }
+      const prefix = stem.split(/[.-]/u, 1)[0] ?? "";
+      if (prefix.length < 3) continue;
+      const stems = stemsByPrefix.get(prefix) ?? new Set();
+      stems.add(stem);
+      stemsByPrefix.set(prefix, stems);
+    }
+    for (const [prefix, stems] of stemsByPrefix) {
+      if (stems.size < 2) continue;
+      report(
+        violations,
+        `${directory}: repeated ${prefix}-prefixed modules belong in a ${prefix}/ owner directory`,
+      );
+    }
+  }
+}
+
 /** Enforces the singular categorized workspace test directory and rejects unowned flat test files. */
 async function checkTestDirectory(workspaceRoot, violations) {
   const pluralRoot = join(workspaceRoot, "tests");
@@ -127,6 +181,141 @@ async function checkTestDirectory(workspaceRoot, violations) {
   }
 }
 
+/** Enforces compact learning entries, ordered progress milestones, and complete selective decision routing. */
+async function checkKnowledgeBase(violations) {
+  const learnings = await readFile("knowledge_base/learnings.md", "utf8");
+  const learningEntries = learnings.split("\n---\n").slice(1);
+  for (const entry of learningEntries) {
+    const title = /^## .+$/mu.exec(entry)?.[0] ?? "untitled learning";
+    const incorrectCount = (entry.match(/^\*\*Incorrect assumption or decision:\*\*/gmu) ?? [])
+      .length;
+    const learningCount = (entry.match(/^\*\*Learning:\*\*/gmu) ?? []).length;
+    const statusCount = (entry.match(/^\*\*Status:\*\*/gmu) ?? []).length;
+    const retiredFields = /^\*\*(?:Context|Cost or risk|Prevention):\*\*/mu.test(entry);
+    if (incorrectCount !== 1 || learningCount !== 1 || statusCount > 1 || retiredFields) {
+      report(violations, `knowledge_base/learnings.md: invalid concise fields in ${title}`);
+    }
+  }
+
+  const progress = await readFile("knowledge_base/progress.md", "utf8");
+  const trackerSection = progress.split("## Milestone tracker", 2)[1]?.split("\n## ", 1)[0] ?? "";
+  const trackerNumbers = [...trackerSection.matchAll(/^\|\s+(\d+)\s+\|/gmu)].map((match) =>
+    Number(match[1]),
+  );
+  if (!trackerNumbers.every((number, index) => number === index)) {
+    report(
+      violations,
+      "knowledge_base/progress.md: milestone tracker must be contiguous and ordered",
+    );
+  }
+  const milestoneNumbers = [...progress.matchAll(/^### Milestone (\d+)\b/gmu)].map((match) =>
+    Number(match[1]),
+  );
+  if (
+    milestoneNumbers.length !== trackerNumbers.length ||
+    !milestoneNumbers.every((number, index) => number === trackerNumbers[index])
+  ) {
+    report(violations, "knowledge_base/progress.md: milestone summaries must match tracker order");
+  }
+
+  const decisionEntries = await readdir("knowledge_base/decisions", { withFileTypes: true });
+  const decisionIndex = await readFile("knowledge_base/decisions/index.md", "utf8");
+  for (const entry of decisionEntries) {
+    if (!entry.isFile() || !entry.name.endsWith(".md") || entry.name === "index.md") continue;
+    if (!decisionIndex.includes(`(${entry.name})`)) {
+      report(violations, `knowledge_base/decisions/index.md: missing ${entry.name}`);
+    }
+  }
+}
+
+/** Keeps established domain clusters out of flat source directories as those areas grow. */
+async function checkDomainStructure(violations) {
+  const rules = [
+    {
+      root: "packages/api/src/lib",
+      domains: ["authoring", "delivery", "entry", "field", "preview", "publication", "webhook"],
+    },
+    {
+      root: "packages/api/src/services",
+      domains: [
+        "authoring",
+        "credential",
+        "delivery",
+        "entry",
+        "field",
+        "locale",
+        "preview",
+        "publication",
+        "rate-limit",
+        "schema",
+        "tooling",
+        "webhook",
+      ],
+    },
+    {
+      root: "packages/api/src/operations",
+      domains: ["authoring", "delivery", "preview", "webhook"],
+    },
+    {
+      root: "packages/api/src/scripts",
+      domains: ["delivery", "preview", "webhook"],
+    },
+    {
+      root: "packages/cli/src",
+      domains: [
+        "authoring-schema",
+        "content",
+        "editor",
+        "experimental-schema",
+        "schema-authoring",
+        "schema-build",
+        "static-schema",
+      ],
+      allowed: new Set(["experimental-schema-build.ts"]),
+    },
+    {
+      root: "apps/web/src/components",
+      domains: [
+        "archive-project",
+        "collection-entries",
+        "create-project",
+        "edit-project",
+        "entry",
+        "generated-form",
+        "locale-tabs",
+        "portable-text-field",
+        "project",
+      ],
+    },
+    {
+      root: "apps/web/src/lib",
+      domains: [
+        "auth-client",
+        "auth-navigation",
+        "cms-validation",
+        "entry",
+        "invitation-link",
+        "platform-validation",
+      ],
+    },
+  ];
+  for (const rule of rules) {
+    const entries = await readdir(rule.root, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || rule.allowed?.has(entry.name)) continue;
+      const domain = rule.domains.find(
+        (candidate) =>
+          entry.name === `${candidate}.ts` ||
+          entry.name.startsWith(`${candidate}.`) ||
+          entry.name.startsWith(`${candidate}-`),
+      );
+      if (domain !== undefined) {
+        report(violations, `${join(rule.root, entry.name)}: place ${domain} modules in a domain/`);
+      }
+    }
+  }
+}
+
 /** Runs all repository structure checks and exits nonzero with stable path-only diagnostics on failure. */
 async function main() {
   const violations = [];
@@ -137,8 +326,13 @@ async function main() {
   const workspaceRoots = await findWorkspaceRoots();
   for (const root of workspaceRoots) {
     await checkSourceBoundary(root, violations);
+    await checkModulePairStructure(root, violations);
+    await checkRepeatedModuleFamilies(root, violations);
     await checkTestDirectory(root, violations);
   }
+  await checkRepeatedModuleFamilies("scripts", violations);
+  await checkKnowledgeBase(violations);
+  await checkDomainStructure(violations);
   if (violations.length > 0) {
     for (const violation of violations) console.error(violation);
     process.exitCode = 1;

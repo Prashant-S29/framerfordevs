@@ -1,21 +1,27 @@
-# Mandatory Project and Agent Rules
+# Project Rule Index
 
-This directory is the mandatory rules entrypoint for every agent session. Read every linked file completely, in the listed order, before changing code. These rules are not optional guidance.
+Root `AGENTS.md` contains the always-on rules Pi loads for every session. This directory provides the detailed, task-specific rules beneath that mandatory baseline.
 
-1. [`session-rules.md`](session-rules.md) — required reading, repository inspection, and session preparation
-2. [`skills-rules.md`](skills-rules.md) — skill selection, research, and recommendation requirements
-3. [`source-of-truth-rules.md`](source-of-truth-rules.md) — conflict resolution and authority order
-4. [`decision-rules.md`](decision-rules.md) — architecture and product decision standards
-5. [`milestone-rules.md`](milestone-rules.md) — milestone scope, review, documentation, and commit handoff
-6. [`migration-rules.md`](migration-rules.md) — developer-controlled generation/application gates and temporary correction-draft workflow
-7. [`effect-rules.md`](effect-rules.md) — stable Effect v3 implementation requirements
-8. [`api-rules.md`](api-rules.md) — application response and centralized error contracts
-9. [`observability-rules.md`](observability-rules.md) — tracing, metrics, logging, auditing, and redaction
-10. [`security-rules.md`](security-rules.md) — authorization, isolation, validation, and secret handling
-11. [`localization-and-publication-rules.md`](localization-and-publication-rules.md) — locale and publication invariants
-12. [`performance-rules.md`](performance-rules.md) — bounded and measurable performance requirements
-13. [`testing-rules.md`](testing-rules.md) — required test categories and determinism
-14. [`monorepo-rules.md`](monorepo-rules.md) — pnpm, Turborepo, dependency, and package boundaries
-15. [`comment-rules.md`](comment-rules.md) — mandatory structured source-code comments
-16. [`documentation-rules.md`](documentation-rules.md) — knowledge-base ownership and durable learnings
-17. [`reporting-rules.md`](reporting-rules.md) — implementation status, validation evidence, developer-testable flows, blockers, and handoffs
+Read a rule completely when the task changes, consumes, validates, or must preserve its domain. Do not load every rule speculatively; follow actual code/contracts when work crosses domains.
+
+| Rule                                                                             | Read when                                                                           |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [`session-rules.md`](session-rules.md)                                           | Starting or resuming substantive repository work; discovery and context selection   |
+| [`skills-rules.md`](skills-rules.md)                                             | Selecting, evaluating, installing, or recommending skills/research guidance         |
+| [`source-of-truth-rules.md`](source-of-truth-rules.md)                           | Reconciling requirements, status, decisions, code, tests, migrations, or Git        |
+| [`decision-rules.md`](decision-rules.md)                                         | Making or requesting a product, architecture, dependency, or authority decision     |
+| [`milestone-rules.md`](milestone-rules.md)                                       | Defining, executing, reviewing, accepting, or advancing a milestone                 |
+| [`migration-rules.md`](migration-rules.md)                                       | Any Drizzle schema, migration, live-catalog, or migration-draft work                |
+| [`effect-rules.md`](effect-rules.md)                                             | Any business workflow, Effect service/error/Layer/runtime, or Effect test work      |
+| [`api-rules.md`](api-rules.md)                                                   | Application API contracts, handlers, responses, errors, or status mapping           |
+| [`observability-rules.md`](observability-rules.md)                               | Logs, traces, metrics, audits, request IDs, telemetry, or redaction                 |
+| [`security-rules.md`](security-rules.md)                                         | Auth, authorization, external input, credentials, tenants, URLs, or sensitive data  |
+| [`localization-and-publication-rules.md`](localization-and-publication-rules.md) | Locales, drafts, publication, snapshots, Delivery, or references                    |
+| [`performance-rules.md`](performance-rules.md)                                   | Queries, lists, caches, concurrency, queues, load, memory, or optimization          |
+| [`testing-rules.md`](testing-rules.md)                                           | Adding/moving tests, changing test infrastructure, or validating behavior           |
+| [`monorepo-rules.md`](monorepo-rules.md)                                         | Packages, dependencies, exports, Turborepo tasks, or workspace boundaries           |
+| [`comment-rules.md`](comment-rules.md)                                           | Adding or materially changing hand-authored source files                            |
+| [`documentation-rules.md`](documentation-rules.md)                               | Changing product/PRD/context/progress/milestone/learning/decision documentation     |
+| [`reporting-rules.md`](reporting-rules.md)                                       | Progress reports, readiness summaries, review handoffs, blockers, or release status |
+
+No rule may override a current explicit developer instruction or higher product authority. When a task spans several domains, read the union of relevant rules rather than all historical material.

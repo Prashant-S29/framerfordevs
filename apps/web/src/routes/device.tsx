@@ -4,7 +4,7 @@ import { Label } from "@framerfordevs/ui/components/label";
 import { createFileRoute } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useState } from "react";
 
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@/lib/auth/client";
 
 interface DeviceRequestSummary {
   readonly userCode: string;

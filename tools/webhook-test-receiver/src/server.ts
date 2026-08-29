@@ -5,7 +5,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { loadScenarioSecrets } from "./config.js";
-import { planScenario, planVerificationFailure } from "./scenarios.js";
+import { planScenario, planVerificationFailure } from "./scenarios/index.js";
 import { verifyWebhook } from "./signature.js";
 import { createCapture, finalizeCapture, reserveAcceptedEvent } from "./storage.js";
 import {

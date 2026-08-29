@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
+import { disposeApplicationRuntime } from "@framerfordevs/api/runtime/index";
 import { db } from "@framerfordevs/db";
 import { and, eq, or } from "@framerfordevs/db/query";
 import {

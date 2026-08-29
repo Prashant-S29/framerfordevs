@@ -11,7 +11,7 @@ import {
   type CredentialFamily,
   InvitationToken,
 } from "../contracts/access";
-import { SecurityServiceFailure } from "../contracts/errors";
+import { SecurityServiceFailure } from "../contracts/response/errors";
 
 export interface CredentialMaterial {
   readonly key: CredentialSecret;

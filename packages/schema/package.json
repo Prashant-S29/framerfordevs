@@ -21,15 +21,15 @@
   "sideEffects": false,
   "exports": {
     ".": {
-      "types": "./dist/index.d.mts",
+      "types": "./dist/index.d",
       "import": "./dist/index.mjs"
     },
     "./compose": {
-      "types": "./dist/compose.d.mts",
+      "types": "./dist/compose.d",
       "import": "./dist/compose.mjs"
     },
     "./validate": {
-      "types": "./dist/validate.d.mts",
+      "types": "./dist/validate.d",
       "import": "./dist/validate.mjs"
     }
   },

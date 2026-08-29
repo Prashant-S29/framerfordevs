@@ -26,7 +26,7 @@ import {
   NotFoundFailure,
   ProjectKeyConflictFailure,
   VersionConflictFailure,
-} from "../contracts/errors";
+} from "../contracts/response/errors";
 import {
   type ArchiveProjectInput,
   type AuthUserId,

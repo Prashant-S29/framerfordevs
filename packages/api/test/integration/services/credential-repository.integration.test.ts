@@ -35,18 +35,18 @@ import {
   revokeApiCredential,
   rotateApiCredential,
 } from "../../../src/operations/credentials";
-import { CredentialAttemptLimiterLive } from "../../../src/services/credential-attempt-limiter";
-import { makeRateLimitManagerLive } from "../../../src/services/rate-limit-manager";
+import { CredentialAttemptLimiterLive } from "../../../src/services/credential/attempt-limiter";
+import { makeRateLimitManagerLive } from "../../../src/services/rate-limit/manager";
 import {
   MemoryRateLimitFallbackStoreLive,
   MemoryRateLimitStoreLive,
-} from "../../../src/services/rate-limit-store";
+} from "../../../src/services/rate-limit/store";
 import {
   type AuthenticateCredentialInput,
   CredentialAuthenticator,
   CredentialAuthenticatorLive,
-} from "../../../src/services/credential-authenticator";
-import { CredentialRepositoryLive } from "../../../src/services/credential-repository";
+} from "../../../src/services/credential/authenticator";
+import { CredentialRepositoryLive } from "../../../src/services/credential/repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 import { PolicyServiceLive } from "../../../src/services/policy";
 import { SecretGeneratorLive } from "../../../src/services/secret-generator";

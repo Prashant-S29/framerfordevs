@@ -24,19 +24,19 @@
   "sideEffects": false,
   "exports": {
     ".": {
-      "types": "./dist/index.d.mts",
+      "types": "./dist/index.d",
       "import": "./dist/index.mjs"
     },
     "./generator": {
-      "types": "./dist/generator.d.mts",
+      "types": "./dist/generator.d",
       "import": "./dist/generator.mjs"
     },
     "./schema-extractor": {
-      "types": "./dist/schema-extractor.d.mts",
+      "types": "./dist/schema-extractor.d",
       "import": "./dist/schema-extractor.mjs"
     },
     "./experimental-schema-build": {
-      "types": "./dist/experimental-schema-build.d.mts",
+      "types": "./dist/experimental-schema-build.d",
       "import": "./dist/experimental-schema-build.mjs"
     }
   },
@@ -49,7 +49,7 @@
     "check-types": "tsc --noEmit && tsc --project tsconfig.editor.json --noEmit",
     "prepack": "pnpm run build && pnpm run check-types && pnpm run test && pnpm run test:packaged",
     "test": "vitest run",
-    "test:packaged": "node test/contract/packaged-static-schema-extractor.mjs && node test/contract/packaged-authoring-workflows.mjs && node test/contract/packaged-editor-workflow.mjs",
+    "test:packaged": "node test/contract/packaged/static-schema-extractor.mjs && node test/contract/packaged/authoring-workflows.mjs && node test/contract/packaged/editor-workflow.mjs",
     "test:browser": "node test/accessibility/real-browser-editor.mjs",
     "test:unit": "vitest run src",
     "test:coverage": "vitest run --coverage"

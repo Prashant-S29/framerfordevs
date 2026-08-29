@@ -3,7 +3,7 @@ import { assert, beforeEach, describe, layer } from "@effect/vitest";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { Effect } from "effect";
 
-import { decodeAuthoringSchemaPlanRequest } from "../operations/authoring-public";
+import { decodeAuthoringSchemaPlanRequest } from "../operations/authoring/public";
 import { withRequestSpan } from "../runtime";
 import { RequestContext, TraceParent } from "./request-context";
 

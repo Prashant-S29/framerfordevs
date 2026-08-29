@@ -101,6 +101,16 @@ Reviews drafts and can publish when granted permission. Review notes and advance
 
 Can inspect permitted resources without mutation rights.
 
+### 6.1 Product surfaces and automation parity
+
+The CMS exposes one server-authoritative resource model through three intentionally different clients:
+
+- The hosted control plane manages accounts, workspaces, projects, members, credentials, webhooks, environments, security/recovery, and Studio registration.
+- A framework-neutral project Studio is mounted at a developer-configured application path and provides role-projected content, localization, editorial layout, Preview, publication, and future visual editing.
+- Public HTTP APIs plus CLI/SDK commands expose every meaningful control-plane and authoring action with stable machine-readable contracts, noninteractive operation, idempotency/concurrency authority, and honest actor attribution.
+
+Project creation and mutation have one backend authority even when both the hosted dashboard and CLI invoke them. Studio browser code must not receive unrestricted management credentials; sensitive operations use exact server-side routes and short-lived user/session authority. The hosted control plane remains a bootstrap and recovery surface when the project application or Studio is unavailable.
+
 ## 7. Common project model
 
 ```text
@@ -545,15 +555,17 @@ The platform ultimately generates:
 - Project configuration
 - Schema lock metadata
 
-Expected CLI flow:
+Expected CLI flow begins with authenticated control-plane bootstrap and continues through code-first authoring:
 
 ```text
-login → link → schema pull → schema check → generate
+login → workspace/project create or link → configure access/integrations → schema export/check/plan/push → generate → content automation
 ```
 
-Generated artifacts identify project, environment, locale contract, and schema revision. Tooling warns when generated contracts are stale. Content-only changes never require type regeneration; published schema changes may.
+Every command intended for agents supports stable JSON, deterministic errors/exit codes, bounded pagination, noninteractive operation, explicit dry-run or acknowledgement gates where applicable, and secret-safe output. Generated artifacts identify project, environment, locale contract, and schema revision. Tooling warns when generated contracts are stale. Content-only changes never require type regeneration; published schema changes may.
 
 ## 20. Client experience
+
+The generated editing experience is ultimately delivered through the project Studio at its configured application path. The same Studio serves developers and clients through server-enforced role, collection, field, action, environment, and locale projection.
 
 Generated forms must provide:
 

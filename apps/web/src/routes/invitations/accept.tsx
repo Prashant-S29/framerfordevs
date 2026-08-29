@@ -22,8 +22,8 @@ import { MailWarningIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { authClient } from "@/lib/auth-client";
-import { buildInvitationSignInLink, parseInvitationTokenHash } from "@/lib/invitation-link";
+import { authClient } from "@/lib/auth/client";
+import { buildInvitationSignInLink, parseInvitationTokenHash } from "@/lib/auth/invitation-link";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/invitations/accept")({

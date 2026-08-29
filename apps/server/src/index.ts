@@ -1,4 +1,4 @@
-import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
+import { disposeApplicationRuntime } from "@framerfordevs/api/runtime/index";
 import { ensureOfficialCliOAuthAuthority } from "@framerfordevs/auth";
 import { env } from "@framerfordevs/env/server";
 import type { Server } from "node:http";

@@ -3,7 +3,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback } from "react";
 
-import { EntryEditor } from "@/components/entry-editor";
+import { EntryEditor } from "@/components/entry/editor";
 
 export const Route = createFileRoute(
   "/_auth/projects/$projectId_/collections/$collectionId_/entries_/$entryId",

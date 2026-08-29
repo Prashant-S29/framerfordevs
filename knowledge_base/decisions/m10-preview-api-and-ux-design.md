@@ -577,7 +577,7 @@ Soft content invalidity remains HTTP 200 with `validation.valid: false`; it is t
 
 ### Contracts
 
-`packages/api/src/contracts/preview.ts` owns:
+`packages/api/src/contracts/preview/index.ts` owns:
 
 - Preview source selectors and metadata
 - Preview item/data/validation contracts
@@ -589,7 +589,7 @@ Effect Schema is canonical. Reusable named contracts use `Schema.Class`/tagged u
 
 ### Pure kernel
 
-`packages/api/src/lib/preview-document.ts` owns dependency-light deterministic work:
+`packages/api/src/lib/preview/document/index.ts` owns dependency-light deterministic work:
 
 - Stable-ID fragment preflight
 - Shared/localized merge
@@ -622,14 +622,14 @@ Stable Drizzle remains Promise-native inside the adapter and is wrapped with `Ef
 
 ### Operations
 
-Named operations under `packages/api/src/operations/preview.ts` include:
+Named operations under `packages/api/src/operations/preview/api/index.ts` include:
 
 - `getCredentialCurrentPreview`
 - `getCredentialRevisionPreview`
 - `getUserCurrentPreview`
 - `getUserRevisionPreview`
 
-The public boundary helpers under `operations/preview-public.ts` own only validated route input, base bearer authentication orchestration, and rate-limit orchestration. Persisted route scope is resolved and compared with the authenticated principal inside `PreviewRepository`; these helpers do not own SQL or compilation.
+The public boundary helpers under `operations/preview/public.ts` own only validated route input, base bearer authentication orchestration, and rate-limit orchestration. Persisted route scope is resolved and compared with the authenticated principal inside `PreviewRepository`; these helpers do not own SQL or compilation.
 
 ### Runtime
 

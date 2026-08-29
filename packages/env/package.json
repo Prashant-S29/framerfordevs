@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./server": "./src/server.ts",
-    "./web": "./src/web.ts"
+    "./server": "./src/server/index.ts",
+    "./web": "./src/web/index.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",

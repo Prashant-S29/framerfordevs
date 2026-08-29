@@ -3,11 +3,12 @@
 import { afterAll, assert, describe, it, vi } from "vitest";
 import request from "supertest";
 
-vi.mock("@framerfordevs/api/operations/preview-public", async (importOriginal) => {
+vi.mock("@framerfordevs/api/operations/preview/public", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("@framerfordevs/api/operations/preview-public")>();
+    await importOriginal<typeof import("@framerfordevs/api/operations/preview/public")>();
   const { Effect } = await import("effect");
-  const { PreviewResponseTooLargeFailure } = await import("@framerfordevs/api/contracts/errors");
+  const { PreviewResponseTooLargeFailure } =
+    await import("@framerfordevs/api/contracts/response/errors/index");
   const ids = {
     workspace: "019fae8b-1234-7000-8000-000000000001",
     project: "019fae8b-1234-7000-8000-000000000002",
@@ -67,7 +68,7 @@ vi.mock("@framerfordevs/api/operations/preview-public", async (importOriginal) =
   };
 });
 
-const { applicationRuntime } = await import("@framerfordevs/api/runtime");
+const { applicationRuntime } = await import("@framerfordevs/api/runtime/index");
 const { createApp } = await import("../../src/app");
 
 const app = createApp({ previewApiEnabled: true });

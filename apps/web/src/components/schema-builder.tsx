@@ -2,8 +2,8 @@ import type {
   DeliveryAccess,
   DeliveryCollectionConfiguration,
   DeliveryFieldCapability,
-} from "@framerfordevs/api/contracts/delivery";
-import type { CollectionFieldDefinition } from "@framerfordevs/api/contracts/schemas";
+} from "@framerfordevs/api/contracts/delivery/index";
+import type { CollectionFieldDefinition } from "@framerfordevs/api/contracts/schema/index";
 import { Badge } from "@framerfordevs/ui/components/badge";
 import { Button } from "@framerfordevs/ui/components/button";
 import {

@@ -10,12 +10,12 @@ import {
 import {
   ExperimentalSchemaBuildWorkerInput,
   ExperimentalSchemaBuildWorkerResponse,
-} from "./experimental-schema-build-protocol";
+} from "./schema/experimental-build/protocol";
 import {
   experimentalSchemaBuildLimits,
   type ExperimentalSchemaBuildInput,
   type ExperimentalSchemaBuildOutput,
-} from "./experimental-schema-build-runner";
+} from "./schema/experimental-build/runner";
 
 export type { ExperimentalSchemaBuildInput, ExperimentalSchemaBuildOutput };
 export {
@@ -50,21 +50,18 @@ export const runExperimentalSchemaBuild = Effect.fn("cli.schema.build.experiment
   return yield* Effect.async<ExperimentalSchemaBuildOutput, ExperimentalSchemaBuildError>(
     (resume) => {
       let settled = false;
-      const worker = new Worker(
-        new URL("./experimental-schema-build-worker.mjs", import.meta.url),
-        {
-          workerData: validatedInput,
-          env: {},
-          execArgv: [],
-          resourceLimits: {
-            maxOldGenerationSizeMb: 96,
-            maxYoungGenerationSizeMb: 16,
-            stackSizeMb: 4,
-          },
-          stdout: true,
-          stderr: true,
+      const worker = new Worker(new URL("./schema/experimental-build/worker", import.meta.url), {
+        workerData: validatedInput,
+        env: {},
+        execArgv: [],
+        resourceLimits: {
+          maxOldGenerationSizeMb: 96,
+          maxYoungGenerationSizeMb: 16,
+          stackSizeMb: 4,
         },
-      );
+        stdout: true,
+        stderr: true,
+      });
       worker.stdout?.resume();
       worker.stderr?.resume();
 

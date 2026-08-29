@@ -1,20 +1,23 @@
 import { randomUUID } from "node:crypto";
 
 import type { ApplicationEffectTransform } from "@framerfordevs/api/context";
-import { RateLimitDecision, rateLimitPolicies } from "@framerfordevs/api/contracts/rate-limit";
-import { applicationRuntime, disposeApplicationRuntime } from "@framerfordevs/api/runtime";
+import {
+  RateLimitDecision,
+  rateLimitPolicies,
+} from "@framerfordevs/api/contracts/rate-limit/index";
+import { applicationRuntime, disposeApplicationRuntime } from "@framerfordevs/api/runtime/index";
 import {
   makePublicationRepository,
   PublicationRepository,
-} from "@framerfordevs/api/services/publication-repository";
+} from "@framerfordevs/api/services/publication/repository";
 import {
   RateLimitManager,
   type RateLimitManagerService,
-} from "@framerfordevs/api/services/rate-limit-manager";
+} from "@framerfordevs/api/services/rate-limit/manager/index";
 import {
   makeToolingPrincipalAuthenticator,
   ToolingPrincipalAuthenticator,
-} from "@framerfordevs/api/services/tooling-principal-authenticator";
+} from "@framerfordevs/api/services/tooling/principal-authenticator/index";
 import { db } from "@framerfordevs/db";
 import { and, eq, inArray, or } from "@framerfordevs/db/query";
 import {

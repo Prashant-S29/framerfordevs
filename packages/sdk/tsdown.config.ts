@@ -2,12 +2,12 @@ import { defineConfig } from "tsdown";
 
 export default defineConfig({
   entry: {
-    index: "./src/index.ts",
-    client: "./src/client.ts",
-    effect: "./src/effect.ts",
-    authoring: "./src/authoring.ts",
-    webhooks: "./src/webhooks.ts",
-    invalidation: "./src/invalidation.ts",
+    index: "./src/index",
+    client: "./src/client/index",
+    effect: "./src/effect/index",
+    authoring: "./src/authoring/index",
+    webhooks: "./src/webhooks/index",
+    invalidation: "./src/invalidation",
   },
   format: "esm",
   outDir: "./dist",

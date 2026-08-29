@@ -1,39 +1,47 @@
 # Repository Agent Instructions
 
-## Required context
+Pi loads this file into every project session and keeps it in the system context across compaction. These are mandatory; `.agents/skills/` is progressive, task-specific guidance and must not carry always-on rules.
 
-- Before changing code, inspect Git, then read `knowledge_base/product.md`, `knowledge_base/prd/cms.md`, `knowledge_base/rules/index.md` and every linked rule, and `knowledge_base/context.md`.
-- Read the status/tracker/current-work portions of `knowledge_base/progress.md` and the active section of `knowledge_base/milestone.md`.
-- Inspect the owning code, tests, package manifest, exports, and configuration before planning changes.
-- Search `knowledge_base/learnings.md` by the task domain. Read only decisions that the current task changes, consumes, or must preserve; use the selective map in `knowledge_base/context.md` and expand when actual dependencies cross domains.
-- Work only on the active milestone unless the developer explicitly changes scope.
-- Treat committed code/tests/configuration/migration history as executable implementation truth and product requirements/rules/relevant approved decisions as governing intent. Report drift instead of silently choosing one.
+## Start and scope
 
-## Skills and local references
+1. Inspect `git status` and recent `git log`; Git is authoritative for branch, commit, and worktree state.
+2. Read `knowledge_base/context.md`. Read only the product/PRD sections, rules, learnings, and decisions mapped there that the task changes, consumes, or must preserve.
+3. Read the status/tracker/current-work section of `knowledge_base/progress.md` and only the active milestone section of `knowledge_base/milestone.md`.
+4. Inspect owning source, tests, manifests, exports, configuration, and migration history before editing.
+5. Load every matching `.agents/skills/*/SKILL.md`; follow referenced material selectively. For Effect work, also use stable-v3 references under `.repos/effect/` when local guides are insufficient.
+6. Work only on the active milestone unless the developer explicitly authorizes another workstream. Ask before destructive work or a materially larger refactor not already authorized.
 
-- Project-owned agent skills live under `.agents/skills/`; use the relevant `SKILL.md` files and their referenced material.
-- For Effect work, follow `.agents/skills/effect-ts/` and inspect stable Effect v3 behavior under `.repos/effect/` when the local guides do not answer the question.
-- Keep agent configuration vendor-neutral; do not introduce tool-specific project directories when `.agents/` is sufficient.
+Do not preload all historical decisions, milestone journals, learnings, or rules. Start from current code and the selective maps; follow actual imports/contracts to additional context.
 
-## Engineering constraints
+## Authority and decisions
 
-- Use pnpm and package-owned dependencies; add packages through pnpm rather than editing dependency versions manually.
-- Preserve package boundaries and the existing Turborepo task model.
-- Use stable Effect v3 conventions, typed errors, Layers, and the shared `ManagedRuntime`; keep `Effect.run*` at runtime boundaries.
-- Do not use `any`, unsafe assertions, request-local runtimes, or business-layer Promise/error leaks.
-- Treat all external input as untrusted and enforce authorization, tenant isolation, bounded validation, redaction, and parameterized database access.
-- Never expose or commit secrets from `.env`, authentication files, session history, or runtime configuration.
+- Current developer instruction outranks product vision, CMS PRD, mandatory rules, active criteria/relevant approved decisions, then status documents.
+- Committed code, tests, config, migrations, and generated artifacts describe executable truth. Report drift from governing intent; never silently choose or rewrite history.
+- Ask before changing product behavior, public contracts, core dependencies, architecture, or approved authority boundaries. Evaluate correctness, security, reliability, performance, UX, DX, observability, and maintainability.
+- Never expose secrets from `.env`, auth files, session history, runtime configuration, or command output.
+
+## Engineering invariants
+
+- Use pnpm and package-owned dependencies; preserve Turborepo tasks and package boundaries. Apps never supply source to packages; cross-package imports use declared exports.
+- Use stable Effect v3, typed expected errors, services/Layers, and the shared `ManagedRuntime`; keep `Effect.run*` at runtime/framework boundaries. No `any`, unsafe assertions, request-local runtimes, or business-layer Promise/raw-error leaks.
+- Treat every external value as untrusted: bound and decode it, authorize server-side before sensitive work, include tenant/project/environment scope, parameterize SQL, and redact telemetry.
+- Application APIs preserve `{ ok, data, error, message }` and centralized schema-backed error/status mapping; protocol-owned endpoints retain native formats.
+- Every content operation names an exact enabled locale; `en` is required, Delivery never falls back, drafts never alter published snapshots, and publication/audit/outbox state is atomic.
+- Stable IDs are distinct from labels, API keys, and source keys. Immutable revisions/publications and optimistic/idempotent authority must remain intact.
+- Only `apps/worker` sends webhooks. Stop independent workers before shared-database integration or coverage and restore/verify them afterward.
+- Organize cohesive internal domains in folders when it improves discovery. Keep public entrypoints stable, prefer direct imports internally, and add barrels only for intentional package APIs; never add convenience barrels that hide cycles or enlarge bundles.
 
 ## Database migrations
 
-- Never generate, apply, push, or execute a database migration, and never modify a real migration or snapshot under `packages/db/src/migrations/`.
-- After an approved Drizzle schema change, stop at each developer-controlled gate and provide the exact migration name and generation/application commands.
-- Inspect developer-generated SQL, snapshots, and journal metadata before application. If an unapplied migration needs an agreed correction, an agent may prepare only a non-authoritative gitignored draft under `tmp/migrations/`; the developer manually replaces the real file, which the agent then reinspects completely.
-- Applied migration files and snapshots are immutable. Inspect the live database read-only only after developer confirmation.
+- Never generate, apply, push, execute, edit, replace, or delete a real migration or snapshot under `packages/db/src/migrations/`.
+- After an approved Drizzle change, provide the exact migration name/commands and stop for developer generation. Fully inspect developer-generated SQL, snapshot, and journal before application.
+- If an unapplied migration needs an agreed correction, prepare only an ignored draft under `tmp/migrations/`; the developer manually updates the real artifact. Applied migrations are immutable.
+- Inspect live databases read-only only after developer confirmation; never expose credentials.
 
-## Validation and handoff
+## Tests, documentation, and handoff
 
-- Read relevant files before editing and ask before destructive changes or large refactors.
-- Add deterministic tests for meaningful behavior and run the applicable format, lint, type-check, test, coverage, and build commands.
-- Keep `knowledge_base/context.md` and `knowledge_base/progress.md` current; add durable learnings only when consequential drift or rework occurred.
-- Do not run `git commit`. Stop for developer manual review at milestone completion.
+- Add deterministic success/failure/authorization/boundary/regression tests with behavior changes. Follow `knowledge_base/decisions/repository-test-structure.md` for placement.
+- Run applicable format, lint, structure, contracts, types, tests, coverage, audit, and builds. Never hide failures or claim unrun evidence.
+- `knowledge_base/context.md` stays a concise zero-context map. `progress.md` stays ordered and factual. `learnings.md` uses only `Incorrect assumption or decision`, `Learning`, and optional unresolved `Status`.
+- Decision records are domain references, not chronological required reading. Update `knowledge_base/decisions/index.md` when adding or superseding one.
+- Before milestone review, update KB status, run `pnpm run ready`, provide one concise Conventional Commit message, and stop. Never run `git commit`, publish packages, change production rollout/configuration, deploy, accept a milestone, or begin the next milestone for the developer.

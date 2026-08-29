@@ -27,7 +27,7 @@ import {
   ReorderProjectLocalesInput,
   UpdateProjectLocaleDisplayNameInput,
   UpdateProjectLocaleStatusInput,
-} from "../../../src/contracts/locales";
+} from "../../../src/contracts/locale";
 import {
   AuthUserId,
   CreateProjectInput,
@@ -36,7 +36,7 @@ import {
   type Workspace as WorkspaceModel,
 } from "../../../src/contracts/platform";
 import { makeAccessRepository } from "../../../src/services/access-repository";
-import { makeLocaleRepository } from "../../../src/services/locale-repository";
+import { makeLocaleRepository } from "../../../src/services/locale/repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 
 const suffix = randomUUID();

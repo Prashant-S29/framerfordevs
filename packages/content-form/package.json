@@ -6,10 +6,10 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./authoring-adapter": "./src/authoring-adapter.ts",
-    "./model": "./src/model.ts",
-    "./renderer": "./src/content-form.tsx",
-    "./values": "./src/values.ts"
+    "./authoring-adapter": "./src/authoring-adapter/index.ts",
+    "./model": "./src/model/index.ts",
+    "./renderer": "./src/content-form/index.tsx",
+    "./values": "./src/values/index.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",

@@ -16,11 +16,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, BoxesIcon, CheckIcon, DatabaseIcon, WebhookIcon } from "lucide-react";
 import { toast } from "sonner";
 
-import { ArchiveProjectDialog } from "@/components/archive-project-dialog";
-import { EditProjectDialog } from "@/components/edit-project-dialog";
-import { ProjectAccessSettings } from "@/components/project-access-settings";
-import { ProjectCollections } from "@/components/project-collections";
-import { ProjectLocaleSettings } from "@/components/project-locale-settings";
+import { ArchiveProjectDialog } from "@/components/project/archive-dialog";
+import { EditProjectDialog } from "@/components/project/edit-dialog";
+import { ProjectAccessSettings } from "@/components/project/access-settings";
+import { ProjectCollections } from "@/components/project/collections";
+import { ProjectLocaleSettings } from "@/components/project/locale-settings";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/_auth/projects/$projectId")({
