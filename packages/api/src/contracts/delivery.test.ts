@@ -21,6 +21,7 @@ const ids = {
   revisionId: "019fae8b-1234-7000-8000-000000000007",
   localeId: "019fae8b-1234-7000-8000-000000000008",
   userId: "delivery-contract-user",
+  credentialId: "019fae8b-1234-7000-8000-000000000009",
 };
 
 const capability = {
@@ -58,7 +59,13 @@ describe("Delivery contracts", () => {
       version: 1,
       fields: [capability],
       updatedByUserId: ids.userId,
+      updatedByCredentialId: null,
       updatedAt: "2026-08-09T12:00:00.000Z",
+    });
+    const credentialConfiguration = Schema.decodeUnknownSync(DeliveryCollectionConfiguration)({
+      ...configuration,
+      updatedByUserId: null,
+      updatedByCredentialId: ids.credentialId,
     });
     const publicUpdate = Schema.decodeUnknownSync(UpdateDeliveryConfigurationInput)({
       projectId: ids.projectId,
@@ -71,6 +78,7 @@ describe("Delivery contracts", () => {
     });
 
     expect(configuration.access).toBe("protected");
+    expect(credentialConfiguration.updatedByCredentialId).toBe(ids.credentialId);
     expect(publicUpdate.publicAccessAcknowledged).toBe(true);
   });
 

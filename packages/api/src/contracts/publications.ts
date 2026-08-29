@@ -2,6 +2,7 @@
 
 import { Schema } from "effect";
 
+import { ApiCredentialId } from "./access";
 import { ApiSuccessSchema } from "./api-response";
 import {
   ChangedEntryFieldIds,
@@ -106,7 +107,8 @@ export class EntryPublicationSummary extends Schema.Class<EntryPublicationSummar
   documentHash: EntryPublicationHash,
   changedFieldIds: ChangedEntryFieldIds,
   size: EntryPublicationSize,
-  publishedByUserId: AuthUserId,
+  publishedByUserId: Schema.NullOr(AuthUserId),
+  publishedByCredentialId: Schema.NullOr(ApiCredentialId),
   publishedAt: IsoDateTime,
   current: Schema.Boolean,
 }) {}

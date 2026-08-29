@@ -1,11 +1,15 @@
 // Verifies M7 entry identity, partition concurrency, idempotency, history, restore, authorization, and audit persistence.
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, it } from "@effect/vitest";
 import { db } from "@framerfordevs/db";
 import { and, eq, or, sql } from "@framerfordevs/db/query";
-import { projectMembership } from "@framerfordevs/db/schema/access";
+import {
+  apiCredential,
+  apiCredentialScope,
+  projectMembership,
+} from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
 import {
   cmsCollection,
@@ -33,8 +37,11 @@ import {
 } from "@framerfordevs/db/schema/platform";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
 
+import { ApiCredentialId } from "../../../src/contracts/access";
+import { AuthoringValueMutations, CmsActor } from "../../../src/contracts/authoring";
 import {
   CreateEntryInput,
+  CreateEntryWithDraftInput,
   GetEntryDraftInput,
   ListEntriesInput,
   ListEntryRevisionsInput,
@@ -52,6 +59,7 @@ import {
   type Workspace as WorkspaceModel,
 } from "../../../src/contracts/platform";
 import {
+  CollectionFieldId,
   CreateCollectionFieldInput,
   CreateCollectionInput,
   defaultFieldEditorMetadata,
@@ -60,6 +68,8 @@ import {
   type CmsCollection,
   type PublishedSchemaRevision,
 } from "../../../src/contracts/schemas";
+import { resolveAuthoringMutations } from "../../../src/lib/authoring-mutations";
+import { makeAuthoringContentRepository } from "../../../src/services/authoring-content-repository";
 import { makeEntryRepository } from "../../../src/services/entry-repository";
 import { makeLocaleRepository } from "../../../src/services/locale-repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
@@ -69,7 +79,13 @@ const suffix = randomUUID();
 const ownerId = `m7-entry-owner-${suffix}`;
 const editorId = `m7-entry-editor-${suffix}`;
 const ownerActor = Schema.decodeUnknownSync(AuthUserId)(ownerId);
+const ownerCmsActor = Schema.decodeUnknownSync(CmsActor)({ kind: "user", id: ownerActor });
 const editorActor = Schema.decodeUnknownSync(AuthUserId)(editorId);
+const managementCredentialId = Schema.decodeUnknownSync(ApiCredentialId)(randomUUID());
+const managementActor = Schema.decodeUnknownSync(CmsActor)({
+  kind: "credential",
+  id: managementCredentialId,
+});
 const platform = makePlatformRepository();
 const schemas = makeSchemaRepository();
 const entries = makeEntryRepository();
@@ -146,6 +162,28 @@ beforeAll(async () => {
       }),
       `m7-capability-${suffix}`,
     ),
+  );
+  const currentWorkspace = required(workspaceModel, "workspace");
+  const credentialProject = required(projectModel, "project");
+  await db.insert(apiCredential).values({
+    id: managementCredentialId,
+    workspaceId: currentWorkspace.id,
+    projectId: credentialProject.id,
+    environmentId: credentialProject.environment.id,
+    family: "management",
+    name: "M13 entry integration",
+    keyPrefix: `ffd_mgmt_${managementCredentialId}`,
+    keyDigest: createHash("sha256").update(managementCredentialId).digest("hex"),
+    createdByUserId: ownerId,
+  });
+  await db.insert(apiCredentialScope).values(
+    ["content.read", "content.write"].map((scope) => ({
+      credentialId: managementCredentialId,
+      workspaceId: currentWorkspace.id,
+      projectId: credentialProject.id,
+      environmentId: credentialProject.environment.id,
+      scope,
+    })),
   );
   await db.insert(workspaceMembership).values({
     workspaceId: required(workspaceModel, "workspace").id,
@@ -419,7 +457,17 @@ afterAll(async () => {
   }
   await db
     .delete(auditEvent)
-    .where(or(eq(auditEvent.actorId, ownerId), eq(auditEvent.actorId, editorId)));
+    .where(
+      or(
+        eq(auditEvent.actorId, ownerId),
+        eq(auditEvent.actorId, editorId),
+        eq(auditEvent.actorId, managementCredentialId),
+      ),
+    );
+  await db
+    .delete(apiCredentialScope)
+    .where(eq(apiCredentialScope.credentialId, managementCredentialId));
+  await db.delete(apiCredential).where(eq(apiCredential.id, managementCredentialId));
   await db.execute(
     sql`delete from project_membership_locale_access where project_id = ${projectModel?.id ?? randomUUID()}`,
   );
@@ -658,6 +706,188 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           ),
       );
       assert.strictEqual(renameAudits[0]?.count, 1);
+    }),
+  );
+
+  it.effect("resolves authorized API-key mutation paths from current published authority", () =>
+    Effect.gen(function* () {
+      const project = required(projectModel, "project");
+      const authority = yield* makeAuthoringContentRepository().resolveMutationAuthority(
+        managementActor,
+        {
+          projectId: project.id,
+          environmentId: project.environment.id,
+          collectionKey: "articles",
+          locale: "en",
+        },
+      );
+      const oauthCollectionId = yield* makeAuthoringContentRepository().resolveCollection(
+        ownerCmsActor,
+        {
+          projectId: project.id,
+          environmentId: project.environment.id,
+          collectionKey: "articles",
+          locale: "en",
+          action: "content.read",
+        },
+      );
+      const mutations = yield* Schema.decodeUnknown(AuthoringValueMutations)([
+        { operation: "set", scope: "shared", path: ["internal_name"], value: "Internal" },
+        { operation: "set", scope: "localized", path: ["hero", "heading"], value: "Hello" },
+      ]);
+      const resolved = resolveAuthoringMutations(mutations, authority.fields);
+
+      assert.strictEqual(authority.collectionId, required(collectionModel, "collection").id);
+      assert.strictEqual(oauthCollectionId, authority.collectionId);
+      assert.strictEqual(authority.revisionId, required(publishedModel, "published schema").id);
+      assert.strictEqual(
+        authority.contractHash,
+        required(publishedModel, "published schema").contractHash,
+      );
+      assert.isTrue(resolved.valid);
+      if (resolved.valid) {
+        const sharedId = Schema.decodeUnknownSync(CollectionFieldId)(
+          required(sharedFieldId, "shared field"),
+        );
+        const mixedObjectId = Schema.decodeUnknownSync(CollectionFieldId)(
+          required(mixedObjectFieldId, "mixed object field"),
+        );
+        const mixedLocalizedId = Schema.decodeUnknownSync(CollectionFieldId)(
+          required(mixedLocalizedFieldId, "mixed localized field"),
+        );
+        assert.deepStrictEqual(resolved.mutations, [
+          { operation: "set", path: [sharedId], value: "Internal" },
+          {
+            operation: "set",
+            path: [mixedObjectId, mixedLocalizedId],
+            value: "Hello",
+          },
+        ]);
+      }
+    }),
+  );
+
+  it.effect("atomically creates initial shared/localized drafts and replays one command", () =>
+    Effect.gen(function* () {
+      const project = required(projectModel, "project");
+      const collection = required(collectionModel, "collection");
+      const published = required(publishedModel, "published schema");
+      const commandId = randomUUID();
+      const input = yield* Schema.decodeUnknown(CreateEntryWithDraftInput)({
+        projectId: project.id,
+        environmentId: project.environment.id,
+        collectionId: collection.id,
+        locale: "en",
+        displayName: "Atomic initial draft",
+        schemaRevisionId: published.id,
+        contractHash: published.contractHash,
+        commandId,
+        sharedMutations: [
+          {
+            operation: "set",
+            path: [required(sharedFieldId, "shared field")],
+            value: "Initial internal",
+          },
+        ],
+        localizedMutations: [
+          {
+            operation: "set",
+            path: [required(localizedFieldId, "localized field")],
+            value: "Initial title",
+          },
+        ],
+      });
+      const created = yield* entries.createEntryWithDraft(
+        managementActor,
+        input,
+        new Date("2026-08-08T10:59:00.000Z"),
+        `m13-create-with-draft-${suffix}`,
+      );
+      const replay = yield* entries.createEntryWithDraft(
+        managementActor,
+        input,
+        new Date("2026-08-08T10:59:30.000Z"),
+        `m13-create-with-draft-replay-${suffix}`,
+      );
+      const draft = yield* entries.getDraft(
+        managementActor,
+        yield* Schema.decodeUnknown(GetEntryDraftInput)({
+          projectId: project.id,
+          environmentId: project.environment.id,
+          collectionId: collection.id,
+          entryId: created.entry.id,
+          locale: "en",
+        }),
+      );
+      const failedCommandId = randomUUID();
+      const failed = yield* Effect.exit(
+        entries.createEntryWithDraft(
+          managementActor,
+          yield* Schema.decodeUnknown(CreateEntryWithDraftInput)({
+            ...input,
+            commandId: failedCommandId,
+            displayName: "Must roll back",
+            localizedMutations: [
+              {
+                operation: "set",
+                path: [required(localizedFieldId, "localized field")],
+                value: "bad\u0000value",
+              },
+            ],
+          }),
+          new Date("2026-08-08T10:59:45.000Z"),
+          `m13-create-with-draft-failed-${suffix}`,
+        ),
+      );
+      const [failedRows] = yield* Effect.promise(() =>
+        db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(cmsEntry)
+          .where(eq(cmsEntry.createCommandId, failedCommandId)),
+      );
+      const rollbackCommandId = randomUUID();
+      const rolledBack = yield* Effect.exit(
+        makeEntryRepository({ failAfter: "audit" }).createEntryWithDraft(
+          managementActor,
+          yield* Schema.decodeUnknown(CreateEntryWithDraftInput)({
+            ...input,
+            commandId: rollbackCommandId,
+            displayName: "Injected rollback",
+          }),
+          new Date("2026-08-08T10:59:50.000Z"),
+          `m13-create-with-draft-rollback-${suffix}`,
+        ),
+      );
+      const [rollbackRows] = yield* Effect.promise(() =>
+        db
+          .select({
+            entries: sql<number>`(select count(*)::int from cms_entry where create_command_id = ${rollbackCommandId})`,
+            shared: sql<number>`(select count(*)::int from cms_entry_shared_revision where command_id = ${rollbackCommandId})`,
+            localized: sql<number>`(select count(*)::int from cms_entry_locale_revision where command_id = ${rollbackCommandId})`,
+          })
+          .from(cmsCollection)
+          .limit(1),
+      );
+
+      assert.strictEqual(replay.entry.id, created.entry.id);
+      assert.strictEqual(created.entry.createdByUserId, null);
+      assert.strictEqual(created.entry.createdByCredentialId, managementCredentialId);
+      assert.strictEqual(created.sharedVersion, 1);
+      assert.strictEqual(created.localizedVersion, 1);
+      assert.strictEqual(replay.sharedRevisionId, created.sharedRevisionId);
+      assert.strictEqual(replay.localizedRevisionId, created.localizedRevisionId);
+      assert.strictEqual(
+        Reflect.get(draft.sharedValues, required(sharedFieldId, "shared field")),
+        "Initial internal",
+      );
+      assert.strictEqual(
+        Reflect.get(draft.localizedValues, required(localizedFieldId, "localized field")),
+        "Initial title",
+      );
+      assert.strictEqual(failureTag(failed), "ValidationFailure");
+      assert.strictEqual(failedRows?.count, 0);
+      assert.strictEqual(failureTag(rolledBack), "DatabaseFailure");
+      assert.deepStrictEqual(rollbackRows, { entries: 0, shared: 0, localized: 0 });
     }),
   );
 
@@ -1169,6 +1399,62 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       }),
   );
 
+  it.effect("attributes management-credential entry writes without issuer impersonation", () =>
+    Effect.gen(function* () {
+      const project = required(projectModel, "project");
+      const collection = required(collectionModel, "collection");
+      const entryId = required(primaryEntryId, "primary entry");
+      const current = yield* entries.getDraft(
+        managementActor,
+        yield* Schema.decodeUnknown(GetEntryDraftInput)({
+          projectId: project.id,
+          environmentId: project.environment.id,
+          collectionId: collection.id,
+          entryId,
+          locale: "en",
+        }),
+      );
+      const requestId = `m13-entry-credential-${suffix}`;
+      const renamed = yield* entries.renameEntry(
+        managementActor,
+        yield* Schema.decodeUnknown(RenameEntryInput)({
+          projectId: project.id,
+          environmentId: project.environment.id,
+          collectionId: collection.id,
+          entryId,
+          locale: "en",
+          displayName: "Credential-attributed entry",
+          expectedNameVersion: current.entry.nameVersion,
+        }),
+        new Date("2026-08-24T01:10:00.000Z"),
+        requestId,
+      );
+      const [stored] = yield* Effect.promise(() =>
+        db
+          .select({
+            changedByUserId: cmsEntry.changedByUserId,
+            changedByCredentialId: cmsEntry.changedByCredentialId,
+          })
+          .from(cmsEntry)
+          .where(eq(cmsEntry.id, entryId)),
+      );
+      const [audit] = yield* Effect.promise(() =>
+        db
+          .select({ actorType: auditEvent.actorType, actorId: auditEvent.actorId })
+          .from(auditEvent)
+          .where(eq(auditEvent.requestId, requestId)),
+      );
+
+      assert.strictEqual(renamed.displayName, "Credential-attributed entry");
+      assert.isNull(stored?.changedByUserId);
+      assert.strictEqual(stored?.changedByCredentialId, managementCredentialId);
+      assert.deepStrictEqual(audit, {
+        actorType: "credential",
+        actorId: managementCredentialId,
+      });
+    }),
+  );
+
   it.effect("uses the intended immutable entry and revision list indexes", () =>
     Effect.gen(function* () {
       const collectionId = required(collectionModel, "collection").id;
@@ -1198,12 +1484,46 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           const localePlan = await transaction.execute(
             sql`explain (format json) select id from cms_entry_locale_revision where entry_id = ${entryId} and locale_id = ${english.id} order by sequence desc limit 25`,
           );
-          return JSON.stringify([entriesPlan.rows, sharedPlan.rows, localePlan.rows]);
+          const createReplayPlan = await transaction.execute(
+            sql`explain (format json) select id from cms_entry where collection_id = ${collectionId} and create_command_id = ${randomUUID()} order by create_command_id limit 1`,
+          );
+          const saveReplayPlan = await transaction.execute(
+            sql`explain (format json) select result_kind from cms_entry_draft_command where entry_id = ${entryId} and command_id = ${randomUUID()} limit 1`,
+          );
+          const entryCredentialPlan = await transaction.execute(
+            sql`explain (format json) select id from cms_entry where created_by_credential_id = ${managementCredentialId} limit 20`,
+          );
+          const sharedCredentialPlan = await transaction.execute(
+            sql`explain (format json) select id from cms_entry_shared_revision where authored_by_credential_id = ${managementCredentialId} limit 20`,
+          );
+          const localeCredentialPlan = await transaction.execute(
+            sql`explain (format json) select id from cms_entry_locale_revision where authored_by_credential_id = ${managementCredentialId} limit 20`,
+          );
+          const commandCredentialPlan = await transaction.execute(
+            sql`explain (format json) select command_id from cms_entry_draft_command where completed_by_credential_id = ${managementCredentialId} limit 20`,
+          );
+          return JSON.stringify([
+            entriesPlan.rows,
+            sharedPlan.rows,
+            localePlan.rows,
+            createReplayPlan.rows,
+            saveReplayPlan.rows,
+            entryCredentialPlan.rows,
+            sharedCredentialPlan.rows,
+            localeCredentialPlan.rows,
+            commandCredentialPlan.rows,
+          ]);
         }),
       );
       assert.include(plans, "cms_entry_collection_created_id_idx");
       assert.match(plans, /cms_entry_shared_revision_entry_(sequence_idx|sequence_unique)/u);
       assert.match(plans, /cms_entry_locale_revision_entry_locale_(sequence_idx|sequence_unique)/u);
+      assert.match(plans, /cms_entry_collection_(?:create_command_unique|created_id_idx)/u);
+      assert.match(plans, /cms_entry_draft_command_(?:entry_command_pk|entry_completed_idx)/u);
+      assert.include(plans, "cms_entry_created_by_credential_idx");
+      assert.include(plans, "cms_entry_shared_revision_author_credential_idx");
+      assert.include(plans, "cms_entry_locale_revision_author_credential_idx");
+      assert.include(plans, "cms_entry_draft_command_completed_by_credential_idx");
     }),
   );
 });

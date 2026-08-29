@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./registry": "./src/registry.ts",
     "./metadata": "./src/metadata.ts",
+    "./artifacts/authoring/v1/openapi.json": "./artifacts/authoring/v1/openapi.json",
     "./artifacts/delivery/v1/openapi.json": "./artifacts/delivery/v1/openapi.json",
     "./artifacts/preview/v1/openapi.json": "./artifacts/preview/v1/openapi.json",
     "./artifacts/tooling/v1/openapi.json": "./artifacts/tooling/v1/openapi.json",

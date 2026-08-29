@@ -59,7 +59,6 @@ import {
   type UnpublishEntryInput,
   type ValidateEntryPublicationInput,
 } from "../contracts/publications";
-import type { AuthUserId } from "../contracts/platform";
 import {
   CollectionFieldDefinition,
   CollectionFieldId,
@@ -77,8 +76,16 @@ import {
 import { compileDeliveryProjections, type DeliveryProjectionRow } from "../lib/delivery-projection";
 import { canonicalizeEntryValue } from "../lib/entry-values";
 import { matchInvalidationMappings } from "../lib/invalidation-mappings";
+import {
+  cmsActorFingerprintValue,
+  cmsActorMatches,
+  cmsActorReferences,
+  cmsAuditActor,
+  normalizeCmsActor,
+  type CmsActorInput,
+} from "./cms-actor";
 import type { ApplicationDb, ApplicationExecutor, ApplicationTransaction } from "./project-access";
-import { authorizeUserProject, selectUserProjectAccess } from "./project-access";
+import { authorizeCmsActorProject, selectUserProjectAccess } from "./project-access";
 import { PublicationEngine } from "./publication-engine";
 import { hashSchemaContract } from "./schema-engine";
 
@@ -350,11 +357,28 @@ interface ScopeAccess {
 
 async function authorizeScope(
   executor: ApplicationExecutor,
-  actorId: AuthUserId,
+  actorId: CmsActorInput,
   input: { readonly projectId: string; readonly environmentId: string; readonly locale: string },
   action: "content.read" | "content.publish",
 ) {
-  const access = await selectUserProjectAccess(executor, actorId, input.projectId);
+  const actor = normalizeCmsActor(actorId);
+  const initialAuthorization =
+    actor.kind === "user"
+      ? null
+      : await authorizeCmsActorProject(
+          executor,
+          actor,
+          input.projectId,
+          input.environmentId,
+          action,
+        );
+  if (initialAuthorization?.kind === "not_found") return outcome("not_found");
+  if (initialAuthorization?.kind === "forbidden") return outcome("forbidden");
+  const access =
+    initialAuthorization?.access ??
+    (actor.kind === "user"
+      ? await selectUserProjectAccess(executor, actor.id, input.projectId)
+      : undefined);
   if (!access) return outcome("not_found");
   const [locale] = await executor
     .select()
@@ -369,10 +393,11 @@ async function authorizeScope(
     )
     .limit(1);
   if (!locale) return outcome("locale_unavailable");
-  const authorization = await authorizeUserProject(
+  const authorization = await authorizeCmsActorProject(
     executor,
-    actorId,
+    actor,
     input.projectId,
+    input.environmentId,
     action,
     locale.id,
   );
@@ -803,6 +828,7 @@ function publicationSummary(
               : "near_limit",
     },
     publishedByUserId: row.publication.publishedByUserId,
+    publishedByCredentialId: row.publication.publishedByCredentialId,
     publishedAt: toIso(row.publication.publishedAt),
     current,
   });
@@ -1081,13 +1107,19 @@ function mapScopeFailure(kind: string) {
 }
 
 function publicationFingerprint(
-  actorId: AuthUserId,
+  actorId: CmsActorInput,
   workspaceId: string,
   localeId: string,
   operation: string,
   input: object,
 ) {
-  return digest({ operation, actorId, workspaceId, localeId, ...input });
+  return digest({
+    operation,
+    actorId: cmsActorFingerprintValue(actorId),
+    workspaceId,
+    localeId,
+    ...input,
+  });
 }
 
 async function loadInvalidationSnapshot(
@@ -1131,12 +1163,17 @@ function makeAudit(options: {
   readonly workspaceId: string;
   readonly projectId: string;
   readonly environmentId: string;
-  readonly actorId: AuthUserId;
+  readonly actorId: CmsActorInput;
   readonly action: string;
   readonly resourceId: string;
   readonly requestId: string;
 }) {
-  return { ...options, actorType: "user", resourceType: "cms_entry_publication" };
+  const { actorId, ...values } = options;
+  return {
+    ...values,
+    ...cmsAuditActor(actorId),
+    resourceType: "cms_entry_publication",
+  };
 }
 
 export type PublicationFailureStage =
@@ -1182,7 +1219,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
 
   return {
     getStatus: Effect.fn("PublicationRepository.getStatus")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: GetEntryPublicationStatusInput,
     ) {
       const result = yield* Effect.tryPromise({
@@ -1236,7 +1273,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
     }),
 
     validate: Effect.fn("PublicationRepository.validate")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: ValidateEntryPublicationInput,
       now: Date,
     ) {
@@ -1266,7 +1303,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
     }),
 
     publish: Effect.fn("PublicationRepository.publish")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: PublishEntryInput,
       now: Date,
       requestId: string,
@@ -1301,7 +1338,14 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               )
               .limit(1);
             if (receipt) {
-              if (receipt.commandFingerprint !== fingerprint || receipt.operation !== "publish")
+              if (
+                receipt.commandFingerprint !== fingerprint ||
+                receipt.operation !== "publish" ||
+                !cmsActorMatches(actorId, {
+                  userId: receipt.completedByUserId,
+                  credentialId: receipt.completedByCredentialId,
+                })
+              )
                 return outcome("command_conflict");
               const artifact = await loadPublicationArtifact(
                 transaction,
@@ -1387,7 +1431,8 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
                 resultLatestPublicationSequence:
                   head?.latestPublicationSequence ?? current.publication.publicationSequence,
                 resultEventSequence: null,
-                completedByUserId: actorId,
+                completedByUserId: cmsActorReferences(actorId).userId,
+                completedByCredentialId: cmsActorReferences(actorId).credentialId,
                 completedAt: now,
               });
               failAfter("receipt");
@@ -1491,7 +1536,8 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
                 changedFieldIds: [...candidate.changedFieldIds],
                 commandId: input.commandId,
                 commandFingerprint: fingerprint,
-                publishedByUserId: actorId,
+                publishedByUserId: cmsActorReferences(actorId).userId,
+                publishedByCredentialId: cmsActorReferences(actorId).credentialId,
                 publishedAt: now,
               })
               .returning();
@@ -1556,7 +1602,8 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
                 version: stateVersion,
                 latestPublicationSequence: publicationSequence,
                 currentPublicationId: publication.id,
-                changedByUserId: actorId,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 updatedAt: now,
               })
               .onConflictDoUpdate({
@@ -1568,7 +1615,8 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
                   version: stateVersion,
                   latestPublicationSequence: publicationSequence,
                   currentPublicationId: publication.id,
-                  changedByUserId: actorId,
+                  changedByUserId: cmsActorReferences(actorId).userId,
+                  changedByCredentialId: cmsActorReferences(actorId).credentialId,
                   updatedAt: now,
                 },
               });
@@ -1674,7 +1722,8 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               resultCurrentPublicationId: publication.id,
               resultLatestPublicationSequence: publicationSequence,
               resultEventSequence: eventSequence,
-              completedByUserId: actorId,
+              completedByUserId: cmsActorReferences(actorId).userId,
+              completedByCredentialId: cmsActorReferences(actorId).credentialId,
               completedAt: now,
             });
             failAfter("receipt");
@@ -1719,7 +1768,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
     }),
 
     unpublish: Effect.fn("PublicationRepository.unpublish")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: UnpublishEntryInput,
       now: Date,
       requestId: string,
@@ -1754,7 +1803,14 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               )
               .limit(1);
             if (receipt) {
-              if (receipt.commandFingerprint !== fingerprint || receipt.operation !== "unpublish")
+              if (
+                receipt.commandFingerprint !== fingerprint ||
+                receipt.operation !== "unpublish" ||
+                !cmsActorMatches(actorId, {
+                  userId: receipt.completedByUserId,
+                  credentialId: receipt.completedByCredentialId,
+                })
+              )
                 return outcome("command_conflict");
               return withValue("replay", { receipt, entry, access: scope.access });
             }
@@ -1786,7 +1842,8 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
                 resultCurrentPublicationId: null,
                 resultLatestPublicationSequence: head?.latestPublicationSequence ?? 0,
                 resultEventSequence: null,
-                completedByUserId: actorId,
+                completedByUserId: cmsActorReferences(actorId).userId,
+                completedByCredentialId: cmsActorReferences(actorId).credentialId,
                 completedAt: now,
               });
               failAfter("receipt");
@@ -1830,7 +1887,8 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               .set({
                 version: nextVersion,
                 currentPublicationId: null,
-                changedByUserId: actorId,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 updatedAt: now,
               })
               .where(
@@ -1945,7 +2003,8 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               resultCurrentPublicationId: null,
               resultLatestPublicationSequence: head.latestPublicationSequence,
               resultEventSequence: eventSequence,
-              completedByUserId: actorId,
+              completedByUserId: cmsActorReferences(actorId).userId,
+              completedByCredentialId: cmsActorReferences(actorId).credentialId,
               completedAt: now,
             });
             failAfter("receipt");
@@ -2008,7 +2067,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
     }),
 
     list: Effect.fn("PublicationRepository.list")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: ListEntryPublicationsInput,
     ) {
       const cursor =

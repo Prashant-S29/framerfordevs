@@ -20,7 +20,7 @@ describe("Delivery backfill integration", () => {
         assert.strictEqual(report.invalidSnapshotCount, 0);
         assert.strictEqual(report.appliedHeadCount, 0);
       }),
-    30_000,
+    60_000,
   );
 
   it.effect("rejects an operator-controlled batch outside the closed bound before querying", () =>

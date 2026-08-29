@@ -1,6 +1,12 @@
 // Browser-safe metadata for the closed public registry. Runtime contract sources remain separate.
 
-export const publicContractFamilies = ["delivery", "preview", "tooling", "webhooks"] as const;
+export const publicContractFamilies = [
+  "authoring",
+  "delivery",
+  "preview",
+  "tooling",
+  "webhooks",
+] as const;
 export type PublicContractFamily = (typeof publicContractFamilies)[number];
 
 export const publicContractMajors = ["v1"] as const;
@@ -23,6 +29,7 @@ export interface PublicContractMetadataEntry {
 }
 
 export const publicContractRegistryKeys = [
+  "authoring/v1",
   "delivery/v1",
   "preview/v1",
   "tooling/v1",
@@ -31,6 +38,18 @@ export const publicContractRegistryKeys = [
 export type PublicContractRegistryKey = (typeof publicContractRegistryKeys)[number];
 
 export const publicContractMetadata = {
+  "authoring/v1": {
+    family: "authoring",
+    major: "v1",
+    kind: "openapi",
+    outputPath: "artifacts/authoring/v1/openapi.json",
+    portalRoute: "/api-reference/authoring/v1",
+    sdkSupported: false,
+    baselinePath: "baselines/authoring/v1/openapi.json",
+    baselineDigest: "d9500549cd95067857b87f494b77375e3d575c4832589478858e125ab3f31205",
+    deprecatedAt: null,
+    sunsetAt: null,
+  },
   "delivery/v1": {
     family: "delivery",
     major: "v1",

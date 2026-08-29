@@ -1,5 +1,6 @@
 // Builds secondary API-reference pages exclusively from canonical public contract artifacts.
 
+import authoringDocument from "@framerfordevs/public-contracts/artifacts/authoring/v1/openapi.json?raw";
 import deliveryDocument from "@framerfordevs/public-contracts/artifacts/delivery/v1/openapi.json?raw";
 import previewDocument from "@framerfordevs/public-contracts/artifacts/preview/v1/openapi.json?raw";
 import toolingDocument from "@framerfordevs/public-contracts/artifacts/tooling/v1/openapi.json?raw";
@@ -37,6 +38,7 @@ function decodeDocument(rawDocument: string): OpenAPIV3_2.Document {
   return candidate;
 }
 
+const authoring = createOpenAPI({ input: { authoring: decodeDocument(authoringDocument) } });
 const delivery = createOpenAPI({ input: { delivery: decodeDocument(deliveryDocument) } });
 const preview = createOpenAPI({ input: { preview: decodeDocument(previewDocument) } });
 const tooling = createOpenAPI({ input: { tooling: decodeDocument(toolingDocument) } });
@@ -53,6 +55,7 @@ const familyPage = {
 
 export const apiContractSource = loader(
   {
+    authoring: await authoring.staticSource({ ...familyPage, baseDir: "authoring/v1" }),
     delivery: await delivery.staticSource({ ...familyPage, baseDir: "delivery/v1" }),
     preview: await preview.staticSource({ ...familyPage, baseDir: "preview/v1" }),
     tooling: await tooling.staticSource({ ...familyPage, baseDir: "tooling/v1" }),

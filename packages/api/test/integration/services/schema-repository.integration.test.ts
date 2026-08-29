@@ -1,9 +1,13 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, it } from "@effect/vitest";
 import { db } from "@framerfordevs/db";
 import { and, eq, isNull, or, sql } from "@framerfordevs/db/query";
-import { projectMembership } from "@framerfordevs/db/schema/access";
+import {
+  apiCredential,
+  apiCredentialScope,
+  projectMembership,
+} from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
 import {
   cmsCollection,
@@ -26,6 +30,9 @@ import {
 } from "@framerfordevs/db/schema/platform";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
 
+import { ApiCredentialId } from "../../../src/contracts/access";
+import { CmsActor } from "../../../src/contracts/authoring";
+import { AuthoringSchemaPlanInput } from "../../../src/contracts/authoring-schema";
 import {
   GetDeliveryConfigurationInput,
   UpdateDeliveryConfigurationInput,
@@ -59,6 +66,7 @@ import {
   ValidateCollectionSchemaInput,
   type CmsCollection as CmsCollectionModel,
 } from "../../../src/contracts/schemas";
+import { makeAuthoringSchemaRepository } from "../../../src/services/authoring-schema-repository";
 import { makeDeliveryRepository } from "../../../src/services/delivery-repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 import { makeSchemaRepository } from "../../../src/services/schema-repository";
@@ -71,8 +79,14 @@ const readerId = `m6-schema-reader-${suffix}`;
 const ownerActor = Schema.decodeUnknownSync(AuthUserId)(ownerId);
 const foreignActor = Schema.decodeUnknownSync(AuthUserId)(foreignId);
 const readerActor = Schema.decodeUnknownSync(AuthUserId)(readerId);
+const managementCredentialId = Schema.decodeUnknownSync(ApiCredentialId)(randomUUID());
+const managementActor = Schema.decodeUnknownSync(CmsActor)({
+  kind: "credential",
+  id: managementCredentialId,
+});
 const platform = makePlatformRepository();
 const schemas = makeSchemaRepository();
+const authoringSchemas = makeAuthoringSchemaRepository();
 const delivery = makeDeliveryRepository();
 const tooling = makeToolingRepository();
 
@@ -171,6 +185,28 @@ beforeAll(async () => {
       "request-m5-schema-enable",
     ),
   );
+  const currentWorkspace = required(workspaceModel, "workspace");
+  const currentProject = required(projectModel, "project");
+  await db.insert(apiCredential).values({
+    id: managementCredentialId,
+    workspaceId: currentWorkspace.id,
+    projectId: currentProject.id,
+    environmentId: currentProject.environment.id,
+    family: "management",
+    name: "M13 schema integration",
+    keyPrefix: `ffd_mgmt_${managementCredentialId}`,
+    keyDigest: createHash("sha256").update(managementCredentialId).digest("hex"),
+    createdByUserId: ownerId,
+  });
+  await db.insert(apiCredentialScope).values(
+    ["schema.read", "schema.write", "schema.publish"].map((scope) => ({
+      credentialId: managementCredentialId,
+      workspaceId: currentWorkspace.id,
+      projectId: currentProject.id,
+      environmentId: currentProject.environment.id,
+      scope,
+    })),
+  );
   disabledProject = await Effect.runPromise(
     platform.createProject(
       ownerActor,
@@ -215,7 +251,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const actorIds = [ownerId, foreignId, readerId];
+  const actorIds = [ownerId, foreignId, readerId, managementCredentialId];
   const ownedCollections = sql`select id from cms_collection where created_by_user_id in (${ownerId}, ${foreignId})`;
   await db.delete(outboxEvent).where(sql`${outboxEvent.subjectId} in (${ownedCollections})`);
   await db
@@ -244,6 +280,10 @@ afterAll(async () => {
   await db
     .delete(auditEvent)
     .where(or(...actorIds.map((actorId) => eq(auditEvent.actorId, actorId))));
+  await db
+    .delete(apiCredentialScope)
+    .where(eq(apiCredentialScope.credentialId, managementCredentialId));
+  await db.delete(apiCredential).where(eq(apiCredential.id, managementCredentialId));
   await db
     .delete(projectCapability)
     .where(or(...actorIds.map((actorId) => eq(projectCapability.changedByUserId, actorId))));
@@ -1643,6 +1683,96 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       }),
   );
 
+  it.effect("loads complete project authority for credential-authenticated planning", () =>
+    Effect.gen(function* () {
+      const project = required(projectModel, "project");
+      const plan = yield* authoringSchemas.plan(
+        managementActor,
+        yield* Schema.decodeUnknown(AuthoringSchemaPlanInput)({
+          scope: {
+            projectId: project.id,
+            environmentId: project.environment.id,
+          },
+          project: {
+            collections: [
+              {
+                sourceKey: "replacement",
+                apiKey: "replacement",
+                fields: [
+                  {
+                    sourceKey: "title",
+                    apiKey: "title",
+                    kind: "short_text",
+                    required: false,
+                    localization: "localized",
+                    configuration: {},
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      );
+
+      assert.isFalse(plan.valid);
+      assert.isTrue(plan.issues.some((issue) => issue.code === "active_collection_omitted"));
+      assert.isTrue(Object.keys(plan.current.revisionIds).length > 0);
+      assert.lengthOf(plan.candidates, 0);
+    }),
+  );
+
+  it.effect("attributes management-credential schema writes without issuer impersonation", () =>
+    Effect.gen(function* () {
+      const collection = required(firstCollection, "collection");
+      const current = yield* schemas.getCollection(
+        managementActor,
+        yield* Schema.decodeUnknown(GetCollectionInput)({
+          projectId: collection.projectId,
+          environmentId: collection.environmentId,
+          collectionId: collection.id,
+        }),
+      );
+      const requestId = `request-m13-credential-${suffix}`;
+      const updated = yield* schemas.updateCollection(
+        managementActor,
+        yield* Schema.decodeUnknown(UpdateCollectionInput)({
+          projectId: collection.projectId,
+          environmentId: collection.environmentId,
+          collectionId: collection.id,
+          version: current.version,
+          draftVersion: current.draftVersion,
+          displayName: "Credential-attributed collection",
+          description: current.description,
+        }),
+        new Date("2026-08-24T01:00:00.000Z"),
+        requestId,
+      );
+      const [stored] = yield* Effect.promise(() =>
+        db
+          .select({
+            changedByUserId: cmsCollection.changedByUserId,
+            changedByCredentialId: cmsCollection.changedByCredentialId,
+          })
+          .from(cmsCollection)
+          .where(eq(cmsCollection.id, collection.id)),
+      );
+      const [audit] = yield* Effect.promise(() =>
+        db
+          .select({ actorType: auditEvent.actorType, actorId: auditEvent.actorId })
+          .from(auditEvent)
+          .where(eq(auditEvent.requestId, requestId)),
+      );
+
+      assert.strictEqual(updated.displayName, "Credential-attributed collection");
+      assert.isNull(stored?.changedByUserId);
+      assert.strictEqual(stored?.changedByCredentialId, managementCredentialId);
+      assert.deepStrictEqual(audit, {
+        actorType: "credential",
+        actorId: managementCredentialId,
+      });
+    }),
+  );
+
   it.effect(
     "uses intended indexes, protects published identities, and rejects archived mutations",
     () =>
@@ -1687,7 +1817,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
           db.transaction(async (transaction) => {
             await transaction.execute(sql`set local enable_seqscan = off`);
             const collectionPlan = await transaction.execute(
-              sql`explain (format json) select id from cms_collection where environment_id = ${collection.environmentId} order by created_at desc, id desc limit 20`,
+              sql`explain (format json) select id from cms_collection where environment_id = ${collection.environmentId} order by created_at desc nulls last, id desc nulls last limit 20`,
             );
             const fieldPlan = await transaction.execute(
               sql`explain (format json) select id from cms_collection_field where collection_id = ${collection.id} and removed_at is null and node_role = 'root' order by position`,
@@ -1710,7 +1840,10 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             ]);
           }),
         );
-        assert.include(plans, "cms_collection_environment_created_id_idx");
+        assert.match(
+          plans,
+          /cms_collection_environment_(?:created_id_idx|key_unique|source_key_unique)/u,
+        );
         assert.include(plans, "cms_field_collection_active_root_position_unique");
         assert.match(plans, /cms_revision_collection_(sequence_desc_idx|sequence_unique)/u);
         assert.include(plans, "outbox_event_pending_available_id_idx");

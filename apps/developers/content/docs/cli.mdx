@@ -1,19 +1,24 @@
 ---
-title: CLI and Code Generation
-description: Authenticate, link a project, pull published schema authority, detect drift, and generate deterministic code.
+title: CLI, Schema, and Local Editor
+description: Authenticate, publish code-owned structure, automate content, launch the local editor, and generate deterministic clients.
 ---
 
 {/* Documents the safe CLI workflow without redefining command-parser authority or secret formats. */}
 
-The `ffd` CLI connects a local codebase to one project environment and generates deterministic developer contracts from immutable published schemas.
+The `ffd` CLI connects a local codebase to one project environment. It generates deterministic consumer contracts, publishes code-owned schema structure, automates hosted content, and runs the secure localhost editor.
 
-> The CLI is release-ready but not yet published to the npm registry. Build and run the local package during M12 review.
+> The package is staged for M13 review but is not yet published to the npm registry.
 
 ## Interactive Workflow
 
 ```bash
 ffd login --api https://api.example.com --open
-ffd link --api https://api.example.com --project PROJECT_ID --environment main
+ffd link \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --environment main \
+  --output src/framerfordevs \
+  --schema framerfordevs.schema.ts
 ffd schema pull
 ffd generate
 ffd schema check
@@ -41,8 +46,10 @@ Do not run interactive login in CI and never write the management token into rep
 - Project ID
 - Environment key
 - Generated output directory
+- Tier 1 schema entry
+- Optional explicit experimental composition entry
 
-The CLI searches parent directories for exactly one configuration, rejects unknown keys and unsafe paths, and never executes project configuration as code.
+The CLI searches parent directories for exactly one configuration, rejects unknown keys and unsafe paths, and never executes project configuration as code. Schema authoring and the local editor require configuration version 2.
 
 ## Pull and Reconciliation
 
@@ -63,7 +70,7 @@ metadata.json
 index.ts
 ```
 
-The lock lives at `.framerfordevs/schema.lock.json`. Outputs contain no credentials, actor identities, content entries, machine paths, or wall-clock timestamps.
+Config v1 records generated-file ownership at `.framerfordevs/schema.lock.json`. Config v2 records it at `.framerfordevs/generated.lock.json`, leaving `.framerfordevs/schema.lock.json` v2 exclusively owned by code-first source/revision authority. Outputs contain no credentials, actor identities, content entries, machine paths, or wall-clock timestamps.
 
 Generation plans and validates every byte before replacing the owned directory. It refuses unsafe symlinks, unowned output, and unexpected modifications.
 
@@ -72,6 +79,34 @@ Generation plans and validates every byte before replacing the owned directory. 
 `ffd schema check` distinguishes additive, potentially breaking, breaking, locale, metadata-only, generated-file, collection, and concurrent-authority drift. Exact up-to-date output is the default CI success state.
 
 Content-only publication never reports type drift because generated authority comes from published schemas rather than entry values.
+
+## Code-First Schema Authoring
+
+```bash
+ffd schema export
+ffd schema plan
+ffd schema push --acknowledge CHANGE_ID
+```
+
+Export bootstraps stable source identities from hosted authority. Plan statically extracts local Tier 1 source before credential and network construction, then asks the server to classify the complete project. Push requires every and only the returned risky change IDs and applies one exact optimistic transaction.
+
+See [Publish a code-first schema](/docs/authoring/code-first-schema).
+
+## Content Automation
+
+`ffd entry` supports bounded list/get/create/update/publish/unpublish workflows. Mutation files are strict project-relative JSON and never enter retry journals. Exact draft and locale-publication authority is obtained before each write.
+
+See [Automate content workflows](/docs/authoring/automate-content).
+
+## Local Editor
+
+```bash
+ffd editor
+```
+
+The editor validates Tier 1 source before authentication, retains hosted bearer authority only in Node memory, and exposes a closed ephemeral loopback operation surface to the browser. Structural drift and invalid local source preserve the last valid form read-only.
+
+See [Edit hosted content locally](/docs/authoring/local-editor).
 
 ## Troubleshooting
 

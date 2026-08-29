@@ -109,7 +109,8 @@ export class DeliveryCollectionConfiguration extends Schema.Class<DeliveryCollec
   access: DeliveryAccess,
   version: ResourceVersion,
   fields: DeliveryFieldCapabilities,
-  updatedByUserId: AuthUserId,
+  updatedByUserId: Schema.NullOr(AuthUserId),
+  updatedByCredentialId: Schema.NullOr(ApiCredentialId),
   updatedAt: IsoDateTime,
 }) {}
 

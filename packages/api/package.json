@@ -33,6 +33,7 @@
     "@framerfordevs/auth": "workspace:*",
     "@framerfordevs/db": "workspace:*",
     "@framerfordevs/env": "workspace:*",
+    "@framerfordevs/schema": "workspace:*",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/core": "2.10.0",
     "@opentelemetry/exporter-metrics-otlp-http": "0.221.0",

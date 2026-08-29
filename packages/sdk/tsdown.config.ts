@@ -5,6 +5,7 @@ export default defineConfig({
     index: "./src/index.ts",
     client: "./src/client.ts",
     effect: "./src/effect.ts",
+    authoring: "./src/authoring.ts",
     webhooks: "./src/webhooks.ts",
     invalidation: "./src/invalidation.ts",
   },

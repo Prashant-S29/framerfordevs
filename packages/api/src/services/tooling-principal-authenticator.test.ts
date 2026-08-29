@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Option } from "effect";
+import { Cause, Effect, Exit, Option, Schema } from "effect";
 
+import { CredentialPrincipal } from "../contracts/access";
 import {
   makeToolingOAuthTokenVerifier,
   makeToolingPrincipalAuthenticator,
@@ -54,6 +55,80 @@ describe("Tooling principal authentication", () => {
     return Effect.exit(authenticator.authenticate({ token: "invalid", source: "source-1" })).pipe(
       Effect.tap((result) =>
         Effect.sync(() => {
+          assert.isTrue(Exit.isFailure(result));
+          if (Exit.isFailure(result)) {
+            const error = Option.getOrUndefined(Cause.failureOption(result.cause));
+            assert.strictEqual(error?._tag, "CredentialInvalidFailure");
+          }
+        }),
+      ),
+    );
+  });
+
+  it.effect("enforces the route-specific OAuth grant", () => {
+    const principal = {
+      kind: "oauth_user" as const,
+      userId: "user-1",
+      clientId: "framerfordevs-cli" as const,
+      scopes: ["authoring:schema:push"],
+      expiresAtEpochSeconds: 1_800_000_000,
+    };
+    let receivedScope = "";
+    const authenticator = makeToolingPrincipalAuthenticator(
+      unusedManagementVerifier,
+      (_token, requiredScope) => {
+        receivedScope = requiredScope;
+        return Effect.succeed(principal);
+      },
+      allowInvalidAttempt,
+    );
+
+    return authenticator
+      .authenticate({
+        token: "jwt.access.token",
+        source: "source-1",
+        oauthScope: "authoring:schema:push",
+        managementScopes: ["schema.read", "schema.write", "schema.publish"],
+      })
+      .pipe(
+        Effect.tap((result) =>
+          Effect.sync(() => {
+            assert.strictEqual(receivedScope, "authoring:schema:push");
+            assert.deepStrictEqual(result, principal);
+          }),
+        ),
+      );
+  });
+
+  it.effect("requires every declared management scope after one credential verification", () => {
+    const principal = Schema.decodeUnknownSync(CredentialPrincipal)({
+      credentialId: "019fae8b-1234-7000-8000-000000000001",
+      workspaceId: "019fae8b-1234-7000-8000-000000000002",
+      projectId: "019fae8b-1234-7000-8000-000000000003",
+      environmentId: "019fae8b-1234-7000-8000-000000000004",
+      family: "management",
+      scopes: ["schema.read", "schema.write"],
+    });
+    let verificationCalls = 0;
+    const authenticator = makeToolingPrincipalAuthenticator(
+      () => {
+        verificationCalls += 1;
+        return Effect.succeed(principal);
+      },
+      () => Effect.never,
+      allowInvalidAttempt,
+    );
+
+    return Effect.exit(
+      authenticator.authenticate({
+        token: "ffd_mgmt_test",
+        source: "source-1",
+        managementScopes: ["schema.read", "schema.write", "schema.publish"],
+      }),
+    ).pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          assert.strictEqual(verificationCalls, 1);
           assert.isTrue(Exit.isFailure(result));
           if (Exit.isFailure(result)) {
             const error = Option.getOrUndefined(Cause.failureOption(result.cause));

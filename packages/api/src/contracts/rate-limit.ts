@@ -4,6 +4,9 @@ import { Schema } from "effect";
 
 export const rateLimitPolicyValues = [
   "credential.verification.invalid",
+  "authoring.credential",
+  "authoring.global",
+  "authoring.user",
   "delivery.anonymous",
   "delivery.credential",
   "delivery.global",
@@ -56,6 +59,24 @@ export const rateLimitPolicies = {
     limitPerInterval: 10,
     intervalMs: 60_000,
     capacity: 10,
+  },
+  "authoring.credential": {
+    policy: "authoring.credential",
+    limitPerInterval: 300,
+    intervalMs: 60_000,
+    capacity: 50,
+  },
+  "authoring.global": {
+    policy: "authoring.global",
+    limitPerInterval: 6_000,
+    intervalMs: 60_000,
+    capacity: 500,
+  },
+  "authoring.user": {
+    policy: "authoring.user",
+    limitPerInterval: 300,
+    intervalMs: 60_000,
+    capacity: 50,
   },
   "delivery.anonymous": {
     policy: "delivery.anonymous",

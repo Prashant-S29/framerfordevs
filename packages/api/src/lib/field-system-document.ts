@@ -133,6 +133,11 @@ function preflightAggregate(value: unknown): FieldValidationIssue | null {
   return null;
 }
 
+/** Compares canonical text by code units without process-locale collation. */
+export function compareCanonicalText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 /** Converts preflighted JSON-compatible values into deterministic key-ordered text. */
 export function canonicalizeSchemaDocument(value: unknown): string {
   if (Array.isArray(value)) {

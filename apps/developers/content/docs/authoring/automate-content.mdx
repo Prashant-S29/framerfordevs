@@ -1,0 +1,59 @@
+---
+title: Automate Content Workflows
+description: Use bounded CLI mutations or the trusted-process SDK with optimistic and exact-locale authority.
+---
+
+## Use the CLI
+
+```bash
+ffd entry list --collection articles --locale en-US
+ffd entry get --collection articles --entry ENTRY_ID --locale en-US
+ffd entry create --collection articles --locale en-US --name "Launch" --mutations create.json
+ffd entry update --collection articles --entry ENTRY_ID --locale en-US --mutations update.json
+ffd entry publish --collection articles --entry ENTRY_ID --locale en-US
+ffd entry unpublish --collection articles --entry ENTRY_ID --locale en-US
+```
+
+Mutation files are project-relative, non-symlinked JSON files no larger than 1 MiB. They contain at most 500 strictly decoded API-key-path mutations. Values never enter lock files, retry journals, or command output.
+
+Create requires current revision and contract authority from schema lock v2, so run `ffd schema export` or a successful `ffd schema push` first. Update reads exact draft versions before saving. Publish validates and then submits the returned exact publication authority.
+
+## Use the SDK
+
+```ts
+import { authoringV1 } from "@framerfordevs/sdk/authoring";
+
+const client = authoringV1({
+  baseUrl: process.env.FFD_API_URL!,
+  projectId: process.env.FFD_PROJECT_ID!,
+  environmentId: process.env.FFD_ENVIRONMENT_ID!,
+  token: process.env.FFD_MANAGEMENT_TOKEN!,
+});
+
+const page = await client.entries.list("articles", "en-US", { limit: 20 });
+const entry = page.body?.ok ? page.body.data.items[0] : undefined;
+
+if (entry) {
+  await client.entries.rename("articles", "en-US", entry.id, {
+    displayName: "Launch article",
+    expectedNameVersion: entry.nameVersion,
+  });
+}
+```
+
+Promise and Effect clients recursively validate requests and responses, reject redirects, bound payloads and timeouts, reject repeated pagination cursors, and expose draft/publication helpers that preserve exact server authority. They never force conflict resolution.
+
+## Grant only required authority
+
+| Workflow                                  | OAuth grant                 | Management permission                               |
+| ----------------------------------------- | --------------------------- | --------------------------------------------------- |
+| Export/read forms and entries             | `authoring:read`            | `schema.read` or `content.read`, by operation       |
+| Plan/apply schema or publish presentation | `authoring:schema:push`     | `schema.read`, `schema.write`, and `schema.publish` |
+| Create, rename, or save drafts            | `authoring:draft:write`     | `content.write`                                     |
+| Publish or unpublish content              | `authoring:content:publish` | `content.publish`                                   |
+
+Credential writes are audited as the credential, not as the user who issued it.
+
+## Trusted-process requirement
+
+Run Authoring clients only in trusted Node.js processes or protected automation. Authoring v1 rejects browser Origin and preflight requests. Never expose management, OAuth access/refresh, or Preview credentials to browser JavaScript, logs, traces, generated files, or command arguments.

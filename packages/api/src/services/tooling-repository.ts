@@ -40,6 +40,7 @@ import {
   toolingLimits,
 } from "../contracts/tooling";
 import { canonicalizeEntryValue } from "../lib/entry-values";
+import { toolingJsonData } from "../lib/tooling-json";
 import { compileCollectionContract } from "./schema-engine";
 import { decodePublishedSchemaRevisionSync } from "./schema-repository";
 import type { ToolingPrincipal } from "./tooling-principal-authenticator";
@@ -488,13 +489,15 @@ export function makeToolingRepository(options: ToolingRepositoryOptions = {}) {
               revisionSequence: published.sequence,
               contractHash: published.contractHash,
               publishedAt: published.publishedAt,
-              contract: compileCollectionContract({
-                formatVersion: published.formatVersion,
-                validationProfile: published.validationProfile,
-                currencyRegistryProfile: published.currencyRegistryProfile,
-                collectionApiKey: published.collectionApiKey,
-                fields: published.fields,
-              }),
+              contract: toolingJsonData(
+                compileCollectionContract({
+                  formatVersion: published.formatVersion,
+                  validationProfile: published.validationProfile,
+                  currencyRegistryProfile: published.currencyRegistryProfile,
+                  collectionApiKey: published.collectionApiKey,
+                  fields: published.fields,
+                }),
+              ),
             });
             if (!responseWithinLimit(response)) return { kind: "too_large" as const };
             return { kind: "success" as const, response };

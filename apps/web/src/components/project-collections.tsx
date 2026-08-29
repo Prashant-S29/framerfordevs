@@ -8,44 +8,19 @@ import {
   CardTitle,
 } from "@framerfordevs/ui/components/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@framerfordevs/ui/components/dialog";
-import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
 } from "@framerfordevs/ui/components/empty";
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@framerfordevs/ui/components/field";
-import { Input } from "@framerfordevs/ui/components/input";
 import { Spinner } from "@framerfordevs/ui/components/spinner";
-import { Textarea } from "@framerfordevs/ui/components/textarea";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "@tanstack/react-form";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRightIcon, PlusIcon } from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { cmsKeyFromName, collectionFormSchema } from "@/lib/cms-validation";
 import { client, orpc } from "@/utils/orpc";
-
-function fieldError(error: unknown): string | undefined {
-  if (typeof error !== "object" || error === null || !("message" in error)) return undefined;
-  return typeof error.message === "string" ? error.message : undefined;
-}
 
 export function ProjectCollections({
   projectId,
@@ -100,14 +75,12 @@ export function ProjectCollections({
 
   return (
     <Card>
-      <CardHeader className="flex-row items-start justify-between gap-4">
-        <div>
-          <CardTitle>Collections</CardTitle>
-          <CardDescription>Versioned content contracts for the main environment.</CardDescription>
-        </div>
-        {canWrite && !isArchived ? (
-          <CreateCollectionDialog projectId={projectId} environmentId={environmentId} />
-        ) : null}
+      <CardHeader>
+        <CardTitle>Collections</CardTitle>
+        <CardDescription>
+          Structure is managed through code-first schema authoring. The dashboard retains content,
+          presentation, and Delivery controls.
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {items.length === 0 ? (
@@ -115,7 +88,8 @@ export function ProjectCollections({
             <EmptyHeader>
               <EmptyTitle>No collections yet</EmptyTitle>
               <EmptyDescription>
-                Create a collection to define your first content contract.
+                Define a collection in schema code, inspect its plan, and push it to this
+                environment.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -133,7 +107,7 @@ export function ProjectCollections({
                   >
                     {collection.currentPublishedSequence > 0
                       ? `Published v${collection.currentPublishedSequence}`
-                      : "Draft only"}
+                      : "Awaiting code push"}
                   </Badge>
                 </div>
                 <p className="text-muted-foreground truncate font-mono text-xs" translate="no">
@@ -141,7 +115,7 @@ export function ProjectCollections({
                 </p>
                 {canWrite ? (
                   <p className="text-muted-foreground text-xs">
-                    Draft version {collection.draftVersion}
+                    Managed revision {collection.draftVersion}
                   </p>
                 ) : null}
               </div>
@@ -169,7 +143,7 @@ export function ProjectCollections({
                       />
                     }
                   >
-                    Schema
+                    Manage
                   </Button>
                 ) : null}
               </div>
@@ -188,168 +162,5 @@ export function ProjectCollections({
         ) : null}
       </CardContent>
     </Card>
-  );
-}
-
-export function CreateCollectionDialog({
-  projectId,
-  environmentId,
-}: {
-  readonly projectId: string;
-  readonly environmentId: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [keyEdited, setKeyEdited] = useState(false);
-  const queryClient = useQueryClient();
-  const create = useMutation(
-    orpc.platform.projects.collections.create.mutationOptions({
-      onSuccess: async (response) => {
-        await queryClient.invalidateQueries({
-          queryKey: orpc.platform.projects.collections.list.queryOptions({
-            input: { projectId, environmentId, cursor: null, limit: 20 },
-          }).queryKey,
-        });
-        toast.success(response.message);
-        form.reset();
-        setKeyEdited(false);
-        setOpen(false);
-      },
-      onError: (error) => toast.error(error.message),
-    }),
-  );
-  const form = useForm({
-    defaultValues: { displayName: "", apiKey: "", description: "" },
-    validators: { onSubmit: collectionFormSchema },
-    onSubmit: ({ value }) =>
-      create.mutate({
-        projectId,
-        environmentId,
-        displayName: value.displayName.trim().normalize("NFC"),
-        apiKey: value.apiKey.trim(),
-        description: value.description.trim().normalize("NFC") || null,
-      }),
-  });
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (
-          !nextOpen &&
-          form.state.isDirty &&
-          !globalThis.confirm("Discard your unsaved collection changes?")
-        ) {
-          return;
-        }
-        setOpen(nextOpen);
-      }}
-    >
-      <DialogTrigger render={<Button size="sm" />}>
-        <PlusIcon data-icon="inline-start" />
-        New collection
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Create a collection</DialogTitle>
-          <DialogDescription>
-            The API key is immutable and becomes part of generated contracts.
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            void form.handleSubmit();
-          }}
-        >
-          <FieldGroup>
-            <form.Field name="displayName">
-              {(field) => {
-                const message = fieldError(field.state.meta.errors[0]);
-                return (
-                  <Field data-invalid={Boolean(message)}>
-                    <FieldLabel htmlFor={field.name}>Display name</FieldLabel>
-                    <Input
-                      id={field.name}
-                      name={field.name}
-                      value={field.state.value}
-                      maxLength={100}
-                      autoComplete="off"
-                      onBlur={field.handleBlur}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        field.handleChange(value);
-                        if (!keyEdited) form.setFieldValue("apiKey", cmsKeyFromName(value));
-                      }}
-                      aria-invalid={Boolean(message)}
-                    />
-                    <FieldError>{message}</FieldError>
-                  </Field>
-                );
-              }}
-            </form.Field>
-            <form.Field name="apiKey">
-              {(field) => {
-                const message = fieldError(field.state.meta.errors[0]);
-                return (
-                  <Field data-invalid={Boolean(message)}>
-                    <FieldLabel htmlFor={field.name}>API key</FieldLabel>
-                    <Input
-                      id={field.name}
-                      name={field.name}
-                      value={field.state.value}
-                      maxLength={63}
-                      spellCheck={false}
-                      autoComplete="off"
-                      translate="no"
-                      onBlur={field.handleBlur}
-                      onChange={(event) => {
-                        setKeyEdited(true);
-                        field.handleChange(event.target.value.toLowerCase());
-                      }}
-                      aria-invalid={Boolean(message)}
-                    />
-                    <FieldDescription>
-                      Lowercase snake case. It cannot be changed later.
-                    </FieldDescription>
-                    <FieldError>{message}</FieldError>
-                  </Field>
-                );
-              }}
-            </form.Field>
-            <form.Field name="description">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor={field.name}>Description</FieldLabel>
-                  <Textarea
-                    id={field.name}
-                    name={field.name}
-                    value={field.state.value}
-                    maxLength={500}
-                    autoComplete="off"
-                    rows={3}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                  />
-                  <FieldDescription>Optional authoring context.</FieldDescription>
-                </Field>
-              )}
-            </form.Field>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <form.Subscribe selector={(state) => state.canSubmit}>
-                {(canSubmit) => (
-                  <Button type="submit" disabled={!canSubmit || create.isPending}>
-                    {create.isPending ? <Spinner data-icon="inline-start" /> : null}
-                    {create.isPending ? "Creating…" : "Create collection"}
-                  </Button>
-                )}
-              </form.Subscribe>
-            </DialogFooter>
-          </FieldGroup>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }

@@ -1,3 +1,5 @@
 {
-  "extends": "@framerfordevs/config/tsconfig.base.json"
+  "extends": "@framerfordevs/config/tsconfig.base.json",
+  "include": ["src/**/*.ts", "tsdown.config.ts", "vitest.config.ts", "vite.editor.config.ts"],
+  "exclude": ["node_modules", "dist", "editor-app"]
 }

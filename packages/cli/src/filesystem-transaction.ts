@@ -129,6 +129,7 @@ export interface CommitGenerationOptions {
   readonly rootDirectory: string;
   readonly outputDirectory: string;
   readonly plan: GenerationPlan;
+  readonly lockFileName?: "schema.lock.json" | "generated.lock.json";
   readonly force?: boolean;
   readonly transactionId?: string;
   readonly beforeStage?: (stage: GeneratorCommitStage) => Effect.Effect<void, GeneratorCommitError>;
@@ -174,7 +175,11 @@ export const commitGenerationPlan = Effect.fn("GeneratorFileSystem.commit")(func
   const outputDirectory = resolve(options.outputDirectory);
   const outputParent = dirname(outputDirectory);
   const lockDirectory = join(rootDirectory, ".framerfordevs");
-  const lockPath = join(lockDirectory, "schema.lock.json");
+  const lockFileName = options.lockFileName ?? "schema.lock.json";
+  if (lockFileName !== "schema.lock.json" && lockFileName !== "generated.lock.json") {
+    return yield* GeneratorOutputUnownedError.make();
+  }
+  const lockPath = join(lockDirectory, lockFileName);
   const safeOutputChain = yield* validateDirectoryChain(fileSystem, rootDirectory, outputParent);
   const safeLockChain = yield* validateDirectoryChain(fileSystem, rootDirectory, lockDirectory);
   if (!safeOutputChain || !safeLockChain) return yield* GeneratorOutputUnownedError.make();
@@ -226,8 +231,8 @@ export const commitGenerationPlan = Effect.fn("GeneratorFileSystem.commit")(func
   const stem = `.${basename(outputDirectory)}.ffd-${transactionId}`;
   const stagingDirectory = join(outputParent, `${stem}-stage`);
   const backupDirectory = join(outputParent, `${stem}-backup`);
-  const lockTemporaryPath = join(lockDirectory, `.schema.lock.${transactionId}.tmp`);
-  const lockBackupPath = join(lockDirectory, `.schema.lock.${transactionId}.backup`);
+  const lockTemporaryPath = join(lockDirectory, `.${lockFileName}.${transactionId}.tmp`);
+  const lockBackupPath = join(lockDirectory, `.${lockFileName}.${transactionId}.backup`);
   let outputBackedUp = false;
   let outputInstalled = false;
   let lockBackedUp = false;
@@ -238,7 +243,7 @@ export const commitGenerationPlan = Effect.fn("GeneratorFileSystem.commit")(func
     if (lockBackedUp) {
       yield* fileSystem.rename(lockBackupPath, lockPath).pipe(Effect.ignore);
     } else if (lockInstalled && previousLockBytes !== null) {
-      const restorePath = join(lockDirectory, `.schema.lock.${transactionId}.restore`);
+      const restorePath = join(lockDirectory, `.${lockFileName}.${transactionId}.restore`);
       yield* fileSystem.remove(restorePath).pipe(Effect.ignore);
       yield* fileSystem.writeUtf8(restorePath, previousLockBytes).pipe(Effect.ignore);
       yield* fileSystem.rename(restorePath, lockPath).pipe(Effect.ignore);

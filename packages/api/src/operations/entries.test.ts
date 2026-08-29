@@ -50,7 +50,9 @@ const entry = Schema.decodeUnknownSync(CmsEntry)({
   displayName: "Test entry",
   nameVersion: 1,
   createdByUserId: "user-1",
+  createdByCredentialId: null,
   changedByUserId: "user-1",
+  changedByCredentialId: null,
   createdAt: timestamp,
   updatedAt: timestamp,
 });

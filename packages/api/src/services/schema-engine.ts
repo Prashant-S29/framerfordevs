@@ -761,6 +761,18 @@ export function classifyCollectionSchemaChanges(
         after: draft.editorLayout,
       }),
     );
+  if (published && published.collectionApiKey !== draft.collection.apiKey)
+    pending.push(
+      makeChange({
+        code: "collection.api_key.updated",
+        classification: "breaking",
+        fieldId: null,
+        summary: "The collection API key changed.",
+        position: -1,
+        before: published.collectionApiKey,
+        after: draft.collection.apiKey,
+      }),
+    );
   if (
     published &&
     (published.collectionDisplayName !== draft.collection.displayName ||
@@ -865,6 +877,19 @@ export function requiredAcknowledgementChanges(changes: SchemaChangeSet): Schema
   return changes.items.filter((change) => change.classification !== "non_breaking");
 }
 
+/** Requires the acknowledgement set to equal every risky change ID, with no broad or extra bypass. */
+export function hasExactSchemaAcknowledgements(
+  changes: SchemaChangeSet,
+  acknowledgedChangeIds: AcknowledgedSchemaChangeIds,
+): boolean {
+  const required = requiredAcknowledgementChanges(changes);
+  const acknowledged = new Set<string>(acknowledgedChangeIds);
+  return (
+    required.length === acknowledged.size &&
+    required.every((change) => acknowledged.has(change.changeId))
+  );
+}
+
 /** Constructs the replaceable aggregate schema service. */
 export function makeSchemaEngine() {
   return {
@@ -898,11 +923,7 @@ export function makeSchemaEngine() {
       acknowledgedChangeIds: AcknowledgedSchemaChangeIds,
     ) {
       const required = requiredAcknowledgementChanges(changes);
-      const acknowledged = new Set<string>(acknowledgedChangeIds);
-      const exact =
-        required.length === acknowledged.size &&
-        required.every((change) => acknowledged.has(change.changeId));
-      if (!exact)
+      if (!hasExactSchemaAcknowledgements(changes, acknowledgedChangeIds))
         return yield* SchemaChangeAcknowledgementRequiredFailure.make({
           requiredChanges: required,
         });

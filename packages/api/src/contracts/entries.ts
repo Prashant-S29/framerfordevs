@@ -2,6 +2,7 @@
 
 import { Schema } from "effect";
 
+import { ApiCredentialId } from "./access";
 import { ApiSuccessSchema } from "./api-response";
 import { LocaleTag, ProjectLocaleId } from "./locales";
 import {
@@ -163,8 +164,10 @@ export class CmsEntry extends Schema.Class<CmsEntry>("CmsEntry")({
   collectionId: CollectionId,
   displayName: Schema.NullOr(EntryDisplayName),
   nameVersion: EntryNameVersion,
-  createdByUserId: AuthUserId,
-  changedByUserId: AuthUserId,
+  createdByUserId: Schema.NullOr(AuthUserId),
+  createdByCredentialId: Schema.NullOr(ApiCredentialId),
+  changedByUserId: Schema.NullOr(AuthUserId),
+  changedByCredentialId: Schema.NullOr(ApiCredentialId),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 }) {}
@@ -229,7 +232,8 @@ export class EntryRevisionSummary extends Schema.Class<EntryRevisionSummary>(
   contractHash: ContractHash,
   changedFieldIds: ChangedEntryFieldIds,
   restoredFromRevisionId: Schema.NullOr(EntryRevisionId),
-  authoredByUserId: AuthUserId,
+  authoredByUserId: Schema.NullOr(AuthUserId),
+  authoredByCredentialId: Schema.NullOr(ApiCredentialId),
   authoredAt: IsoDateTime,
 }) {}
 
@@ -257,6 +261,30 @@ export class CreateEntryInput extends Schema.Class<CreateEntryInput>("CreateEntr
   schemaRevisionId: SchemaRevisionId,
   contractHash: ContractHash,
   commandId: EntryCommandId,
+}) {}
+
+export class CreateEntryWithDraftInput extends Schema.Class<CreateEntryWithDraftInput>(
+  "CreateEntryWithDraftInput",
+)({
+  ...EntryScopeInputFields,
+  displayName: EntryDisplayName,
+  schemaRevisionId: SchemaRevisionId,
+  contractHash: ContractHash,
+  commandId: EntryCommandId,
+  sharedMutations: EntryValueMutations,
+  localizedMutations: EntryValueMutations,
+}) {}
+
+export class CreateEntryWithDraftResult extends Schema.Class<CreateEntryWithDraftResult>(
+  "CreateEntryWithDraftResult",
+)({
+  entry: CmsEntry,
+  commandId: EntryCommandId,
+  sharedVersion: EntryDraftVersion,
+  sharedRevisionId: Schema.NullOr(EntryRevisionId),
+  localizedVersion: EntryDraftVersion,
+  localizedRevisionId: Schema.NullOr(EntryRevisionId),
+  validation: EntryValidation,
 }) {}
 
 export class RenameEntryInput extends Schema.Class<RenameEntryInput>("RenameEntryInput")({

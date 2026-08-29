@@ -76,9 +76,16 @@ describe("OAuth device CLI flow", () => {
       const browser: Array<string> = [];
       const dependencies = services({ presented, browser });
       let polls = 0;
-      const fetch: typeof globalThis.fetch = (input) => {
+      let requestedScope = "";
+      const fetch: typeof globalThis.fetch = (input, init) => {
         const url = new URL(String(input));
-        if (url.pathname.endsWith("/device/code")) return success(deviceResponse);
+        if (url.pathname.endsWith("/device/code")) {
+          const body: unknown = JSON.parse(String(init?.body));
+          const scope =
+            typeof body === "object" && body !== null ? Reflect.get(body, "scope") : undefined;
+          requestedScope = typeof scope === "string" ? scope : "";
+          return success(deviceResponse);
+        }
         polls += 1;
         return polls === 1
           ? success({ error: "authorization_pending" }, 400)
@@ -94,6 +101,10 @@ describe("OAuth device CLI flow", () => {
         );
         yield* flushAsync;
         assert.deepEqual(presented, ["ABCD-EFGH"]);
+        assert.strictEqual(
+          requestedScope,
+          "openid profile offline_access tooling:read authoring:read authoring:draft:write authoring:content:publish authoring:schema:push",
+        );
         assert.deepEqual(browser, []);
         assert.strictEqual(polls, 0);
         yield* TestClock.adjust("5 seconds");

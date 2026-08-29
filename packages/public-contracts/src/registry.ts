@@ -1,5 +1,6 @@
 // Declares the only public contract sources behind the browser-safe closed registry metadata.
 
+import { authoringOpenApiDocument } from "@framerfordevs/api/contracts/authoring-openapi";
 import { deliveryOpenApiDocument } from "@framerfordevs/api/contracts/delivery-openapi";
 import { previewOpenApiDocument } from "@framerfordevs/api/contracts/preview-openapi";
 import { toolingOpenApiDocument } from "@framerfordevs/api/contracts/tooling-openapi";
@@ -39,6 +40,10 @@ function webhookEventSchema(): unknown {
 }
 
 export const publicContractRegistry = {
+  "authoring/v1": {
+    ...publicContractMetadata["authoring/v1"],
+    source: () => authoringOpenApiDocument,
+  },
   "delivery/v1": {
     ...publicContractMetadata["delivery/v1"],
     source: () => deliveryOpenApiDocument,

@@ -1,0 +1,20 @@
+---
+title: Authoring from Code
+description: Own schema structure in TypeScript, edit hosted content locally, and automate exact authoring workflows.
+---
+
+Milestone 13 separates authoring authority deliberately:
+
+- **Code owns published structure:** source identities, API keys, field kinds, localization, validation, enums, and references.
+- **Hosted presentation owns editing UX:** labels, help, placeholders, field order, tabs, groups, sidebar placement, and role visibility.
+- **The hosted database owns content:** drafts, immutable revisions, exact-locale publications, audit records, and event delivery.
+
+Schema source uses stable `sourceKey` values so API-key renames do not replace collection, field, or enum identities. The server remains the authority for validation, change classification, ID allocation, optimistic concurrency, immutable publication, and audit.
+
+## Choose a workflow
+
+- [Define and publish a code-first schema](/docs/authoring/code-first-schema)
+- [Edit hosted content with the localhost editor](/docs/authoring/local-editor)
+- [Automate content with the CLI or SDK](/docs/authoring/automate-content)
+
+Authoring v1 is intended for trusted tools. It accepts bearer credentials only, rejects browser-origin requests and redirects, and returns `Cache-Control: no-store`. Never place OAuth, management, Preview, or refresh credentials in browser bundles.

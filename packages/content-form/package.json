@@ -1,0 +1,39 @@
+{
+  "name": "@framerfordevs/content-form",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./authoring-adapter": "./src/authoring-adapter.ts",
+    "./model": "./src/model.ts",
+    "./renderer": "./src/content-form.tsx",
+    "./values": "./src/values.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run src",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@framerfordevs/ui": "workspace:*",
+    "@portabletext/editor": "^7.10.15",
+    "effect": "3.22.0",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@framerfordevs/config": "workspace:*",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitest/coverage-v8": "3.2.7",
+    "axe-core": "^4.12.1",
+    "jsdom": "^29.1.1",
+    "typescript": "catalog:",
+    "vitest": "3.2.7"
+  }
+}

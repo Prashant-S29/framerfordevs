@@ -34,10 +34,13 @@ import {
   SchemaRevisionId,
 } from "../contracts/schemas";
 import { EditorLayout } from "../contracts/field-system";
+import { ToolingCollectionContract } from "../contracts/tooling";
+import { toolingJsonData } from "../lib/tooling-json";
 import {
   SchemaEngine,
   SchemaEngineLive,
   classifyCollectionSchemaChanges,
+  compileCollectionContract,
   fingerprintSchemaPublication,
   hashCollectionContract,
   hashCollectionDraft,
@@ -90,6 +93,7 @@ function makeField(options: FieldOptions): CollectionFieldDefinition {
 }
 
 function makeCollection(options?: {
+  readonly apiKey?: string;
   readonly displayName?: string;
   readonly description?: string | null;
   readonly publishedRevisionId?: SchemaRevisionId | null;
@@ -101,7 +105,7 @@ function makeCollection(options?: {
     workspaceId,
     projectId,
     environmentId,
-    apiKey: CollectionApiKey.make("blog_posts"),
+    apiKey: CollectionApiKey.make(options?.apiKey ?? "blog_posts"),
     displayName: CollectionDisplayName.make(options?.displayName ?? "Blog posts"),
     description:
       options?.description === null
@@ -188,6 +192,7 @@ function makePublished(fields: ReadonlyArray<CollectionFieldDefinition>): Publis
     potentiallyBreakingChangeCount: 0,
     breakingChangeCount: 0,
     publishedByUserId: actorId,
+    publishedByCredentialId: null,
     publishedAt: timestamp,
     fields,
     editorLayout: makeLayout(fields),
@@ -214,6 +219,26 @@ describe("schema draft validation", () => {
       publication.issues.map((validationIssue) => validationIssue.code),
       ["field_count_required"],
     );
+  });
+
+  it("classifies a collection API-key rename as breaking while preserving collection identity", () => {
+    const published = makePublished([optionalTitle]);
+    const draft = makeDraft(
+      [optionalTitle],
+      makeCollection({
+        apiKey: "articles",
+        publishedRevisionId: revisionId,
+        publishedSequence: 1,
+      }),
+    );
+    const changes = classifyCollectionSchemaChanges(published, draft);
+
+    assert.deepInclude(changes.items[0], {
+      code: "collection.api_key.updated",
+      classification: "breaking",
+      fieldId: null,
+    });
+    assert.strictEqual(draft.collection.id, published.collectionId);
   });
 
   it("reports duplicate identities, keys, positions, sparse ordering, and M6 configuration", () => {
@@ -330,6 +355,54 @@ describe("schema draft validation", () => {
         (change) =>
           change.code === "editor_layout.updated" && change.classification === "non_breaking",
       ),
+    );
+  });
+
+  it("projects optional contract configuration to recursively valid Tooling JSON", () => {
+    const contract = compileCollectionContract({
+      formatVersion: 2,
+      validationProfile: "m6-strict",
+      currencyRegistryProfile: "iso-4217@2025-05-12",
+      collectionApiKey: "articles",
+      fields: [
+        makeField({
+          id: firstFieldId,
+          apiKey: "status",
+          kind: "enum",
+          configuration: {
+            options: [
+              {
+                id: "019fae8b-1234-7000-8000-000000000011",
+                value: "draft",
+                label: "Draft",
+                position: 0,
+              },
+            ],
+          },
+        }),
+        makeField({
+          id: secondFieldId,
+          apiKey: "budget",
+          kind: "money",
+          position: 1,
+          configuration: { currencies: ["USD"] },
+        }),
+        makeField({
+          id: thirdFieldId,
+          apiKey: "body",
+          kind: "rich_text",
+          position: 2,
+          configuration: {},
+        }),
+      ],
+    });
+
+    const toolingContract = toolingJsonData(contract);
+    assert.include(JSON.stringify(toolingContract), '"default":null');
+    assert.doesNotThrow(() =>
+      Schema.decodeUnknownSync(ToolingCollectionContract)(toolingContract, {
+        onExcessProperty: "error",
+      }),
     );
   });
 

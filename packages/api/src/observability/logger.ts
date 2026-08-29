@@ -10,7 +10,7 @@ export interface LogRecord {
 }
 
 const sensitiveKeyPattern =
-  /authorization|cookie|password|secret|token|database.?url|body|content|payload/i;
+  /authorization|cookie|password|secret|token|database.?url|body|content|payload|source.?key|api.?key|label|display.?name|description|help.?text|placeholder|pattern|default|email|url|(^|[._-])mutations?($|[._-])|(^|[._-])values?($|[._-])|command.?file|schema.?document|project.?schema/i;
 const bearerPattern = /\bBearer\s+[A-Za-z0-9._~+\x2f-]+=*/gi;
 const databaseUrlPattern = /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis):\/\/[^\s,;]+/gi;
 const urlCredentialsPattern = /([a-z][a-z0-9+.-]*:\/\/)([^\s/:@]+):([^\s/@]+)@/gi;

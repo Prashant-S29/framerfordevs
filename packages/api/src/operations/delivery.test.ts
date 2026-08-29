@@ -105,6 +105,7 @@ const configuration = Schema.decodeUnknownSync(DeliveryCollectionConfiguration)(
   version: 1,
   fields: [],
   updatedByUserId: "delivery-owner",
+  updatedByCredentialId: null,
   updatedAt: timestamp,
 });
 const anonymous = Schema.decodeUnknownSync(DeliveryAccessPrincipal)({

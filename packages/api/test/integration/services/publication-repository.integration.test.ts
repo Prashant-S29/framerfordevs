@@ -1,11 +1,15 @@
 // Verifies the core M8 publication lifecycle against PostgreSQL while rolling append-only artifacts back.
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, it } from "@effect/vitest";
 import { db } from "@framerfordevs/db";
 import { and, eq, inArray, sql } from "@framerfordevs/db/query";
-import { projectMembership } from "@framerfordevs/db/schema/access";
+import {
+  apiCredential,
+  apiCredentialScope,
+  projectMembership,
+} from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
 import {
   cmsCollection,
@@ -41,7 +45,13 @@ import {
 } from "@framerfordevs/db/schema/platform";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
 
-import { CreateEntryInput, SaveEntryDraftInput } from "../../../src/contracts/entries";
+import { ApiCredentialId } from "../../../src/contracts/access";
+import { CmsActor } from "../../../src/contracts/authoring";
+import {
+  CreateEntryInput,
+  GetEntryDraftInput,
+  SaveEntryDraftInput,
+} from "../../../src/contracts/entries";
 import { CreateProjectLocaleInput } from "../../../src/contracts/locales";
 import {
   GetEntryPublicationStatusInput,
@@ -81,6 +91,11 @@ import { makeSchemaRepository } from "../../../src/services/schema-repository";
 const suffix = randomUUID();
 const ownerId = `m8-publication-owner-${suffix}`;
 const ownerActor = Schema.decodeUnknownSync(AuthUserId)(ownerId);
+const managementCredentialId = Schema.decodeUnknownSync(ApiCredentialId)(randomUUID());
+const managementActor = Schema.decodeUnknownSync(CmsActor)({
+  kind: "credential",
+  id: managementCredentialId,
+});
 const platform = makePlatformRepository();
 const schemas = makeSchemaRepository();
 const entries = makeEntryRepository();
@@ -148,6 +163,26 @@ beforeAll(async () => {
       }),
       `m8-capability-${suffix}`,
     ),
+  );
+  await db.insert(apiCredential).values({
+    id: managementCredentialId,
+    workspaceId: required(workspaceModel, "workspace").id,
+    projectId: currentProject.id,
+    environmentId: currentProject.environment.id,
+    family: "management",
+    name: "M13 publication integration",
+    keyPrefix: `ffd_mgmt_${managementCredentialId}`,
+    keyDigest: createHash("sha256").update(managementCredentialId).digest("hex"),
+    createdByUserId: ownerId,
+  });
+  await db.insert(apiCredentialScope).values(
+    ["content.read", "content.publish"].map((scope) => ({
+      credentialId: managementCredentialId,
+      workspaceId: required(workspaceModel, "workspace").id,
+      projectId: currentProject.id,
+      environmentId: currentProject.environment.id,
+      scope,
+    })),
   );
   await Effect.runPromise(
     locales.createLocale(
@@ -354,7 +389,11 @@ afterAll(async () => {
       .where(eq(cmsCollectionDeliveryConfig.collectionId, collectionId));
     await db.delete(cmsCollection).where(eq(cmsCollection.id, collectionId));
   }
-  await db.delete(auditEvent).where(eq(auditEvent.actorId, ownerId));
+  await db.delete(auditEvent).where(inArray(auditEvent.actorId, [ownerId, managementCredentialId]));
+  await db
+    .delete(apiCredentialScope)
+    .where(eq(apiCredentialScope.credentialId, managementCredentialId));
+  await db.delete(apiCredential).where(eq(apiCredential.id, managementCredentialId));
   await db
     .delete(projectMembership)
     .where(eq(projectMembership.projectId, required(projectModel, "project").id));
@@ -1382,6 +1421,201 @@ describe.sequential("publication repository PostgreSQL integration", () => {
     }
   });
 
+  it("attributes management-credential publish and unpublish without issuer impersonation", async () => {
+    const currentProject = required(projectModel, "project");
+    const currentCollection = required(collectionModel, "collection");
+    const currentEntryId = required(entryId, "entry");
+    const currentTargetEntryId = required(targetEntryId, "target entry");
+    const currentPublished = required(publishedModel, "published schema");
+    const currentTitleFieldId = required(titleFieldId, "title field");
+    const scope = {
+      projectId: currentProject.id,
+      environmentId: currentProject.environment.id,
+      collectionId: currentCollection.id,
+      entryId: currentEntryId,
+      locale: "en",
+    };
+    const targetScope = { ...scope, entryId: currentTargetEntryId };
+    const targetDraft = await Effect.runPromise(
+      entries.getDraft(ownerActor, Schema.decodeUnknownSync(GetEntryDraftInput)(targetScope)),
+    );
+    await Effect.runPromise(
+      entries.saveDraft(
+        ownerActor,
+        Schema.decodeUnknownSync(SaveEntryDraftInput)({
+          ...targetScope,
+          schemaRevisionId: currentPublished.id,
+          contractHash: currentPublished.contractHash,
+          commandId: randomUUID(),
+          expectedSharedVersion: targetDraft.sharedVersion,
+          expectedLocalizedVersion: targetDraft.localizedVersion,
+          sharedMutations: [],
+          localizedMutations: [
+            {
+              operation: "set",
+              path: [currentTitleFieldId],
+              value: "Credential publication target",
+            },
+          ],
+        }),
+        new Date("2026-08-24T01:19:59.000Z"),
+        `m13-publish-target-save-${suffix}`,
+      ),
+    );
+    let rolledBack = false;
+
+    try {
+      await db.transaction(async (transaction) => {
+        const publications = makePublicationRepository({
+          executor: transaction,
+          runTransaction: (work) => work(transaction),
+        });
+        const targetPlan = await Effect.runPromise(
+          publications.validate(
+            managementActor,
+            Schema.decodeUnknownSync(ValidateEntryPublicationInput)(targetScope),
+            new Date("2026-08-24T01:20:00.000Z"),
+          ),
+        );
+        assert.isTrue(targetPlan.valid);
+        if (targetPlan.authorityHash === null)
+          throw new Error("Expected target publication authority.");
+        await Effect.runPromise(
+          publications.publish(
+            managementActor,
+            Schema.decodeUnknownSync(PublishEntryInput)({
+              ...targetScope,
+              commandId: randomUUID(),
+              authorityHash: targetPlan.authorityHash,
+              expectedStateVersion: targetPlan.stateVersion,
+              expectedPublicationId: targetPlan.currentPublicationId,
+              expectedSchemaRevisionId: targetPlan.schemaRevisionId,
+              expectedContractHash: targetPlan.contractHash,
+              expectedSharedVersion: targetPlan.sharedVersion,
+              expectedSharedRevisionId: targetPlan.sharedRevisionId,
+              expectedLocalizedVersion: targetPlan.localizedVersion,
+              expectedLocalizedRevisionId: targetPlan.localizedRevisionId,
+            }),
+            new Date("2026-08-24T01:20:00.500Z"),
+            `m13-publish-target-credential-${suffix}`,
+          ),
+        );
+        const plan = await Effect.runPromise(
+          publications.validate(
+            managementActor,
+            Schema.decodeUnknownSync(ValidateEntryPublicationInput)(scope),
+            new Date("2026-08-24T01:20:01.000Z"),
+          ),
+        );
+        assert.isTrue(plan.valid);
+        if (plan.authorityHash === null)
+          throw new Error("Expected credential publication authority.");
+        const publishRequestId = `m13-publish-credential-${suffix}`;
+        const published = await Effect.runPromise(
+          publications.publish(
+            managementActor,
+            Schema.decodeUnknownSync(PublishEntryInput)({
+              ...scope,
+              commandId: randomUUID(),
+              authorityHash: plan.authorityHash,
+              expectedStateVersion: plan.stateVersion,
+              expectedPublicationId: plan.currentPublicationId,
+              expectedSchemaRevisionId: plan.schemaRevisionId,
+              expectedContractHash: plan.contractHash,
+              expectedSharedVersion: plan.sharedVersion,
+              expectedSharedRevisionId: plan.sharedRevisionId,
+              expectedLocalizedVersion: plan.localizedVersion,
+              expectedLocalizedRevisionId: plan.localizedRevisionId,
+            }),
+            new Date("2026-08-24T01:20:01.000Z"),
+            publishRequestId,
+          ),
+        );
+        const unpublishRequestId = `m13-unpublish-credential-${suffix}`;
+        await Effect.runPromise(
+          publications.unpublish(
+            managementActor,
+            Schema.decodeUnknownSync(UnpublishEntryInput)({
+              ...scope,
+              commandId: randomUUID(),
+              expectedStateVersion: published.stateVersion,
+              expectedPublicationId: published.publication.id,
+            }),
+            new Date("2026-08-24T01:20:02.000Z"),
+            unpublishRequestId,
+          ),
+        );
+
+        const [publication] = await transaction
+          .select({
+            userId: cmsEntryLocalePublication.publishedByUserId,
+            credentialId: cmsEntryLocalePublication.publishedByCredentialId,
+          })
+          .from(cmsEntryLocalePublication)
+          .where(eq(cmsEntryLocalePublication.id, published.publication.id));
+        const commands = await transaction
+          .select({
+            operation: cmsEntryPublicationCommand.operation,
+            userId: cmsEntryPublicationCommand.completedByUserId,
+            credentialId: cmsEntryPublicationCommand.completedByCredentialId,
+          })
+          .from(cmsEntryPublicationCommand)
+          .where(
+            and(
+              eq(cmsEntryPublicationCommand.entryId, currentEntryId),
+              eq(cmsEntryPublicationCommand.completedByCredentialId, managementCredentialId),
+            ),
+          )
+          .orderBy(cmsEntryPublicationCommand.completedAt);
+        const [head] = await transaction
+          .select({
+            userId: cmsEntryLocalePublicationHead.changedByUserId,
+            credentialId: cmsEntryLocalePublicationHead.changedByCredentialId,
+          })
+          .from(cmsEntryLocalePublicationHead)
+          .where(
+            and(
+              eq(cmsEntryLocalePublicationHead.entryId, currentEntryId),
+              eq(cmsEntryLocalePublicationHead.localeId, plan.localeId),
+            ),
+          );
+        const audits = await transaction
+          .select({ actorType: auditEvent.actorType, actorId: auditEvent.actorId })
+          .from(auditEvent)
+          .where(inArray(auditEvent.requestId, [publishRequestId, unpublishRequestId]));
+
+        assert.deepStrictEqual(publication, {
+          userId: null,
+          credentialId: managementCredentialId,
+        });
+        assert.deepStrictEqual(
+          commands.map((command) => ({
+            operation: command.operation,
+            userId: command.userId,
+            credentialId: command.credentialId,
+          })),
+          [
+            { operation: "publish", userId: null, credentialId: managementCredentialId },
+            { operation: "unpublish", userId: null, credentialId: managementCredentialId },
+          ],
+        );
+        assert.deepStrictEqual(head, {
+          userId: null,
+          credentialId: managementCredentialId,
+        });
+        assert.deepStrictEqual(audits, [
+          { actorType: "credential", actorId: managementCredentialId },
+          { actorType: "credential", actorId: managementCredentialId },
+        ]);
+        rolledBack = true;
+        transaction.rollback();
+      });
+    } catch (cause) {
+      if (!rolledBack) throw cause;
+    }
+    assert.isTrue(rolledBack);
+  });
+
   it("uses the intended current-head, history, receipt, and reverse-reference indexes", async () => {
     const currentProject = required(projectModel, "project");
     const currentCollection = required(collectionModel, "collection");
@@ -1410,12 +1644,24 @@ describe.sequential("publication repository PostgreSQL integration", () => {
       const reverseReference = await transaction.execute(
         sql`explain (format json) select source_publication_id from cms_entry_locale_publication_reference where target_publication_id = ${targetPublicationId}`,
       );
+      const publicationCredential = await transaction.execute(
+        sql`explain (format json) select id from cms_entry_locale_publication where published_by_credential_id = ${managementCredentialId} limit 20`,
+      );
+      const headCredential = await transaction.execute(
+        sql`explain (format json) select entry_id from cms_entry_locale_publication_head where changed_by_credential_id = ${managementCredentialId} limit 20`,
+      );
+      const commandCredential = await transaction.execute(
+        sql`explain (format json) select command_id from cms_entry_publication_command where completed_by_credential_id = ${managementCredentialId} limit 20`,
+      );
       return JSON.stringify([
         exactHead.rows,
         localeCurrent.rows,
         history.rows,
         receipt.rows,
         reverseReference.rows,
+        publicationCredential.rows,
+        headCredential.rows,
+        commandCredential.rows,
       ]);
     });
     assert.include(plans, "cms_entry_pub_head_entry_locale_pk");
@@ -1423,5 +1669,8 @@ describe.sequential("publication repository PostgreSQL integration", () => {
     assert.match(plans, /cms_entry_pub_(history_idx|entry_locale_sequence_unique)/u);
     assert.include(plans, "cms_entry_pub_command_entry_command_pk");
     assert.include(plans, "cms_entry_pub_ref_target_publication_idx");
+    assert.include(plans, "cms_entry_pub_publisher_credential_idx");
+    assert.include(plans, "cms_entry_pub_head_changed_by_credential_idx");
+    assert.include(plans, "cms_entry_pub_command_completed_by_credential_idx");
   });
 });

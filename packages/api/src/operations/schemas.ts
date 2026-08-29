@@ -1,6 +1,11 @@
 import { Clock, Effect, Exit, Schema } from "effect";
 
-import { UnauthorizedFailure } from "../contracts/errors";
+import { AuthoringPublishPresentationRequest } from "../contracts/authoring-presentation";
+import { DashboardSchemaAuthoringRetiredFailure, UnauthorizedFailure } from "../contracts/errors";
+import type {
+  GetCollectionPresentationInput,
+  PublishCollectionPresentationInput,
+} from "../contracts/management-presentation";
 import type {
   CreateCollectionFieldInput,
   CreateCollectionInput,
@@ -22,12 +27,19 @@ import type {
 } from "../contracts/schemas";
 import { AuthUserId } from "../contracts/platform";
 import { Telemetry } from "../observability/telemetry";
+import { AuthoringPresentationRepository } from "../services/authoring-presentation-repository";
 import { SchemaRepository } from "../services/schema-repository";
 
 const decodeActorId = (actorId: string) =>
   Schema.decodeUnknown(AuthUserId)(actorId).pipe(Effect.mapError(() => UnauthorizedFailure.make()));
 
 const currentDate = Effect.map(Clock.currentTimeMillis, (millis) => new Date(millis));
+
+export const rejectRetiredDashboardSchemaAuthoring = Effect.fn(
+  "schema.dashboard_authoring.retired",
+)(function* () {
+  return yield* DashboardSchemaAuthoringRetiredFailure.make();
+});
 
 function fieldCountBucket(count: number): "1-10" | "11-50" | "51-100" {
   if (count <= 10) return "1-10";
@@ -258,6 +270,69 @@ export const validateCollectionSchema = Effect.fn("schema.validate")(function* (
       }),
     ),
   );
+});
+
+export const getCollectionPresentation = Effect.fn("schema.presentation.get")(function* (
+  actorUserId: string,
+  input: GetCollectionPresentationInput,
+) {
+  const actorId = yield* decodeActorId(actorUserId);
+  yield* Effect.annotateCurrentSpan({
+    projectId: input.projectId,
+    environmentId: input.environmentId,
+    collectionId: input.collectionId,
+  });
+  const collection = yield* (yield* SchemaRepository).getCollection(actorId, input);
+  return yield* (yield* AuthoringPresentationRepository).get(
+    { kind: "user", id: actorId },
+    { projectId: input.projectId, environmentId: input.environmentId },
+    collection.apiKey,
+  );
+});
+
+export const publishCollectionPresentation = Effect.fn("schema.presentation.publish")(function* (
+  actorUserId: string,
+  input: PublishCollectionPresentationInput,
+  requestId: string,
+) {
+  const actorId = yield* decodeActorId(actorUserId);
+  yield* Effect.annotateCurrentSpan({
+    projectId: input.projectId,
+    environmentId: input.environmentId,
+    collectionId: input.collectionId,
+  });
+  const collection = yield* (yield* SchemaRepository).getCollection(actorId, input);
+  const repository = yield* AuthoringPresentationRepository;
+  const telemetry = yield* Telemetry;
+  const startedAt = yield* Clock.currentTimeMillis;
+  return yield* repository
+    .publish(
+      { kind: "user", id: actorId },
+      { projectId: input.projectId, environmentId: input.environmentId },
+      collection.apiKey,
+      AuthoringPublishPresentationRequest.make({
+        commandId: input.commandId,
+        expectedRevisionId: input.expectedRevisionId,
+        expectedSequence: input.expectedSequence,
+        presentation: input.presentation,
+      }),
+      new Date(startedAt),
+      requestId,
+    )
+    .pipe(
+      Effect.onExit((exit) =>
+        Clock.currentTimeMillis.pipe(
+          Effect.flatMap((completedAt) =>
+            telemetry.recordSchemaPublication({
+              outcome: Exit.isSuccess(exit) ? "success" : "failure",
+              severity: Exit.isSuccess(exit) && !exit.value.noOp ? "non_breaking" : "none",
+              fieldCountBucket: fieldCountBucket(input.presentation.fields.length),
+              durationMs: Math.max(0, completedAt - startedAt),
+            }),
+          ),
+        ),
+      ),
+    );
 });
 
 export const publishCollectionSchema = Effect.fn("schema.publish")(function* (

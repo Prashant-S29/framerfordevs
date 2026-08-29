@@ -1,13 +1,14 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { db } from "@framerfordevs/db";
-import { and, desc, eq, inArray, isNull, lt, or, sql } from "@framerfordevs/db/query";
+import { and, eq, inArray, isNull, lt, or, sql } from "@framerfordevs/db/query";
 import {
   cmsCollection,
   cmsCollectionDeliveryConfig,
   cmsCollectionDeliveryField,
   cmsCollectionField,
   cmsCollectionSchemaHead,
+  cmsEnumOptionSourceIdentity,
   cmsSchemaRevision,
   cmsSchemaRevisionField,
   outboxEvent,
@@ -38,10 +39,8 @@ import {
   type CollectionFieldAuthoringNode,
   type CollectionFieldMutation,
   CollectionSchemaValidation,
-  ContractHash,
   currentCurrencyRegistryProfile,
   defaultFieldEditorMetadata,
-  GeneratedFormDefinition,
   PublishedSchemaRevision,
   SchemaHash,
   SchemaValidationIssue,
@@ -64,7 +63,6 @@ import {
   type ValidateCollectionSchemaInput,
 } from "../contracts/schemas";
 import { EditorLayout } from "../contracts/field-system";
-import type { AuthUserId } from "../contracts/platform";
 import {
   classifyCollectionSchemaChanges,
   fingerprintSchemaPublication,
@@ -76,16 +74,24 @@ import {
   validateCollectionDraft,
   type SchemaDraftState,
 } from "./schema-engine";
+import { canonicalizeSchemaDocument, compareCanonicalText } from "../lib/field-system-document";
 import { reconstructFieldTree, flattenFieldTree } from "../lib/field-tree";
 import { fieldSystemLimits, fieldSystemValidationProfile } from "../lib/field-system-profile";
-import { iso4217MinorUnits } from "../registry/iso-4217.generated";
+import { generatedFormDefinition, syntheticEditorLayout } from "../lib/generated-form-definition";
 import { matchInvalidationMappings } from "../lib/invalidation-mappings";
 import { canonicalizeEntryValue } from "../lib/entry-values";
+import {
+  cmsActorMatches,
+  cmsActorReferences,
+  cmsAuditActor,
+  normalizeCmsActor,
+  type CmsActorInput,
+} from "./cms-actor";
 import { isRoleAllowed } from "./policy";
 import {
   type ApplicationDb,
   type ApplicationExecutor,
-  authorizeUserProject,
+  authorizeCmsActorProject,
 } from "./project-access";
 
 function outcome<K extends string>(kind: K): { readonly kind: K } {
@@ -130,11 +136,107 @@ function toIso(value: Date): string {
   return value.toISOString();
 }
 
+const reservedSourceKeys = new Set([
+  "id",
+  "entry_id",
+  "collection_id",
+  "locale",
+  "schema_revision",
+  "publication_id",
+  "publication_sequence",
+  "created_at",
+  "updated_at",
+  "published_at",
+  "_meta",
+  "__proto__",
+  "prototype",
+  "constructor",
+]);
+
+function legacySourceKey(readable: string, stableId: string): string {
+  const suffix = stableId.replaceAll("-", "").slice(-12);
+  const stem = readable.slice(0, 50).replace(/[-_]$/u, "");
+  return `${stem || "item"}-${suffix}`;
+}
+
+function collectionSourceKey(apiKey: string, collectionId: string): string {
+  return reservedSourceKeys.has(apiKey) ? legacySourceKey(apiKey, collectionId) : apiKey;
+}
+
+function projectHostedStructureNode(
+  field: CollectionFieldDefinition,
+  fieldSourceKeys: ReadonlyMap<string, string>,
+  enumOptionSourceKeys: ReadonlyMap<string, string>,
+): unknown {
+  const children = field.children.map((child) =>
+    projectHostedStructureNode(child, fieldSourceKeys, enumOptionSourceKeys),
+  );
+  children.sort((left, right) =>
+    compareCanonicalText(canonicalizeSchemaDocument(left), canonicalizeSchemaDocument(right)),
+  );
+  const configuration =
+    field.kind === "enum"
+      ? {
+          options: field.configuration.options
+            .map((option) => ({
+              id: option.id,
+              sourceKey:
+                enumOptionSourceKeys.get(option.id) ?? legacySourceKey(option.value, option.id),
+              value: option.value,
+            }))
+            .sort((left, right) => compareCanonicalText(left.sourceKey, right.sourceKey)),
+          ...(field.configuration.default === undefined
+            ? {}
+            : { default: field.configuration.default }),
+        }
+      : field.configuration;
+  return {
+    id: field.id,
+    sourceKey: fieldSourceKeys.get(field.id) ?? legacySourceKey(field.apiKey ?? "item", field.id),
+    parentFieldId: field.parentFieldId,
+    nodeRole: field.nodeRole === "object_property" ? "property" : field.nodeRole,
+    apiKey: field.apiKey,
+    kind: field.kind,
+    required: field.required,
+    localization: field.localization,
+    deprecated: field.deprecated,
+    configuration,
+    children,
+  };
+}
+
+function hashHostedCollectionStructure(options: {
+  readonly collectionId: string;
+  readonly sourceKey: string;
+  readonly apiKey: string;
+  readonly fields: ReadonlyArray<CollectionFieldDefinition>;
+  readonly fieldSourceKeys: ReadonlyMap<string, string>;
+  readonly enumOptionSourceKeys: ReadonlyMap<string, string>;
+}): string {
+  const fields = options.fields.map((field) =>
+    projectHostedStructureNode(field, options.fieldSourceKeys, options.enumOptionSourceKeys),
+  );
+  fields.sort((left, right) =>
+    compareCanonicalText(canonicalizeSchemaDocument(left), canonicalizeSchemaDocument(right)),
+  );
+  const canonicalJson = canonicalizeSchemaDocument({
+    collection: {
+      id: options.collectionId,
+      sourceKey: options.sourceKey,
+      apiKey: options.apiKey,
+      fields,
+    },
+    version: 1,
+  });
+  return createHash("sha256").update(canonicalJson, "utf8").digest("hex");
+}
+
 interface CollectionRow {
   readonly id: string;
   readonly workspaceId: string;
   readonly projectId: string;
   readonly environmentId: string;
+  readonly sourceKey: string;
   readonly apiKey: string;
   readonly displayName: string;
   readonly description: string | null;
@@ -151,8 +253,9 @@ interface CollectionRow {
 }
 
 function collectionValue(row: CollectionRow) {
+  const { sourceKey: _, ...publicRow } = row;
   return {
-    ...row,
+    ...publicRow,
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
   };
@@ -163,6 +266,7 @@ const collectionProjection = {
   workspaceId: cmsCollection.workspaceId,
   projectId: cmsCollection.projectId,
   environmentId: cmsCollection.environmentId,
+  sourceKey: cmsCollection.sourceKey,
   apiKey: cmsCollection.apiKey,
   displayName: cmsCollection.displayName,
   description: cmsCollection.description,
@@ -182,7 +286,7 @@ function makeAuditValues(options: {
   readonly workspaceId: string;
   readonly projectId: string;
   readonly environmentId: string;
-  readonly actorId: AuthUserId;
+  readonly actorId: CmsActorInput;
   readonly action: string;
   readonly resourceId: string;
   readonly resourceType?: string;
@@ -192,8 +296,7 @@ function makeAuditValues(options: {
     workspaceId: options.workspaceId,
     projectId: options.projectId,
     environmentId: options.environmentId,
-    actorType: "user",
-    actorId: options.actorId,
+    ...cmsAuditActor(options.actorId),
     action: options.action,
     resourceType: options.resourceType ?? "cms_collection",
     resourceId: options.resourceId,
@@ -207,12 +310,18 @@ async function lockProjectShared(executor: ApplicationExecutor, projectId: strin
 
 async function authorizeEnvironment(
   executor: ApplicationExecutor,
-  actorId: AuthUserId,
+  actorId: CmsActorInput,
   projectId: string,
   environmentId: string,
   action: ProjectPermissionAction,
 ) {
-  const authorization = await authorizeUserProject(executor, actorId, projectId, action);
+  const authorization = await authorizeCmsActorProject(
+    executor,
+    normalizeCmsActor(actorId),
+    projectId,
+    environmentId,
+    action,
+  );
   if (authorization.kind !== "allowed") return authorization;
 
   const [environmentRow] = await executor
@@ -318,62 +427,6 @@ function decodeFieldTreeSync(
   return tree.roots;
 }
 
-function syntheticEditorLayout(fields: ReadonlyArray<CollectionFieldDefinition>) {
-  return Schema.decodeUnknownSync(EditorLayout)({
-    version: 1,
-    tabs: [
-      {
-        id: "00000000-0000-4000-8000-000000000001",
-        title: "Content",
-        description: null,
-        position: 0,
-        visibleToRoles: [
-          "owner",
-          "developer",
-          "content_admin",
-          "editor",
-          "reviewer",
-          "client_editor",
-          "read_only",
-        ],
-        groups: [
-          {
-            id: "00000000-0000-4000-8000-000000000002",
-            title: "Main",
-            description: null,
-            position: 0,
-            columns: 1,
-            visibleToRoles: [
-              "owner",
-              "developer",
-              "content_admin",
-              "editor",
-              "reviewer",
-              "client_editor",
-              "read_only",
-            ],
-            fields: [...fields].sort(compareFieldPosition).map((field, position) => ({
-              id: field.id,
-              fieldId: field.id,
-              position,
-              helpTextOverride: null,
-              visibleToRoles: field.editor.visibleToRoles,
-            })),
-          },
-        ],
-      },
-    ],
-    sidebarGroups: [],
-  });
-}
-
-function compareFieldPosition(
-  left: CollectionFieldDefinition,
-  right: CollectionFieldDefinition,
-): number {
-  return left.position - right.position || left.id.localeCompare(right.id);
-}
-
 function draftStateSync(
   collection: CollectionRow,
   rows: ReadonlyArray<typeof cmsCollectionField.$inferSelect>,
@@ -406,7 +459,7 @@ function decodeDraftSync(
   });
 }
 
-async function loadPublishedRevisionRows(
+export async function loadPublishedRevisionRows(
   executor: ApplicationExecutor,
   input: {
     readonly collectionId: string;
@@ -474,6 +527,7 @@ export function decodePublishedSchemaRevisionSync(rows: {
     potentiallyBreakingChangeCount: revision.potentiallyBreakingChangeCount,
     breakingChangeCount: revision.breakingChangeCount,
     publishedByUserId: revision.publishedByUserId,
+    publishedByCredentialId: revision.publishedByCredentialId,
     publishedAt: toIso(revision.publishedAt),
     fields,
     editorLayout,
@@ -827,109 +881,6 @@ function removeRootPlacement(layout: EditorLayout, fieldId: string): EditorLayou
   });
 }
 
-function projectFieldForRole(
-  field: CollectionFieldDefinition,
-  role: typeof ProjectRole.Type,
-): CollectionFieldDefinition | null {
-  if (!field.editor.visibleToRoles.includes(role)) return null;
-  const children: Array<CollectionFieldDefinition> = [];
-  for (const child of field.children) {
-    const projected = projectFieldForRole(child, role);
-    if (projected) children.push(projected);
-  }
-  return { ...field, children };
-}
-
-function projectLayoutForRole(
-  layout: EditorLayout,
-  visibleFieldIds: ReadonlySet<string>,
-  role: typeof ProjectRole.Type,
-): EditorLayout {
-  const tabs = layout.tabs
-    .filter((tab) => tab.visibleToRoles.includes(role))
-    .map((tab, tabPosition) => ({
-      ...tab,
-      position: tabPosition,
-      groups: tab.groups
-        .filter((group) => group.visibleToRoles.includes(role))
-        .map((group, groupPosition) => ({
-          ...group,
-          position: groupPosition,
-          fields: group.fields
-            .filter(
-              (placement) =>
-                placement.visibleToRoles.includes(role) && visibleFieldIds.has(placement.fieldId),
-            )
-            .map((placement, position) => ({ ...placement, position })),
-        })),
-    }))
-    .filter((tab) => tab.groups.length > 0);
-  const sidebarGroups = layout.sidebarGroups
-    .filter((group) => group.visibleToRoles.includes(role))
-    .map((group, position) => ({
-      ...group,
-      position,
-      fields: group.fields
-        .filter(
-          (placement) =>
-            placement.visibleToRoles.includes(role) && visibleFieldIds.has(placement.fieldId),
-        )
-        .map((placement, fieldPosition) => ({ ...placement, position: fieldPosition })),
-    }));
-  if (tabs.length === 0) return syntheticEditorLayout([]);
-  return Schema.decodeUnknownSync(EditorLayout)({
-    version: 1,
-    tabs,
-    sidebarGroups,
-  });
-}
-
-function generatedFormDefinition(options: {
-  readonly source: "draft" | "published";
-  readonly collectionId: string;
-  readonly revisionId: string | null;
-  readonly formatVersion: number;
-  readonly validationProfile: string;
-  readonly currencyRegistryProfile: string | null;
-  readonly contractHash: ContractHash;
-  readonly role: typeof ProjectRole.Type;
-  readonly fields: ReadonlyArray<CollectionFieldDefinition>;
-  readonly editorLayout: EditorLayout;
-}) {
-  const fields: Array<CollectionFieldDefinition> = [];
-  for (const field of options.fields) {
-    const projected = projectFieldForRole(field, options.role);
-    if (projected) fields.push(projected);
-  }
-  const flattened = flattenFieldTree(fields);
-  const fieldIds = new Set(flattened.map((field) => field.id));
-  const canEdit = isRoleAllowed(options.role, "content.write");
-  const editableFieldIds = canEdit
-    ? flattened
-        .filter((field) => field.editor.editableByRoles.includes(options.role))
-        .map((field) => field.id)
-    : [];
-  const currencies = new Set<string>();
-  for (const field of flattened) {
-    if (field.kind === "money") {
-      for (const currency of field.configuration.currencies) currencies.add(currency);
-    }
-  }
-  const currencyMinorUnits: Record<string, number> = {};
-  for (const currency of [...currencies].sort()) {
-    const minorUnit = Reflect.get(iso4217MinorUnits, currency);
-    if (typeof minorUnit === "number") currencyMinorUnits[currency] = minorUnit;
-  }
-  return Schema.decodeUnknownSync(GeneratedFormDefinition)({
-    ...options,
-    canEdit,
-    fields,
-    editableFieldIds,
-    editorLayout: projectLayoutForRole(options.editorLayout, fieldIds, options.role),
-    currencyMinorUnits,
-  });
-}
-
 async function lockCollection(executor: ApplicationExecutor, collectionId: string) {
   await executor.execute(sql`select id from cms_collection where id = ${collectionId} for update`);
 }
@@ -943,13 +894,15 @@ async function lockActiveFields(executor: ApplicationExecutor, collectionId: str
 async function bumpDraft(
   executor: ApplicationExecutor,
   collectionId: string,
-  actorId: AuthUserId,
+  actorId: CmsActorInput,
   now: Date,
 ) {
+  const actor = cmsActorReferences(actorId);
   await executor
     .update(cmsCollectionSchemaHead)
     .set({
-      changedByUserId: actorId,
+      changedByUserId: actor.userId,
+      changedByCredentialId: actor.credentialId,
       draftVersion: sql`${cmsCollectionSchemaHead.draftVersion} + 1`,
       updatedAt: now,
     })
@@ -991,7 +944,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
 
   return {
     listCollections: Effect.fn("SchemaRepository.listCollections")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: ListCollectionsInput,
     ) {
       const cursor =
@@ -1035,7 +988,10 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 cursorCondition,
               ),
             )
-            .orderBy(desc(cmsCollection.createdAt), desc(cmsCollection.id))
+            .orderBy(
+              sql`${cmsCollection.createdAt} desc nulls last`,
+              sql`${cmsCollection.id} desc nulls last`,
+            )
             .limit(input.limit + 1);
           return outcomeWith("success", { rows });
         },
@@ -1064,7 +1020,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     createCollection: Effect.fn("SchemaRepository.createCollection")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: CreateCollectionInput,
       now: Date,
       requestId: string,
@@ -1085,17 +1041,22 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
             if (authorization.kind === "cms_required") return outcome("cms_required");
             if (authorization.access.project.archivedAt) return outcome("invalid_state");
 
+            const collectionId = randomUUID();
             const [collection] = await transaction
               .insert(cmsCollection)
               .values({
+                id: collectionId,
                 workspaceId: authorization.access.project.workspaceId,
                 projectId: input.projectId,
                 environmentId: input.environmentId,
+                sourceKey: collectionSourceKey(input.apiKey, collectionId),
                 apiKey: input.apiKey,
                 displayName: input.displayName,
                 description: input.description,
-                createdByUserId: actorId,
-                changedByUserId: actorId,
+                createdByUserId: cmsActorReferences(actorId).userId,
+                createdByCredentialId: cmsActorReferences(actorId).credentialId,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 createdAt: now,
                 updatedAt: now,
               })
@@ -1106,7 +1067,8 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               workspaceId: collection.workspaceId,
               projectId: collection.projectId,
               environmentId: collection.environmentId,
-              changedByUserId: actorId,
+              changedByUserId: cmsActorReferences(actorId).userId,
+              changedByCredentialId: cmsActorReferences(actorId).credentialId,
               updatedAt: now,
             });
             await transaction.insert(cmsCollectionDeliveryConfig).values({
@@ -1116,7 +1078,8 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               environmentId: collection.environmentId,
               access: "protected",
               version: 1,
-              changedByUserId: actorId,
+              changedByUserId: cmsActorReferences(actorId).userId,
+              changedByCredentialId: cmsActorReferences(actorId).credentialId,
               createdAt: now,
               updatedAt: now,
             });
@@ -1156,7 +1119,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     getCollection: Effect.fn("SchemaRepository.getCollection")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: GetCollectionInput,
     ) {
       const result = yield* Effect.tryPromise({
@@ -1197,7 +1160,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     updateCollection: Effect.fn("SchemaRepository.updateCollection")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: UpdateCollectionInput,
       now: Date,
       requestId: string,
@@ -1238,7 +1201,8 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               .set({
                 displayName: input.displayName,
                 description: input.description,
-                changedByUserId: actorId,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 version: sql`${cmsCollection.version} + 1`,
                 updatedAt: now,
               })
@@ -1246,7 +1210,8 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
             await transaction
               .update(cmsCollectionSchemaHead)
               .set({
-                changedByUserId: actorId,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 draftVersion: sql`${cmsCollectionSchemaHead.draftVersion} + 1`,
                 updatedAt: now,
               })
@@ -1282,7 +1247,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     getDraft: Effect.fn("SchemaRepository.getDraft")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: GetCollectionDraftInput,
     ) {
       const result = yield* Effect.tryPromise({
@@ -1318,7 +1283,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     createField: Effect.fn("SchemaRepository.createField")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: CreateCollectionFieldInput,
       now: Date,
       requestId: string,
@@ -1444,6 +1409,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 projectId: collection.projectId,
                 environmentId: collection.environmentId,
                 collectionId: collection.id,
+                sourceKey: legacySourceKey(input.field.apiKey ?? "item", fieldId),
                 parentFieldId: input.parentFieldId,
                 nodeRole,
                 referenceCollectionId: targetCollectionId,
@@ -1456,8 +1422,10 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 position: candidate.position,
                 editorMetadata: editorMetadataValue(editor),
                 configuration: input.field.configuration,
-                createdByUserId: actorId,
-                changedByUserId: actorId,
+                createdByUserId: cmsActorReferences(actorId).userId,
+                createdByCredentialId: cmsActorReferences(actorId).credentialId,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 createdAt: now,
                 updatedAt: now,
               })
@@ -1515,7 +1483,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     updateField: Effect.fn("SchemaRepository.updateField")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: UpdateCollectionFieldInput,
       now: Date,
       requestId: string,
@@ -1641,7 +1609,8 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 deprecated: input.field.deprecated,
                 editorMetadata: editorMetadataValue(editor),
                 configuration: input.field.configuration,
-                changedByUserId: actorId,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 updatedAt: now,
               })
               .where(
@@ -1699,7 +1668,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     replaceFields: Effect.fn("SchemaRepository.replaceFields")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: ReplaceCollectionDraftFieldsInput,
       now: Date,
       requestId: string,
@@ -1780,9 +1749,11 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 .update(cmsCollectionField)
                 .set({
                   removedAt: now,
-                  removedByUserId: actorId,
+                  removedByUserId: cmsActorReferences(actorId).userId,
+                  removedByCredentialId: cmsActorReferences(actorId).credentialId,
                   position: null,
-                  changedByUserId: actorId,
+                  changedByUserId: cmsActorReferences(actorId).userId,
+                  changedByCredentialId: cmsActorReferences(actorId).credentialId,
                   updatedAt: now,
                 })
                 .where(inArray(cmsCollectionField.id, [...currentIds]));
@@ -1801,7 +1772,8 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 position: field.position,
                 editorMetadata: editorMetadataValue(field.editor),
                 configuration: field.configuration,
-                changedByUserId: actorId,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 removedAt: null,
                 removedByUserId: null,
                 updatedAt: now,
@@ -1823,8 +1795,10 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                   projectId: collection.projectId,
                   environmentId: collection.environmentId,
                   collectionId: collection.id,
+                  sourceKey: legacySourceKey(field.apiKey ?? "item", field.id),
                   ...values,
-                  createdByUserId: actorId,
+                  createdByUserId: cmsActorReferences(actorId).userId,
+                  createdByCredentialId: cmsActorReferences(actorId).credentialId,
                   createdAt: now,
                 });
               }
@@ -1874,7 +1848,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     removeField: Effect.fn("SchemaRepository.removeField")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: RemoveCollectionFieldInput,
       now: Date,
       requestId: string,
@@ -1971,9 +1945,11 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               .update(cmsCollectionField)
               .set({
                 removedAt: now,
-                removedByUserId: actorId,
+                removedByUserId: cmsActorReferences(actorId).userId,
+                removedByCredentialId: cmsActorReferences(actorId).credentialId,
                 position: null,
-                changedByUserId: actorId,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 updatedAt: now,
               })
               .where(inArray(cmsCollectionField.id, [...removedIds]));
@@ -1982,7 +1958,8 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 .update(cmsCollectionField)
                 .set({
                   position: (row.position ?? 0) - 1,
-                  changedByUserId: actorId,
+                  changedByUserId: cmsActorReferences(actorId).userId,
+                  changedByCredentialId: cmsActorReferences(actorId).credentialId,
                   updatedAt: now,
                 })
                 .where(eq(cmsCollectionField.id, row.id));
@@ -2030,7 +2007,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     reorderFields: Effect.fn("SchemaRepository.reorderFields")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: ReorderCollectionFieldsInput,
       now: Date,
       requestId: string,
@@ -2082,7 +2059,12 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
             if (siblings[0]?.nodeRole === "list_item") return outcome("conflict");
             await transaction
               .update(cmsCollectionField)
-              .set({ removedAt: now, removedByUserId: actorId, position: null })
+              .set({
+                removedAt: now,
+                removedByUserId: cmsActorReferences(actorId).userId,
+                removedByCredentialId: cmsActorReferences(actorId).credentialId,
+                position: null,
+              })
               .where(inArray(cmsCollectionField.id, currentIds));
             for (const [position, fieldId] of input.fieldIds.entries()) {
               await transaction
@@ -2090,8 +2072,10 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 .set({
                   removedAt: null,
                   removedByUserId: null,
+                  removedByCredentialId: null,
                   position,
-                  changedByUserId: actorId,
+                  changedByUserId: cmsActorReferences(actorId).userId,
+                  changedByCredentialId: cmsActorReferences(actorId).credentialId,
                   updatedAt: now,
                 })
                 .where(eq(cmsCollectionField.id, fieldId));
@@ -2130,7 +2114,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     updateEditorLayout: Effect.fn("SchemaRepository.updateEditorLayout")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: UpdateEditorLayoutInput,
       now: Date,
       requestId: string,
@@ -2203,7 +2187,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     getPublishedRevision: Effect.fn("SchemaRepository.getPublishedRevision")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: GetPublishedSchemaRevisionInput,
     ) {
       const result = yield* Effect.tryPromise({
@@ -2238,7 +2222,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     getLatestPublished: Effect.fn("SchemaRepository.getLatestPublished")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: GetLatestPublishedSchemaInput,
     ) {
       const result = yield* Effect.tryPromise({
@@ -2279,7 +2263,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     getDraftForm: Effect.fn("SchemaRepository.getDraftForm")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: GetDraftGeneratedFormInput,
     ) {
       const result = yield* Effect.tryPromise({
@@ -2311,6 +2295,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               currencyRegistryProfile: draft.currencyRegistryProfile,
               contractHash: draft.contractHash,
               role: Schema.decodeUnknownSync(ProjectRole)(authorization.access.role),
+              canEdit: isRoleAllowed(authorization.access.role, "content.write"),
               fields: draft.fields,
               editorLayout: draft.editorLayout,
             }),
@@ -2326,7 +2311,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     getPublishedForm: Effect.fn("SchemaRepository.getPublishedForm")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: GetPublishedGeneratedFormInput,
     ) {
       const result = yield* Effect.tryPromise({
@@ -2360,6 +2345,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               currencyRegistryProfile: revision.currencyRegistryProfile,
               contractHash: revision.contractHash,
               role: Schema.decodeUnknownSync(ProjectRole)(authorization.access.role),
+              canEdit: isRoleAllowed(authorization.access.role, "content.write"),
               fields: revision.fields,
               editorLayout: revision.editorLayout,
             }),
@@ -2375,7 +2361,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     validateSchema: Effect.fn("SchemaRepository.validateSchema")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: ValidateCollectionSchemaInput,
     ) {
       const result = yield* Effect.tryPromise({
@@ -2427,7 +2413,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
     }),
 
     publishSchema: Effect.fn("SchemaRepository.publishSchema")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: PublishCollectionSchemaInput,
       now: Date,
       requestId: string,
@@ -2463,6 +2449,13 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               )
               .limit(1);
             if (existing) {
+              if (
+                !cmsActorMatches(actorId, {
+                  userId: existing.publishedByUserId,
+                  credentialId: existing.publishedByCredentialId,
+                })
+              )
+                return outcome("conflict");
               const expected = fingerprintSchemaPublication(
                 input,
                 Schema.decodeUnknownSync(SchemaHash)(existing.schemaHash),
@@ -2483,10 +2476,8 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
             )
               return outcome("version_conflict");
             await lockActiveFields(transaction, input.collectionId);
-            const draft = decodeDraftSync(
-              collection,
-              await loadActiveFieldRows(transaction, input.collectionId),
-            );
+            const activeFieldRows = await loadActiveFieldRows(transaction, input.collectionId);
+            const draft = decodeDraftSync(collection, activeFieldRows);
             const validation = validateCollectionDraft(draft, "publication");
             if (!validation.valid)
               return outcomeWith("schema_invalid", { issues: validation.issues });
@@ -2531,8 +2522,57 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
             if (deliveryIssues.length > 0) {
               return outcomeWith("schema_invalid", { issues: deliveryIssues.slice(0, 50) });
             }
+            const enumOptionIdentityRows = await transaction
+              .select()
+              .from(cmsEnumOptionSourceIdentity)
+              .where(eq(cmsEnumOptionSourceIdentity.collectionId, collection.id));
+            const enumOptions = flattenedFields.flatMap((field) =>
+              field.kind === "enum"
+                ? field.configuration.options.map((option) => ({
+                    ...option,
+                    fieldId: field.id,
+                  }))
+                : [],
+            );
+            const currentEnumOptionIds = new Set<string>(enumOptions.map((option) => option.id));
+            const retiredCurrentOption = enumOptionIdentityRows.find(
+              (identity) => identity.retiredAt !== null && currentEnumOptionIds.has(identity.id),
+            );
+            if (retiredCurrentOption) {
+              return outcomeWith("schema_invalid", {
+                issues: [
+                  schemaInvalidIssue(
+                    "fields.configuration.options",
+                    "source_identity_retired",
+                    "A retired enum option identity cannot be reused.",
+                  ),
+                ],
+              });
+            }
+            const activeEnumOptionSourceKeys = new Map<string, string>(
+              enumOptionIdentityRows
+                .filter((identity) => identity.retiredAt === null)
+                .map((identity) => [identity.id, identity.sourceKey]),
+            );
+            const newEnumOptions = enumOptions
+              .filter((option) => !activeEnumOptionSourceKeys.has(option.id))
+              .map((option) => ({
+                ...option,
+                sourceKey: legacySourceKey(option.value, option.id),
+              }));
+            for (const option of newEnumOptions) {
+              activeEnumOptionSourceKeys.set(option.id, option.sourceKey);
+            }
             const schemaHash = hashCollectionDraft(draft);
             const contractHash = hashCollectionContract(draft);
+            const structureHash = hashHostedCollectionStructure({
+              collectionId: collection.id,
+              sourceKey: collection.sourceKey,
+              apiKey: collection.apiKey,
+              fields: draft.fields,
+              fieldSourceKeys: new Map(activeFieldRows.map((field) => [field.id, field.sourceKey])),
+              enumOptionSourceKeys: activeEnumOptionSourceKeys,
+            });
             const publishedRows =
               collection.currentPublishedRevisionId === null
                 ? null
@@ -2549,6 +2589,37 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               return outcomeWith("acknowledgement_required", {
                 changes: requiredAcknowledgementChanges(changes),
               });
+            if (newEnumOptions.length > 0) {
+              await transaction.insert(cmsEnumOptionSourceIdentity).values(
+                newEnumOptions.map((option) => ({
+                  id: option.id,
+                  workspaceId: collection.workspaceId,
+                  projectId: collection.projectId,
+                  environmentId: collection.environmentId,
+                  collectionId: collection.id,
+                  fieldId: option.fieldId,
+                  sourceKey: option.sourceKey,
+                  createdByUserId: cmsActorReferences(actorId).userId,
+                  createdByCredentialId: cmsActorReferences(actorId).credentialId,
+                  createdAt: now,
+                })),
+              );
+            }
+            const activePersistedOptionIds = enumOptionIdentityRows
+              .filter(
+                (identity) => identity.retiredAt === null && !currentEnumOptionIds.has(identity.id),
+              )
+              .map((identity) => identity.id);
+            if (activePersistedOptionIds.length > 0) {
+              await transaction
+                .update(cmsEnumOptionSourceIdentity)
+                .set({
+                  retiredAt: now,
+                  retiredByUserId: cmsActorReferences(actorId).userId,
+                  retiredByCredentialId: cmsActorReferences(actorId).credentialId,
+                })
+                .where(inArray(cmsEnumOptionSourceIdentity.id, activePersistedOptionIds));
+            }
             const sequence = collection.currentPublishedSequence + 1;
             const [revisionRow] = await transaction
               .insert(cmsSchemaRevision)
@@ -2567,12 +2638,14 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 currencyRegistryProfile: draft.currencyRegistryProfile,
                 editorLayout: editorLayoutValue(draft.editorLayout),
                 schemaHash,
+                structureHash,
                 commandId: input.commandId,
                 commandFingerprint: fingerprintSchemaPublication(input, schemaHash),
                 nonBreakingChangeCount: changes.nonBreakingCount,
                 potentiallyBreakingChangeCount: changes.potentiallyBreakingCount,
                 breakingChangeCount: changes.breakingCount,
-                publishedByUserId: actorId,
+                publishedByUserId: cmsActorReferences(actorId).userId,
+                publishedByCredentialId: cmsActorReferences(actorId).credentialId,
                 publishedAt: now,
               })
               .returning();
@@ -2610,7 +2683,9 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 draftBaseRevisionId: revisionRow.id,
                 currentPublishedRevisionId: revisionRow.id,
                 currentPublishedSequence: sequence,
-                changedByUserId: actorId,
+                currentPublishedStructureHash: structureHash,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 updatedAt: now,
               })
               .where(eq(cmsCollectionSchemaHead.collectionId, collection.id));

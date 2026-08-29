@@ -697,13 +697,13 @@ Make public integrations discoverable and strongly typed while detecting contrac
 
 ## Milestone 13 — Code-first schema and content authoring with a local agent-first editor
 
-**Status:** The developer approved `decisions/m13-code-first-authoring-and-local-editor-design.md` on 2026-08-23 without authorizing implementation. The critical dependency/performance evidence and second-approval gate must complete before separate implementation authorization; no feature code, migration, package publication, or dashboard-builder removal is authorized.
+**Status:** Complete and developer-accepted. Final `pnpm run ready` passes 1,184 tests, 15 type-check tasks, contract drift checks, formatting, lint, structure, coverage, and eight builds after dashboard structure-builder retirement and the final locale-authority correction. All 13 manual scenarios, observability/redaction, query/concurrency/rollback, fuzz, measured load, controlled real-browser, documentation, Changeset, package, Docker, residue, and database-invariant gates are complete. Legacy dashboard schema mutations return stable `410 DASHBOARD_SCHEMA_AUTHORING_RETIRED` while content, Presentation, Delivery, navigation, and read-only structure authority remain. QuickJS issue #255 continues to block only Tier 2 production/default enablement and hard-memory proof. OAuth rollout, package publication/versioning, production configuration, commit, and deployment remain separate developer-controlled release actions.
 
 ### Goal
 
 Make schema and content authoring agent-first without weakening the existing versioned schema, validation, publication, and concurrency authorities.
 
-### Proposed direction — not yet approved design
+### Approved direction — phased implementation
 
 - Define collection schemas as code in the developer's repository.
 - Push schema changes through the existing validate, classify, breaking-change acknowledgment, and publish lifecycle.
@@ -713,12 +713,32 @@ Make schema and content authoring agent-first without weakening the existing ver
 - Preserve the database as content authority and the published code schema as collection-structure authority.
 - Preserve server-side validation, optimistic concurrency, immutable schema revisions, stable IDs, exact numeric handling, independent locale publication, audits, and outbox events.
 
-### Design gate
+### Acceptance result
 
-- Do not treat the proposal as an implementation design or reopen M9–M12.
-- After M12 approval and completion, re-run full discovery against then-current requirements, rules, code, tests, package configuration, migrations, decisions, learnings, and applicable skills.
-- Produce M13 deliverables, automated success criteria, manual review, security/performance/observability gates, migration impact, and an explicit approval-requested list.
-- Do not remove the dashboard schema builder, add write APIs/scopes, publish packages, or implement the local editor before the M13 design receives explicit developer approval.
+The approved design is `knowledge_base/decisions/m13-code-first-authoring-and-local-editor-design.md`; the exact active checklist is `Milestone 13 remaining-work reconciliation` in `knowledge_base/progress.md`.
+
+- `[x]` Complete schema, presentation, exact-locale content/publication, SDK, CLI, shared-form, local-editor, and strict Authoring transport implementation.
+- `[x]` Complete authorization, redaction, observability, concurrency, failure injection, query plans, parser fuzz/termination, load/bundle, package, Docker, and controlled real-browser evidence.
+- `[x]` Complete task-oriented documentation, compiled examples, package READMEs, M13 Changeset, exact public artifacts, and current full readiness.
+- `[x]` Complete developer-approved transactional cleanup of the exact canceled-run fixture graph and verify zero matching residue, zero immutable content-publication artifacts removed, clean database invariants, current outbox projection, and a healthy restarted worker.
+- `[x]` Complete and accept manual scenarios 1–2: clean dashboard-authored export/generation and presentation-only publication preserve readable source identity plus structure/contract/type-shape authority with separate config-v2 lock ownership.
+- `[x]` Refresh readiness/package/image evidence after the Tooling optional-value JSON/hash-parity and config-v2 lock-path fixes found during scenario 2; the historical pre-retirement 1,192-test run and post-run residue/invariants pass, followed by the authoritative final 1,184-test retirement baseline.
+- `[x]` Complete and accept manual scenario 3: one code-only optional field plans/pushes with stable server identity and management-credential attribution, then renders, saves, and publishes through both local editor and dashboard in hosted locale `en`. Resolve invalid hardcoded locale defaulting and false 502 mapping for real typed retry-journal conflicts.
+- `[x]` Complete and accept manual scenario 4: an API-key rename preserves stable field identity, fails closed without the one exact breaking-change acknowledgement, and publishes only after receiving that exact acknowledgement.
+- `[x]` Complete and accept manual scenario 5: two new collections with reciprocal references resolve in one plan/apply, retain nullable candidate authority until allocation, persist exact server-generated target identities atomically, and remain usable through the retained dashboard. Code-created collection Delivery configuration and credential-aware management attribution are corrected and exactly repaired.
+- `[x]` Complete and accept manual scenario 6: local-only OAuth proves schema/read/write/publish grants with honest user attribution, while a schema-read-only management credential succeeds only for its exact read operation and fails non-enumeratingly elsewhere. Restore OAuth disabled and clean only exact review authority after logout.
+- `[x]` Complete and accept manual scenario 7: CLI and standalone SDK script create/update/publish/unpublish exact-locale content; Delivery visibility follows publication state and real signed content-free webhook events succeed through an approved temporary public tunnel.
+- `[x]` Complete and accept manual scenario 8: a concurrent dashboard winner causes an optimistic local-editor conflict while preserving unsaved local input; explicit reload and subsequent local recovery save succeed.
+- `[x]` Complete and accept manual scenario 9: an unpushed local field renders live while all writes remain drift-disabled, then disappears and restores matched write authority after local rollback without hosted mutation.
+- `[x]` Complete and accept manual scenario 10: browser network/storage, local files/assets, process arguments, and initial OS environment contain no hosted credential/content authority; management launch uses bounded post-preparation stdin rather than an exported long-lived process environment.
+- `[x]` Complete and accept manual scenario 12: the live task-oriented portal coherently leads from schema code through push, secure local editing, scripted exact-locale publication, Delivery/webhook verification, and troubleshooting without making raw contracts the primary journey.
+- `[x]` Complete and accept manual scenario 13: explicit credential-free Tier 2 composition deterministically emits the accepted Tier 1 bytes and content-safe manifest, stale inputs block authenticated use pre-auth, and isolation/adversarial evidence passes while the runtime remains experimental/default-off with `memoryLimitHard: false`.
+- `[x]` Record accepted parity evidence from manual scenarios 1–10 and 12–13.
+- `[x]` Obtain explicit dashboard-builder retirement approval after parity, remove dashboard collection/field/layout/schema-publication mutation controls, and enforce stable authenticated `410 DASHBOARD_SCHEMA_AUTHORING_RETIRED` responses without repository mutation.
+- `[x]` Complete and accept manual scenario 11 last: confirm structure authoring is absent while content, Presentation, Delivery, navigation, administration, and read-only current-structure authority remain intact.
+- `[x]` Keep Tier 2 experimental/default-off with `memoryLimitHard: false`; do not claim the blocked hard-memory proof.
+- `[A]` Developer accepted and closed Milestone 13.
+- `[x]` Keep OAuth rollout, package publication/versioning, production configuration, commit, and deployment outside milestone acceptance as separate developer-controlled release actions.
 
 ---
 

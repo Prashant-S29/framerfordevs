@@ -16,6 +16,11 @@ import { CliConfig } from "./schema";
 export const cliConfigFileName = "framerfordevs.config.json";
 const maximumConfigBytes = 16 * 1_024;
 
+/** Keeps generated-consumer ownership separate from code-authoring authority in config v2. */
+export function generationLockFileName(config: CliConfig) {
+  return config.schemaVersion === 2 ? "generated.lock.json" : "schema.lock.json";
+}
+
 export interface CliConfigFileSystemService {
   readonly exists: (path: string) => Effect.Effect<boolean, CliFileSystemError>;
   readonly readUtf8: (path: string) => Effect.Effect<string, CliFileSystemError>;
@@ -95,9 +100,33 @@ export const loadCliConfig = Effect.fn("CliConfig.load")(function* (startDirecto
     Effect.mapError(() => CliConfigInvalidError.make()),
   );
   const directory = dirname(path);
-  const outputDirectory = resolve(directory, config.output);
-  if (outputDirectory !== directory && !outputDirectory.startsWith(`${directory}${sep}`)) {
+  const resolveInsideProject = (relativePath: string) => {
+    const absolutePath = resolve(directory, relativePath);
+    return absolutePath === directory || absolutePath.startsWith(`${directory}${sep}`)
+      ? absolutePath
+      : null;
+  };
+  const outputDirectory = resolveInsideProject(config.output);
+  const schemaPath = config.schemaVersion === 2 ? resolveInsideProject(config.schema) : null;
+  const schemaBuildEntryPath =
+    config.schemaVersion === 2 && config.schemaBuild !== undefined
+      ? resolveInsideProject(config.schemaBuild.entry)
+      : null;
+  if (
+    outputDirectory === null ||
+    (config.schemaVersion === 2 && schemaPath === null) ||
+    (config.schemaVersion === 2 &&
+      config.schemaBuild !== undefined &&
+      schemaBuildEntryPath === null)
+  ) {
     return yield* CliConfigInvalidError.make();
   }
-  return { path, directory, outputDirectory, config };
+  return {
+    path,
+    directory,
+    outputDirectory,
+    schemaPath,
+    schemaBuildEntryPath,
+    config,
+  };
 });

@@ -1,6 +1,16 @@
-import { assert, describe, layer } from "@effect/vitest";
+import { assert, describe, it, layer } from "@effect/vitest";
 import { Effect, Exit, Layer, Schema } from "effect";
 
+import {
+  AuthoringCollectionPresentation,
+  AuthoringPresentationRevision,
+  AuthoringPresentationSnapshot,
+  AuthoringPublishPresentationResult,
+} from "../contracts/authoring-presentation";
+import {
+  GetCollectionPresentationInput,
+  PublishCollectionPresentationInput,
+} from "../contracts/management-presentation";
 import {
   CollectionDraftSchema,
   CollectionSchemaValidation,
@@ -14,12 +24,19 @@ import {
   ValidateCollectionSchemaInput,
 } from "../contracts/schemas";
 import { TelemetryLive } from "../observability/telemetry";
+import {
+  AuthoringPresentationRepository,
+  makeAuthoringPresentationRepository,
+} from "../services/authoring-presentation-repository";
 import { SchemaRepository, makeSchemaRepository } from "../services/schema-repository";
 import {
   getCollectionDraft,
+  getCollectionPresentation,
   getLatestPublishedSchema,
   getPublishedSchemaRevision,
+  publishCollectionPresentation,
   publishCollectionSchema,
+  rejectRetiredDashboardSchemaAuthoring,
   replaceCollectionDraftFields,
   validateCollectionSchema,
 } from "./schemas";
@@ -141,6 +158,7 @@ const revision = Schema.decodeUnknownSync(PublishedSchemaRevision)({
   potentiallyBreakingChangeCount: 1,
   breakingChangeCount: 0,
   publishedByUserId: "user-1",
+  publishedByCredentialId: null,
   publishedAt: timestamp,
   fields: draft.fields,
   editorLayout,
@@ -160,9 +178,45 @@ const validation = CollectionSchemaValidation.make({
   }),
 });
 
+const presentation = Schema.decodeUnknownSync(AuthoringCollectionPresentation)({
+  displayName: "Articles",
+  description: null,
+  fields: [
+    {
+      fieldId,
+      displayLabel: "Title",
+      position: 0,
+      editor,
+      enumOptions: [],
+    },
+  ],
+  editorLayout,
+});
+const presentationRevision = Schema.decodeUnknownSync(AuthoringPresentationRevision)({
+  collectionId,
+  revisionId,
+  previousRevisionId: null,
+  sequence: 1,
+  schemaHash: "a".repeat(64),
+  structureHash: "c".repeat(64),
+  contractHash: "b".repeat(64),
+  publishedAt: timestamp,
+});
+const presentationSnapshot = AuthoringPresentationSnapshot.make({
+  revision: presentationRevision,
+  presentation,
+});
+const presentationResult = AuthoringPublishPresentationResult.make({
+  commandId: revision.commandId,
+  replayed: false,
+  noOp: false,
+  ...presentationSnapshot,
+});
+
 const calls: Array<string> = [];
 const RepositoryTest = Layer.succeed(SchemaRepository, {
   ...makeSchemaRepository(),
+  getCollection: () => Effect.sync(() => (calls.push("getCollection"), draft.collection)),
   getDraft: () => Effect.sync(() => (calls.push("getDraft"), draft)),
   validateSchema: () => Effect.sync(() => (calls.push("validateSchema"), validation)),
   publishSchema: () => Effect.sync(() => (calls.push("publishSchema"), revision)),
@@ -170,9 +224,27 @@ const RepositoryTest = Layer.succeed(SchemaRepository, {
   getLatestPublished: () => Effect.sync(() => (calls.push("getLatestPublished"), revision)),
   getPublishedRevision: () => Effect.sync(() => (calls.push("getPublishedRevision"), revision)),
 });
-const OperationTest = Layer.merge(RepositoryTest, TelemetryLive);
+const PresentationRepositoryTest = Layer.succeed(AuthoringPresentationRepository, {
+  ...makeAuthoringPresentationRepository(),
+  get: () => Effect.sync(() => (calls.push("getPresentation"), presentationSnapshot)),
+  publish: () => Effect.sync(() => (calls.push("publishPresentation"), presentationResult)),
+});
+const OperationTest = Layer.mergeAll(RepositoryTest, PresentationRepositoryTest, TelemetryLive);
 
 describe("schema operations", () => {
+  it.effect("returns stable code-authority failure for retired dashboard mutations", () =>
+    Effect.gen(function* () {
+      const exit = yield* Effect.exit(rejectRetiredDashboardSchemaAuthoring());
+      assert.isTrue(Exit.isFailure(exit));
+      if (Exit.isFailure(exit)) {
+        assert.match(
+          JSON.stringify(exit.cause.toJSON()),
+          /DashboardSchemaAuthoringRetiredFailure/u,
+        );
+      }
+    }),
+  );
+
   layer(OperationTest)((it) => {
     it.effect("forwards schema lifecycle workflows through a replaceable repository", () =>
       Effect.gen(function* () {
@@ -195,6 +267,21 @@ describe("schema operations", () => {
             fields: [],
           }),
           "request-schema-replace",
+        );
+        yield* getCollectionPresentation(
+          "user-1",
+          yield* Schema.decodeUnknown(GetCollectionPresentationInput)(scope),
+        );
+        yield* publishCollectionPresentation(
+          "user-1",
+          yield* Schema.decodeUnknown(PublishCollectionPresentationInput)({
+            ...scope,
+            commandId,
+            expectedRevisionId: revisionId,
+            expectedSequence: 1,
+            presentation,
+          }),
+          "request-presentation-operation",
         );
         yield* publishCollectionSchema(
           "user-1",
@@ -220,6 +307,10 @@ describe("schema operations", () => {
           "getDraft",
           "validateSchema",
           "replaceFields",
+          "getCollection",
+          "getPresentation",
+          "getCollection",
+          "publishPresentation",
           "publishSchema",
           "getLatestPublished",
           "getPublishedRevision",

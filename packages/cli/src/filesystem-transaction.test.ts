@@ -70,13 +70,18 @@ async function exists(path: string) {
 function commit(
   root: string,
   generation: GenerationPlan,
-  options?: { force?: boolean; stage?: GeneratorCommitStage },
+  options?: {
+    force?: boolean;
+    stage?: GeneratorCommitStage;
+    lockFileName?: "schema.lock.json" | "generated.lock.json";
+  },
 ) {
   return commitGenerationPlan({
     rootDirectory: root,
     outputDirectory: join(root, "src", "framerfordevs"),
     plan: generation,
     transactionId: options?.stage ?? "success",
+    ...(options?.lockFileName === undefined ? {} : { lockFileName: options.lockFileName }),
     ...(options?.force === undefined ? {} : { force: options.force }),
     ...(options?.stage === undefined
       ? {}
@@ -117,6 +122,29 @@ describe("generator filesystem transaction", () => {
 
       await assertPlanInstalled(root, generation);
       assert.deepEqual(await readdir(join(root, "src")), ["framerfordevs"]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps config-v2 generated ownership separate from authoring lock authority", async () => {
+    const root = await temporaryDirectory();
+    try {
+      const authoringLock = '{"lockVersion":2,"authority":"preserve"}\n';
+      await mkdir(join(root, ".framerfordevs"), { recursive: true });
+      await writeFile(join(root, ".framerfordevs", "schema.lock.json"), authoringLock, "utf8");
+      const generation = plan("v2");
+
+      await Effect.runPromise(commit(root, generation, { lockFileName: "generated.lock.json" }));
+
+      assert.strictEqual(
+        await readFile(join(root, ".framerfordevs", "schema.lock.json"), "utf8"),
+        authoringLock,
+      );
+      assert.strictEqual(
+        await readFile(join(root, ".framerfordevs", "generated.lock.json"), "utf8"),
+        generation.lockBytes,
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }

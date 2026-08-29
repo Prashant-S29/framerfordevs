@@ -6,6 +6,8 @@ describe("route structure", () => {
   it("keeps schema, entry, Preview, and Webhooks workspaces outside the project detail tree", () => {
     const router = getRouter();
     const schemaRoute = router.routesById["/_auth/projects/$projectId_/collections/$collectionId"];
+    const presentationRoute =
+      router.routesById["/_auth/projects/$projectId_/collections/$collectionId_/presentation"];
     const entriesRoute =
       router.routesById["/_auth/projects/$projectId_/collections/$collectionId_/entries"];
     const editorRoute =
@@ -17,6 +19,9 @@ describe("route structure", () => {
     const webhooksRoute = router.routesById["/_auth/projects/$projectId_/webhooks"];
 
     expect(schemaRoute.fullPath).toBe("/projects/$projectId/collections/$collectionId");
+    expect(presentationRoute.fullPath).toBe(
+      "/projects/$projectId/collections/$collectionId/presentation",
+    );
     expect(entriesRoute.fullPath).toBe("/projects/$projectId/collections/$collectionId/entries");
     expect(editorRoute.fullPath).toBe(
       "/projects/$projectId/collections/$collectionId/entries/$entryId",
@@ -26,6 +31,7 @@ describe("route structure", () => {
     );
     expect(webhooksRoute.fullPath).toBe("/projects/$projectId/webhooks");
     expect(schemaRoute.parentRoute.id).toBe("/_auth");
+    expect(presentationRoute.parentRoute.id).toBe("/_auth");
     expect(entriesRoute.parentRoute.id).toBe("/_auth");
     expect(editorRoute.parentRoute.id).toBe("/_auth");
     expect(previewRoute.parentRoute.id).toBe("/_auth");

@@ -1,9 +1,10 @@
 // Renders the generated multilingual M7 draft editor, conflict recovery, and immutable revision restore controls.
 
-import type {
-  CollectionFieldDefinition,
-  GeneratedFormDefinition,
-} from "@framerfordevs/api/contracts/schemas";
+import type { GeneratedFormDefinition } from "@framerfordevs/api/contracts/schemas";
+import {
+  adaptContentFormDefinition,
+  partitionContentFormDefinition,
+} from "@framerfordevs/content-form";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,53 +63,6 @@ import { entryNameSchema } from "@/lib/cms-validation";
 import { applyNewEntryPartitionDefaults } from "@/lib/entry-defaults";
 import { fieldMutations } from "@/lib/entry-mutations";
 import { client, orpc } from "@/utils/orpc";
-
-function withChildren(
-  field: CollectionFieldDefinition,
-  children: ReadonlyArray<CollectionFieldDefinition>,
-): CollectionFieldDefinition {
-  return { ...field, children };
-}
-
-function partitionField(
-  field: CollectionFieldDefinition,
-  scope: "shared" | "localized",
-  inherited: "shared" | "localized" | null = null,
-): CollectionFieldDefinition | null {
-  const effective = inherited ?? field.localization;
-  if (effective === scope) return field;
-  if (effective !== "mixed" || field.kind !== "object") return null;
-  const children = field.children.flatMap((child) => {
-    const projected = partitionField(child, scope, null);
-    return projected ? [projected] : [];
-  });
-  return children.length > 0 ? withChildren(field, children) : null;
-}
-
-function partitionDefinition(
-  definition: GeneratedFormDefinition,
-  scope: "shared" | "localized",
-  canEdit: boolean,
-): GeneratedFormDefinition {
-  const fields = definition.fields.flatMap((field) => {
-    const projected = partitionField(field, scope);
-    return projected ? [projected] : [];
-  });
-  const visibleIds = new Set<string>();
-  const stack = [...fields];
-  while (stack.length > 0) {
-    const field = stack.pop();
-    if (!field) break;
-    visibleIds.add(field.id);
-    stack.push(...field.children);
-  }
-  return {
-    ...definition,
-    canEdit: definition.canEdit && canEdit,
-    fields,
-    editableFieldIds: definition.editableFieldIds.filter((id) => visibleIds.has(id)),
-  };
-}
 
 const dateFormatter = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
 
@@ -469,13 +423,14 @@ function EntryDraftWorkspace({
   readonly onDirtyChange: (dirty: boolean) => void;
 }) {
   const queryClient = useQueryClient();
+  const projectedDefinition = useMemo(() => adaptContentFormDefinition(definition), [definition]);
   const sharedDefinition = useMemo(
-    () => partitionDefinition(definition, "shared", draft.canEditShared),
-    [definition, draft.canEditShared],
+    () => partitionContentFormDefinition(projectedDefinition, "shared", draft.canEditShared),
+    [draft.canEditShared, projectedDefinition],
   );
   const localizedDefinition = useMemo(
-    () => partitionDefinition(definition, "localized", true),
-    [definition],
+    () => partitionContentFormDefinition(projectedDefinition, "localized", true),
+    [projectedDefinition],
   );
   const [sharedValues, setSharedValues] = useState(() =>
     applyNewEntryPartitionDefaults(
@@ -610,6 +565,7 @@ function EntryDraftWorkspace({
           {sharedDefinition.fields.length > 0 ? (
             <GeneratedForm
               definition={sharedDefinition}
+              validationFields={definition.fields}
               values={sharedValues}
               onValuesChange={setSharedValues}
               onSubmit={() => save.mutate()}
@@ -634,6 +590,7 @@ function EntryDraftWorkspace({
           {localizedDefinition.fields.length > 0 ? (
             <GeneratedForm
               definition={localizedDefinition}
+              validationFields={definition.fields}
               values={localizedValues}
               onValuesChange={setLocalizedValues}
               onSubmit={() => save.mutate()}

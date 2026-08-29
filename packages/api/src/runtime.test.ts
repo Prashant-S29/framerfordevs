@@ -56,6 +56,8 @@ const TelemetryTest = Layer.succeed(Telemetry, {
   recordPreviewAuditFailure: () => Effect.void,
   recordToolingRequest: () => Effect.void,
   recordToolingOAuthVerification: () => Effect.void,
+  recordAuthoringAuthentication: () => Effect.void,
+  recordAuthoringRequest: () => Effect.void,
   recordRateLimitDecision: () => Effect.void,
   recordRateLimitStore: () => Effect.void,
 });

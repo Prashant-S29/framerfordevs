@@ -1,0 +1,55 @@
+---
+title: Edit Hosted Content Locally
+description: Launch the secure localhost editor, handle schema drift, save optimistic drafts, and publish one locale.
+---
+
+## Prerequisites
+
+Link a version 2 project configuration and ensure the local Tier 1 schema is valid. The credential must have read authority plus the exact draft or publication grants required by the work.
+
+```bash
+# OAuth uses native credential storage when enabled.
+ffd editor
+
+# For management authority, avoid the long-lived process's initial OS environment.
+read -rsp "Editor token: " FFD_EDITOR_TOKEN && echo
+printf '%s\n' "$FFD_EDITOR_TOKEN" | ffd editor --token-stdin
+unset FFD_EDITOR_TOKEN
+```
+
+The bounded stdin mode rejects an exported `FFD_MANAGEMENT_TOKEN` as ambiguous and reads the token only after credential-blind schema preparation. The CLI validates local schema before constructing credential or network authority, compares it with hosted structure, binds an ephemeral `127.0.0.1` port, and opens the browser with a one-time fragment challenge.
+
+## Edit an entry
+
+1. Select a collection, entry, and locale. The editor defaults to the first hosted project locale and suggests only the bounded hosted locale list.
+2. Edit the role-projected shared and localized fields.
+3. Save against the displayed schema revision, contract hash, shared version, and localized version.
+4. Resolve server validation issues if present.
+5. Use **Validate and publish _locale_** to publish only that locale.
+
+Publication never implicitly publishes another locale. Unpublish also targets the exact selected locale.
+
+## Handle concurrent edits
+
+If another writer advances a draft, rename, schema, or publication authority, the server returns a closed conflict. The editor preserves local unsaved values and requires an explicit reload/reapply decision; it never force-overwrites or silently declares local state authoritative.
+
+Navigation and locale changes warn while edits are unsaved.
+
+## Handle schema drift
+
+The CLI watches only the configured Tier 1 output through the same restricted static extractor used by plan and push.
+
+- If local and hosted structure match, writes are enabled.
+- If local structure differs, unpublished local fields remain visible but read-only. Run `ffd schema plan`, review the changes, then run `ffd schema push` with exact acknowledgements.
+- If local source becomes invalid, the editor keeps the last valid form visible read-only with a bounded diagnostic.
+- For experimental Tier 2 projects, run `ffd schema build` explicitly. The editor never executes composition source.
+
+The browser never writes hosted content to disk.
+
+## Security boundary
+
+The loopback server is a closed backend-for-frontend, not a proxy. It accepts only named operations with recursively exact request shapes. It rejects non-loopback peers, Host confusion, query authority, traversal, unknown routes, invalid Origin/session/content type, oversized bodies, and redirects.
+
+Hosted bearer and refresh credentials remain in mutable Node memory. They do not enter browser HTML, JavaScript, URLs, storage, headers chosen by the browser, or the browser-opener environment. Responses use a locked Content Security Policy and `no-store`.
+
+Do not expose the loopback port through a tunnel, container port mapping, or LAN bind.

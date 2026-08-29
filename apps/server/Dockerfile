@@ -8,7 +8,7 @@ COPY . .
 RUN --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
 
 ENV NODE_ENV=production
-RUN cd apps/server && pnpm run build
+RUN pnpm --filter @framerfordevs/schema build && cd apps/server && pnpm run build
 ENV SKIP_ENV_VALIDATION=
 ENV SKIP_EFFECT_SOURCE_SETUP=
 

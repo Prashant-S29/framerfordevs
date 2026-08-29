@@ -8,4 +8,5 @@ export * from "./generator.js";
 export * from "./oauth-device.js";
 export * from "./pull.js";
 export * from "./schema.js";
+export * from "./schema-extractor.js";
 export * from "./tooling-http-client.js";

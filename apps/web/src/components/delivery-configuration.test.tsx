@@ -9,7 +9,7 @@ import axe from "axe-core";
 import { Schema } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { DeliveryConfigurationCard } from "./schema-builder";
+import { CodeManagedStructureCard, DeliveryConfigurationCard } from "./schema-builder";
 
 const ids = {
   project: "019fae8b-1234-7000-8000-000000000001",
@@ -65,6 +65,7 @@ const configuration = Schema.decodeUnknownSync(DeliveryCollectionConfiguration)(
   version: 1,
   fields: [],
   updatedByUserId: "delivery-ui-owner",
+  updatedByCredentialId: null,
   updatedAt: "2026-08-09T12:00:00.000Z",
 });
 
@@ -87,6 +88,18 @@ function renderConfiguration(canConfigure = true, hasPublishedSchema = true) {
 }
 
 afterEach(cleanup);
+
+describe("retired dashboard structure authoring", () => {
+  it("shows current code-managed fields without structure mutation controls", () => {
+    render(<CodeManagedStructureCard fields={fields} revisionId={ids.collection} />);
+
+    expect(screen.getByRole("heading", { name: "Structure is managed in code" })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Current managed fields" })).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: /add field|save schema|publish schema/i }),
+    ).toBeNull();
+  });
+});
 
 describe("Delivery configuration", () => {
   it("requires the irreversible public-access acknowledgement and exposes kind-safe capabilities", async () => {

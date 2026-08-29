@@ -78,6 +78,8 @@ const NoopTelemetry: TelemetryService = {
   recordPreviewAuditFailure: () => Effect.void,
   recordToolingRequest: () => Effect.void,
   recordToolingOAuthVerification: () => Effect.void,
+  recordAuthoringAuthentication: () => Effect.void,
+  recordAuthoringRequest: () => Effect.void,
   recordRateLimitDecision: () => Effect.void,
   recordRateLimitStore: () => Effect.void,
 };

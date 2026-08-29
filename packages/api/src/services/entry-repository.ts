@@ -24,6 +24,7 @@ import { ApiErrorDetail } from "../contracts/api-response";
 import {
   CmsEntry,
   CmsEntryDraft,
+  CreateEntryWithDraftResult,
   EntryId,
   CmsEntryPage,
   EntryRevisionPage,
@@ -32,6 +33,7 @@ import {
   EntryValidationIssue,
   SaveEntryDraftResult,
   type CreateEntryInput,
+  type CreateEntryWithDraftInput,
   type EntryValueMutation,
   type EntryValues,
   type GetEntryDraftInput,
@@ -62,7 +64,6 @@ import {
   encodeEntryCursor,
   encodeEntryRevisionCursor,
 } from "../contracts/entry-cursor";
-import type { AuthUserId } from "../contracts/platform";
 import {
   CollectionFieldDefinition,
   ContractHash,
@@ -73,9 +74,17 @@ import { flattenFieldTree, reconstructFieldTree } from "../lib/field-tree";
 import { validateFieldValue } from "../lib/field-validation";
 import { applyEntryMutations, canonicalizeEntryValue } from "../lib/entry-values";
 import {
+  cmsActorFingerprintValue,
+  cmsActorMatches,
+  cmsActorReferences,
+  cmsAuditActor,
+  normalizeCmsActor,
+  type CmsActorInput,
+} from "./cms-actor";
+import {
   type ApplicationDb,
   type ApplicationExecutor,
-  authorizeUserProject,
+  authorizeCmsActorProject,
   selectUserProjectAccess,
 } from "./project-access";
 import { isRoleAllowed } from "./policy";
@@ -118,7 +127,9 @@ function entryValue(row: typeof cmsEntry.$inferSelect) {
     displayName: row.displayName,
     nameVersion: row.nameVersion,
     createdByUserId: row.createdByUserId,
+    createdByCredentialId: row.createdByCredentialId,
     changedByUserId: row.changedByUserId,
+    changedByCredentialId: row.changedByCredentialId,
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
   });
@@ -266,11 +277,28 @@ type ScopeResult =
 
 async function authorizeScope(
   executor: ApplicationExecutor,
-  actorId: AuthUserId,
+  actorId: CmsActorInput,
   input: { readonly projectId: string; readonly environmentId: string; readonly locale: string },
   action: "content.read" | "content.write",
 ): Promise<ScopeResult> {
-  const access = await selectUserProjectAccess(executor, actorId, input.projectId);
+  const actor = normalizeCmsActor(actorId);
+  const initialAuthorization =
+    actor.kind === "user"
+      ? null
+      : await authorizeCmsActorProject(
+          executor,
+          actor,
+          input.projectId,
+          input.environmentId,
+          action,
+        );
+  if (initialAuthorization?.kind === "not_found") return outcome("not_found");
+  if (initialAuthorization?.kind === "forbidden") return outcome("forbidden");
+  const access =
+    initialAuthorization?.access ??
+    (actor.kind === "user"
+      ? await selectUserProjectAccess(executor, actor.id, input.projectId)
+      : undefined);
   if (!access) return outcome("not_found");
   const [locale] = await executor
     .select()
@@ -285,10 +313,11 @@ async function authorizeScope(
     )
     .limit(1);
   if (!locale) return outcome("locale_unavailable");
-  const authorization = await authorizeUserProject(
+  const authorization = await authorizeCmsActorProject(
     executor,
-    actorId,
+    actor,
     input.projectId,
+    input.environmentId,
     action,
     locale.id,
   );
@@ -889,13 +918,14 @@ function makeAuditValues(options: {
   readonly workspaceId: string;
   readonly projectId: string;
   readonly environmentId: string;
-  readonly actorId: AuthUserId;
+  readonly actorId: CmsActorInput;
   readonly action: string;
   readonly resourceType: string;
   readonly resourceId: string;
   readonly requestId: string;
 }) {
-  return { ...options, actorType: "user" };
+  const { actorId, ...values } = options;
+  return { ...values, ...cmsAuditActor(actorId) };
 }
 
 type EntryFailureStage = "revision" | "head" | "audit" | "receipt";
@@ -913,7 +943,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
 
   return {
     createEntry: Effect.fn("EntryRepository.createEntry")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: CreateEntryInput,
       now: Date,
       requestId: string,
@@ -938,7 +968,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
               return outcome("conflict");
             const fingerprint = fingerprintJson({
               operation: "create",
-              actorId,
+              actorId: cmsActorFingerprintValue(actorId),
               workspaceId: scope.access.workspaceId,
               ...input,
               localeId: scope.access.locale.id,
@@ -957,7 +987,11 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
               )
               .limit(1);
             if (existing)
-              return existing.createCommandFingerprint === fingerprint
+              return existing.createCommandFingerprint === fingerprint &&
+                cmsActorMatches(actorId, {
+                  userId: existing.createdByUserId,
+                  credentialId: existing.createdByCredentialId,
+                })
                 ? outcomeWith("success", { row: existing })
                 : outcome("command_conflict");
             const [row] = await transaction
@@ -971,8 +1005,10 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                 nameVersion: 1,
                 createCommandId: input.commandId,
                 createCommandFingerprint: fingerprint,
-                createdByUserId: actorId,
-                changedByUserId: actorId,
+                createdByUserId: cmsActorReferences(actorId).userId,
+                createdByCredentialId: cmsActorReferences(actorId).credentialId,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 createdAt: now,
                 updatedAt: now,
               })
@@ -1007,8 +1043,336 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
       return entryValue(result.row);
     }),
 
+    createEntryWithDraft: Effect.fn("EntryRepository.createEntryWithDraft")(function* (
+      actorId: CmsActorInput,
+      input: CreateEntryWithDraftInput,
+      now: Date,
+      requestId: string,
+    ) {
+      const result = yield* Effect.tryPromise({
+        try: () =>
+          database.transaction(async (transaction) => {
+            await lockProjectShared(transaction, input.projectId);
+            const scope = await authorizeScope(transaction, actorId, input, "content.write");
+            if (scope.kind !== "success") return scope;
+            if (input.sharedMutations.length > 0 && scope.access.localeAccessMode !== "all")
+              return outcome("forbidden");
+            await lockCollectionShared(transaction, input.collectionId);
+            await lockCreateCommand(transaction, input.collectionId, input.commandId);
+            const contract = await loadPublishedContract(transaction, input);
+            if (contract === undefined) return outcome("not_found");
+            if (contract === null) return outcome("published_required");
+            if (contract.revision.workspaceId !== scope.access.workspaceId)
+              return outcome("not_found");
+            if (
+              contract.revision.id !== input.schemaRevisionId ||
+              contract.contractHash !== input.contractHash
+            )
+              return outcome("conflict");
+            const fingerprint = fingerprintJson({
+              operation: "create_with_draft",
+              actorId: cmsActorFingerprintValue(actorId),
+              workspaceId: scope.access.workspaceId,
+              ...input,
+              localeId: scope.access.locale.id,
+            });
+            const [existing] = await transaction
+              .select()
+              .from(cmsEntry)
+              .where(
+                and(
+                  eq(cmsEntry.collectionId, input.collectionId),
+                  eq(cmsEntry.createCommandId, input.commandId),
+                  eq(cmsEntry.workspaceId, scope.access.workspaceId),
+                  eq(cmsEntry.projectId, input.projectId),
+                  eq(cmsEntry.environmentId, input.environmentId),
+                ),
+              )
+              .limit(1);
+            if (existing) {
+              if (
+                existing.createCommandFingerprint !== fingerprint ||
+                !cmsActorMatches(actorId, {
+                  userId: existing.createdByUserId,
+                  credentialId: existing.createdByCredentialId,
+                })
+              )
+                return outcome("command_conflict");
+              const [sharedHead] = await transaction
+                .select()
+                .from(cmsEntrySharedDraft)
+                .where(eq(cmsEntrySharedDraft.entryId, existing.id))
+                .limit(1);
+              const [localeHead] = await transaction
+                .select()
+                .from(cmsEntryLocaleDraft)
+                .where(
+                  and(
+                    eq(cmsEntryLocaleDraft.entryId, existing.id),
+                    eq(cmsEntryLocaleDraft.localeId, scope.access.locale.id),
+                  ),
+                )
+                .limit(1);
+              const [sharedRevision] = sharedHead
+                ? await transaction
+                    .select()
+                    .from(cmsEntrySharedRevision)
+                    .where(eq(cmsEntrySharedRevision.id, sharedHead.currentRevisionId))
+                    .limit(1)
+                : [];
+              const [localizedRevision] = localeHead
+                ? await transaction
+                    .select()
+                    .from(cmsEntryLocaleRevision)
+                    .where(eq(cmsEntryLocaleRevision.id, localeHead.currentRevisionId))
+                    .limit(1)
+                : [];
+              return outcomeWith("replay", {
+                row: existing,
+                scope,
+                contract,
+                sharedVersion: sharedHead?.version ?? 0,
+                sharedRevisionId: sharedRevision?.id ?? null,
+                localizedVersion: localeHead?.version ?? 0,
+                localizedRevisionId: localizedRevision?.id ?? null,
+                sharedValues: entryValues(sharedRevision?.values ?? {}),
+                localizedValues: entryValues(localizedRevision?.values ?? {}),
+              });
+            }
+            const authorizationIssues = [
+              ...mutationAuthorizationIssues(
+                input.sharedMutations,
+                contract.fields,
+                scope.access.role,
+                "shared",
+              ),
+              ...mutationAuthorizationIssues(
+                input.localizedMutations,
+                contract.fields,
+                scope.access.role,
+                "localized",
+              ),
+            ];
+            if (authorizationIssues.length > 0)
+              return outcomeWith("validation_failure", { details: authorizationIssues });
+            const sharedResult = applyEntryMutations(entryValues({}), input.sharedMutations);
+            const localizedResult = applyEntryMutations(entryValues({}), input.localizedMutations);
+            if (!sharedResult.valid)
+              return outcomeWith("kernel_failure", { issues: sharedResult.issues });
+            if (!localizedResult.valid)
+              return outcomeWith("kernel_failure", { issues: localizedResult.issues });
+            const validation = validateDraftValues({
+              fields: contract.fields,
+              sharedValues: sharedResult.values,
+              localizedValues: localizedResult.values,
+              locale: scope.access.locale,
+            });
+            const references = await validateReferenceAvailability(transaction, {
+              workspaceId: scope.access.workspaceId,
+              projectId: input.projectId,
+              environmentId: input.environmentId,
+              locale: scope.access.locale,
+              fields: contract.fields,
+              sharedValues: sharedResult.values,
+              localizedValues: localizedResult.values,
+              validation,
+            });
+            if (references.limitExceeded)
+              return outcomeWith("validation_failure", { details: [referenceLimitFailure()] });
+            const storageIssues = hardDraftIssues(references.validation);
+            if (storageIssues.length > 0)
+              return outcomeWith("validation_failure", { details: storageIssues });
+            const [row] = await transaction
+              .insert(cmsEntry)
+              .values({
+                workspaceId: scope.access.workspaceId,
+                projectId: input.projectId,
+                environmentId: input.environmentId,
+                collectionId: input.collectionId,
+                displayName: input.displayName,
+                nameVersion: 1,
+                createCommandId: input.commandId,
+                createCommandFingerprint: fingerprint,
+                createdByUserId: cmsActorReferences(actorId).userId,
+                createdByCredentialId: cmsActorReferences(actorId).credentialId,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
+                createdAt: now,
+                updatedAt: now,
+              })
+              .returning();
+            if (!row) throw new Error("Entry insert returned no row.");
+            let sharedRevisionId: string | null = null;
+            let localizedRevisionId: string | null = null;
+            const sharedVersion = sharedResult.changed ? 1 : 0;
+            const localizedVersion = localizedResult.changed ? 1 : 0;
+            if (sharedResult.changed) {
+              const [revision] = await transaction
+                .insert(cmsEntrySharedRevision)
+                .values({
+                  workspaceId: row.workspaceId,
+                  projectId: row.projectId,
+                  environmentId: row.environmentId,
+                  collectionId: row.collectionId,
+                  entryId: row.id,
+                  sequence: 1,
+                  previousRevisionId: null,
+                  schemaRevisionId: contract.revision.id,
+                  contractHash: contract.contractHash,
+                  values: sharedResult.values,
+                  valuesHash: digest(sharedResult.values),
+                  changedFieldIds: mutationRootIds(input.sharedMutations),
+                  commandId: input.commandId,
+                  commandFingerprint: fingerprint,
+                  restoredFromRevisionId: null,
+                  authoredByUserId: cmsActorReferences(actorId).userId,
+                  authoredByCredentialId: cmsActorReferences(actorId).credentialId,
+                  authoredAt: now,
+                })
+                .returning();
+              if (!revision) throw new Error("Initial shared revision insert returned no row.");
+              sharedRevisionId = revision.id;
+              await transaction.insert(cmsEntrySharedDraft).values({
+                entryId: row.id,
+                workspaceId: row.workspaceId,
+                projectId: row.projectId,
+                environmentId: row.environmentId,
+                collectionId: row.collectionId,
+                version: 1,
+                currentRevisionId: revision.id,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
+                updatedAt: now,
+              });
+              await transaction.insert(auditEvent).values(
+                makeAuditValues({
+                  workspaceId: row.workspaceId,
+                  projectId: row.projectId,
+                  environmentId: row.environmentId,
+                  actorId,
+                  action: "cms.entry.shared_draft.saved",
+                  resourceType: "cms_entry_shared_revision",
+                  resourceId: revision.id,
+                  requestId,
+                }),
+              );
+            }
+            if (localizedResult.changed) {
+              const [revision] = await transaction
+                .insert(cmsEntryLocaleRevision)
+                .values({
+                  workspaceId: row.workspaceId,
+                  projectId: row.projectId,
+                  environmentId: row.environmentId,
+                  collectionId: row.collectionId,
+                  entryId: row.id,
+                  localeId: scope.access.locale.id,
+                  sequence: 1,
+                  previousRevisionId: null,
+                  schemaRevisionId: contract.revision.id,
+                  contractHash: contract.contractHash,
+                  values: localizedResult.values,
+                  valuesHash: digest(localizedResult.values),
+                  changedFieldIds: mutationRootIds(input.localizedMutations),
+                  commandId: input.commandId,
+                  commandFingerprint: fingerprint,
+                  restoredFromRevisionId: null,
+                  authoredByUserId: cmsActorReferences(actorId).userId,
+                  authoredByCredentialId: cmsActorReferences(actorId).credentialId,
+                  authoredAt: now,
+                })
+                .returning();
+              if (!revision) throw new Error("Initial localized revision insert returned no row.");
+              localizedRevisionId = revision.id;
+              await transaction.insert(cmsEntryLocaleDraft).values({
+                entryId: row.id,
+                localeId: scope.access.locale.id,
+                workspaceId: row.workspaceId,
+                projectId: row.projectId,
+                environmentId: row.environmentId,
+                collectionId: row.collectionId,
+                version: 1,
+                currentRevisionId: revision.id,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
+                updatedAt: now,
+              });
+              await transaction.insert(auditEvent).values(
+                makeAuditValues({
+                  workspaceId: row.workspaceId,
+                  projectId: row.projectId,
+                  environmentId: row.environmentId,
+                  actorId,
+                  action: "cms.entry.locale_draft.saved",
+                  resourceType: "cms_entry_locale_revision",
+                  resourceId: revision.id,
+                  requestId,
+                }),
+              );
+            }
+            await transaction.insert(auditEvent).values(
+              makeAuditValues({
+                workspaceId: row.workspaceId,
+                projectId: row.projectId,
+                environmentId: row.environmentId,
+                actorId,
+                action: "cms.entry.created",
+                resourceType: "cms_entry",
+                resourceId: row.id,
+                requestId,
+              }),
+            );
+            failAfter("audit");
+            return outcomeWith("success", {
+              row,
+              scope,
+              contract,
+              sharedVersion,
+              sharedRevisionId,
+              localizedVersion,
+              localizedRevisionId,
+              sharedValues: sharedResult.values,
+              localizedValues: localizedResult.values,
+              validation: references.validation,
+            });
+          }),
+        catch: (cause) => databaseFailure("entry.create_with_draft", cause),
+      });
+      if (result.kind === "not_found")
+        return yield* NotFoundFailure.make({ resource: "collection" });
+      if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
+      if (result.kind === "locale_unavailable") return yield* LocaleUnavailableFailure.make();
+      if (result.kind === "cms_required") return yield* CmsCapabilityRequiredFailure.make();
+      if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
+      if (result.kind === "published_required") return yield* PublishedSchemaRequiredFailure.make();
+      if (result.kind === "conflict") return yield* ConflictFailure.make();
+      if (result.kind === "command_conflict") return yield* EntryCommandConflictFailure.make();
+      if (result.kind === "validation_failure")
+        return yield* ValidationFailure.make({ details: result.details });
+      if (result.kind === "kernel_failure")
+        return yield* validationFailureFromKernel(result.issues);
+      const validation =
+        result.kind === "replay"
+          ? validateDraftValues({
+              fields: result.contract.fields,
+              sharedValues: result.sharedValues,
+              localizedValues: result.localizedValues,
+              locale: result.scope.access.locale,
+            })
+          : result.validation;
+      return Schema.decodeUnknownSync(CreateEntryWithDraftResult)({
+        entry: entryValue(result.row),
+        commandId: input.commandId,
+        sharedVersion: result.sharedVersion,
+        sharedRevisionId: result.sharedRevisionId,
+        localizedVersion: result.localizedVersion,
+        localizedRevisionId: result.localizedRevisionId,
+        validation,
+      });
+    }),
+
     listEntries: Effect.fn("EntryRepository.listEntries")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: ListEntriesInput,
     ) {
       const cursor = input.cursor === null ? null : yield* decodeEntryCursor(input.cursor, input);
@@ -1070,7 +1434,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
 
     /** Renames management-only entry metadata with tenant scope and optimistic concurrency. */
     renameEntry: Effect.fn("EntryRepository.renameEntry")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: RenameEntryInput,
       now: Date,
       requestId: string,
@@ -1104,7 +1468,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
               .set({
                 displayName: input.displayName,
                 nameVersion: row.nameVersion + 1,
-                changedByUserId: actorId,
+                changedByUserId: cmsActorReferences(actorId).userId,
+                changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 updatedAt: now,
               })
               .where(
@@ -1147,7 +1512,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
     }),
 
     getDraft: Effect.fn("EntryRepository.getDraft")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: GetEntryDraftInput,
     ) {
       const result = yield* Effect.tryPromise({
@@ -1294,7 +1659,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
     }),
 
     saveDraft: Effect.fn("EntryRepository.saveDraft")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: SaveEntryDraftInput,
       now: Date,
       requestId: string,
@@ -1333,7 +1698,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
             if (!row) return outcome("entry_not_found");
             const fingerprint = fingerprintJson({
               operation: "save",
-              actorId,
+              actorId: cmsActorFingerprintValue(actorId),
               workspaceId: scope.access.workspaceId,
               localeId: scope.access.locale.id,
               ...input,
@@ -1351,7 +1716,11 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
               )
               .limit(1);
             if (receipt)
-              return receipt.commandFingerprint === fingerprint
+              return receipt.commandFingerprint === fingerprint &&
+                cmsActorMatches(actorId, {
+                  userId: receipt.completedByUserId,
+                  credentialId: receipt.completedByCredentialId,
+                })
                 ? outcomeWith("replay", { receipt, row, scope, contract })
                 : outcome("command_conflict");
             if (input.sharedMutations.length > 0 && scope.access.localeAccessMode !== "all")
@@ -1494,7 +1863,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   commandId: input.commandId,
                   commandFingerprint: fingerprint,
                   restoredFromRevisionId: null,
-                  authoredByUserId: actorId,
+                  authoredByUserId: cmsActorReferences(actorId).userId,
+                  authoredByCredentialId: cmsActorReferences(actorId).credentialId,
                   authoredAt: now,
                 })
                 .returning();
@@ -1507,7 +1877,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   .set({
                     version: sharedVersion,
                     currentRevisionId: revision.id,
-                    changedByUserId: actorId,
+                    changedByUserId: cmsActorReferences(actorId).userId,
+                    changedByCredentialId: cmsActorReferences(actorId).credentialId,
                     updatedAt: now,
                   })
                   .where(
@@ -1526,7 +1897,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   collectionId: row.collectionId,
                   version: sharedVersion,
                   currentRevisionId: revision.id,
-                  changedByUserId: actorId,
+                  changedByUserId: cmsActorReferences(actorId).userId,
+                  changedByCredentialId: cmsActorReferences(actorId).credentialId,
                   updatedAt: now,
                 });
               failAfter("head");
@@ -1565,7 +1937,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   commandId: input.commandId,
                   commandFingerprint: fingerprint,
                   restoredFromRevisionId: null,
-                  authoredByUserId: actorId,
+                  authoredByUserId: cmsActorReferences(actorId).userId,
+                  authoredByCredentialId: cmsActorReferences(actorId).credentialId,
                   authoredAt: now,
                 })
                 .returning();
@@ -1578,7 +1951,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   .set({
                     version: localizedVersion,
                     currentRevisionId: revision.id,
-                    changedByUserId: actorId,
+                    changedByUserId: cmsActorReferences(actorId).userId,
+                    changedByCredentialId: cmsActorReferences(actorId).credentialId,
                     updatedAt: now,
                   })
                   .where(
@@ -1599,7 +1973,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   collectionId: row.collectionId,
                   version: localizedVersion,
                   currentRevisionId: revision.id,
-                  changedByUserId: actorId,
+                  changedByUserId: cmsActorReferences(actorId).userId,
+                  changedByCredentialId: cmsActorReferences(actorId).credentialId,
                   updatedAt: now,
                 });
               failAfter("head");
@@ -1621,7 +1996,11 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
             if (changed)
               await transaction
                 .update(cmsEntry)
-                .set({ changedByUserId: actorId, updatedAt: now })
+                .set({
+                  changedByUserId: cmsActorReferences(actorId).userId,
+                  changedByCredentialId: cmsActorReferences(actorId).credentialId,
+                  updatedAt: now,
+                })
                 .where(
                   and(
                     eq(cmsEntry.id, row.id),
@@ -1644,7 +2023,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
               resultSharedRevisionId: sharedRevisionId,
               resultLocaleVersion: localizedVersion,
               resultLocaleRevisionId: localizedRevisionId,
-              completedByUserId: actorId,
+              completedByUserId: cmsActorReferences(actorId).userId,
+              completedByCredentialId: cmsActorReferences(actorId).credentialId,
               completedAt: now,
             });
             failAfter("receipt");
@@ -1761,7 +2141,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
     }),
 
     listRevisions: Effect.fn("EntryRepository.listRevisions")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: ListEntryRevisionsInput,
     ) {
       const cursor =
@@ -1871,6 +2251,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
           changedFieldIds: row.changedFieldIds.filter((id) => result.visibleIds.has(id)),
           restoredFromRevisionId: row.restoredFromRevisionId,
           authoredByUserId: row.authoredByUserId,
+          authoredByCredentialId: row.authoredByCredentialId,
           authoredAt: toIso(row.authoredAt),
         }),
       );
@@ -1892,7 +2273,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
     }),
 
     restoreRevision: Effect.fn("EntryRepository.restoreRevision")(function* (
-      actorId: AuthUserId,
+      actorId: CmsActorInput,
       input: RestoreEntryRevisionInput,
       now: Date,
       requestId: string,
@@ -1933,7 +2314,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
             if (!row) return outcome("entry_not_found");
             const fingerprint = fingerprintJson({
               operation: "restore",
-              actorId,
+              actorId: cmsActorFingerprintValue(actorId),
               workspaceId: scope.access.workspaceId,
               localeId: scope.access.locale.id,
               ...input,
@@ -1951,7 +2332,11 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
               )
               .limit(1);
             if (receipt)
-              return receipt.commandFingerprint === fingerprint
+              return receipt.commandFingerprint === fingerprint &&
+                cmsActorMatches(actorId, {
+                  userId: receipt.completedByUserId,
+                  credentialId: receipt.completedByCredentialId,
+                })
                 ? outcomeWith("replay", { receipt, row, scope, contract })
                 : outcome("command_conflict");
             const isShared = input.scope === "shared";
@@ -2108,7 +2493,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   commandId: input.commandId,
                   commandFingerprint: fingerprint,
                   restoredFromRevisionId: target.id,
-                  authoredByUserId: actorId,
+                  authoredByUserId: cmsActorReferences(actorId).userId,
+                  authoredByCredentialId: cmsActorReferences(actorId).credentialId,
                   authoredAt: now,
                 })
                 .returning();
@@ -2121,7 +2507,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   .set({
                     version: sharedVersion,
                     currentRevisionId: revision.id,
-                    changedByUserId: actorId,
+                    changedByUserId: cmsActorReferences(actorId).userId,
+                    changedByCredentialId: cmsActorReferences(actorId).credentialId,
                     updatedAt: now,
                   })
                   .where(
@@ -2140,7 +2527,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   collectionId: row.collectionId,
                   version: sharedVersion,
                   currentRevisionId: revision.id,
-                  changedByUserId: actorId,
+                  changedByUserId: cmsActorReferences(actorId).userId,
+                  changedByCredentialId: cmsActorReferences(actorId).credentialId,
                   updatedAt: now,
                 });
               failAfter("head");
@@ -2179,7 +2567,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   commandId: input.commandId,
                   commandFingerprint: fingerprint,
                   restoredFromRevisionId: target.id,
-                  authoredByUserId: actorId,
+                  authoredByUserId: cmsActorReferences(actorId).userId,
+                  authoredByCredentialId: cmsActorReferences(actorId).credentialId,
                   authoredAt: now,
                 })
                 .returning();
@@ -2192,7 +2581,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   .set({
                     version: localizedVersion,
                     currentRevisionId: revision.id,
-                    changedByUserId: actorId,
+                    changedByUserId: cmsActorReferences(actorId).userId,
+                    changedByCredentialId: cmsActorReferences(actorId).credentialId,
                     updatedAt: now,
                   })
                   .where(
@@ -2213,7 +2603,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   collectionId: row.collectionId,
                   version: localizedVersion,
                   currentRevisionId: revision.id,
-                  changedByUserId: actorId,
+                  changedByUserId: cmsActorReferences(actorId).userId,
+                  changedByCredentialId: cmsActorReferences(actorId).credentialId,
                   updatedAt: now,
                 });
               failAfter("head");
@@ -2234,7 +2625,11 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
             if (changed)
               await transaction
                 .update(cmsEntry)
-                .set({ changedByUserId: actorId, updatedAt: now })
+                .set({
+                  changedByUserId: cmsActorReferences(actorId).userId,
+                  changedByCredentialId: cmsActorReferences(actorId).credentialId,
+                  updatedAt: now,
+                })
                 .where(
                   and(
                     eq(cmsEntry.id, row.id),
@@ -2257,7 +2652,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
               resultSharedRevisionId: sharedRevisionId,
               resultLocaleVersion: localizedVersion,
               resultLocaleRevisionId: localizedRevisionId,
-              completedByUserId: actorId,
+              completedByUserId: cmsActorReferences(actorId).userId,
+              completedByCredentialId: cmsActorReferences(actorId).credentialId,
               completedAt: now,
             });
             failAfter("receipt");

@@ -1,19 +1,20 @@
 ---
 title: SDK
-description: Configure framework-independent Delivery and Preview clients, transport validation, and webhook helpers.
+description: Configure framework-independent Delivery, Preview, and trusted-process Authoring clients.
 ---
 
 {/* Teaches supported SDK workflows while package exports and tests remain signature authority. */}
 
 `@framerfordevs/sdk` is a framework-independent ESM package for Node.js 22 and modern standards-based runtimes. It uses standard `fetch`, preserves the public response envelope, and exposes each API family explicitly.
 
-> The package is release-ready but not yet published to the npm registry. Local tarball installation is available during M12 review.
+> The package is staged for M13 review but is not yet published to the npm registry.
 
 ## Package Exports
 
 | Export                            | Purpose                                                |
 | --------------------------------- | ------------------------------------------------------ |
 | `@framerfordevs/sdk/client`       | Delivery v1 and Preview v1 clients                     |
+| `@framerfordevs/sdk/authoring`    | Promise and Effect Authoring v1 clients                |
 | `@framerfordevs/sdk/effect`       | Exact Effect transport schemas and decoders            |
 | `@framerfordevs/sdk/webhooks`     | Raw-byte signature verification and replay reservation |
 | `@framerfordevs/sdk/invalidation` | Normalized cache invalidation tags and routes          |
@@ -39,6 +40,27 @@ The client does not hide the `{ ok, data, error, message }` response contract or
 Preview is for trusted server-side tools. Configure a separate Preview client with a Preview credential and never expose it to browser JavaScript.
 
 Preview supports current drafts and explicit historical schema revisions. Responses are always `no-store` and may describe incomplete drafts, so their validation metadata remains part of the application workflow.
+
+## Authoring Client
+
+Authoring is for trusted Node.js tools. Configure it with an OAuth access token or environment-bound management credential; never ship that authority to browser JavaScript.
+
+```ts
+import { authoringV1 } from "@framerfordevs/sdk/authoring";
+
+const authoring = authoringV1({
+  baseUrl: process.env.FFD_API_URL!,
+  projectId: process.env.FFD_PROJECT_ID!,
+  environmentId: process.env.FFD_ENVIRONMENT_ID!,
+  token: process.env.FFD_MANAGEMENT_TOKEN!,
+});
+
+const form = await authoring.form.get("articles");
+```
+
+Promise and Effect clients cover schema export/plan/apply, immutable presentation publication, role-projected forms, optimistic entry rename and draft writes, validation, and exact-locale publish/unpublish. Requests and responses are recursively decoded and bounded. Redirects, stale authority, repeated cursors, and force-overwrite behavior fail closed.
+
+See [Automate content workflows](/docs/authoring/automate-content).
 
 ## Runtime Validation
 

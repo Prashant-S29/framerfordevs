@@ -11,12 +11,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GeneratedForm } from "./generated-form";
 
-vi.mock("./portable-text-field", () => ({
-  default: ({ value }: { readonly value: unknown }) => (
-    <output aria-label="Rich text value">{JSON.stringify(value)}</output>
-  ),
-}));
-
 const editor = {
   helpText: "Generated from the schema contract.",
   placeholder: "Enter a value",
@@ -150,7 +144,9 @@ afterEach(cleanup);
 
 describe("generated form", () => {
   it("renders typed role-aware controls without detectable accessibility violations", async () => {
-    const { container } = render(<GeneratedForm definition={definition} />);
+    const { container } = render(
+      <GeneratedForm definition={definition} validationFields={definition.fields} />,
+    );
 
     expect(screen.getByLabelText(/title/i)).toBeTruthy();
     expect(screen.getByLabelText(/price currency/i)).toBeTruthy();
@@ -161,7 +157,7 @@ describe("generated form", () => {
 
   it("reports required preview validation without persisting values", async () => {
     const user = userEvent.setup();
-    render(<GeneratedForm definition={definition} />);
+    render(<GeneratedForm definition={definition} validationFields={definition.fields} />);
 
     await user.click(screen.getByRole("button", { name: /validate preview/i }));
     expect(screen.getByText(/review the highlighted preview fields/i)).toBeTruthy();
@@ -175,6 +171,7 @@ describe("generated form", () => {
     render(
       <GeneratedForm
         definition={definition}
+        validationFields={definition.fields}
         values={{}}
         onValuesChange={() => undefined}
         serverIssues={{ [titleId]: "This field is required." }}
@@ -201,10 +198,14 @@ describe("generated form", () => {
       ],
     };
     render(
-      <GeneratedForm definition={definition} values={{ [fields[4]?.id ?? "missing"]: document }} />,
+      <GeneratedForm
+        definition={definition}
+        validationFields={definition.fields}
+        values={{ [fields[4]?.id ?? "missing"]: document }}
+      />,
     );
 
-    expect((await screen.findByLabelText(/rich text value/i)).textContent).toContain("Saved body");
+    expect(await screen.findByText("Saved body")).toBeTruthy();
   });
 
   it("emits controlled values under stable field IDs and exposes save status", async () => {
@@ -214,6 +215,7 @@ describe("generated form", () => {
     render(
       <GeneratedForm
         definition={definition}
+        validationFields={definition.fields}
         values={{}}
         onValuesChange={onValuesChange}
         onSubmit={onSubmit}

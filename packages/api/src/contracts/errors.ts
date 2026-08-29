@@ -87,6 +87,10 @@ export class SchemaChangeAcknowledgementRequiredFailure extends Schema.TaggedErr
   requiredChanges: SchemaChanges,
 }) {}
 
+export class DashboardSchemaAuthoringRetiredFailure extends Schema.TaggedError<DashboardSchemaAuthoringRetiredFailure>(
+  "DashboardSchemaAuthoringRetiredFailure",
+)("DashboardSchemaAuthoringRetiredFailure", {}) {}
+
 export class PublishedSchemaRequiredFailure extends Schema.TaggedError<PublishedSchemaRequiredFailure>(
   "PublishedSchemaRequiredFailure",
 )("PublishedSchemaRequiredFailure", {}) {}
@@ -167,6 +171,46 @@ export class ToolingConcurrentSchemaChangeFailure extends Schema.TaggedError<Too
 export class ToolingResponseTooLargeFailure extends Schema.TaggedError<ToolingResponseTooLargeFailure>(
   "ToolingResponseTooLargeFailure",
 )("ToolingResponseTooLargeFailure", {}) {}
+
+export class AuthoringStaleSchemaFailure extends Schema.TaggedError<AuthoringStaleSchemaFailure>(
+  "AuthoringStaleSchemaFailure",
+)("AuthoringStaleSchemaFailure", {}) {}
+
+export class AuthoringDraftConflictFailure extends Schema.TaggedError<AuthoringDraftConflictFailure>(
+  "AuthoringDraftConflictFailure",
+)("AuthoringDraftConflictFailure", {
+  details: Schema.Array(ApiErrorDetail).pipe(Schema.minItems(1), Schema.maxItems(2)),
+}) {}
+
+export class AuthoringPublicationConflictFailure extends Schema.TaggedError<AuthoringPublicationConflictFailure>(
+  "AuthoringPublicationConflictFailure",
+)("AuthoringPublicationConflictFailure", {
+  details: ValidationDetailsSchema,
+}) {}
+
+export class AuthoringPublicationInvalidFailure extends Schema.TaggedError<AuthoringPublicationInvalidFailure>(
+  "AuthoringPublicationInvalidFailure",
+)("AuthoringPublicationInvalidFailure", {
+  details: ValidationDetailsSchema,
+}) {}
+
+export class AuthoringCommandConflictFailure extends Schema.TaggedError<AuthoringCommandConflictFailure>(
+  "AuthoringCommandConflictFailure",
+)("AuthoringCommandConflictFailure", {}) {}
+
+export class AuthoringRiskyAcknowledgementRequiredFailure extends Schema.TaggedError<AuthoringRiskyAcknowledgementRequiredFailure>(
+  "AuthoringRiskyAcknowledgementRequiredFailure",
+)("AuthoringRiskyAcknowledgementRequiredFailure", {}) {}
+
+export class AuthoringSourceIdentityConflictFailure extends Schema.TaggedError<AuthoringSourceIdentityConflictFailure>(
+  "AuthoringSourceIdentityConflictFailure",
+)("AuthoringSourceIdentityConflictFailure", {
+  details: ValidationDetailsSchema,
+}) {}
+
+export class AuthoringResponseTooLargeFailure extends Schema.TaggedError<AuthoringResponseTooLargeFailure>(
+  "AuthoringResponseTooLargeFailure",
+)("AuthoringResponseTooLargeFailure", {}) {}
 
 export class WebhookDestinationUnsafeFailure extends Schema.TaggedError<WebhookDestinationUnsafeFailure>(
   "WebhookDestinationUnsafeFailure",
@@ -250,6 +294,7 @@ export type ApplicationError =
   | CollectionKeyConflictFailure
   | SchemaInvalidFailure
   | SchemaChangeAcknowledgementRequiredFailure
+  | DashboardSchemaAuthoringRetiredFailure
   | PublishedSchemaRequiredFailure
   | EntryDraftConflictFailure
   | EntryCommandConflictFailure
@@ -267,6 +312,14 @@ export type ApplicationError =
   | ToolingCursorInvalidFailure
   | ToolingConcurrentSchemaChangeFailure
   | ToolingResponseTooLargeFailure
+  | AuthoringStaleSchemaFailure
+  | AuthoringDraftConflictFailure
+  | AuthoringPublicationConflictFailure
+  | AuthoringPublicationInvalidFailure
+  | AuthoringCommandConflictFailure
+  | AuthoringRiskyAcknowledgementRequiredFailure
+  | AuthoringSourceIdentityConflictFailure
+  | AuthoringResponseTooLargeFailure
   | WebhookDestinationUnsafeFailure
   | WebhookDestinationResolutionFailure
   | WebhookEndpointLimitReachedFailure
@@ -298,6 +351,7 @@ export const apiErrorHttpStatus = {
   COLLECTION_KEY_CONFLICT: 409,
   SCHEMA_INVALID: 422,
   SCHEMA_CHANGE_ACKNOWLEDGEMENT_REQUIRED: 409,
+  DASHBOARD_SCHEMA_AUTHORING_RETIRED: 410,
   PUBLISHED_SCHEMA_REQUIRED: 409,
   ENTRY_DRAFT_CONFLICT: 409,
   ENTRY_COMMAND_CONFLICT: 409,
@@ -314,6 +368,15 @@ export const apiErrorHttpStatus = {
   TOOLING_CURSOR_INVALID: 400,
   TOOLING_CONCURRENT_SCHEMA_CHANGE: 409,
   TOOLING_RESPONSE_TOO_LARGE: 413,
+  STALE_SCHEMA: 409,
+  DRAFT_CONFLICT: 409,
+  PUBLICATION_CONFLICT: 409,
+  PUBLICATION_INVALID: 422,
+  COMMAND_CONFLICT: 409,
+  RISKY_ACKNOWLEDGEMENT_REQUIRED: 409,
+  SOURCE_IDENTITY_CONFLICT: 409,
+  REQUEST_TOO_LARGE: 413,
+  RESPONSE_TOO_LARGE: 413,
   WEBHOOK_DESTINATION_UNSAFE: 422,
   WEBHOOK_ENDPOINT_LIMIT_REACHED: 409,
   WEBHOOK_SECRET_ROTATION_CONFLICT: 409,
@@ -501,6 +564,12 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
         ...(details.length === 0 ? {} : { details }),
       };
     }
+    case "DashboardSchemaAuthoringRetiredFailure":
+      return {
+        code: "DASHBOARD_SCHEMA_AUTHORING_RETIRED",
+        message: "Collection structure is managed through code-first schema authoring.",
+        retryable: false,
+      };
     case "PublishedSchemaRequiredFailure":
       return {
         code: "PUBLISHED_SCHEMA_REQUIRED",
@@ -613,6 +682,59 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
       return {
         code: "TOOLING_RESPONSE_TOO_LARGE",
         message: "The Tooling response exceeds the maximum size.",
+        retryable: false,
+      };
+    case "AuthoringStaleSchemaFailure":
+      return {
+        code: "STALE_SCHEMA",
+        message: "Published schema authority changed. Plan the complete project schema again.",
+        retryable: false,
+      };
+    case "AuthoringDraftConflictFailure":
+      return {
+        code: "DRAFT_CONFLICT",
+        message:
+          "The draft changed since it was loaded. Review the latest authority and try again.",
+        retryable: false,
+        details: error.details,
+      };
+    case "AuthoringPublicationConflictFailure":
+      return {
+        code: "PUBLICATION_CONFLICT",
+        message: "Publication authority changed. Validate the exact locale again.",
+        retryable: false,
+        details: error.details,
+      };
+    case "AuthoringPublicationInvalidFailure":
+      return {
+        code: "PUBLICATION_INVALID",
+        message: "The exact locale cannot be published until its publication issues are resolved.",
+        retryable: false,
+        details: error.details,
+      };
+    case "AuthoringCommandConflictFailure":
+      return {
+        code: "COMMAND_CONFLICT",
+        message: "The command identifier was already used for a different schema apply.",
+        retryable: false,
+      };
+    case "AuthoringRiskyAcknowledgementRequiredFailure":
+      return {
+        code: "RISKY_ACKNOWLEDGEMENT_REQUIRED",
+        message: "Acknowledge exactly the risky changes returned by the current plan.",
+        retryable: false,
+      };
+    case "AuthoringSourceIdentityConflictFailure":
+      return {
+        code: "SOURCE_IDENTITY_CONFLICT",
+        message: "One or more authoring source identities conflict with persisted authority.",
+        retryable: false,
+        details: error.details,
+      };
+    case "AuthoringResponseTooLargeFailure":
+      return {
+        code: "RESPONSE_TOO_LARGE",
+        message: "The Authoring response exceeds the maximum size.",
         retryable: false,
       };
     case "WebhookDestinationUnsafeFailure":

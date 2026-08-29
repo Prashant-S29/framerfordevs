@@ -11,7 +11,7 @@ import {
   EntryPublicationStatus,
   EntryPublicationSummary,
 } from "@framerfordevs/api/contracts/publications";
-import { CollectionDraftSchema, SchemaChange } from "@framerfordevs/api/contracts/schemas";
+import { CollectionDraftSchema } from "@framerfordevs/api/contracts/schemas";
 import { WebhookEndpoint } from "@framerfordevs/api/contracts/webhooks";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -35,9 +35,7 @@ import {
 import { AddLocaleDialog } from "@/components/project-locale-settings";
 import { CreateEntryDialog } from "@/components/collection-entries";
 import { PublicationCard, RenameEntryDialog } from "@/components/entry-editor";
-import { CreateCollectionDialog } from "@/components/project-collections";
-import { PublishCard } from "@/components/schema-builder";
-import { SchemaWorkbench } from "@/components/schema-workbench";
+import { CodeManagedStructureCard } from "@/components/schema-builder";
 import {
   CreateInvalidationMappingDialog,
   CreateWebhookEndpointDialog,
@@ -167,14 +165,6 @@ const collectionDraft = Schema.decodeUnknownSync(CollectionDraftSchema)({
     updatedAt: "2026-08-01T00:00:00.000Z",
   },
   fields: [],
-});
-
-const riskySchemaChange = Schema.decodeUnknownSync(SchemaChange)({
-  changeId: "a".repeat(64),
-  code: "field.added.required",
-  classification: "potentially_breaking",
-  fieldId: "019fae8b-1234-7000-8000-000000000011",
-  summary: "A required field was added.",
 });
 
 function renderWithQueryClient(component: ReactNode, queryClient = new QueryClient()) {
@@ -347,6 +337,7 @@ describe("platform management accessibility", () => {
       changedFieldIds: [],
       size,
       publishedByUserId: "accessible-user",
+      publishedByCredentialId: null,
       publishedAt: "2026-08-09T12:00:00.000Z",
       current: true,
     });
@@ -435,57 +426,15 @@ describe("platform management accessibility", () => {
     expect((await axe.run(unpublishDialog)).violations).toEqual([]);
   });
 
-  it("has accessible collection and schema-building semantics", async () => {
-    const user = userEvent.setup();
-    renderWithQueryClient(
-      <CreateCollectionDialog projectId={project.id} environmentId={project.environment.id} />,
-    );
-    await expectOpenDialogToHaveNoViolations(/new collection/i);
-    cleanup();
+  it("has accessible code-managed structure semantics without mutation controls", async () => {
     const { container } = renderWithQueryClient(
-      <SchemaWorkbench
-        scope={{
-          projectId: project.id,
-          environmentId: project.environment.id,
-          collectionId: collectionDraft.collection.id,
-        }}
-        draft={collectionDraft}
-        collections={[
-          {
-            id: collectionDraft.collection.id,
-            displayName: collectionDraft.collection.displayName,
-          },
-        ]}
-        canWrite
-        onSaved={async () => undefined}
-        onDirtyChange={() => undefined}
-      />,
+      <CodeManagedStructureCard fields={collectionDraft.fields} revisionId={null} />,
     );
-    await user.click(screen.getByRole("button", { name: "Add Field" }));
+    expect(screen.getByRole("heading", { name: /structure is managed in code/i })).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: /add field|save schema|publish schema/i }),
+    ).toBeNull();
     expect((await axe.run(container)).violations).toEqual([]);
-  });
-
-  it("requires every risky schema change acknowledgement before publication", async () => {
-    const user = userEvent.setup();
-    renderWithQueryClient(
-      <PublishCard
-        scope={{
-          projectId: project.id,
-          environmentId: project.environment.id,
-          collectionId: collectionDraft.collection.id,
-        }}
-        draft={collectionDraft}
-        changes={[riskySchemaChange]}
-        valid
-        issues={[]}
-        canPublish
-        onPublished={async () => undefined}
-      />,
-    );
-    const publish = screen.getByRole("button", { name: /publish schema/i });
-    expect(publish.hasAttribute("disabled")).toBe(true);
-    await user.click(screen.getByRole("checkbox", { name: /required field was added/i }));
-    expect(publish.hasAttribute("disabled")).toBe(false);
   });
 
   it("validates locale tags before creating a locale", async () => {

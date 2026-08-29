@@ -2,13 +2,32 @@
 
 import { createHash } from "node:crypto";
 
-import { createContext, type Context } from "@framerfordevs/api/context";
+import {
+  type ApplicationEffectTransform,
+  createContext,
+  type Context,
+} from "@framerfordevs/api/context";
 import { EffectSchemaToJsonSchemaConverter } from "@framerfordevs/api/contracts/effect-schema-converter";
 import {
   apiFailure,
   type ApiData,
   type ApiResponse,
 } from "@framerfordevs/api/contracts/api-response";
+import { authoringLimits } from "@framerfordevs/api/contracts/authoring";
+import type {
+  AuthoringCreateEntryRequest,
+  AuthoringRenameEntryRequest,
+  AuthoringSaveEntryDraftRequest,
+} from "@framerfordevs/api/contracts/authoring-content";
+import type {
+  AuthoringPublishEntryRequest,
+  AuthoringUnpublishEntryRequest,
+} from "@framerfordevs/api/contracts/authoring-publication";
+import type { AuthoringPublishPresentationRequest } from "@framerfordevs/api/contracts/authoring-presentation";
+import type {
+  AuthoringSchemaApplyRequest,
+  AuthoringSchemaPlanRequest,
+} from "@framerfordevs/api/contracts/authoring-schema";
 import type { DeliveryAccessPrincipal } from "@framerfordevs/api/contracts/delivery";
 import { toolingLimits } from "@framerfordevs/api/contracts/tooling";
 import {
@@ -17,6 +36,46 @@ import {
 } from "@framerfordevs/public-contracts";
 import type { RateLimitDecision } from "@framerfordevs/api/contracts/rate-limit";
 import { selectCanonicalNetworkSource } from "@framerfordevs/api/lib/network-source";
+import {
+  applyAuthoringProjectSchema,
+  authenticateAuthoringRequest,
+  authoringContentPublishBearerRequirement,
+  authoringContentReadBearerRequirement,
+  authoringDraftWriteBearerRequirement,
+  authoringSchemaApplyBearerRequirement,
+  authoringSchemaExportBearerRequirement,
+  authoringSchemaPlanBearerRequirement,
+  authoringPresentationPublishBearerRequirement,
+  authoringSchemaRequestCost,
+  decodeAuthoringCreateEntryRequest,
+  decodeAuthoringEntryScope,
+  decodeAuthoringListEntriesQuery,
+  decodeAuthoringProjectScope,
+  decodeAuthoringRenameEntryRequest,
+  decodeAuthoringPublishEntryRequest,
+  decodeAuthoringSaveEntryDraftRequest,
+  decodeAuthoringUnpublishEntryRequest,
+  decodeAuthoringValidatePublicationRequest,
+  decodeAuthoringSchemaApplyRequest,
+  decodeAuthoringSchemaPlanRequest,
+  decodeAuthoringPublishPresentationRequest,
+  evaluateAuthoringGlobalRateLimit,
+  createAuthoringEntry,
+  evaluateAuthoringPrincipalRateLimit,
+  exportAuthoringProjectSchema,
+  getAuthoringEntryDraft,
+  getAuthoringGeneratedForm,
+  getAuthoringPresentation,
+  getAuthoringPublicationStatus,
+  listAuthoringEntries,
+  planAuthoringProjectSchema,
+  publishAuthoringEntry,
+  publishAuthoringPresentation,
+  renameAuthoringEntry,
+  saveAuthoringEntryDraft,
+  unpublishAuthoringEntry,
+  validateAuthoringPublication,
+} from "@framerfordevs/api/operations/authoring-public";
 import {
   authenticateToolingRequest,
   decodeToolingCollectionRevisionScope,
@@ -61,14 +120,20 @@ import type {
 import { readinessCheck, healthCheck } from "@framerfordevs/api/operations/system";
 import { makeRequestContext } from "@framerfordevs/api/observability/request-context";
 import {
+  authoringCostBucket,
+  authoringSizeBucket,
   toolingPageCountBucket,
   toolingResponseSizeBucket,
   toStatusFamily,
+  type AuthoringEndpoint,
+  type AuthoringSubject,
   type PreviewQueryRejectionCategory,
   type ToolingEndpoint,
   type ToolingSubject,
 } from "@framerfordevs/api/observability/telemetry";
 import {
+  observeAuthoringAuthentication,
+  observeAuthoringRequest,
   observeHttpRequest,
   observePreviewQueryRejection,
   observeToolingRequest,
@@ -100,6 +165,7 @@ function publicArtifactBytes(key: PublicContractRegistryKey): string {
   return artifact.bytes;
 }
 
+const authoringOpenApiBytes = publicArtifactBytes("authoring/v1");
 const deliveryOpenApiBytes = publicArtifactBytes("delivery/v1");
 const previewOpenApiBytes = publicArtifactBytes("preview/v1");
 const toolingOpenApiBytes = publicArtifactBytes("tooling/v1");
@@ -1352,10 +1418,941 @@ function createToolingRouter(): Router {
   return router;
 }
 
+function setAuthoringHeaders(res: Response): void {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Vary", "Authorization");
+}
+
+function sendAuthoringResponse(
+  req: Request,
+  res: Response,
+  status: number,
+  response: ApiResponse<ApiData>,
+): void {
+  setAuthoringHeaders(res);
+  if (status === 401) res.setHeader("WWW-Authenticate", 'Bearer realm="authoring"');
+  const body = Buffer.from(JSON.stringify(response), "utf8");
+  if (body.byteLength > authoringLimits.responseBytes) {
+    const failure = apiFailure({
+      code: "RESPONSE_TOO_LARGE",
+      message: "The Authoring response exceeds the maximum size.",
+      requestId: requestContext(req).requestId,
+      retryable: false,
+    });
+    res.status(413).json(failure);
+    return;
+  }
+  res.status(status).setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Content-Length", String(body.byteLength));
+  res.end(body);
+}
+
+interface AuthoringHttpObservation {
+  readonly endpoint: AuthoringEndpoint;
+  readonly startedAt: number;
+  subject: AuthoringSubject;
+  cost: number;
+}
+
+const authoringObservations = new WeakMap<Response, AuthoringHttpObservation>();
+
+export function classifyAuthoringEndpoint(method: string, path: string): AuthoringEndpoint | null {
+  if (path.endsWith("/schema/export") && method === "GET") return "schema_export";
+  if (path.endsWith("/schema/plan") && method === "POST") return "schema_plan";
+  if (path.endsWith("/schema/apply") && method === "POST") return "schema_apply";
+  if (path.endsWith("/presentation"))
+    return method === "GET"
+      ? "presentation_get"
+      : method === "POST"
+        ? "presentation_publish"
+        : null;
+  if (path.endsWith("/form") && method === "GET") return "form_get";
+  if (path.endsWith("/entries"))
+    return method === "GET" ? "entry_list" : method === "POST" ? "entry_create" : null;
+  if (/\/entries\/[^/]+\/draft$/u.test(path))
+    return method === "GET" ? "entry_get" : method === "PATCH" ? "entry_save" : null;
+  if (/\/entries\/[^/]+\/publication\/validate$/u.test(path) && method === "POST")
+    return "publication_validate";
+  if (/\/entries\/[^/]+\/publication\/publish$/u.test(path) && method === "POST")
+    return "publication_publish";
+  if (/\/entries\/[^/]+\/publication\/unpublish$/u.test(path) && method === "POST")
+    return "publication_unpublish";
+  if (/\/entries\/[^/]+\/publication$/u.test(path) && method === "GET") return "publication_status";
+  if (/\/entries\/[^/]+$/u.test(path) && method === "PATCH") return "entry_rename";
+  return null;
+}
+
+async function enforceAuthoringQuota(
+  req: Request,
+  res: Response,
+  context: Context,
+  principal: ToolingPrincipal | null,
+  cost: number,
+): Promise<boolean> {
+  const result = await context.execute(
+    principal === null ? "api.authoring.rate_limit.global" : "api.authoring.rate_limit.principal",
+    principal === null
+      ? evaluateAuthoringGlobalRateLimit(cost)
+      : evaluateAuthoringPrincipalRateLimit(principal, cost),
+    "Authoring quota evaluated.",
+  );
+  const decision = stepData(req, res, result);
+  if (decision === null) return false;
+  setRateLimitHeaders(res, decision);
+  if (decision.allowed) return true;
+  sendAuthoringResponse(
+    req,
+    res,
+    429,
+    apiFailure({
+      code: "RATE_LIMITED",
+      message: "Too many requests. Try again later.",
+      requestId: context.request.requestId,
+      retryable: true,
+    }),
+  );
+  return false;
+}
+
+async function prepareAuthoringRequest(
+  req: Request,
+  res: Response,
+  context: Context,
+  cost: number,
+  requirement: typeof authoringSchemaPlanBearerRequirement,
+): Promise<ToolingPrincipal | undefined> {
+  const observation = authoringObservations.get(res);
+  if (observation !== undefined) observation.cost = cost;
+  if (!(await enforceAuthoringQuota(req, res, context, null, cost))) return undefined;
+  const authentication = await context.execute(
+    "api.authoring.authenticate",
+    authenticateAuthoringRequest(
+      req.headers.authorization ?? null,
+      selectCanonicalNetworkSource(req.ip, req.socket.remoteAddress),
+      requirement,
+    ),
+    "Authoring principal authenticated.",
+  );
+  if (!authentication.response.ok) {
+    void observeAuthoringAuthentication({
+      subject: "unknown",
+      outcome: authentication.status < 500 ? "invalid" : "failure",
+    }).catch(() => undefined);
+    sendAuthoringResponse(req, res, authentication.status, authentication.response);
+    return undefined;
+  }
+  const principal = authentication.response.data;
+  if (observation !== undefined) observation.subject = principal.kind;
+  void observeAuthoringAuthentication({
+    subject: principal.kind,
+    outcome: "success",
+  }).catch(() => undefined);
+  if (!(await enforceAuthoringQuota(req, res, context, principal, cost))) return undefined;
+  return principal;
+}
+
+function authoringBodyBytes(req: Request): number {
+  const contentLength = req.headers["content-length"];
+  if (typeof contentLength === "string" && /^[0-9]+$/u.test(contentLength)) {
+    const parsed = Number(contentLength);
+    if (Number.isSafeInteger(parsed)) return parsed;
+  }
+  return Buffer.byteLength(JSON.stringify(req.body ?? null), "utf8");
+}
+
+const makeApplicationContext = createContext;
+
+function createAuthoringRouter(transformEffect?: ApplicationEffectTransform): Router {
+  const router = express.Router();
+  const createContext = ({ req }: { readonly req: Request }) =>
+    transformEffect === undefined
+      ? makeApplicationContext({ req })
+      : makeApplicationContext({ req, transformEffect });
+
+  router.use((req, res, next) => {
+    const endpoint = classifyAuthoringEndpoint(req.method, req.path);
+    if (endpoint !== null) {
+      const observation: AuthoringHttpObservation = {
+        endpoint,
+        startedAt: performance.now(),
+        subject: "unknown",
+        cost: 1,
+      };
+      authoringObservations.set(res, observation);
+      res.once("finish", () => {
+        void observeAuthoringRequest({
+          endpoint: observation.endpoint,
+          subject: observation.subject,
+          outcome: res.statusCode < 400 ? "success" : "failure",
+          statusFamily: toStatusFamily(res.statusCode),
+          requestSizeBucket: authoringSizeBucket(authoringBodyBytes(req)),
+          responseSizeBucket: authoringSizeBucket(responseContentLength(res)),
+          costBucket: authoringCostBucket(observation.cost),
+          durationMs: Math.max(0, performance.now() - observation.startedAt),
+        }).catch(() => undefined);
+      });
+    }
+
+    setAuthoringHeaders(res);
+    const specificationRoute = req.path === "/openapi.json" || req.path === "/docs";
+    if (specificationRoute) {
+      next();
+      return;
+    }
+    if (req.headers.origin !== undefined || req.method === "OPTIONS") {
+      sendAuthoringResponse(
+        req,
+        res,
+        403,
+        apiFailure({
+          code: "FORBIDDEN",
+          message: "Browser-origin Authoring requests are not allowed.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    const rawQuery = req.originalUrl.split("?", 2)[1] ?? "";
+    if (Buffer.byteLength(rawQuery, "utf8") > 8_192) {
+      sendAuthoringResponse(
+        req,
+        res,
+        400,
+        apiFailure({
+          code: "VALIDATION_ERROR",
+          message: "The Authoring query is invalid.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    if (rawQuery !== "" && !(req.method === "GET" && req.path.endsWith("/entries"))) {
+      sendAuthoringResponse(
+        req,
+        res,
+        400,
+        apiFailure({
+          code: "VALIDATION_ERROR",
+          message: "This Authoring route does not accept query parameters.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    const contentLength = req.headers["content-length"];
+    if (
+      typeof contentLength === "string" &&
+      (!/^[0-9]+$/u.test(contentLength) || Number(contentLength) > authoringLimits.requestBytes)
+    ) {
+      sendAuthoringResponse(
+        req,
+        res,
+        413,
+        apiFailure({
+          code: "REQUEST_TOO_LARGE",
+          message: "The Authoring request exceeds the maximum size.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    if ((req.method === "POST" || req.method === "PATCH") && !req.is("application/json")) {
+      sendAuthoringResponse(
+        req,
+        res,
+        400,
+        apiFailure({
+          code: "VALIDATION_ERROR",
+          message: "Authoring requests require application/json.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    next();
+  });
+
+  router.get("/openapi.json", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.type("application/json").send(authoringOpenApiBytes);
+  });
+  router.get(
+    "/docs",
+    (_req, res, next) => {
+      res.setHeader("Cache-Control", "public, max-age=300");
+      next();
+    },
+    apiReference({
+      pageTitle: "Framer for Devs Authoring API",
+      url: "/api/authoring/v1/openapi.json",
+    }),
+  );
+
+  router.use(express.json({ limit: authoringLimits.requestBytes, strict: true }));
+
+  const presentationPath =
+    "/projects/:projectId/environments/:environmentId/collections/:collectionKey/presentation";
+  router.get(presentationPath, async (req, res) => {
+    const context = createContext({ req });
+    const principal = await prepareAuthoringRequest(
+      req,
+      res,
+      context,
+      2,
+      authoringSchemaExportBearerRequirement,
+    );
+    if (principal === undefined) return;
+    const projectResult = await context.execute(
+      "api.authoring.presentation.project",
+      decodeAuthoringProjectScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Authoring project scope decoded.",
+    );
+    const project = stepData(req, res, projectResult);
+    if (project === null) return;
+    const result = await context.execute(
+      "api.authoring.presentation.get",
+      getAuthoringPresentation(principal, project, routeParameter(req, "collectionKey")),
+      "Authoring presentation loaded.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+  router.post(presentationPath, async (req, res) => {
+    const context = createContext({ req });
+    const principal = await prepareAuthoringRequest(
+      req,
+      res,
+      context,
+      Math.min(100, 4 + Math.ceil(authoringBodyBytes(req) / 16_384)),
+      authoringPresentationPublishBearerRequirement,
+    );
+    if (principal === undefined) return;
+    const projectResult = await context.execute(
+      "api.authoring.presentation.project",
+      decodeAuthoringProjectScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Authoring project scope decoded.",
+    );
+    const project = stepData(req, res, projectResult);
+    if (project === null) return;
+    const bodyResult = await context.execute(
+      "api.authoring.presentation.body",
+      decodeAuthoringPublishPresentationRequest(req.body),
+      "Authoring presentation body decoded.",
+    );
+    const body = stepData(req, res, bodyResult) as AuthoringPublishPresentationRequest | null;
+    if (body === null) return;
+    const result = await context.execute(
+      "api.authoring.presentation.publish",
+      publishAuthoringPresentation(
+        principal,
+        project,
+        routeParameter(req, "collectionKey"),
+        body,
+        context.request.requestId,
+      ),
+      "Authoring presentation published.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  const formPath =
+    "/projects/:projectId/environments/:environmentId/collections/:collectionKey/form";
+  router.get(formPath, async (req, res) => {
+    const context = createContext({ req });
+    const principal = await prepareAuthoringRequest(
+      req,
+      res,
+      context,
+      2,
+      authoringContentReadBearerRequirement,
+    );
+    if (principal === undefined) return;
+    const projectResult = await context.execute(
+      "api.authoring.form.project",
+      decodeAuthoringProjectScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Authoring project scope decoded.",
+    );
+    const project = stepData(req, res, projectResult);
+    if (project === null) return;
+    const result = await context.execute(
+      "api.authoring.form.get",
+      getAuthoringGeneratedForm(principal, project, routeParameter(req, "collectionKey")),
+      "Authoring generated form loaded.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  const entriesPath =
+    "/projects/:projectId/environments/:environmentId/collections/:collectionKey/locales/:locale/entries";
+  const prepareEntryScope = async (
+    req: Request,
+    res: Response,
+    context: Context,
+    cost: number,
+    requirement: typeof authoringSchemaPlanBearerRequirement,
+  ) => {
+    const principal = await prepareAuthoringRequest(req, res, context, cost, requirement);
+    if (principal === undefined) return undefined;
+    const projectResult = await context.execute(
+      "api.authoring.entry.project",
+      decodeAuthoringProjectScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Authoring project scope decoded.",
+    );
+    const project = stepData(req, res, projectResult);
+    if (project === null) return undefined;
+    const scopeResult = await context.execute(
+      "api.authoring.entry.scope",
+      decodeAuthoringEntryScope(
+        routeParameter(req, "collectionKey"),
+        routeParameter(req, "locale"),
+      ),
+      "Authoring entry scope decoded.",
+    );
+    const scope = stepData(req, res, scopeResult);
+    return scope === null ? undefined : { principal, project, scope };
+  };
+
+  router.get(entriesPath, async (req, res) => {
+    const context = createContext({ req });
+    const parameters = new URLSearchParams(req.originalUrl.split("?", 2)[1] ?? "");
+    if (
+      [...parameters.keys()].some((key) => key !== "cursor" && key !== "limit") ||
+      parameters.getAll("cursor").length > 1 ||
+      parameters.getAll("limit").length > 1
+    ) {
+      sendAuthoringResponse(
+        req,
+        res,
+        400,
+        apiFailure({
+          code: "VALIDATION_ERROR",
+          message: "The Authoring query is invalid.",
+          requestId: context.request.requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    const queryResult = await context.execute(
+      "api.authoring.entry.list.query",
+      decodeAuthoringListEntriesQuery({
+        cursor: parameters.get("cursor"),
+        limit: Number(parameters.get("limit") ?? "20"),
+      }),
+      "Authoring entry query decoded.",
+    );
+    const query = stepData(req, res, queryResult);
+    if (query === null) return;
+    const principal = await prepareAuthoringRequest(
+      req,
+      res,
+      context,
+      1 + Math.ceil(query.limit / 10),
+      authoringContentReadBearerRequirement,
+    );
+    if (principal === undefined) return;
+    const projectResult = await context.execute(
+      "api.authoring.entry.list.project",
+      decodeAuthoringProjectScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Authoring project scope decoded.",
+    );
+    const project = stepData(req, res, projectResult);
+    if (project === null) return;
+    const scopeResult = await context.execute(
+      "api.authoring.entry.list.scope",
+      decodeAuthoringEntryScope(
+        routeParameter(req, "collectionKey"),
+        routeParameter(req, "locale"),
+      ),
+      "Authoring entry scope decoded.",
+    );
+    const scope = stepData(req, res, scopeResult);
+    if (scope === null) return;
+    const result = await context.execute(
+      "api.authoring.entry.list",
+      listAuthoringEntries(principal, project, scope, query),
+      "Authoring entries loaded.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  router.post(entriesPath, async (req, res) => {
+    const context = createContext({ req });
+    const prepared = await prepareEntryScope(
+      req,
+      res,
+      context,
+      Math.min(100, 3 + Math.ceil(authoringBodyBytes(req) / 16_384)),
+      authoringDraftWriteBearerRequirement,
+    );
+    if (prepared === undefined) return;
+    const bodyResult = await context.execute(
+      "api.authoring.entry.create.body",
+      decodeAuthoringCreateEntryRequest(req.body),
+      "Authoring create body decoded.",
+    );
+    const body = stepData(req, res, bodyResult) as AuthoringCreateEntryRequest | null;
+    if (body === null) return;
+    const result = await context.execute(
+      "api.authoring.entry.create",
+      createAuthoringEntry(
+        prepared.principal,
+        prepared.project,
+        prepared.scope,
+        body,
+        context.request.requestId,
+      ),
+      "Authoring entry created with initial draft.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  const entryPath = `${entriesPath}/:entryId`;
+  router.patch(entryPath, async (req, res) => {
+    const context = createContext({ req });
+    const prepared = await prepareEntryScope(
+      req,
+      res,
+      context,
+      2,
+      authoringDraftWriteBearerRequirement,
+    );
+    if (prepared === undefined) return;
+    const bodyResult = await context.execute(
+      "api.authoring.entry.rename.body",
+      decodeAuthoringRenameEntryRequest(req.body),
+      "Authoring rename body decoded.",
+    );
+    const body = stepData(req, res, bodyResult) as AuthoringRenameEntryRequest | null;
+    if (body === null) return;
+    const result = await context.execute(
+      "api.authoring.entry.rename",
+      renameAuthoringEntry(
+        prepared.principal,
+        prepared.project,
+        prepared.scope,
+        routeParameter(req, "entryId"),
+        body,
+        context.request.requestId,
+      ),
+      "Authoring entry renamed.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  const entryDraftPath = `${entryPath}/draft`;
+  router.get(entryDraftPath, async (req, res) => {
+    const context = createContext({ req });
+    const principal = await prepareAuthoringRequest(
+      req,
+      res,
+      context,
+      2,
+      authoringContentReadBearerRequirement,
+    );
+    if (principal === undefined) return;
+    const projectResult = await context.execute(
+      "api.authoring.entry.get.project",
+      decodeAuthoringProjectScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Authoring project scope decoded.",
+    );
+    const project = stepData(req, res, projectResult);
+    if (project === null) return;
+    const scopeResult = await context.execute(
+      "api.authoring.entry.get.scope",
+      decodeAuthoringEntryScope(
+        routeParameter(req, "collectionKey"),
+        routeParameter(req, "locale"),
+      ),
+      "Authoring entry scope decoded.",
+    );
+    const scope = stepData(req, res, scopeResult);
+    if (scope === null) return;
+    const result = await context.execute(
+      "api.authoring.entry.get",
+      getAuthoringEntryDraft(principal, project, scope, routeParameter(req, "entryId")),
+      "Authoring entry draft loaded.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  router.patch(entryDraftPath, async (req, res) => {
+    const context = createContext({ req });
+    const cost = Math.min(100, 2 + Math.ceil(authoringBodyBytes(req) / 16_384));
+    const principal = await prepareAuthoringRequest(
+      req,
+      res,
+      context,
+      cost,
+      authoringDraftWriteBearerRequirement,
+    );
+    if (principal === undefined) return;
+    const projectResult = await context.execute(
+      "api.authoring.entry.save.project",
+      decodeAuthoringProjectScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Authoring project scope decoded.",
+    );
+    const project = stepData(req, res, projectResult);
+    if (project === null) return;
+    const scopeResult = await context.execute(
+      "api.authoring.entry.save.scope",
+      decodeAuthoringEntryScope(
+        routeParameter(req, "collectionKey"),
+        routeParameter(req, "locale"),
+      ),
+      "Authoring entry scope decoded.",
+    );
+    const scope = stepData(req, res, scopeResult);
+    if (scope === null) return;
+    const bodyResult = await context.execute(
+      "api.authoring.entry.save.body",
+      decodeAuthoringSaveEntryDraftRequest(req.body),
+      "Authoring draft body decoded.",
+    );
+    const body = stepData(req, res, bodyResult) as AuthoringSaveEntryDraftRequest | null;
+    if (body === null) return;
+    const result = await context.execute(
+      "api.authoring.entry.save",
+      saveAuthoringEntryDraft(
+        principal,
+        project,
+        scope,
+        routeParameter(req, "entryId"),
+        body,
+        context.request.requestId,
+      ),
+      "Authoring entry draft saved.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  const publicationPath = `${entriesPath}/:entryId/publication`;
+  router.get(publicationPath, async (req, res) => {
+    const context = createContext({ req });
+    const prepared = await prepareEntryScope(
+      req,
+      res,
+      context,
+      2,
+      authoringContentReadBearerRequirement,
+    );
+    if (prepared === undefined) return;
+    const result = await context.execute(
+      "api.authoring.publication.status",
+      getAuthoringPublicationStatus(
+        prepared.principal,
+        prepared.project,
+        prepared.scope,
+        routeParameter(req, "entryId"),
+      ),
+      "Authoring publication status loaded.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  router.post(`${publicationPath}/validate`, async (req, res) => {
+    const context = createContext({ req });
+    const prepared = await prepareEntryScope(
+      req,
+      res,
+      context,
+      3,
+      authoringContentPublishBearerRequirement,
+    );
+    if (prepared === undefined) return;
+    const bodyResult = await context.execute(
+      "api.authoring.publication.validate.body",
+      decodeAuthoringValidatePublicationRequest(req.body),
+      "Authoring publication validation body decoded.",
+    );
+    if (stepData(req, res, bodyResult) === null) return;
+    const result = await context.execute(
+      "api.authoring.publication.validate",
+      validateAuthoringPublication(
+        prepared.principal,
+        prepared.project,
+        prepared.scope,
+        routeParameter(req, "entryId"),
+      ),
+      "Authoring publication validated.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  router.post(`${publicationPath}/publish`, async (req, res) => {
+    const context = createContext({ req });
+    const prepared = await prepareEntryScope(
+      req,
+      res,
+      context,
+      Math.min(100, 4 + Math.ceil(authoringBodyBytes(req) / 16_384)),
+      authoringContentPublishBearerRequirement,
+    );
+    if (prepared === undefined) return;
+    const bodyResult = await context.execute(
+      "api.authoring.publication.publish.body",
+      decodeAuthoringPublishEntryRequest(req.body),
+      "Authoring publish body decoded.",
+    );
+    const body = stepData(req, res, bodyResult) as AuthoringPublishEntryRequest | null;
+    if (body === null) return;
+    const result = await context.execute(
+      "api.authoring.publication.publish",
+      publishAuthoringEntry(
+        prepared.principal,
+        prepared.project,
+        prepared.scope,
+        routeParameter(req, "entryId"),
+        body,
+        context.request.requestId,
+      ),
+      "Authoring locale published.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  router.post(`${publicationPath}/unpublish`, async (req, res) => {
+    const context = createContext({ req });
+    const prepared = await prepareEntryScope(
+      req,
+      res,
+      context,
+      Math.min(100, 3 + Math.ceil(authoringBodyBytes(req) / 16_384)),
+      authoringContentPublishBearerRequirement,
+    );
+    if (prepared === undefined) return;
+    const bodyResult = await context.execute(
+      "api.authoring.publication.unpublish.body",
+      decodeAuthoringUnpublishEntryRequest(req.body),
+      "Authoring unpublish body decoded.",
+    );
+    const body = stepData(req, res, bodyResult) as AuthoringUnpublishEntryRequest | null;
+    if (body === null) return;
+    const result = await context.execute(
+      "api.authoring.publication.unpublish",
+      unpublishAuthoringEntry(
+        prepared.principal,
+        prepared.project,
+        prepared.scope,
+        routeParameter(req, "entryId"),
+        body,
+        context.request.requestId,
+      ),
+      "Authoring locale unpublished.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  const exportPath = "/projects/:projectId/environments/:environmentId/schema/export";
+  router.get(exportPath, async (req, res) => {
+    const context = createContext({ req });
+    const principal = await prepareAuthoringRequest(
+      req,
+      res,
+      context,
+      1,
+      authoringSchemaExportBearerRequirement,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.authoring.schema.export.scope",
+      decodeAuthoringProjectScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Authoring project scope decoded.",
+    );
+    const scope = stepData(req, res, scopeResult);
+    if (scope === null) return;
+    const result = await context.execute(
+      "api.authoring.schema.export",
+      exportAuthoringProjectSchema(principal, scope),
+      "Authoring schema export completed.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  const planPath = "/projects/:projectId/environments/:environmentId/schema/plan";
+  router.post(planPath, async (req, res) => {
+    const context = createContext({ req });
+    const cost = authoringSchemaRequestCost(authoringBodyBytes(req), "plan");
+    const principal = await prepareAuthoringRequest(
+      req,
+      res,
+      context,
+      cost,
+      authoringSchemaPlanBearerRequirement,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.authoring.schema.plan.scope",
+      decodeAuthoringProjectScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Authoring project scope decoded.",
+    );
+    const scope = stepData(req, res, scopeResult);
+    if (scope === null) return;
+    const bodyResult = await context.execute(
+      "api.authoring.schema.plan.body",
+      decodeAuthoringSchemaPlanRequest(req.body),
+      "Authoring schema plan body decoded.",
+    );
+    const body = stepData(req, res, bodyResult) as AuthoringSchemaPlanRequest | null;
+    if (body === null) return;
+    const result = await context.execute(
+      "api.authoring.schema.plan",
+      planAuthoringProjectSchema(principal, scope, body),
+      "Authoring schema plan completed.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  const applyPath = "/projects/:projectId/environments/:environmentId/schema/apply";
+  router.post(applyPath, async (req, res) => {
+    const context = createContext({ req });
+    const cost = authoringSchemaRequestCost(authoringBodyBytes(req), "apply");
+    const principal = await prepareAuthoringRequest(
+      req,
+      res,
+      context,
+      cost,
+      authoringSchemaApplyBearerRequirement,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.authoring.schema.apply.scope",
+      decodeAuthoringProjectScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Authoring project scope decoded.",
+    );
+    const scope = stepData(req, res, scopeResult);
+    if (scope === null) return;
+    const bodyResult = await context.execute(
+      "api.authoring.schema.apply.body",
+      decodeAuthoringSchemaApplyRequest(req.body),
+      "Authoring schema apply body decoded.",
+    );
+    const body = stepData(req, res, bodyResult) as AuthoringSchemaApplyRequest | null;
+    if (body === null) return;
+    const result = await context.execute(
+      "api.authoring.schema.apply",
+      applyAuthoringProjectSchema(principal, scope, body, context.request.requestId),
+      "Authoring schema apply completed.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  router.use((req, res) => {
+    res.setHeader("Allow", "GET, POST, PATCH, OPTIONS");
+    const knownSchemaPath =
+      /^\/projects\/[^/]+\/environments\/[^/]+\/schema\/(?:export|plan|apply)$/u.test(req.path);
+    const knownContentPath =
+      /^\/projects\/[^/]+\/environments\/[^/]+\/collections\/[^/]+\/(?:form|presentation|locales\/[^/]+\/entries(?:\/[^/]+(?:\/draft|\/publication(?:\/(?:validate|publish|unpublish))?)?)?)$/u.test(
+        req.path,
+      );
+    sendAuthoringResponse(
+      req,
+      res,
+      knownSchemaPath || knownContentPath ? 405 : 404,
+      apiFailure({
+        code: "NOT_FOUND",
+        message: "The requested resource was not found.",
+        requestId: requestContext(req).requestId,
+        retryable: false,
+      }),
+    );
+  });
+  router.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      next(error);
+      return;
+    }
+    const type =
+      typeof error === "object" && error !== null && "type" in error
+        ? Reflect.get(error, "type")
+        : undefined;
+    if (type === "entity.too.large") {
+      sendAuthoringResponse(
+        req,
+        res,
+        413,
+        apiFailure({
+          code: "REQUEST_TOO_LARGE",
+          message: "The Authoring request exceeds the maximum size.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    if (type === "entity.parse.failed") {
+      sendAuthoringResponse(
+        req,
+        res,
+        400,
+        apiFailure({
+          code: "VALIDATION_ERROR",
+          message: "The Authoring request body is invalid JSON.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    const context = requestContext(req);
+    void reportBoundaryDefect(context, error).catch(() => undefined);
+    sendAuthoringResponse(req, res, 500, internalAuthoringFailure(context.requestId));
+  });
+  return router;
+}
+
+function internalAuthoringFailure(requestId: string) {
+  return apiFailure({
+    code: "INTERNAL_ERROR",
+    message: "An unexpected error occurred.",
+    requestId,
+    retryable: false,
+  });
+}
+
 export interface CreateAppOptions {
   readonly deliveryApiEnabled?: boolean;
   readonly previewApiEnabled?: boolean;
   readonly managementApiReferenceEnabled?: boolean;
+  readonly authoringEffectTransform?: ApplicationEffectTransform;
 }
 
 export function createApp(options: CreateAppOptions = {}): Express {
@@ -1380,6 +2377,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     next();
   });
 
+  app.use("/api/authoring/v1", createAuthoringRouter(options.authoringEffectTransform));
   app.use("/api/delivery/v1", createDeliveryRouter(deliveryApiEnabled));
   app.use("/api/preview/v1", createPreviewRouter(previewApiEnabled));
   app.use("/api/tooling/v1", createToolingRouter());

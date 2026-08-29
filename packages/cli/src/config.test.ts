@@ -1,7 +1,12 @@
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
-import { ancestorConfigCandidates, CliConfigFileSystem, loadCliConfig } from "./config";
+import {
+  ancestorConfigCandidates,
+  CliConfigFileSystem,
+  generationLockFileName,
+  loadCliConfig,
+} from "./config";
 
 function fileSystem(files: Readonly<Record<string, string>>) {
   return Layer.succeed(CliConfigFileSystem, {
@@ -19,6 +24,15 @@ const valid = JSON.stringify({
   projectId: "019fae8b-1234-7000-8000-000000000001",
   environment: "main",
   output: "src/framerfordevs",
+});
+const validV2 = JSON.stringify({
+  schemaVersion: 2,
+  apiBaseUrl: "https://api.example.com",
+  projectId: "019fae8b-1234-7000-8000-000000000001",
+  environment: "main",
+  output: "src/framerfordevs",
+  schema: "framerfordevs.schema.ts",
+  schemaBuild: { entry: "schema/compose.schema.ts" },
 });
 
 describe("CLI config", () => {
@@ -45,6 +59,31 @@ describe("CLI config", () => {
         }),
       ),
     ),
+  );
+
+  it.effect("loads v2 schema authority while retaining v1 compatibility", () =>
+    Effect.gen(function* () {
+      const v1 = yield* loadCliConfig("/workspace/v1").pipe(
+        Effect.provide(
+          fileSystem({
+            "/workspace/v1/framerfordevs.config.json": valid,
+          }),
+        ),
+      );
+      const v2 = yield* loadCliConfig("/workspace/v2").pipe(
+        Effect.provide(
+          fileSystem({
+            "/workspace/v2/framerfordevs.config.json": validV2,
+          }),
+        ),
+      );
+
+      assert.isNull(v1.schemaPath);
+      assert.strictEqual(generationLockFileName(v1.config), "schema.lock.json");
+      assert.strictEqual(generationLockFileName(v2.config), "generated.lock.json");
+      assert.strictEqual(v2.schemaPath, "/workspace/v2/framerfordevs.schema.ts");
+      assert.strictEqual(v2.schemaBuildEntryPath, "/workspace/v2/schema/compose.schema.ts");
+    }),
   );
 
   it.effect("rejects missing and ambiguous ancestor authority", () =>
@@ -74,6 +113,9 @@ describe("CLI config", () => {
         { ...JSON.parse(valid), token: "secret" },
         { ...JSON.parse(valid), output: "../outside" },
         { ...JSON.parse(valid), output: "/absolute" },
+        { ...JSON.parse(validV2), schema: "../outside.schema.ts" },
+        { ...JSON.parse(validV2), schema: "/absolute.schema.ts" },
+        { ...JSON.parse(validV2), schemaBuild: { entry: "../compose.schema.ts" } },
         { ...JSON.parse(valid), apiBaseUrl: "http://api.example.com" },
         { ...JSON.parse(valid), apiBaseUrl: "https://user:pass@api.example.com" },
       ];

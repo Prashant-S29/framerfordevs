@@ -24,7 +24,9 @@ export const Route = createFileRoute("/_auth/projects/$projectId_/collections/$c
         context.orpc.platform.projects.collections.schema.draft.get.queryOptions({ input: scope }),
       ),
       context.queryClient.ensureQueryData(
-        context.orpc.platform.projects.collections.schema.validate.queryOptions({ input: scope }),
+        context.orpc.platform.projects.collections.deliveryConfiguration.get.queryOptions({
+          input: scope,
+        }),
       ),
     ]);
   },

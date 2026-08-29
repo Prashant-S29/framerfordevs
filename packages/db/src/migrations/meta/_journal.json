@@ -92,6 +92,20 @@
       "when": 1787400995570,
       "tag": "0012_add_cli_oauth_device_authorization",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1787513412121,
+      "tag": "0013_add_code_first_authoring_authorities",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1787515349928,
+      "tag": "0014_normalize_authoring_actor_foreign_keys",
+      "breakpoints": true
     }
   ]
 }

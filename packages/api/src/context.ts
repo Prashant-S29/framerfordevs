@@ -7,8 +7,15 @@ import type { ApplicationError } from "./contracts/errors";
 import { makeRequestContext, type RequestContext } from "./observability/request-context";
 import { type ApplicationResult, type ApplicationServices, executeApplication } from "./runtime";
 
+export interface ApplicationEffectTransform {
+  <A extends ApiData>(
+    effect: Effect.Effect<A, ApplicationError, ApplicationServices>,
+  ): Effect.Effect<A, ApplicationError, ApplicationServices>;
+}
+
 interface CreateContextOptions {
   readonly req: Request;
+  readonly transformEffect?: ApplicationEffectTransform;
 }
 
 export interface Context {
@@ -21,7 +28,7 @@ export interface Context {
   ) => Promise<ApplicationResult<A>>;
 }
 
-export function createContext({ req }: CreateContextOptions): Context {
+export function createContext({ req, transformEffect }: CreateContextOptions): Context {
   const request = makeRequestContext({
     requestId: req.headers["x-request-id"],
     traceParent: req.headers.traceparent,
@@ -33,6 +40,11 @@ export function createContext({ req }: CreateContextOptions): Context {
     headers: fromNodeHeaders(req.headers),
     request,
     execute: (operation, effect, successMessage) =>
-      executeApplication(operation, request, effect, successMessage),
+      executeApplication(
+        operation,
+        request,
+        transformEffect === undefined ? effect : transformEffect(effect),
+        successMessage,
+      ),
   };
 }

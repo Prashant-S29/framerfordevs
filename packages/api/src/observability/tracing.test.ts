@@ -3,8 +3,9 @@ import { assert, beforeEach, describe, layer } from "@effect/vitest";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { Effect } from "effect";
 
-import { RequestContext, TraceParent } from "./request-context";
+import { decodeAuthoringSchemaPlanRequest } from "../operations/authoring-public";
 import { withRequestSpan } from "../runtime";
+import { RequestContext, TraceParent } from "./request-context";
 
 const exporter = new InMemorySpanExporter();
 const TracingTest = NodeSdk.layer(() => ({
@@ -42,6 +43,32 @@ describe("OpenTelemetry trace propagation", () => {
         assert.strictEqual(span.spanContext().traceId, request.traceParent?.traceId);
         assert.strictEqual(span.parentSpanContext?.spanId, request.traceParent?.spanId);
         assert.strictEqual(span.attributes["app.request_id"], request.requestId);
+      });
+    });
+
+    it.effect("keeps rejected Authoring schema input out of trace data", () => {
+      const sentinel = "must-not-enter-authoring-traces";
+
+      return Effect.gen(function* () {
+        yield* Effect.exit(
+          decodeAuthoringSchemaPlanRequest({
+            token: sentinel,
+            project: { collections: [{ sourceKey: sentinel, apiKey: sentinel }] },
+          }),
+        );
+
+        const spans = exporter.getFinishedSpans();
+        const decodeSpan = spans.find((span) => span.name === "authoring.public.input.decode");
+        assert.isDefined(decodeSpan);
+        const encoded = JSON.stringify({
+          attributes: decodeSpan?.attributes,
+          status: decodeSpan?.status,
+          events: decodeSpan?.events.map((event) => ({
+            name: event.name,
+            attributes: event.attributes,
+          })),
+        });
+        assert.notInclude(encoded, sentinel);
       });
     });
 

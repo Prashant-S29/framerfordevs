@@ -99,6 +99,42 @@ export interface ToolingRequestMetric {
   readonly durationMs: number;
 }
 
+export type AuthoringEndpoint =
+  | "schema_export"
+  | "schema_plan"
+  | "schema_apply"
+  | "presentation_get"
+  | "presentation_publish"
+  | "form_get"
+  | "entry_list"
+  | "entry_create"
+  | "entry_rename"
+  | "entry_get"
+  | "entry_save"
+  | "publication_status"
+  | "publication_validate"
+  | "publication_publish"
+  | "publication_unpublish";
+export type AuthoringSubject = "oauth_user" | "management_credential" | "unknown";
+export type AuthoringSizeBucket = "none" | "small" | "medium" | "large" | "near_limit";
+export type AuthoringCostBucket = "1" | "2-5" | "6-20" | "21-50" | "51-100";
+
+export interface AuthoringAuthenticationMetric {
+  readonly subject: AuthoringSubject;
+  readonly outcome: "success" | "invalid" | "failure";
+}
+
+export interface AuthoringRequestMetric {
+  readonly endpoint: AuthoringEndpoint;
+  readonly subject: AuthoringSubject;
+  readonly outcome: "success" | "failure";
+  readonly statusFamily: StatusFamily;
+  readonly requestSizeBucket: AuthoringSizeBucket;
+  readonly responseSizeBucket: AuthoringSizeBucket;
+  readonly costBucket: AuthoringCostBucket;
+  readonly durationMs: number;
+}
+
 export interface RateLimitDecisionMetric {
   readonly policy: RateLimitPolicy;
   readonly enforcementMode: RateLimitEnforcementMode;
@@ -141,6 +177,10 @@ export interface TelemetryService {
   readonly recordToolingOAuthVerification: (
     outcome: "success" | "invalid" | "failure",
   ) => Effect.Effect<void>;
+  readonly recordAuthoringAuthentication: (
+    event: AuthoringAuthenticationMetric,
+  ) => Effect.Effect<void>;
+  readonly recordAuthoringRequest: (event: AuthoringRequestMetric) => Effect.Effect<void>;
   readonly recordRateLimitDecision: (event: RateLimitDecisionMetric) => Effect.Effect<void>;
   readonly recordRateLimitStore: (event: RateLimitStoreMetric) => Effect.Effect<void>;
 }
@@ -244,6 +284,32 @@ const toolingRequestLatency = Metric.histogram(
 
 const toolingOAuthVerificationCount = Metric.counter("tooling_oauth_verifications_total", {
   description: "Tooling OAuth access-token verification outcomes",
+  incremental: true,
+});
+
+const authoringAuthenticationCount = Metric.counter("authoring_authentications_total", {
+  description: "Authoring authentication outcomes by bounded subject family",
+  incremental: true,
+});
+
+const authoringRequestCount = Metric.counter("authoring_requests_total", {
+  description: "Authoring request outcomes by bounded endpoint, subject, and status family",
+  incremental: true,
+});
+
+const authoringRequestLatency = Metric.histogram(
+  "authoring_request_duration_ms",
+  MetricBoundaries.exponential({ start: 1, factor: 2, count: 16 }),
+  "Authoring request duration in milliseconds by bounded endpoint and outcome",
+);
+
+const authoringPayloadCount = Metric.counter("authoring_payloads_total", {
+  description: "Authoring request and response size buckets by bounded endpoint",
+  incremental: true,
+});
+
+const authoringQuotaCostCount = Metric.counter("authoring_quota_costs_total", {
+  description: "Authoring quota cost buckets by bounded endpoint",
   incremental: true,
 });
 
@@ -411,6 +477,55 @@ export const TelemetryLive = Layer.succeed(Telemetry, {
   },
   recordToolingOAuthVerification: (outcome) =>
     Metric.update(Metric.tagged(toolingOAuthVerificationCount, "outcome", outcome), 1),
+  recordAuthoringAuthentication: (event) =>
+    Metric.update(
+      Metric.tagged(
+        Metric.tagged(authoringAuthenticationCount, "subject", event.subject),
+        "outcome",
+        event.outcome,
+      ),
+      1,
+    ),
+  recordAuthoringRequest: (event) => {
+    const requests = Metric.tagged(
+      Metric.tagged(
+        Metric.tagged(
+          Metric.tagged(authoringRequestCount, "endpoint", event.endpoint),
+          "subject",
+          event.subject,
+        ),
+        "outcome",
+        event.outcome,
+      ),
+      "status_family",
+      event.statusFamily,
+    );
+    const latency = Metric.tagged(
+      Metric.tagged(authoringRequestLatency, "endpoint", event.endpoint),
+      "outcome",
+      event.outcome,
+    );
+    const payloads = Metric.tagged(
+      Metric.tagged(
+        Metric.tagged(authoringPayloadCount, "endpoint", event.endpoint),
+        "request_size",
+        event.requestSizeBucket,
+      ),
+      "response_size",
+      event.responseSizeBucket,
+    );
+    const quotaCosts = Metric.tagged(
+      Metric.tagged(authoringQuotaCostCount, "endpoint", event.endpoint),
+      "cost",
+      event.costBucket,
+    );
+    return Effect.all([
+      Metric.update(requests, 1),
+      Metric.update(latency, event.durationMs),
+      Metric.update(payloads, 1),
+      Metric.update(quotaCosts, 1),
+    ]).pipe(Effect.asVoid);
+  },
   recordRateLimitDecision: (event) =>
     Metric.update(
       Metric.tagged(
@@ -447,6 +562,22 @@ export function toolingPageCountBucket(count: number): ToolingPageCountBucket {
   if (count <= 10) return "1-10";
   if (count <= 20) return "11-20";
   return "21-50";
+}
+
+export function authoringSizeBucket(bytes: number): AuthoringSizeBucket {
+  if (bytes <= 0) return "none";
+  if (bytes <= 16 * 1_024) return "small";
+  if (bytes <= 256 * 1_024) return "medium";
+  if (bytes <= 1_024 * 1_024) return "large";
+  return "near_limit";
+}
+
+export function authoringCostBucket(cost: number): AuthoringCostBucket {
+  if (cost <= 1) return "1";
+  if (cost <= 5) return "2-5";
+  if (cost <= 20) return "6-20";
+  if (cost <= 50) return "21-50";
+  return "51-100";
 }
 
 export function toStatusFamily(status: number): StatusFamily {

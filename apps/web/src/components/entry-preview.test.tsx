@@ -117,6 +117,7 @@ const sharedRevision = Schema.decodeUnknownSync(EntryRevisionSummary)({
   changedFieldIds: [],
   restoredFromRevisionId: null,
   authoredByUserId: "preview-author",
+  authoredByCredentialId: null,
   authoredAt: timestamp,
 });
 const localizedRevision = Schema.decodeUnknownSync(EntryRevisionSummary)({
@@ -179,6 +180,7 @@ const publicationSummary = Schema.decodeUnknownSync(EntryPublicationSummary)({
     bucket: "small",
   },
   publishedByUserId: "preview-author",
+  publishedByCredentialId: null,
   publishedAt: timestamp,
   current: true,
 });

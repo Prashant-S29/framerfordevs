@@ -4,6 +4,7 @@ import { assert, describe, it } from "@effect/vitest";
 
 import {
   canonicalizeSchemaDocument,
+  compareCanonicalText,
   validateAggregateSchemaDocument,
 } from "./field-system-document";
 
@@ -13,6 +14,12 @@ describe("aggregate schema documents", () => {
     const right = { a: { x: [3, 1], y: 2 }, z: 1 };
 
     assert.strictEqual(canonicalizeSchemaDocument(left), canonicalizeSchemaDocument(right));
+  });
+
+  it("orders canonical text by code units rather than locale collation", () => {
+    assert.strictEqual(compareCanonicalText("a-b", "a_b"), -1);
+    assert.strictEqual(compareCanonicalText("a_b", "a-b"), 1);
+    assert.strictEqual(compareCanonicalText("same", "same"), 0);
   });
 
   it("accepts a bounded document and rejects a cumulative payload above one MiB", () => {

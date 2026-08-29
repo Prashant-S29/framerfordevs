@@ -11,6 +11,11 @@ export const Route = createFileRoute("/api-reference/")({
 
 const families = [
   {
+    description: "Code-schema planning and atomic acknowledged publication.",
+    family: "authoring/v1",
+    title: "Authoring v1",
+  },
+  {
     description: "Published, explicit-locale content reads and immutable publications.",
     family: "delivery/v1",
     title: "Delivery v1",

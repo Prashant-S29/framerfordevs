@@ -321,71 +321,73 @@ describe("Webhook worker repository PostgreSQL integration", () => {
       availableAt: now,
       processedAt: null,
     });
-    await db.insert(webhookEndpoint).values({
-      id: endpointId,
-      workspaceId: current.workspaceId,
-      projectId: current.projectId,
-      environmentId: current.environmentId,
-      name: `lease-${endpointId}`,
-      state: "disabled",
-      createdByUserId: actorId,
-      changedByUserId: actorId,
-      createdAt: now,
-      updatedAt: now,
-    });
-    await db.insert(webhookEndpointDestination).values({
-      id: destinationId,
-      endpointId,
-      workspaceId: current.workspaceId,
-      projectId: current.projectId,
-      environmentId: current.environmentId,
-      sequence: 1,
-      displayOrigin: "https://example.com",
-      encryptionKeyId: "integration-key",
-      nonce: "A".repeat(16),
-      ciphertext: "A".repeat(22),
-      keyedFingerprint: "a".repeat(64),
-      createdByUserId: actorId,
-      createdAt: now,
-    });
-    await db.insert(webhookEndpointSecret).values({
-      id: secretId,
-      endpointId,
-      workspaceId: current.workspaceId,
-      projectId: current.projectId,
-      environmentId: current.environmentId,
-      sequence: 1,
-      state: "active",
-      encryptionKeyId: "integration-key",
-      nonce: "A".repeat(16),
-      ciphertext: "A".repeat(22),
-      fingerprint: "a".repeat(16),
-      activatedAt: now,
-      createdByUserId: actorId,
-      changedByUserId: actorId,
-      createdAt: now,
-      updatedAt: now,
-    });
-    await db
-      .update(webhookEndpoint)
-      .set({
-        state: "enabled",
-        currentDestinationId: destinationId,
-        enabledAt: now,
+    await db.transaction(async (transaction) => {
+      await transaction.insert(webhookEndpoint).values({
+        id: endpointId,
+        workspaceId: current.workspaceId,
+        projectId: current.projectId,
+        environmentId: current.environmentId,
+        name: `lease-${endpointId}`,
+        state: "disabled",
+        createdByUserId: actorId,
+        changedByUserId: actorId,
+        createdAt: now,
         updatedAt: now,
-      })
-      .where(eq(webhookEndpoint.id, endpointId));
-    await db.insert(webhookEndpointSubscription).values({
-      endpointId,
-      workspaceId: current.workspaceId,
-      projectId: current.projectId,
-      environmentId: current.environmentId,
-      eventType: "cms.schema.published",
-      activeFrom: new Date(now.getTime() - 1_000),
-      activeUntil: new Date(now.getTime() + 1_000),
-      createdByUserId: actorId,
-      closedByUserId: actorId,
-      createdAt: new Date(now.getTime() - 1_000),
+      });
+      await transaction.insert(webhookEndpointDestination).values({
+        id: destinationId,
+        endpointId,
+        workspaceId: current.workspaceId,
+        projectId: current.projectId,
+        environmentId: current.environmentId,
+        sequence: 1,
+        displayOrigin: "https://example.com",
+        encryptionKeyId: "integration-key",
+        nonce: "A".repeat(16),
+        ciphertext: "A".repeat(22),
+        keyedFingerprint: "a".repeat(64),
+        createdByUserId: actorId,
+        createdAt: now,
+      });
+      await transaction.insert(webhookEndpointSecret).values({
+        id: secretId,
+        endpointId,
+        workspaceId: current.workspaceId,
+        projectId: current.projectId,
+        environmentId: current.environmentId,
+        sequence: 1,
+        state: "active",
+        encryptionKeyId: "integration-key",
+        nonce: "A".repeat(16),
+        ciphertext: "A".repeat(22),
+        fingerprint: "a".repeat(16),
+        activatedAt: now,
+        createdByUserId: actorId,
+        changedByUserId: actorId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await transaction.insert(webhookEndpointSubscription).values({
+        endpointId,
+        workspaceId: current.workspaceId,
+        projectId: current.projectId,
+        environmentId: current.environmentId,
+        eventType: "cms.schema.published",
+        activeFrom: new Date(now.getTime() - 1_000),
+        activeUntil: new Date(now.getTime() + 1_000),
+        createdByUserId: actorId,
+        closedByUserId: actorId,
+        createdAt: new Date(now.getTime() - 1_000),
+      });
+      await transaction
+        .update(webhookEndpoint)
+        .set({
+          state: "enabled",
+          currentDestinationId: destinationId,
+          enabledAt: now,
+          updatedAt: now,
+        })
+        .where(eq(webhookEndpoint.id, endpointId));
     });
     const dispatch = await Effect.runPromise(
       makeWebhookWorkerRepository().dispatchBatch(new Date(now.getTime() + 2_000), 1),

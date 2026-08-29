@@ -20,6 +20,8 @@ import {
   Telemetry,
   TelemetryLive,
   toStatusFamily,
+  type AuthoringAuthenticationMetric,
+  type AuthoringRequestMetric,
   type PreviewQueryRejectionCategory,
   type ToolingRequestMetric,
 } from "./observability/telemetry";
@@ -46,6 +48,10 @@ import {
 import { DeliveryRepository, DeliveryRepositoryLive } from "./services/delivery-repository";
 import { EntryEngine, EntryEngineLive } from "./services/entry-engine";
 import { EntryRepository, EntryRepositoryLive } from "./services/entry-repository";
+import {
+  AuthoringContentRepository,
+  AuthoringContentRepositoryLive,
+} from "./services/authoring-content-repository";
 import { FieldEngine, FieldEngineLive } from "./services/field-engine";
 import { LocaleRepository, LocaleRepositoryLive } from "./services/locale-repository";
 import { PlatformRepository, PlatformRepositoryLive } from "./services/platform-repository";
@@ -67,6 +73,14 @@ import {
   PublicationRepositoryLive,
 } from "./services/publication-repository";
 import { SchemaEngine, SchemaEngineLive } from "./services/schema-engine";
+import {
+  AuthoringSchemaRepository,
+  AuthoringSchemaRepositoryLive,
+} from "./services/authoring-schema-repository";
+import {
+  AuthoringPresentationRepository,
+  AuthoringPresentationRepositoryLive,
+} from "./services/authoring-presentation-repository";
 import { SchemaRepository, SchemaRepositoryLive } from "./services/schema-repository";
 import { SecretGenerator, SecretGeneratorLive } from "./services/secret-generator";
 import { ToolingCursorSigner, makeToolingCursorSignerLive } from "./services/tooling-cursor-signer";
@@ -115,6 +129,9 @@ export type ApplicationServices =
   | FieldEngine
   | SchemaEngine
   | SchemaRepository
+  | AuthoringContentRepository
+  | AuthoringSchemaRepository
+  | AuthoringPresentationRepository
   | ToolingCursorSigner
   | ToolingOAuthTokenVerifier
   | ToolingPrincipalAuthenticator
@@ -202,6 +219,9 @@ const InfrastructureLive = Layer.mergeAll(
   FieldEngineLive,
   SchemaEngineLive,
   SchemaRepositoryLive,
+  AuthoringContentRepositoryLive,
+  AuthoringSchemaRepositoryLive,
+  AuthoringPresentationRepositoryLive,
   ToolingOAuthTokenVerifierLive,
   ToolingPrincipalAuthenticatorLive,
   WebhookCryptoLive,
@@ -430,6 +450,20 @@ export function observeHttpRequest(
 export function observeToolingRequest(event: ToolingRequestMetric): Promise<void> {
   return applicationRuntime.runPromise(
     Effect.flatMap(Telemetry, (telemetry) => telemetry.recordToolingRequest(event)),
+  );
+}
+
+export function observeAuthoringAuthentication(
+  event: AuthoringAuthenticationMetric,
+): Promise<void> {
+  return applicationRuntime.runPromise(
+    Effect.flatMap(Telemetry, (telemetry) => telemetry.recordAuthoringAuthentication(event)),
+  );
+}
+
+export function observeAuthoringRequest(event: AuthoringRequestMetric): Promise<void> {
+  return applicationRuntime.runPromise(
+    Effect.flatMap(Telemetry, (telemetry) => telemetry.recordAuthoringRequest(event)),
   );
 }
 

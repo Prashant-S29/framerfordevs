@@ -77,6 +77,8 @@ function telemetry(
       }),
     recordToolingRequest: () => Effect.void,
     recordToolingOAuthVerification: () => Effect.void,
+    recordAuthoringAuthentication: () => Effect.void,
+    recordAuthoringRequest: () => Effect.void,
     recordRateLimitDecision: () => Effect.void,
     recordRateLimitStore: () => Effect.void,
   };

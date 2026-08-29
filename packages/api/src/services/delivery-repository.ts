@@ -67,7 +67,8 @@ interface DeliveryConfigurationRow {
   readonly collectionKey: string;
   readonly access: string;
   readonly version: number;
-  readonly changedByUserId: string;
+  readonly changedByUserId: string | null;
+  readonly changedByCredentialId: string | null;
   readonly updatedAt: Date;
 }
 
@@ -143,6 +144,7 @@ function configurationValue(
     version: row.version,
     fields,
     updatedByUserId: row.changedByUserId,
+    updatedByCredentialId: row.changedByCredentialId,
     updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -536,6 +538,7 @@ export function makeDeliveryRepository(database: ApplicationDb = db): DeliveryRe
                   access: input.access,
                   version: nextVersion,
                   changedByUserId: actorId,
+                  changedByCredentialId: null,
                   updatedAt: now,
                 })
                 .where(

@@ -584,9 +584,9 @@ Record a learning when an implementation or decision:
 
 **Learning:** In-process test isolation cannot control an independently running consumer of the same database. Queue integration suites need a separate database or an explicit operational exclusion around all external workers.
 
-**Prevention:** Stop the local worker before PostgreSQL integration/coverage gates, verify it is stopped, remove only explicitly identified test fixtures if an accidental claim occurs, and restart it only after validation. Production workers and tests should use isolated databases in deployment/CI topology.
+**Prevention:** Stop the local worker before PostgreSQL integration/coverage gates and verify its actual process/container state immediately before the gate; do not rely on a stop command placed after earlier `&&` steps that may short-circuit. Remove only explicitly identified test fixtures if an accidental claim occurs, and restart it only after validation. Production workers and tests should use isolated databases in deployment/CI topology.
 
-**Status:** Resolved for the current M11 validation run; durable database isolation remains an environment concern.
+**Status:** Resolved again during M13: after developer authorization, the Compose worker was directly stopped and verified immediately before all shared-database normal/coverage gates. All 713 API and 124 server tests passed, scoped residue/invariants reconciled cleanly, and the worker was restarted healthy. Focused runs now use `pnpm --dir <package> exec vitest run <exact-file>`.
 
 ---
 
@@ -618,10 +618,324 @@ Record a learning when an implementation or decision:
 
 **Prevention:** Define the first-success journey and complete information architecture before implementing the portal shell. Use source-controlled MDX for authored teaching, canonical generated artifacts for structural reference, compiling examples for code, self-hosted public-only search, and a bounded compatibility slice before broad content migration.
 
-**Status:** Resolved in M12 with self-hosted Fumadocs on the existing TanStack Start app, 27 MDX pages, static search, canonical secondary references, renewed readiness, and a pending developer manual review.
+**Status:** Resolved and developer-approved in M12 with self-hosted Fumadocs on the existing TanStack Start app, 27 MDX pages, static search, canonical secondary references, and renewed readiness.
 
 ---
 
-## Current implementation learnings
+## 2026-08-23 — Stable source identity does not classify collection API-key renames
 
-The platform authorization, locale foundations, versioned schema engine, field system, schema-authoring workbench, stable entries, multilingual drafts, revision history, independent locale publication, immutable Delivery snapshots, Production Delivery API, Preview API, publication events, webhooks, retries, and invalidation are developer-approved and committed through Milestone 11 at `fef7205`. M11 migrations `0010` and `0011` are developer-applied and read-only verified. The approved repository test-structure normalization is committed at `fe69a76`. Additional entries should be added only when consequential drift or rework occurs.
+**Context:** M13 resolved code collections through the existing M5/M6 classifier so source-key API-key renames would preserve stable IDs while retaining breaking-change acknowledgement.
+
+**Incorrect assumption or decision:** The existing classifier covered field API-key changes but did not compare the published collection API key with the candidate collection API key.
+
+**Cost or risk:** A code-owned collection API-key rename could change the public contract without producing the required breaking change or exact acknowledgement, despite stable collection identity being preserved.
+
+**Learning:** Identity reconciliation and compatibility classification are separate authorities. Stable source/collection IDs prevent replacement; they do not make API-key changes non-breaking. Candidate parity tests must enumerate collection-level contract fields as well as field-level changes.
+
+**Prevention:** The shared classifier now emits breaking `collection.api_key.updated`, with a deterministic test proving the collection ID remains unchanged. M13 project qualification reuses that change rather than maintaining a second classifier.
+
+**Status:** Resolved in the active uncommitted M13 implementation; the full 1,007-test normal/coverage readiness gate passes.
+
+---
+
+## 2026-08-24 — Authority hashes must not depend on locale collation
+
+**Context:** M13 backfilled immutable revision structure hashes in PostgreSQL and then compared every migrated hash with the application projection.
+
+**Incorrect assumption or decision:** Canonical arrays were sorted with JavaScript `localeCompare`, while the migration correctly used PostgreSQL `COLLATE "C"`. Locale collation treats punctuation such as hyphens and underscores differently from byte/code-unit order.
+
+**Cost or risk:** Three existing revision hashes differed between persistence and application authority even though both projected the same fields. Future plan/apply comparisons could have reported false drift across runtimes or locales.
+
+**Learning:** Hash canonicalization must use an explicit locale-independent lexical comparator at every ordering boundary. Human-language collation is never suitable for authority bytes.
+
+**Prevention:** Shared canonical sorting now compares code units directly, punctuation-order regression coverage is required, and post-migration verification recomputes every persisted revision hash through the application algorithm.
+
+**Status:** Resolved in the active M13 worktree; all 31 migrated revision hashes match after the comparator correction.
+
+---
+
+## 2026-08-24 — PostgreSQL identifier limits apply to generated constraint names
+
+**Context:** M13 added credential alternatives and Drizzle-generated inline foreign keys alongside explicit composite tenant foreign keys.
+
+**Incorrect assumption or decision:** Generated inline foreign-key names were accepted without checking PostgreSQL's 63-byte identifier limit.
+
+**Cost or risk:** Eighteen credential/user foreign-key names were silently truncated in the live catalog, diverging from snapshot names and making future schema reconciliation brittle. Credential direct foreign keys were also redundant with stronger composite tenant foreign keys.
+
+**Learning:** Generated DDL must be checked against database identifier limits, not only TypeScript schema names. Redundant single-column credential foreign keys should not accompany tenant-qualified composite authority.
+
+**Prevention:** Credential columns rely only on explicitly named composite tenant foreign keys; the project apply user foreign key has a short explicit name; schema-contract tests reject redundant credential foreign keys; post-application catalog verification checks exact validated constraint names.
+
+**Status:** Resolved through developer-generated/applied migration `0014_normalize_authoring_actor_foreign_keys`; read-only verification confirms the intended short user constraint, 22 tenant-qualified credential constraints, and no redundant truncated direct credential constraints.
+
+---
+
+## 2026-08-24 — New actor foreign keys invalidate legacy credential-first fixture teardown
+
+**Context:** An exploratory Authoring HTTP success test reused the broad platform integration fixture and created an immutable schema-apply receipt attributed to a management credential.
+
+**Incorrect assumption or decision:** The test treated the platform fixture's existing cleanup as sufficient even though that cleanup deletes credentials before the M13 apply receipt and immutable schema graph that now reference them.
+
+**Cost or risk:** Every assertion passed, but `afterAll` failed on the tenant-qualified credential foreign key and left one test graph plus its empty peer workspace for explicitly approved scoped cleanup. A successful behavior test was therefore not a clean test.
+
+**Learning:** Adding a successful mutation to an older integration fixture changes that fixture's ownership graph. Assertion success is insufficient; teardown order must include every new dependent table before any referenced actor or tenant row.
+
+**Prevention:** Keep Authoring apply success/replay proof in its transaction-contained repository fixture until a dedicated HTTP fixture owns the complete M13 graph. Before adding cross-layer mutation tests, inventory all new actor/receipt/revision/outbox foreign keys, register idempotent cleanup before the first write, run the teardown path explicitly, and reconcile the unique namespace read-only afterward.
+
+**Status:** Resolved; the mutating platform test was removed, its exact failed graph and empty peer were deleted after developer approval, and the retained HTTP test covers read-only planning plus pre-persistence scope denial.
+
+---
+
+## 2026-08-24 — Server image builds must include runtime-externalized workspace distributions
+
+**Context:** The Authoring transport made the server bundle reach the runtime validator exported by the new `@framerfordevs/schema` workspace.
+
+**Incorrect assumption or decision:** A successful host `tsdown` build was treated as sufficient even though the bundle left the workspace import external and the server Dockerfile built only `apps/server`.
+
+**Cost or risk:** The first rebuilt image restarted with `ERR_MODULE_NOT_FOUND`: first the package was not linked directly, then its declared `dist/validate.mjs` did not exist in the image. Host tests and builds had masked the production package-resolution boundary.
+
+**Learning:** A workspace import externalized from an application bundle is a runtime dependency, even when reached transitively through another workspace. Its package link and built export must both exist in the production image.
+
+**Prevention:** Declare runtime-externalized workspaces directly in the consuming application through pnpm, build their distributions before the application bundle in the Dockerfile, and verify the rebuilt container plus one exact artifact/route request rather than relying only on host builds.
+
+**Status:** Resolved; the server declares `@framerfordevs/schema`, the image builds it first, the rebuilt container is healthy, and its Authoring artifact bytes match canonical source.
+
+---
+
+## 2026-08-24 — Named SDK envelopes do not prove exact DTO parity
+
+**Context:** The M13 Authoring SDK added named response classes and safe helpers for every current HTTP path.
+
+**Incorrect assumption or decision:** Top-level operation-specific class names were treated as complete strict DTO decoding even though schema export/plan/apply nested records and all write request bodies still used generic JSON-object contracts.
+
+**Cost or risk:** Progress and context briefly overstated SDK completion. Malformed or excess nested schema authority could pass SDK decoding, and consumers lacked operation-specific write input types despite the canonical HTTP contract being stricter.
+
+**Learning:** SDK contract parity is recursive and bidirectional. A named outer envelope is not an exact client contract when nested response authority or request bodies remain generic.
+
+**Prevention:** Reconcile every SDK operation against the canonical request and response schema field by field; reject nested excess properties and bounds; test malformed inputs at each level; and do not mark the SDK complete until generated declarations expose operation-specific request and response types.
+
+**Status:** Resolved. Every current operation now exposes runtime-validated request types and recursively exact response/error decoding; the SDK directly uses the shared dependency-free project validator, and representative malformed/excess/boundary tests pass.
+
+---
+
+## 2026-08-24 — Pre-auth execution requires a separate module graph, not only command ordering
+
+**Context:** The explicit experimental `ffd schema build` command was first added as a branch inside the existing CLI entry module.
+
+**Incorrect assumption or decision:** Running the build branch before token acquisition was treated as credential isolation even though static imports and the module-level `ManagedRuntime` still loaded or constructed credential-store, OAuth, Tooling, and authenticated command dependencies before command dispatch.
+
+**Cost or risk:** The command behavior did not read a token, but its process construction violated the approved credential-unreachability boundary and made a future import-side effect capable of reopening credential authority.
+
+**Learning:** A pre-auth security boundary is defined by the loaded and constructed dependency graph, not by which branch executes first. Credential-bearing services must be unreachable by module construction as well as unused at runtime.
+
+**Prevention:** Keep the package binary as a minimal dynamic dispatcher. Load `schema build` through a dedicated credential-blind module and load authenticated commands through a separate module only for other commands. Packaged tests recursively inspect the schema-build static import graph for keyring, management-token, OAuth, Tooling, and Authoring dependencies and execute hostile token/file/network probes against the built artifact.
+
+**Status:** Resolved before release staging. The packaged CLI preserves dynamic pre-auth dispatch, schema build constructs no credential/API service graph, and the credential-blind artifact and hostile execution gates pass.
+
+---
+
+## 2026-08-25 — Parallel database fixtures must publish valid aggregates atomically
+
+**Context:** With the external worker correctly stopped, the full API suite ran the webhook management and webhook-worker repository fixtures in parallel against the same baseline project.
+
+**Incorrect assumption or decision:** The worker fixture inserted an endpoint, destination, secret, subscription, and enabled pointer through separate committed statements. During the short interval before the subscription insert, the management fixture could list that endpoint and correctly reject its impossible zero-subscription aggregate.
+
+**Cost or risk:** One full API run failed despite the production repositories behaving correctly. A focused rerun passed, which could have hidden a deterministic cross-file race and left normal parallel readiness flaky.
+
+**Learning:** Stopping external consumers is necessary but not sufficient for shared-database isolation. A test fixture that represents one valid aggregate must become visible atomically, especially when parallel suites intentionally query broad tenant collections.
+
+**Prevention:** The worker fixture now inserts the endpoint, destination, secret, subscription, and enabled pointer in one database transaction. The two webhook integration files pass together in parallel, and complete 713-test normal/coverage API gates pass with zero scoped residue.
+
+**Status:** Resolved in the active M13 worktree; no production persistence behavior or migration changed.
+
+---
+
+## 2026-08-25 — Successful HTTP publication fixtures must roll back, not delete, immutable artifacts
+
+**Context:** M13 needed a real public-HTTP fixture covering schema apply plus exact-locale create/save/publish/unpublish, replay, conflicts, and credential attribution.
+
+**Incorrect assumption or decision:** The first fixture committed publication artifacts and planned to delete its graph in `afterAll`, overlooking the database triggers that correctly prohibit deletion of publication rows and command receipts. One run also used a single weighted-rate-limit identity for every schema and content request. A later dynamic Vitest runtime-module mock was assumed to provide deterministic repository substitution, but one rerun bypassed it and committed the publication.
+
+**Cost or risk:** Teardown failed closed after one publication, requiring developer-approved exact cleanup with a temporary trigger bypass. The single principal also reached its legitimate weighted quota before unpublish. A second draft-only run exposed a missing workspace-level audit cleanup predicate, and the nondeterministic module mock later leaked one more exact publication graph; both were separately reconciled and removed with developer approval.
+
+**Learning:** Append-only integration artifacts cannot be made teardown-safe by adding more delete statements. End-to-end HTTP tests need the real repository bound to a test-owned rollback transaction at the Effect service boundary. Distinct least-privilege principals should represent independently quota-controlled workflows.
+
+**Prevention:** `createApp` now accepts a closed process-owned Authoring Effect transform, and every Authoring `Context` applies that transform before the shared runtime boundary. The fixture deterministically provides only a transaction-bound real `PublicationRepository`; publish, replay, conflict, status, and unpublish still execute through Express and production operations while immutable writes roll back. Setup registers exact cleanup before its first write, separate least-privilege credentials respect quotas, and post-suite namespace/outbox/receipt reconciliation is zero. The default live wiring and immutable triggers remain unchanged; runtime module mocking is no longer used.
+
+**Status:** Resolved in the active M13 worktree. All 135 server tests and 718 API tests pass in normal and coverage runs with zero matching residue.
+
+---
+
+## 2026-08-25 — Query-plan tests must accept equivalent bounded indexes
+
+**Context:** Presentation publication added bounded lookup plan assertions and the full API coverage run repeated the existing schema-list plan gate against a small shared fixture database.
+
+**Incorrect assumption or decision:** The assertions required one exact index name even though PostgreSQL could legitimately select another environment-leading or collection-leading index with equivalent bounded access under the fixture's tiny statistics. `enable_seqscan = off` prevents sequential scans; it does not force the most semantically obvious index.
+
+**Cost or risk:** Production queries remained parameterized and bounded, and focused reruns passed, but one complete coverage run failed nondeterministically on an exact planner-choice assertion.
+
+**Learning:** Query-plan evidence should prove the required access shape and approved index family, not one optimizer tie-break. Exact index assertions are appropriate only when no equivalent leading-prefix plan exists.
+
+**Prevention:** Presentation and schema plan tests now accept the reviewed environment- and collection-leading index alternatives while continuing to reject sequential access, assert the relevant lookup predicates, and verify the intended indexes exist in PostgreSQL.
+
+**Status:** Resolved in the active M13 worktree; the subsequent 718-test API coverage run passes.
+
+---
+
+## 2026-08-25 — Runtime-exact unions also need discriminated public TypeScript types
+
+**Context:** The shared content-form package added an adapter from the strictly decoded Authoring SDK generated-form DTO into its exhaustive 18-kind renderer DTO.
+
+**Incorrect assumption or decision:** The SDK runtime schema was an exact union of 18 field variants, but its exported recursive TypeScript interface represented `kind` as one broad union and `configuration` as generic JSON. Runtime safety was preserved, yet TypeScript could not correlate money, enum, reference, or nested child configuration with the selected kind.
+
+**Cost or risk:** A browser adapter could not prove exhaustive, assertion-free projection from the SDK type even though the value had already passed strict runtime decoding. Leaving the mismatch would encourage unsafe casts or duplicate ad hoc validation in the local editor.
+
+**Learning:** Runtime discriminants and compile-time discriminants are separate authorities. A recursively exact schema must export a correspondingly discriminated TypeScript union when downstream exhaustive adapters depend on kind-specific properties.
+
+**Prevention:** The SDK field type is now a mapped discriminated union, and its schema variant helper preserves the literal kind generically. Cross-package compile tests prove both management and Authoring DTOs enter the renderer adapters without assertions; the browser package still projects only its minimal inert fields.
+
+**Status:** Resolved in the active M13 worktree; SDK, content-form, dashboard, and workspace type gates pass.
+
+---
+
+## 2026-08-26 — Local editor authority and form hydration must have explicit lifetimes
+
+**Context:** The first hardened local-editor pass captured the hosted bearer in a long-lived SDK client, allowed the OS browser opener to inherit the management-token environment, and rehydrated controlled form state whenever the periodically refreshed generated-form object changed.
+
+**Incorrect assumption or decision:** Nulling the outer token variable was treated as clearing credential authority even though the gateway's SDK closure retained the original string. Separately, a data-fetch object identity was treated as draft identity, so an equal presentation refresh could become an implicit form reset.
+
+**Cost or risk:** A closed loopback server could retain credential material beyond intended shutdown ownership, the detached browser-opener process could receive unrelated write authority, and a hosted presentation refresh could silently discard unsaved local edits despite the editor's conflict-preservation promise.
+
+**Learning:** Secret lifetime and controlled-edit lifetime need explicit mutable authorities. Clearing one reference does not clear copies captured by long-lived clients, and query-object identity is not persisted draft authority.
+
+**Prevention:** The editor gateway now receives a mutable token getter and creates the strict SDK client only for each request; management authority is removed from `process.env` after acquisition, every browser-opener child receives a sanitized environment, and shutdown nulls the getter before awaiting in-flight refresh and closing the watcher/server. Form hydration is keyed by entry, schema revision, and both partition versions/revisions, while equal form/presentation refreshes preserve controlled values. Tests prove post-close token unreachability, opener-environment isolation, live presentation polling without local reset, conflict preservation, and explicit versioned reload.
+
+**Status:** Resolved in the active M13 worktree.
+
+---
+
+## 2026-08-27 — Full parallel readiness needs explicit interaction budgets and cancellation-aware residue gates
+
+**Context:** The final M13 `pnpm run ready` runs database suites, lazy React interactions, coverage instrumentation, and all workspaces concurrently.
+
+**Incorrect assumption or decision:** Focused interaction timings and framework default five-second test timeouts were treated as sufficient under full coverage contention. Several failed readiness attempts then canceled still-running database workspaces; framework teardown could not complete every already-persisted fixture graph.
+
+**Cost or risk:** Correct editor and schema-workbench interactions flaked only in the aggregate gate, while canceled Authoring/Tooling/schema fixtures left precisely identifiable test-only users, drafts, audits, and outbox rows in the shared database. Re-running successfully did not remove prior canceled-run graphs.
+
+**Learning:** A focused pass is not a full-readiness latency bound, and process cancellation is outside `afterAll` authority. Meaningful lazy or multi-step interaction tests need explicit bounded waits/test budgets derived from the aggregate coverage run. Every complete shared-database gate still needs post-run read-only namespace reconciliation even when the final run passes.
+
+**Prevention:** The editor and lazy schema-workbench tests now use explicit 15–30 second aggregate test budgets and a five-second lazy-query wait while retaining measured production interaction ceilings separately. The current full gate passes 1,192 tests. Read-only reconciliation isolated the canceled-run graph before developer-approved cleanup. The first guarded cleanup transaction rolled back unchanged when its project-only audit predicate missed 16 workspace-level rows; renewed approval and a workspace-scoped predicate then removed exactly 10 users/projects, eight workspaces, six draft entries, 16 outbox rows, 14 derived publication events, and 178 audits, with zero immutable content-publication artifacts.
+
+**Status:** Resolved. Post-cleanup residue and invariant checks pass, supported outbox projection is current, and the worker was restarted healthy.
+
+---
+
+## 2026-08-27 — A verified release image is not the active manual-review runtime
+
+**Context:** M13 manual scenario 1 used the healthy local Compose stack after final package/image evidence had passed.
+
+**Incorrect assumption or decision:** Building and inspecting the final server image was treated as sufficient runtime provenance, but Compose still ran a three-day-old `latest` image. That server returned an older schema-export DTO without required `revisions`; the current strict SDK correctly rejected it as `CLI_AUTHORING_TRANSPORT`.
+
+**Cost or risk:** Manual review could misclassify deployment drift as a CLI/SDK defect or evaluate stale dashboard/server behavior despite green release artifacts.
+
+**Learning:** Artifact provenance and active-runtime provenance are separate gates. Health checks prove process liveness, not that a container runs the reviewed image or DTO version.
+
+**Prevention:** Before manual review, compare active container image IDs with reviewed artifacts, rebuild UI images from the current worktree, recreate services, and then probe one strict cross-package operation. The review stack now runs refreshed server image `fb668f98…` and current dashboard image `632acd10…`; strict schema export, immutable Tooling reads, and generation pass.
+
+**Status:** Resolved during manual scenario 1.
+
+---
+
+## 2026-08-28 — Individually valid workflows can collide at shared serialization and ownership boundaries
+
+**Context:** Fresh M13 manual scenarios chained dashboard-authored export, immutable Tooling reads, config-v2 generation, and presentation-only publication for the first time outside synthetic fixtures.
+
+**Incorrect assumption or decision:** Tooling fixtures always supplied optional enum defaults, so internal contract objects containing `undefined` were never exercised at the recursively exact JSON boundary. Separately, code-first authoring lock v2 and the legacy generated-consumer transaction both claimed `.framerfordevs/schema.lock.json`, although each workflow passed independently.
+
+**Cost or risk:** Immutable revision reads returned sanitized 503 responses for enums without defaults, and generation could not coexist with an exported authoring lock. An initial boundary fix that omitted `undefined` also broke contract-hash parity because established canonical hashing maps it to `null`.
+
+**Learning:** Cross-workflow acceptance must compose real outputs, not only test each command in isolation. Public JSON normalization must preserve canonical hash semantics exactly, and separate owners must never overwrite one path merely because both artifacts are called a lock.
+
+**Prevention:** Tooling now maps JavaScript-only `undefined` recursively to canonical JSON `null`, with enum/money/rich-text regression coverage, preserving the established contract hash. Config v2 keeps authoring authority at `.framerfordevs/schema.lock.json` and generated ownership at `.framerfordevs/generated.lock.json`; config v1 remains compatible. Filesystem tests prove the generated transaction preserves the authoring lock, and clean manual export/generate/presentation/export/generate now succeeds without `--force`.
+
+**Status:** Resolved during manual scenario 2. Refreshed 1,192-test readiness, package/image inspection, zero-residue reconciliation, database invariants, and healthy worker evidence pass.
+
+---
+
+## 2026-08-28 — Local editor defaults and retry recovery must derive from hosted and persisted authority
+
+**Context:** M13 manual scenario 3 opened a real project whose supported locales are `en` and `hi`, then exercised create/save recovery through the loopback editor.
+
+**Incorrect assumption or decision:** The browser defaulted to hardcoded `en-US` instead of hosted locale authority. Separately, the Promise boundary assumed `Effect.runPromise` would reject with the typed retry-journal error directly, so a real pending-command conflict was mislabeled as upstream 502. During diagnosis, a retained command ID was replayed manually without first proving that the stored local fingerprint represented the same request; the server result was valid, but the local journal could not reconcile a different fingerprint.
+
+**Cost or risk:** Valid forms appeared to have no entries, actionable local command conflicts looked like hosted outages, and manual recovery required exact server/row reconciliation plus developer-approved local-journal cleanup before further mutation.
+
+**Learning:** Locale defaults are hosted project authority, not UI conventions. Effect failures crossing into Promise code must be explicitly unwrapped before tag-based classification. A content-free command ID alone is insufficient proof of retry equivalence; the persisted operation and fingerprint remain part of idempotency authority.
+
+**Prevention:** Editor status now loads a bounded locale list from the Tooling manifest, verifies its resolved environment, defaults to the first hosted locale, and suppresses locale-partition reads/writes until a locale is selected. The journal boundary uses `runPromiseExit` to recover typed failures and maps real conflicts to `409 EDITOR_COMMAND_PENDING`, with a filesystem-backed regression test. Future direct retry diagnostics must recompute and compare the exact local fingerprint before sending; otherwise stop and reconcile server state before seeking approval to clear only the proven journal.
+
+**Status:** Resolved during manual scenario 3. Twenty-seven focused editor tests, CLI/editor type checks, and the production build pass; the developer confirmed five-field local/dashboard parity, exact-locale draft save, and publication.
+
+---
+
+## 2026-08-28 — New aggregate creation must preserve companion-feature invariants and actor unions
+
+**Context:** M13 manual scenario 5 created two mutually referencing collections through code-first apply and then opened them in the retained dashboard builder.
+
+**Incorrect assumption or decision:** Authoring apply reproduced the core collection/schema graph but omitted the M9 protected Delivery configuration that dashboard collection creation always seeds. After exact repair, the legacy Delivery management DTO still required a human updater even though the database and M13 authority model correctly attributed creation to a management credential.
+
+**Cost or risk:** Entries and reciprocal references worked, but the retained builder first failed with Delivery 404 and then 503 at response decoding. A future user update would also have set a user actor without clearing the prior credential actor, violating exactly-one actor authority.
+
+**Learning:** A second creation path must inventory every required companion row introduced by later milestones, not only the owning aggregate's original tables. Once persistence permits user-or-credential attribution, every reader, DTO, updater, and UI fixture crossing that row must represent the same union honestly.
+
+**Prevention:** Code-first allocation now creates a version-1 protected Delivery configuration in the same transaction as every new collection and schema head. PostgreSQL mutual-reference coverage counts both companion rows and existing failure injection covers rollback. Delivery management output now carries nullable user and credential actor IDs, maps both from persistence, and clears credential attribution on a later human update. The two pre-fix review rows were repaired only after exact developer approval and guarded reconciliation.
+
+**Status:** Resolved during manual scenario 5. Focused PostgreSQL, API contract/operation, dashboard interaction, type-check, build, zero-residue, healthy-worker, and refreshed healthy-server evidence pass; the developer confirmed both collection builders load.
+
+---
+
+## 2026-08-28 — OAuth user policy needs exact locale context before content pre-resolution
+
+**Context:** M13 manual scenario 6 used the real device flow and native credential store, then ran the same exact-locale content commands previously exercised through management credentials.
+
+**Incorrect assumption or decision:** Authoring content helpers authorized `content.read` or `content.write` while resolving collection/mutation authority but did not yet supply the requested locale ID. Credential policy does not model member locale restrictions, so management tests passed; user policy correctly rejects every locale-scoped action with missing locale context. Separately, the production-mode local image correctly rejected an HTTP OAuth resource, requiring an explicit temporary development-mode review topology rather than weakening HTTPS validation.
+
+**Cost or risk:** OAuth schema plan succeeded while OAuth content list returned a misleading-looking forbidden result for an owner with all-locale access. Without correction, every OAuth content operation would fail before reaching repositories that already enforced the exact locale.
+
+**Learning:** Authentication scope success is not authorization-context completeness. Every user content preflight must resolve and pass the exact enabled locale before policy evaluation; management success cannot substitute for OAuth/user coverage. Local HTTP OAuth review must use an explicitly temporary non-production runtime, never a production HTTPS exception.
+
+**Prevention:** Collection and mutation authority helpers now resolve the enabled locale ID first and pass it through all list/get/create/rename/save/status/validate/publish/unpublish paths. Generated form reads use role-projected project visibility because the form route has no locale, while exact mutations remain locale-authorized. A real user-actor PostgreSQL regression proves exact-locale resolution. OAuth was enabled only in a temporary development-mode container, then native authority, temporary refresh/device rows, the container, and the setting were removed; normal production-mode Compose is healthy with OAuth disabled.
+
+**Status:** Resolved during manual scenario 6. OAuth schema/read/update/publication passed with exact user attribution; a schema-read-only management credential was allowed only for export and denied elsewhere. Focused API, PostgreSQL, dashboard, type-check, build, cleanup, and runtime-health evidence pass.
+
+---
+
+## 2026-08-28 — A healthy test port does not prove the intended receiver owns it
+
+**Context:** M13 manual scenario 7 started an approved local webhook receiver and ngrok tunnel while an older hardened receiver container already bound loopback port 8787.
+
+**Incorrect assumption or decision:** The startup script launched a host receiver in the background and then treated a successful `/health/ready` probe as proof that the new process owned the port. The host process had actually exited with `EADDRINUSE`; the probe reached the pre-existing receiver, whose different secret mount correctly returned signed webhook attempts as 503.
+
+**Cost or risk:** The publication webhook accumulated bounded retries before the correct receiver secret was installed. Liveness alone could have attributed evidence to the wrong process or storage root.
+
+**Learning:** Test-runtime provenance requires listener/process/container identity in addition to port health, just as application runtime provenance requires image identity in addition to container health.
+
+**Prevention:** Before starting a receiver, inspect the bound listener and container ownership, verify the launched PID remains alive, and verify its configured evidence/secret roots before exposing a tunnel. Scenario 7 reused the already-hardened receiver intentionally after identification, installed the exact ignored mode-600 secret, reconciled attempts, and then removed only the scenario event captures and secret after disabling the endpoint.
+
+**Status:** Resolved during manual scenario 7. Published delivery ultimately verified and succeeded; unpublish succeeded on its first attempt. Tunnel, local secret, and exact captures are removed while durable platform delivery history remains intact.
+
+---
+
+## 2026-08-29 — Deleting `process.env` does not erase Linux initial-environment bytes
+
+**Context:** M13 manual scenario 10 inspected browser, filesystem, process arguments, and Linux `/proc/<pid>/environ` while the long-lived local editor was running from an exported management token.
+
+**Incorrect assumption or decision:** Removing `FFD_MANAGEMENT_TOKEN` from Node's `process.env` was treated as removal from the process environment. Node and sanitized opener children no longer observed the key, but Linux retained the original initial-environment bytes in `/proc` for the lifetime of the process.
+
+**Cost or risk:** The browser and child processes remained isolated, but another same-user process with permitted `/proc` access could still recover initial environment authority. Documentation overstated long-lived process-environment removal.
+
+**Learning:** A secret-bearing process cannot reliably scrub its initial OS environment in portable JavaScript. The long-lived process must start without the secret; clearing a language/runtime map afterward is insufficient.
+
+**Prevention:** `ffd editor --token-stdin` accepts one bounded whitespace-free management token only after credential-blind local schema preparation, rejects simultaneous exported management authority, and keeps the token out of initial OS environment and process arguments. Documentation now prefers OAuth native storage when enabled or a non-exported shell variable piped to this mode. Legacy environment support remains for compatibility but is no longer the recommended secure editor launch.
+
+**Status:** Resolved during manual scenario 10. `/proc` and command-line inspection of the stdin-launched editor proved no credential environment keys or arguments; DevTools/browser/local persistence checks passed, 36 focused tests and CLI/editor type-check/build pass, and clean shutdown left no journal.

@@ -23,6 +23,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
+import { apiCredential } from "./access";
 import { user } from "./auth";
 import { projectLocale } from "./locale";
 import { environment, project, workspace } from "./platform";
@@ -44,31 +45,77 @@ export const cmsCollection = pgTable(
     workspaceId: uuid("workspace_id").notNull(),
     projectId: uuid("project_id").notNull(),
     environmentId: uuid("environment_id").notNull(),
+    sourceKey: varchar("source_key", { length: 63 }).notNull(),
     apiKey: varchar("api_key", { length: 63 }).notNull(),
     displayName: varchar("display_name", { length: 100 }).notNull(),
     description: varchar("description", { length: 500 }),
     version: integer("version").default(1).notNull(),
-    createdByUserId: text("created_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
-    changedByUserId: text("changed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    createdByCredentialId: uuid("created_by_credential_id"),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
     createdAt: cmsTimestamp("created_at").defaultNow().notNull(),
     updatedAt: cmsTimestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
     foreignKey({
+      name: "cms_collection_created_credential_tenant_fk",
+      columns: [
+        table.createdByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_collection_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
       name: "cms_collection_environment_tenant_fk",
       columns: [table.environmentId, table.projectId, table.workspaceId],
       foreignColumns: [environment.id, environment.projectId, environment.workspaceId],
     }).onDelete("restrict"),
+    unique("cms_collection_environment_source_key_unique").on(table.environmentId, table.sourceKey),
     unique("cms_collection_environment_key_unique").on(table.environmentId, table.apiKey),
     unique("cms_collection_id_tenant_unique").on(
       table.id,
       table.environmentId,
       table.projectId,
       table.workspaceId,
+    ),
+    check(
+      "cms_collection_created_actor_exactly_one",
+      sql`num_nonnulls(${table.createdByUserId}, ${table.createdByCredentialId}) = 1`,
+    ),
+    check(
+      "cms_collection_changed_actor_exactly_one",
+      sql`num_nonnulls(${table.changedByUserId}, ${table.changedByCredentialId}) = 1`,
+    ),
+    check(
+      "cms_collection_source_key_valid",
+      sql`${table.sourceKey} ~ '^[a-z][a-z0-9_-]{0,62}$' and ${table.sourceKey} !~ '--|__' and right(${table.sourceKey}, 1) not in ('-', '_') and ${table.sourceKey} not in ('id', 'entry_id', 'collection_id', 'locale', 'schema_revision', 'publication_id', 'publication_sequence', 'created_at', 'updated_at', 'published_at', '_meta', '__proto__', 'prototype', 'constructor')`,
     ),
     check(
       "cms_collection_api_key_valid",
@@ -90,6 +137,12 @@ export const cmsCollection = pgTable(
     ),
     index("cms_collection_created_by_user_idx").on(table.createdByUserId),
     index("cms_collection_changed_by_user_idx").on(table.changedByUserId),
+    index("cms_collection_created_by_credential_idx")
+      .on(table.createdByCredentialId)
+      .where(sql`${table.createdByCredentialId} is not null`),
+    index("cms_collection_changed_by_credential_idx")
+      .on(table.changedByCredentialId)
+      .where(sql`${table.changedByCredentialId} is not null`),
   ],
 );
 
@@ -101,6 +154,7 @@ export const cmsCollectionField = pgTable(
     projectId: uuid("project_id").notNull(),
     environmentId: uuid("environment_id").notNull(),
     collectionId: uuid("collection_id").notNull(),
+    sourceKey: varchar("source_key", { length: 63 }).notNull(),
     parentFieldId: uuid("parent_field_id"),
     nodeRole: varchar("node_role", { length: 32 }).default("root").notNull(),
     referenceCollectionId: uuid("reference_collection_id"),
@@ -119,20 +173,68 @@ export const cmsCollectionField = pgTable(
       .$type<Readonly<Record<string, unknown>>>()
       .default(sql`'{}'::jsonb`)
       .notNull(),
-    createdByUserId: text("created_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
-    changedByUserId: text("changed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    createdByCredentialId: uuid("created_by_credential_id"),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
     removedAt: cmsTimestamp("removed_at"),
     removedByUserId: text("removed_by_user_id").references(() => user.id, {
       onDelete: "restrict",
     }),
+    removedByCredentialId: uuid("removed_by_credential_id"),
     createdAt: cmsTimestamp("created_at").defaultNow().notNull(),
     updatedAt: cmsTimestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
+    foreignKey({
+      name: "cms_field_created_credential_tenant_fk",
+      columns: [
+        table.createdByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_field_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_field_removed_credential_tenant_fk",
+      columns: [
+        table.removedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "cms_field_collection_tenant_fk",
       columns: [table.collectionId, table.environmentId, table.projectId, table.workspaceId],
@@ -175,6 +277,7 @@ export const cmsCollectionField = pgTable(
         cmsCollection.workspaceId,
       ],
     }).onDelete("restrict"),
+    unique("cms_field_collection_source_key_unique").on(table.collectionId, table.sourceKey),
     unique("cms_field_id_collection_tenant_unique").on(
       table.id,
       table.collectionId,
@@ -197,6 +300,18 @@ export const cmsCollectionField = pgTable(
     uniqueIndex("cms_field_collection_active_list_item_unique")
       .on(table.collectionId, table.parentFieldId)
       .where(sql`${table.removedAt} is null and ${table.nodeRole} = 'list_item'`),
+    check(
+      "cms_field_created_actor_exactly_one",
+      sql`num_nonnulls(${table.createdByUserId}, ${table.createdByCredentialId}) = 1`,
+    ),
+    check(
+      "cms_field_changed_actor_exactly_one",
+      sql`num_nonnulls(${table.changedByUserId}, ${table.changedByCredentialId}) = 1`,
+    ),
+    check(
+      "cms_field_source_key_valid",
+      sql`${table.sourceKey} ~ '^[a-z][a-z0-9_-]{0,62}$' and ${table.sourceKey} !~ '--|__' and right(${table.sourceKey}, 1) not in ('-', '_') and ${table.sourceKey} not in ('id', 'entry_id', 'collection_id', 'locale', 'schema_revision', 'publication_id', 'publication_sequence', 'created_at', 'updated_at', 'published_at', '_meta', '__proto__', 'prototype', 'constructor')`,
+    ),
     check(
       "cms_field_node_role_valid",
       sql`${table.nodeRole} in ('root', 'object_property', 'list_item') and ((${table.nodeRole} = 'root' and ${table.parentFieldId} is null) or (${table.nodeRole} <> 'root' and ${table.parentFieldId} is not null))`,
@@ -240,7 +355,7 @@ export const cmsCollectionField = pgTable(
     ),
     check(
       "cms_field_lifecycle_consistent",
-      sql`(${table.removedAt} is null and ${table.removedByUserId} is null and ((${table.nodeRole} = 'list_item' and ${table.position} = 0) or (${table.nodeRole} <> 'list_item' and ${table.position} between 0 and 99))) or (${table.removedAt} is not null and ${table.removedByUserId} is not null and ${table.position} is null)`,
+      sql`(${table.removedAt} is null and num_nonnulls(${table.removedByUserId}, ${table.removedByCredentialId}) = 0 and ((${table.nodeRole} = 'list_item' and ${table.position} = 0) or (${table.nodeRole} <> 'list_item' and ${table.position} between 0 and 99))) or (${table.removedAt} is not null and num_nonnulls(${table.removedByUserId}, ${table.removedByCredentialId}) = 1 and ${table.position} is null)`,
     ),
     index("cms_field_collection_parent_position_id_idx")
       .on(table.collectionId, table.parentFieldId, table.position, table.id)
@@ -257,6 +372,115 @@ export const cmsCollectionField = pgTable(
     index("cms_field_removed_by_user_idx")
       .on(table.removedByUserId)
       .where(sql`${table.removedByUserId} is not null`),
+    index("cms_field_created_by_credential_idx")
+      .on(table.createdByCredentialId)
+      .where(sql`${table.createdByCredentialId} is not null`),
+    index("cms_field_changed_by_credential_idx")
+      .on(table.changedByCredentialId)
+      .where(sql`${table.changedByCredentialId} is not null`),
+    index("cms_field_removed_by_credential_idx")
+      .on(table.removedByCredentialId)
+      .where(sql`${table.removedByCredentialId} is not null`),
+  ],
+);
+
+export const cmsEnumOptionSourceIdentity = pgTable(
+  "cms_enum_option_source_identity",
+  {
+    id: cmsId("id").primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    collectionId: uuid("collection_id").notNull(),
+    fieldId: uuid("field_id").notNull(),
+    sourceKey: varchar("source_key", { length: 63 }).notNull(),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    createdByCredentialId: uuid("created_by_credential_id"),
+    retiredAt: cmsTimestamp("retired_at"),
+    retiredByUserId: text("retired_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    retiredByCredentialId: uuid("retired_by_credential_id"),
+    createdAt: cmsTimestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "cms_enum_option_created_credential_tenant_fk",
+      columns: [
+        table.createdByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_enum_option_retired_credential_tenant_fk",
+      columns: [
+        table.retiredByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_enum_option_field_tenant_fk",
+      columns: [
+        table.fieldId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+      ],
+      foreignColumns: [
+        cmsCollectionField.id,
+        cmsCollectionField.collectionId,
+        cmsCollectionField.environmentId,
+        cmsCollectionField.projectId,
+        cmsCollectionField.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    unique("cms_enum_option_field_source_key_unique").on(table.fieldId, table.sourceKey),
+    unique("cms_enum_option_id_field_tenant_unique").on(
+      table.id,
+      table.fieldId,
+      table.collectionId,
+      table.environmentId,
+      table.projectId,
+      table.workspaceId,
+    ),
+    check(
+      "cms_enum_option_source_key_valid",
+      sql`${table.sourceKey} ~ '^[a-z][a-z0-9_-]{0,62}$' and ${table.sourceKey} !~ '--|__' and right(${table.sourceKey}, 1) not in ('-', '_') and ${table.sourceKey} not in ('id', 'entry_id', 'collection_id', 'locale', 'schema_revision', 'publication_id', 'publication_sequence', 'created_at', 'updated_at', 'published_at', '_meta', '__proto__', 'prototype', 'constructor')`,
+    ),
+    check(
+      "cms_enum_option_created_actor_exactly_one",
+      sql`num_nonnulls(${table.createdByUserId}, ${table.createdByCredentialId}) = 1`,
+    ),
+    check(
+      "cms_enum_option_retirement_consistent",
+      sql`(${table.retiredAt} is null and num_nonnulls(${table.retiredByUserId}, ${table.retiredByCredentialId}) = 0) or (${table.retiredAt} is not null and num_nonnulls(${table.retiredByUserId}, ${table.retiredByCredentialId}) = 1)`,
+    ),
+    index("cms_enum_option_collection_field_idx").on(table.collectionId, table.fieldId),
+    index("cms_enum_option_created_by_credential_idx")
+      .on(table.createdByCredentialId)
+      .where(sql`${table.createdByCredentialId} is not null`),
+    index("cms_enum_option_retired_by_credential_idx")
+      .on(table.retiredByCredentialId)
+      .where(sql`${table.retiredByCredentialId} is not null`),
   ],
 );
 
@@ -269,13 +493,29 @@ export const cmsCollectionDeliveryConfig = pgTable(
     environmentId: uuid("environment_id").notNull(),
     access: varchar("access", { length: 16 }).default("protected").notNull(),
     version: integer("version").default(1).notNull(),
-    changedByUserId: text("changed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
     createdAt: cmsTimestamp("created_at").defaultNow().notNull(),
     updatedAt: cmsTimestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
+    foreignKey({
+      name: "cms_collection_delivery_config_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "cms_collection_delivery_config_tenant_fk",
       columns: [table.collectionId, table.environmentId, table.projectId, table.workspaceId],
@@ -293,6 +533,10 @@ export const cmsCollectionDeliveryConfig = pgTable(
       table.workspaceId,
     ),
     check(
+      "cms_collection_delivery_config_actor_exactly_one",
+      sql`num_nonnulls(${table.changedByUserId}, ${table.changedByCredentialId}) = 1`,
+    ),
+    check(
       "cms_collection_delivery_config_access_valid",
       sql`${table.access} in ('protected', 'public')`,
     ),
@@ -302,6 +546,9 @@ export const cmsCollectionDeliveryConfig = pgTable(
       table.collectionId,
     ),
     index("cms_collection_delivery_config_changed_by_user_idx").on(table.changedByUserId),
+    index("cms_collection_delivery_config_changed_by_credential_idx")
+      .on(table.changedByCredentialId)
+      .where(sql`${table.changedByCredentialId} is not null`),
   ],
 );
 
@@ -415,6 +662,7 @@ export const cmsSchemaRevision = pgTable(
     currencyRegistryProfile: varchar("currency_registry_profile", { length: 64 }),
     editorLayout: jsonb("editor_layout").$type<Readonly<Record<string, unknown>>>(),
     schemaHash: char("schema_hash", { length: 64 }).notNull(),
+    structureHash: char("structure_hash", { length: 64 }).notNull(),
     commandId: uuid("command_id").notNull(),
     commandFingerprint: char("command_fingerprint", { length: 64 }).notNull(),
     nonBreakingChangeCount: integer("non_breaking_change_count").default(0).notNull(),
@@ -422,12 +670,28 @@ export const cmsSchemaRevision = pgTable(
       .default(0)
       .notNull(),
     breakingChangeCount: integer("breaking_change_count").default(0).notNull(),
-    publishedByUserId: text("published_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    publishedByUserId: text("published_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    publishedByCredentialId: uuid("published_by_credential_id"),
     publishedAt: cmsTimestamp("published_at").defaultNow().notNull(),
   },
   (table) => [
+    foreignKey({
+      name: "cms_revision_published_credential_tenant_fk",
+      columns: [
+        table.publishedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "cms_revision_collection_tenant_fk",
       columns: [table.collectionId, table.environmentId, table.projectId, table.workspaceId],
@@ -470,6 +734,14 @@ export const cmsSchemaRevision = pgTable(
       table.projectId,
       table.workspaceId,
     ),
+    unique("cms_revision_id_scope_structure_unique").on(
+      table.id,
+      table.collectionId,
+      table.environmentId,
+      table.projectId,
+      table.workspaceId,
+      table.structureHash,
+    ),
     unique("cms_revision_id_scope_sequence_unique").on(
       table.id,
       table.collectionId,
@@ -477,6 +749,10 @@ export const cmsSchemaRevision = pgTable(
       table.projectId,
       table.workspaceId,
       table.sequence,
+    ),
+    check(
+      "cms_revision_published_actor_exactly_one",
+      sql`num_nonnulls(${table.publishedByUserId}, ${table.publishedByCredentialId}) = 1`,
     ),
     check("cms_revision_sequence_positive", sql`${table.sequence} > 0`),
     check(
@@ -509,6 +785,7 @@ export const cmsSchemaRevision = pgTable(
       sql`${table.editorLayout} is null or (jsonb_typeof(${table.editorLayout}) = 'object' and octet_length(${table.editorLayout}::text) <= 32768)`,
     ),
     check("cms_revision_schema_hash_valid", sql`${table.schemaHash} ~ '^[0-9a-f]{64}$'`),
+    check("cms_revision_structure_hash_valid", sql`${table.structureHash} ~ '^[0-9a-f]{64}$'`),
     check(
       "cms_revision_command_fingerprint_valid",
       sql`${table.commandFingerprint} ~ '^[0-9a-f]{64}$'`,
@@ -525,6 +802,9 @@ export const cmsSchemaRevision = pgTable(
       .on(table.previousRevisionId)
       .where(sql`${table.previousRevisionId} is not null`),
     index("cms_revision_published_by_user_idx").on(table.publishedByUserId),
+    index("cms_revision_published_by_credential_idx")
+      .on(table.publishedByCredentialId)
+      .where(sql`${table.publishedByCredentialId} is not null`),
   ],
 );
 
@@ -699,17 +979,34 @@ export const cmsCollectionSchemaHead = pgTable(
     draftBaseRevisionId: uuid("draft_base_revision_id"),
     currentPublishedRevisionId: uuid("current_published_revision_id"),
     currentPublishedSequence: integer("current_published_sequence").default(0).notNull(),
+    currentPublishedStructureHash: char("current_published_structure_hash", { length: 64 }),
     validationProfile: varchar("validation_profile", { length: 64 })
       .default("ffd-fields@1")
       .notNull(),
     currencyRegistryProfile: varchar("currency_registry_profile", { length: 64 }),
     editorLayout: jsonb("editor_layout").$type<Readonly<Record<string, unknown>>>(),
-    changedByUserId: text("changed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
     updatedAt: cmsTimestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
+    foreignKey({
+      name: "cms_head_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "cms_head_collection_tenant_fk",
       columns: [table.collectionId, table.environmentId, table.projectId, table.workspaceId],
@@ -738,6 +1035,25 @@ export const cmsCollectionSchemaHead = pgTable(
       ],
     }).onDelete("restrict"),
     foreignKey({
+      name: "cms_head_current_revision_structure_fk",
+      columns: [
+        table.currentPublishedRevisionId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+        table.currentPublishedStructureHash,
+      ],
+      foreignColumns: [
+        cmsSchemaRevision.id,
+        cmsSchemaRevision.collectionId,
+        cmsSchemaRevision.environmentId,
+        cmsSchemaRevision.projectId,
+        cmsSchemaRevision.workspaceId,
+        cmsSchemaRevision.structureHash,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
       name: "cms_head_current_revision_sequence_fk",
       columns: [
         table.currentPublishedRevisionId,
@@ -756,6 +1072,10 @@ export const cmsCollectionSchemaHead = pgTable(
         cmsSchemaRevision.sequence,
       ],
     }).onDelete("restrict"),
+    check(
+      "cms_head_changed_actor_exactly_one",
+      sql`num_nonnulls(${table.changedByUserId}, ${table.changedByCredentialId}) = 1`,
+    ),
     check("cms_head_draft_version_positive", sql`${table.draftVersion} > 0`),
     check(
       "cms_head_validation_profile_valid",
@@ -771,7 +1091,7 @@ export const cmsCollectionSchemaHead = pgTable(
     ),
     check(
       "cms_head_publication_consistent",
-      sql`(${table.draftBaseRevisionId} is null and ${table.currentPublishedRevisionId} is null and ${table.currentPublishedSequence} = 0) or (${table.draftBaseRevisionId} is not null and ${table.currentPublishedRevisionId} is not null and ${table.currentPublishedSequence} > 0)`,
+      sql`(${table.draftBaseRevisionId} is null and ${table.currentPublishedRevisionId} is null and ${table.currentPublishedSequence} = 0 and ${table.currentPublishedStructureHash} is null) or (${table.draftBaseRevisionId} is not null and ${table.currentPublishedRevisionId} is not null and ${table.currentPublishedSequence} > 0 and ${table.currentPublishedStructureHash} ~ '^[0-9a-f]{64}$')`,
     ),
     index("cms_head_draft_base_revision_idx")
       .on(table.draftBaseRevisionId)
@@ -780,6 +1100,136 @@ export const cmsCollectionSchemaHead = pgTable(
       .on(table.currentPublishedRevisionId)
       .where(sql`${table.currentPublishedRevisionId} is not null`),
     index("cms_head_changed_by_user_idx").on(table.changedByUserId),
+    index("cms_head_changed_by_credential_idx")
+      .on(table.changedByCredentialId)
+      .where(sql`${table.changedByCredentialId} is not null`),
+  ],
+);
+
+export const cmsProjectSchemaApplyCommand = pgTable(
+  "cms_project_schema_apply_command",
+  {
+    commandId: uuid("command_id").notNull(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    commandFingerprint: char("command_fingerprint", { length: 64 }).notNull(),
+    expectedManifestHash: char("expected_manifest_hash", { length: 64 }).notNull(),
+    planHash: char("plan_hash", { length: 64 }).notNull(),
+    resultManifestHash: char("result_manifest_hash", { length: 64 }).notNull(),
+    noOp: boolean("no_op").notNull(),
+    result: jsonb("result").$type<Readonly<Record<string, unknown>>>().notNull(),
+    completedByUserId: text("completed_by_user_id"),
+    completedByCredentialId: uuid("completed_by_credential_id"),
+    completedAt: cmsTimestamp("completed_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "cms_project_schema_apply_command_pk",
+      columns: [table.environmentId, table.commandId],
+    }),
+    foreignKey({
+      name: "cms_project_schema_apply_user_fk",
+      columns: [table.completedByUserId],
+      foreignColumns: [user.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_project_schema_apply_environment_fk",
+      columns: [table.environmentId, table.projectId, table.workspaceId],
+      foreignColumns: [environment.id, environment.projectId, environment.workspaceId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_project_schema_apply_credential_tenant_fk",
+      columns: [
+        table.completedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "cms_project_schema_apply_fingerprint_valid",
+      sql`${table.commandFingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "cms_project_schema_apply_hashes_valid",
+      sql`${table.expectedManifestHash} ~ '^[0-9a-f]{64}$' and ${table.planHash} ~ '^[0-9a-f]{64}$' and ${table.resultManifestHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "cms_project_schema_apply_result_valid",
+      sql`jsonb_typeof(${table.result}) = 'object' and octet_length(${table.result}::text) <= 1048576`,
+    ),
+    check(
+      "cms_project_schema_apply_actor_exactly_one",
+      sql`num_nonnulls(${table.completedByUserId}, ${table.completedByCredentialId}) = 1`,
+    ),
+    index("cms_project_schema_apply_completed_idx").on(
+      table.environmentId,
+      table.completedAt.desc(),
+      table.commandId.desc(),
+    ),
+    index("cms_project_schema_apply_completed_by_credential_idx")
+      .on(table.completedByCredentialId)
+      .where(sql`${table.completedByCredentialId} is not null`),
+  ],
+);
+
+export const cmsProjectSchemaApplyRevision = pgTable(
+  "cms_project_schema_apply_revision",
+  {
+    environmentId: uuid("environment_id").notNull(),
+    commandId: uuid("command_id").notNull(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    collectionId: uuid("collection_id").notNull(),
+    revisionId: uuid("revision_id").notNull(),
+    structureHash: char("structure_hash", { length: 64 }).notNull(),
+    contractHash: char("contract_hash", { length: 64 }).notNull(),
+    changed: boolean("changed").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "cms_project_schema_apply_revision_pk",
+      columns: [table.environmentId, table.commandId, table.collectionId],
+    }),
+    foreignKey({
+      name: "cms_project_schema_apply_revision_command_fk",
+      columns: [table.environmentId, table.commandId],
+      foreignColumns: [
+        cmsProjectSchemaApplyCommand.environmentId,
+        cmsProjectSchemaApplyCommand.commandId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_project_schema_apply_revision_tenant_fk",
+      columns: [
+        table.revisionId,
+        table.collectionId,
+        table.environmentId,
+        table.projectId,
+        table.workspaceId,
+        table.structureHash,
+      ],
+      foreignColumns: [
+        cmsSchemaRevision.id,
+        cmsSchemaRevision.collectionId,
+        cmsSchemaRevision.environmentId,
+        cmsSchemaRevision.projectId,
+        cmsSchemaRevision.workspaceId,
+        cmsSchemaRevision.structureHash,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "cms_project_schema_apply_revision_hashes_valid",
+      sql`${table.structureHash} ~ '^[0-9a-f]{64}$' and ${table.contractHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    index("cms_project_schema_apply_revision_revision_idx").on(table.revisionId),
   ],
 );
 
@@ -796,16 +1246,48 @@ export const cmsEntry = pgTable(
     publicationEventSequence: integer("publication_event_sequence").default(0).notNull(),
     createCommandId: uuid("create_command_id").notNull(),
     createCommandFingerprint: char("create_command_fingerprint", { length: 64 }).notNull(),
-    createdByUserId: text("created_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
-    changedByUserId: text("changed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    createdByCredentialId: uuid("created_by_credential_id"),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
     createdAt: cmsTimestamp("created_at").defaultNow().notNull(),
     updatedAt: cmsTimestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
+    foreignKey({
+      name: "cms_entry_created_credential_tenant_fk",
+      columns: [
+        table.createdByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_entry_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "cms_entry_collection_tenant_fk",
       columns: [table.collectionId, table.environmentId, table.projectId, table.workspaceId],
@@ -828,6 +1310,14 @@ export const cmsEntry = pgTable(
       table.createCommandId,
     ),
     check(
+      "cms_entry_created_actor_exactly_one",
+      sql`num_nonnulls(${table.createdByUserId}, ${table.createdByCredentialId}) = 1`,
+    ),
+    check(
+      "cms_entry_changed_actor_exactly_one",
+      sql`num_nonnulls(${table.changedByUserId}, ${table.changedByCredentialId}) = 1`,
+    ),
+    check(
       "cms_entry_display_name_valid",
       sql`${table.displayName} is null or (char_length(${table.displayName}) between 1 and 100 and ${table.displayName} = btrim(${table.displayName}) and ${table.displayName} !~ '[[:cntrl:]]')`,
     ),
@@ -848,6 +1338,12 @@ export const cmsEntry = pgTable(
     ),
     index("cms_entry_created_by_user_idx").on(table.createdByUserId),
     index("cms_entry_changed_by_user_idx").on(table.changedByUserId),
+    index("cms_entry_created_by_credential_idx")
+      .on(table.createdByCredentialId)
+      .where(sql`${table.createdByCredentialId} is not null`),
+    index("cms_entry_changed_by_credential_idx")
+      .on(table.changedByCredentialId)
+      .where(sql`${table.changedByCredentialId} is not null`),
   ],
 );
 
@@ -870,12 +1366,28 @@ export const cmsEntrySharedRevision = pgTable(
     commandId: uuid("command_id").notNull(),
     commandFingerprint: char("command_fingerprint", { length: 64 }).notNull(),
     restoredFromRevisionId: uuid("restored_from_revision_id"),
-    authoredByUserId: text("authored_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    authoredByUserId: text("authored_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    authoredByCredentialId: uuid("authored_by_credential_id"),
     authoredAt: cmsTimestamp("authored_at").defaultNow().notNull(),
   },
   (table) => [
+    foreignKey({
+      name: "cms_entry_shared_revision_author_credential_tenant_fk",
+      columns: [
+        table.authoredByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "cms_entry_shared_revision_entry_tenant_fk",
       columns: [
@@ -967,6 +1479,10 @@ export const cmsEntrySharedRevision = pgTable(
       table.workspaceId,
       table.sequence,
     ),
+    check(
+      "cms_entry_shared_revision_author_exactly_one",
+      sql`num_nonnulls(${table.authoredByUserId}, ${table.authoredByCredentialId}) = 1`,
+    ),
     check("cms_entry_shared_revision_sequence_positive", sql`${table.sequence} > 0`),
     check(
       "cms_entry_shared_revision_previous_consistent",
@@ -1005,6 +1521,9 @@ export const cmsEntrySharedRevision = pgTable(
       .on(table.restoredFromRevisionId)
       .where(sql`${table.restoredFromRevisionId} is not null`),
     index("cms_entry_shared_revision_author_idx").on(table.authoredByUserId),
+    index("cms_entry_shared_revision_author_credential_idx")
+      .on(table.authoredByCredentialId)
+      .where(sql`${table.authoredByCredentialId} is not null`),
   ],
 );
 
@@ -1028,12 +1547,28 @@ export const cmsEntryLocaleRevision = pgTable(
     commandId: uuid("command_id").notNull(),
     commandFingerprint: char("command_fingerprint", { length: 64 }).notNull(),
     restoredFromRevisionId: uuid("restored_from_revision_id"),
-    authoredByUserId: text("authored_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    authoredByUserId: text("authored_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    authoredByCredentialId: uuid("authored_by_credential_id"),
     authoredAt: cmsTimestamp("authored_at").defaultNow().notNull(),
   },
   (table) => [
+    foreignKey({
+      name: "cms_entry_locale_revision_author_credential_tenant_fk",
+      columns: [
+        table.authoredByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "cms_entry_locale_revision_entry_tenant_fk",
       columns: [
@@ -1144,6 +1679,10 @@ export const cmsEntryLocaleRevision = pgTable(
       table.workspaceId,
       table.sequence,
     ),
+    check(
+      "cms_entry_locale_revision_author_exactly_one",
+      sql`num_nonnulls(${table.authoredByUserId}, ${table.authoredByCredentialId}) = 1`,
+    ),
     check("cms_entry_locale_revision_sequence_positive", sql`${table.sequence} > 0`),
     check(
       "cms_entry_locale_revision_previous_consistent",
@@ -1187,6 +1726,9 @@ export const cmsEntryLocaleRevision = pgTable(
       .on(table.restoredFromRevisionId)
       .where(sql`${table.restoredFromRevisionId} is not null`),
     index("cms_entry_locale_revision_author_idx").on(table.authoredByUserId),
+    index("cms_entry_locale_revision_author_credential_idx")
+      .on(table.authoredByCredentialId)
+      .where(sql`${table.authoredByCredentialId} is not null`),
   ],
 );
 
@@ -1200,12 +1742,28 @@ export const cmsEntrySharedDraft = pgTable(
     collectionId: uuid("collection_id").notNull(),
     version: integer("version").notNull(),
     currentRevisionId: uuid("current_revision_id").notNull(),
-    changedByUserId: text("changed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
     updatedAt: cmsTimestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
+    foreignKey({
+      name: "cms_entry_shared_draft_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "cms_entry_shared_draft_entry_tenant_fk",
       columns: [
@@ -1244,9 +1802,16 @@ export const cmsEntrySharedDraft = pgTable(
         cmsEntrySharedRevision.sequence,
       ],
     }).onDelete("restrict"),
+    check(
+      "cms_entry_shared_draft_actor_exactly_one",
+      sql`num_nonnulls(${table.changedByUserId}, ${table.changedByCredentialId}) = 1`,
+    ),
     check("cms_entry_shared_draft_version_positive", sql`${table.version} > 0`),
     index("cms_entry_shared_draft_current_revision_idx").on(table.currentRevisionId),
     index("cms_entry_shared_draft_changed_by_user_idx").on(table.changedByUserId),
+    index("cms_entry_shared_draft_changed_by_credential_idx")
+      .on(table.changedByCredentialId)
+      .where(sql`${table.changedByCredentialId} is not null`),
   ],
 );
 
@@ -1261,9 +1826,10 @@ export const cmsEntryLocaleDraft = pgTable(
     collectionId: uuid("collection_id").notNull(),
     version: integer("version").notNull(),
     currentRevisionId: uuid("current_revision_id").notNull(),
-    changedByUserId: text("changed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
     updatedAt: cmsTimestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
@@ -1271,6 +1837,21 @@ export const cmsEntryLocaleDraft = pgTable(
       name: "cms_entry_locale_draft_entry_locale_pk",
       columns: [table.entryId, table.localeId],
     }),
+    foreignKey({
+      name: "cms_entry_locale_draft_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "cms_entry_locale_draft_entry_tenant_fk",
       columns: [
@@ -1316,10 +1897,17 @@ export const cmsEntryLocaleDraft = pgTable(
         cmsEntryLocaleRevision.sequence,
       ],
     }).onDelete("restrict"),
+    check(
+      "cms_entry_locale_draft_actor_exactly_one",
+      sql`num_nonnulls(${table.changedByUserId}, ${table.changedByCredentialId}) = 1`,
+    ),
     check("cms_entry_locale_draft_version_positive", sql`${table.version} > 0`),
     index("cms_entry_locale_draft_locale_entry_idx").on(table.localeId, table.entryId),
     index("cms_entry_locale_draft_current_revision_idx").on(table.currentRevisionId),
     index("cms_entry_locale_draft_changed_by_user_idx").on(table.changedByUserId),
+    index("cms_entry_locale_draft_changed_by_credential_idx")
+      .on(table.changedByCredentialId)
+      .where(sql`${table.changedByCredentialId} is not null`),
   ],
 );
 
@@ -1340,9 +1928,10 @@ export const cmsEntryDraftCommand = pgTable(
     resultSharedRevisionId: uuid("result_shared_revision_id"),
     resultLocaleVersion: integer("result_locale_version").notNull(),
     resultLocaleRevisionId: uuid("result_locale_revision_id"),
-    completedByUserId: text("completed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    completedByUserId: text("completed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    completedByCredentialId: uuid("completed_by_credential_id"),
     completedAt: cmsTimestamp("completed_at").defaultNow().notNull(),
   },
   (table) => [
@@ -1350,6 +1939,21 @@ export const cmsEntryDraftCommand = pgTable(
       name: "cms_entry_draft_command_entry_command_pk",
       columns: [table.entryId, table.commandId],
     }),
+    foreignKey({
+      name: "cms_entry_draft_command_completed_credential_tenant_fk",
+      columns: [
+        table.completedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "cms_entry_draft_command_entry_tenant_fk",
       columns: [
@@ -1413,6 +2017,10 @@ export const cmsEntryDraftCommand = pgTable(
       ],
     }).onDelete("restrict"),
     check(
+      "cms_entry_draft_command_actor_exactly_one",
+      sql`num_nonnulls(${table.completedByUserId}, ${table.completedByCredentialId}) = 1`,
+    ),
+    check(
       "cms_entry_draft_command_operation_valid",
       sql`${table.operation} in ('save', 'restore')`,
     ),
@@ -1439,6 +2047,9 @@ export const cmsEntryDraftCommand = pgTable(
     ),
     index("cms_entry_draft_command_locale_idx").on(table.localeId),
     index("cms_entry_draft_command_completed_by_user_idx").on(table.completedByUserId),
+    index("cms_entry_draft_command_completed_by_credential_idx")
+      .on(table.completedByCredentialId)
+      .where(sql`${table.completedByCredentialId} is not null`),
   ],
 );
 
@@ -1466,12 +2077,28 @@ export const cmsEntryLocalePublication = pgTable(
     changedFieldIds: uuid("changed_field_ids").array().notNull(),
     commandId: uuid("command_id").notNull(),
     commandFingerprint: char("command_fingerprint", { length: 64 }).notNull(),
-    publishedByUserId: text("published_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    publishedByUserId: text("published_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    publishedByCredentialId: uuid("published_by_credential_id"),
     publishedAt: cmsTimestamp("published_at").defaultNow().notNull(),
   },
   (table) => [
+    foreignKey({
+      name: "cms_entry_pub_published_credential_tenant_fk",
+      columns: [
+        table.publishedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "cms_entry_pub_entry_tenant_fk",
       columns: [
@@ -1610,6 +2237,10 @@ export const cmsEntryLocalePublication = pgTable(
       table.projectId,
       table.workspaceId,
     ),
+    check(
+      "cms_entry_pub_actor_exactly_one",
+      sql`num_nonnulls(${table.publishedByUserId}, ${table.publishedByCredentialId}) = 1`,
+    ),
     check("cms_entry_pub_sequence_positive", sql`${table.publicationSequence} > 0`),
     check("cms_entry_pub_event_sequence_positive", sql`${table.eventSequence} > 0`),
     check(
@@ -1652,6 +2283,9 @@ export const cmsEntryLocalePublication = pgTable(
       .on(table.previousPublicationId)
       .where(sql`${table.previousPublicationId} is not null`),
     index("cms_entry_pub_publisher_idx").on(table.publishedByUserId),
+    index("cms_entry_pub_publisher_credential_idx")
+      .on(table.publishedByCredentialId)
+      .where(sql`${table.publishedByCredentialId} is not null`),
   ],
 );
 
@@ -1821,9 +2455,10 @@ export const cmsEntryLocalePublicationHead = pgTable(
     version: integer("version").notNull(),
     latestPublicationSequence: integer("latest_publication_sequence").notNull(),
     currentPublicationId: uuid("current_publication_id"),
-    changedByUserId: text("changed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
     updatedAt: cmsTimestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
@@ -1831,6 +2466,21 @@ export const cmsEntryLocalePublicationHead = pgTable(
       name: "cms_entry_pub_head_entry_locale_pk",
       columns: [table.entryId, table.localeId],
     }),
+    foreignKey({
+      name: "cms_entry_pub_head_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "cms_entry_pub_head_entry_tenant_fk",
       columns: [
@@ -1885,6 +2535,10 @@ export const cmsEntryLocalePublicationHead = pgTable(
       table.projectId,
       table.workspaceId,
     ),
+    check(
+      "cms_entry_pub_head_actor_exactly_one",
+      sql`num_nonnulls(${table.changedByUserId}, ${table.changedByCredentialId}) = 1`,
+    ),
     check("cms_entry_pub_head_version_positive", sql`${table.version} > 0`),
     check("cms_entry_pub_head_sequence_positive", sql`${table.latestPublicationSequence} > 0`),
     index("cms_entry_pub_head_locale_collection_current_idx")
@@ -1894,6 +2548,9 @@ export const cmsEntryLocalePublicationHead = pgTable(
       .on(table.currentPublicationId)
       .where(sql`${table.currentPublicationId} is not null`),
     index("cms_entry_pub_head_changed_by_user_idx").on(table.changedByUserId),
+    index("cms_entry_pub_head_changed_by_credential_idx")
+      .on(table.changedByCredentialId)
+      .where(sql`${table.changedByCredentialId} is not null`),
   ],
 );
 
@@ -2064,9 +2721,10 @@ export const cmsEntryPublicationCommand = pgTable(
     resultCurrentPublicationId: uuid("result_current_publication_id"),
     resultLatestPublicationSequence: integer("result_latest_publication_sequence").notNull(),
     resultEventSequence: integer("result_event_sequence"),
-    completedByUserId: text("completed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    completedByUserId: text("completed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    completedByCredentialId: uuid("completed_by_credential_id"),
     completedAt: cmsTimestamp("completed_at").defaultNow().notNull(),
   },
   (table) => [
@@ -2074,6 +2732,21 @@ export const cmsEntryPublicationCommand = pgTable(
       name: "cms_entry_pub_command_entry_command_pk",
       columns: [table.entryId, table.commandId],
     }),
+    foreignKey({
+      name: "cms_entry_pub_command_completed_credential_tenant_fk",
+      columns: [
+        table.completedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "cms_entry_pub_command_entry_tenant_fk",
       columns: [
@@ -2120,6 +2793,10 @@ export const cmsEntryPublicationCommand = pgTable(
       ],
     }).onDelete("restrict"),
     check(
+      "cms_entry_pub_command_actor_exactly_one",
+      sql`num_nonnulls(${table.completedByUserId}, ${table.completedByCredentialId}) = 1`,
+    ),
+    check(
       "cms_entry_pub_command_operation_valid",
       sql`${table.operation} in ('publish', 'unpublish')`,
     ),
@@ -2145,6 +2822,9 @@ export const cmsEntryPublicationCommand = pgTable(
     ),
     index("cms_entry_pub_command_locale_idx").on(table.localeId),
     index("cms_entry_pub_command_completed_by_idx").on(table.completedByUserId),
+    index("cms_entry_pub_command_completed_by_credential_idx")
+      .on(table.completedByCredentialId)
+      .where(sql`${table.completedByCredentialId} is not null`),
   ],
 );
 

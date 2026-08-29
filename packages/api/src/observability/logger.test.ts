@@ -32,6 +32,41 @@ describe("structured log redaction", () => {
     });
   });
 
+  it("redacts Authoring schema, presentation, content, and command-file fields", () => {
+    const sentinel = "must-not-enter-diagnostics";
+    const fields = redactFields({
+      sourceKey: sentinel,
+      api_key: sentinel,
+      displayLabel: sentinel,
+      displayName: sentinel,
+      description: sentinel,
+      helpText: sentinel,
+      placeholder: sentinel,
+      validationPattern: sentinel,
+      defaultValue: sentinel,
+      previewUrl: sentinel,
+      email: sentinel,
+      mutations: [sentinel],
+      values: { title: sentinel },
+      commandFile: sentinel,
+      schemaDocument: { collections: [sentinel] },
+      projectSchema: { collections: [sentinel] },
+      projectId: "project-safe-id",
+      environmentId: "environment-safe-id",
+      actorKind: "management_credential",
+      mutationCount: "1-10",
+    });
+    const encoded = JSON.stringify(fields);
+
+    expect(encoded).not.toContain(sentinel);
+    expect(fields).toMatchObject({
+      projectId: "project-safe-id",
+      environmentId: "environment-safe-id",
+      actorKind: "management_credential",
+      mutationCount: "1-10",
+    });
+  });
+
   it("redacts credentials embedded in free-form error messages", () => {
     const redacted = redactString(
       "Bearer abc.def password=hunter2 postgresql://admin:secret@database/internal",

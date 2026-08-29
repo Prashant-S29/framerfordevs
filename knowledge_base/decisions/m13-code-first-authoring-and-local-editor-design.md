@@ -1,8 +1,30 @@
 # Milestone 13 code-first authoring and local editor design
 
-**Status:** Developer approved on 2026-08-23; implementation is not authorized. Exact parser/transpiler/isolate selection and schema-build performance acceptance remain behind the approved evidence and second-approval gate.
+**Status:** Complete and developer-accepted on 2026-08-27. Tier 1 and experimental/default-off Tier 2, Authoring API/SDK/CLI, secure local editor, dashboard builder retirement, all 13 manual scenarios, and final readiness are complete. The known QuickJS hard-memory gap continues to block only Tier 2 production/default enablement and its hard-memory proof. Package publication/versioning, production OAuth rollout, production configuration, commit, and deployment remain separate release actions.
 
 **Date:** 2026-08-23
+
+## Superseded scope amendment — Tier 2 deferred
+
+After the required evidence gate proved that no evaluated Tier 2 isolate satisfies the approved hard resource/capability contract, the developer selected **Defer Tier 2**. M13 v1 implements only the Tier 1 closed static TypeScript schema path. It does not ship `ffd schema build`, `schemaBuild` configuration, a build manifest, `@framerfordevs/schema/compose`, a transpiler, QuickJS/Javy, or any project-code execution path. Functions, loops, mapping, spread, factories, fluent builders, local-module composition, and npm imports remain unsupported.
+
+This amendment supersedes every Tier 2 implementation, test, rollout, acceptance, and manual-review requirement later in this record for M13 v1. Those sections remain as historical evidence/future design input only. Reintroducing Tier 2 requires a new approved architecture and dependency/resource evidence gate. No Node child, `vm`, shell/npm delegation, unrestricted loader, or weaker fallback is permitted.
+
+Deferral preserved the fail-closed security boundary and unblocked the Tier 1 foundation. It is superseded only by the experimental amendment below; its rejection of unrestricted Node/child/shell fallbacks remains controlling.
+
+## Approved experimental Tier 2 amendment — production enablement blocked
+
+The developer subsequently directed M13 to retain Tier 2 and selected **Experimental and release-blocked** after an explicit confirmation of the host-OOM consequence. M13 may implement exact `quickjs-emscripten-core@0.32.0` + `@jitl/quickjs-wasmfile-release-sync@0.32.0` with the evidence-recorded WASM, but only behind explicit experimental opt-in and default off. The public result must state `memoryLimitHard: false`; no documentation, telemetry, or UI may imply that the configured 64 MiB QuickJS limit is a hard boundary.
+
+Upstream `justjake/quickjs-emscripten#255` blocks only describing Tier 2 as production-ready, enabling it by default, and passing a hard-memory-isolation test. M13 implementation and acceptance may proceed with Tier 2 explicitly experimental/default-off and this limitation documented. Worker timeout/termination and V8 limits are defense in depth, not substitutes for the missing WASM limit. This amendment does not accept host OOM as a production-ready residual behavior.
+
+All other Tier 2 controls remain mandatory: credential-blind empty-environment worker construction, no credential/keychain/API service graph, no host callbacks, no filesystem/process/network/clock/randomness/WebAssembly globals, fixed transpilation without compiler host/tsconfig/plugins, only first-party compose helpers plus bounded local TypeScript modules, strict output validation, deterministic Tier 1 emission, CPU/stack/output bounds, and no invocation by authenticated/editor paths. Node `vm`, ordinary child execution, shell/npm delegation, unrestricted imports, and weaker fallback remain prohibited.
+
+The developer also authorized broader M13 implementation to continue, subject to every existing Drizzle/migration, publication, OAuth rollout, commit, and milestone-acceptance gate.
+
+## Approved candidate-hash nullability amendment
+
+A read-only plan cannot reserve the server-generated IDs required by authoritative `structureHash`. The developer selected an always-present nullable contract: `candidateStructureHash` is exactly `null` for each collection candidate containing any unallocated collection, field, or enum-option identity, and is a real candidate `StructureHash` wherever every stable ID is already known. The property is never optional. `planHash` deterministically binds the exact canonical document to current manifest authority; authoritative `structureHash` is always returned after apply allocates IDs under lock.
 
 ## Decision summary
 
@@ -11,7 +33,7 @@ Milestone 13 will make collection structure and content workflows usable by code
 The design uses:
 
 - A publishable, dependency-light `@framerfordevs/schema` declarative TypeScript contract in the developer's repository, extracted statically without executing project code
-- An optional, explicitly invoked `ffd schema build` tier that runs composable schema code in a capability-denied, credential-blind isolate and commits ordinary declarative output for the unchanged extractor
+- An explicit experimental Tier 2 composition runtime using fixed TypeScript transpilation and capability-denied QuickJS 0.32.0; only production/default enablement and hard-memory proof are blocked
 - Immutable authoring source keys that reconcile code definitions to server-generated collection, field, and enum-option IDs
 - A separate allowlisted Authoring API v1 rather than changing the released read-only semantics of Tooling v1
 - A project-level schema plan/apply protocol that reuses the M5/M6 validator and classifier, requires exact risky-change acknowledgements, and atomically publishes all changed collection revisions with outbox events
@@ -24,7 +46,25 @@ The design uses:
 - A dedicated dashboard presentation editor for labels, help, placeholders, field order, tabs, groups, sidebar placement, and role visibility
 - Removal of dashboard collection-structure mutation routes and controls after code export/adoption support is available
 
-The developer approved this design and all 19 explicit decisions on 2026-08-23 without authorizing implementation. This approval is not exact dependency selection: the named parser/transpiler/isolate evidence slice, measured schema-build baseline, and second dependency/performance approval remain mandatory before implementation authorization. Feature code, dependencies, database schemas, migration generation/application, package publication, and dashboard-builder removal remain blocked.
+The developer approved the original design and all 19 explicit decisions on 2026-08-23. Decisions 20 and 21 deferred Tier 2 and authorized the Tier 1 foundation. Decision 22 reintroduced experimental/default-off QuickJS Tier 2 and authorized continued M13 implementation. Decision 23 scoped issue #255 to Tier 2 production/default enablement and hard-memory proof only. The developer later generated/applied the two approved migrations, approved builder retirement after parity, accepted all 13 scenarios, and closed M13 on 2026-08-27. Package publication/versioning, production OAuth rollout, production configuration, commits, and deployment remain separately gated.
+
+## Tier 1 foundation implementation record — 2026-08-23
+
+The authorized slice initially added the public type-only, runtime-dependency-free `@framerfordevs/schema` package and the programmatic `@framerfordevs/cli/schema-extractor` export. Contracts cover all 18 M6 field kinds, kind-correlated configuration, nested object/list roles, source-key enum options, and source-key references while excluding generated IDs, presentation, actors, hashes, credentials, and tenant authority.
+
+The extractor uses only TypeScript 6.0.3 `createSourceFile` syntax trees and a first-party reducer. It does not transpile, type-check through a compiler host, load tsconfig, resolve package exports/plugins, or execute a module. It bounds one real project root, 32 non-symlinked `.schema.ts` files, 256 KiB per file, 1 MiB aggregate/output, 1,000 declarations, expression depth 64, schema depth 8, 50 collections, and 100 field nodes per collection. Strict reduction/validation produces canonical JSON bytes and SHA-256 or a content-safe typed error.
+
+The public boundary runs the reducer in a short-lived worker with an explicitly empty environment, empty inherited `execArgv`, 64 MiB old-generation/16 MiB young-generation limits, 4 MiB stack, bounded worker protocol, and a three-second termination deadline. Neither the worker graph nor the command path imports credential store, keyring, OAuth, Tooling, or Authoring clients. No CLI command or authenticated path consumes the extractor in this slice.
+
+The dependency-free kind-correlated validator now lives at `@framerfordevs/schema/validate`, so static extraction, experimental composition, and server Authoring kernels consume one packaged runtime authority without adding framework dependencies. Focused unit/coverage tests exercise every kind, local modules, stable canonical output, executable syntax, runtime/package imports, globals, calls/new/functions/loops/spread/getters/property access/dynamic import, malformed syntax, excess/generated/presentation properties, duplicate identities, graph cycles, symlinks, and depth bounds. The built-worker hostile fixture proves a parent management-token sentinel is unobservable, a sentinel file is unchanged, and a listening fake server receives zero connections. CLI/schema tarballs contain only declared dist/docs/license/package files; an isolated NodeNext fixture type-checks `ProjectSchema` and executes the packaged worker. The pre-Tier-2 foundation passed `pnpm run ready` across 15 workspaces with 960 tests in both normal and coverage runs. No package was published.
+
+## Experimental Tier 2 runtime implementation record — 2026-08-23
+
+The package exports pure `@framerfordevs/schema/compose` identity helpers and a separately named `@framerfordevs/cli/experimental-schema-build` programmatic boundary. The runner requires `experimental: true`. Subsequent CLI integration exposes it only through explicit `ffd schema build [--check] [--json]` and optional config v2 `schemaBuild.entry`; a minimal dynamic dispatcher enters a credential-blind module graph before credential/API modules load. No authenticated operation, plan/push path, editor path, or implicit build invokes it.
+
+The runner resolves at most 32 real non-symlinked local `.ts` modules under one canonical root, allows only the compose export and type-only root schema contract, rejects package/Node/dynamic/CommonJS/meta/await imports, transpiles each module with fixed TypeScript 6.0.3 CommonJS options, and executes a closed in-guest module registry. QuickJS receives no host callback or module loader. Date, randomness, eval, and Function globals are removed; default QuickJS also exposes no process, require, fetch/XHR/WebSocket, workers, Deno/Bun, or WebAssembly capability. Source, graph, transpiled program, stack, CPU, output, schema, and worker lifetime are bounded.
+
+Output is strictly validated through the same kind-correlated Tier 1 contract and emitted as canonical JSON, digest, and deterministic Tier 1 source. Tests prove factories, loops, mapping/spread, helpers, local modules, repeatability, Tier 1 hash/byte parity, explicit opt-in, import rejection, non-termination interruption, and capability denial. The packaged worker runs while the parent has a token/file/network sentinel and observes no token, file mutation, or connection. Every output reports runtime `quickjs-emscripten-0.32.0-experimental` and `memoryLimitHard: false`; issue #255 remains explicitly unresolved. Post-change `pnpm run ready` passes 966 tests in both normal and coverage runs; production audit, packaged hostile execution, reviewed tarballs, clean isolated NodeNext/QuickJS fixture, and `git diff --check` pass.
 
 ## Source hierarchy and discovery
 
@@ -117,7 +157,7 @@ The design resolves these gaps while preserving the existing authorities. It doe
 3. Stable collection, field, enum-option, entry, locale, revision, and publication IDs remain server-generated and canonical.
 4. Authoring source keys reconcile code to stable IDs but never replace IDs in storage, delivery, references, events, or audits.
 5. Mutable API keys, labels, and source keys are distinct concepts. Source keys are immutable after first materialization; API keys retain the existing change rules; labels remain presentation.
-6. Authenticated CLI commands, the local editor, and the hosted server never execute developer schema modules. The default Tier 1 path statically extracts only an allowlisted declarative TypeScript subset before loading credentials; optional Tier 2 execution occurs only through the explicit credential-blind build capability and must emit Tier 1 input.
+6. Authenticated CLI commands, the local editor, and the hosted server never execute developer schema modules. Tier 1 statically extracts only an allowlisted declarative subset. Experimental Tier 2 runs only through its explicit credential-blind worker before credential construction; it is never implicit and has no unrestricted fallback.
 7. Every schema apply is revalidated and reclassified under database locks against the exact current published manifest. A stale plan cannot publish.
 8. Every risky change ID must be acknowledged exactly. `--yes`, a broad acknowledgement, or a local-only bypass cannot weaken this gate.
 9. Presentation edits cannot mutate the structural projection or `contractHash`.
@@ -135,7 +175,7 @@ The design resolves these gaps while preserving the existing authorities. It doe
 
 ### Package and file boundary
 
-A new public `@framerfordevs/schema` package owns serializable schema types, TypeScript authoring contracts, and local validation helpers. Tier 1 has no runtime helper requirement; the separately exported Tier 2 compose helpers run only inside the credential-blind build capability. The package has no React, database, Express, Better Auth server, dashboard, or application-runtime dependency.
+A new public `@framerfordevs/schema` package owns serializable schema types, TypeScript authoring contracts, local validation helpers, and the pure experimental `/compose` identity helpers. Tier 1 has no runtime helper requirement. The package has no React, database, Express, Better Auth server, dashboard, or application-runtime dependency.
 
 The existing non-executable `framerfordevs.config.json` remains the project-link authority and gains one bounded relative path, for example:
 
@@ -246,9 +286,11 @@ Additional controls are mandatory:
 
 This is a security boundary, not only a reliability adapter. The extractor and its adversarial bypass corpus are release-blocking and receive the same review standard as credential parsing, tenant authorization, and loopback isolation.
 
-## Authoring ergonomics amendment — optional credential-blind schema build
+## Tier 2 design and evidence reference
 
-### Why this amendment exists
+> **Experimental; production enablement blocked.** Decisions 22–23 reactivate this design only behind explicit opt-in. The hard-memory proof remains unmet, so Tier 2 cannot be production/default enabled; M13 may otherwise complete with the runtime experimental/default-off.
+
+### Why the original amendment existed
 
 The restricted extractor is the correct default security boundary, but its closed grammar intentionally removes ordinary TypeScript composition. A Tier 1 author cannot call shared field factories, map a definition list, spread a common field set, build fluent helpers, or compute repeated structures. Pretending this has Sanity-equivalent ergonomics would be inaccurate.
 
@@ -358,6 +400,49 @@ The dependency-evaluation slice records cold-process results on identified devel
 
 Provisional acceptance budgets are representative-fixture p95 at or below 2 seconds, bounded-maximum p95 at or below 5 seconds, guest memory at or below 64 MiB, and peak host RSS at or below 256 MiB. `--check` and write mode must produce identical schema bytes. These are hypotheses to validate, not numbers declared passed by design approval. If candidate evidence misses a budget, the record must show the result and the developer must explicitly approve a revised budget or architecture before implementation authorization.
 
+### Dependency and performance evidence — 2026-08-23
+
+The developer's instruction to continue M13 started only the approved pre-implementation evidence slice. No feature package, manifest, root lockfile, runtime code, or migration was changed. Candidates were installed with pnpm in an isolated `/tmp` project using `--ignore-workspace --ignore-scripts`; its production audit reported no known vulnerabilities. Root Git remained clean at `12e9ea9`.
+
+Evidence environment: Node `22.21.1`, pnpm `10.25.0`, Linux x64 `6.14.0-37-generic`, AMD Ryzen 5 5625U (6 cores/12 threads). Benchmarks used 20 separate cold Node processes per scenario with a scrubbed child environment. The representative fixture contained 20 collections/1,000 field nodes/150,077 output bytes. The proposed evidence boundary contained 50 collections/5,000 field nodes/749,597 output bytes; final Authoring request limits still require contract approval during implementation.
+
+#### Parser/transpiler evidence
+
+| Candidate            | Provenance/package evidence                                                                                                                                                                     |                            Measured static parse p95 | Decision                                                                                                                                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `typescript@6.0.3`   | Microsoft TypeScript, Apache-2.0, already root-pinned; npm integrity `sha512-y2Tv…cdBw==`; 140 files/24,346,827 unpacked bytes; no install hook                                                 | 46.08 ms representative; 122.73 ms evidence boundary | **Recommend for exact second approval** as the Tier 1 parser. It adds no new root lock resolution and uses the official TypeScript grammar, although making TypeScript a shipped CLI runtime dependency has a material 24 MiB install cost. |
+| `oxc-parser@0.146.0` | Oxc/VoidZero, MIT; npm integrity `sha512-hrt0…XpaA==`; 31-file/1,424,069-byte JS package plus 19 declared optional native platform packages; Linux installed both ~2.15 MiB glibc/musl binaries |   6.01 ms representative; 25.27 ms evidence boundary | Reject for v1. It is faster, but speed is not limiting and native multi-platform artifacts, rapid release cadence, and a wider optional lock graph add avoidable provenance/packaging surface.                                              |
+
+`typescript.createSourceFile` parsed hostile calls/imports as syntax without executing them. The approved closed reducer—not the TypeScript compiler host—must reject those nodes. Tier 1 does not use transpilation, module resolution, compiler hosts, transformers, plugins, or tsconfig execution. Experimental Tier 2 separately uses fixed `transpileModule` options and a first-party bounded resolver.
+
+#### Isolate package evidence
+
+The lean QuickJS graph is `quickjs-emscripten-core@0.32.0` + `@jitl/quickjs-wasmfile-release-sync@0.32.0` + transitive `@jitl/quickjs-ffi-types@0.32.0`, all MIT and maintained/published by the same single npm maintainer. The core and variant npm integrities are `sha512-QFnP…zUyg==` and `sha512-BKND…pVrg==`; the exact installed release WASM SHA-256 is `105c3bed22d457e43e3d1c3c1c6959fda62a8fe06f0fc8a985303c3a2be72232` (503,134 bytes). The umbrella `quickjs-emscripten@0.32.0` is not recommended because it pulls debug/release and sync/asyncify variants that M13 does not use.
+
+Capability probes confirmed the default guest had no `process`, `require`, CommonJS module, `fetch`, XHR, WebSocket, Worker, Deno, Bun, or WebAssembly globals. After removing Date/random/eval/Function globals, constructor-based code still observed host capabilities as `undefined`; hostile file/keychain/network attempts observed no sentinel values, left the sentinel file unchanged, and made zero connections to a listening fake Authoring/Tooling server. Infinite loops were interrupted. Dynamic import produced a pending guest promise and a handle-disposal error rather than a clean rejection, confirming that the transpiler's mandatory syntax rejection cannot be delegated to the runtime.
+
+Cold performance passed the provisional latency/RSS budgets:
+
+| Scenario                     | Total median | Total p95 | WASM startup p95 | Evaluate/serialize p95 | Peak host RSS p95 | Peak measured guest use |
+| ---------------------------- | -----------: | --------: | ---------------: | ---------------------: | ----------------: | ----------------------: |
+| 20 collections / 1,000 nodes |    120.25 ms | 223.68 ms |         25.40 ms |               25.50 ms | 144,236,544 bytes |           316,382 bytes |
+| 50 collections / 5,000 nodes |    207.83 ms | 220.62 ms |         14.40 ms |               41.75 ms | 187,875,328 bytes |         1,205,162 bytes |
+
+Despite those positive results, the prebuilt release WASM **fails the approved hard resource-bound requirement**. Upstream open issue `justjake/quickjs-emscripten#255` reproduces `runtime.setMemoryLimit(64 MiB)` failing to prevent host growth/OOM because the prebuilt WASM enables memory growth; its documented workaround is a custom build with imported fixed WebAssembly memory and `ALLOW_MEMORY_GROWTH=0`. The evidence used ArrayBuffer allocation, which was rejected, but that narrower success cannot override the upstream string-allocation OOM reproduction. A same-process/worker timeout does not create a cross-platform hard host-memory boundary. Therefore `quickjs-emscripten`'s prebuilt variant is **rejected for Tier 2 as currently designed**, not selected merely because latency passed.
+
+Bytecode Alliance Javy `v9.1.0` has credible governance and release checksums, but it is distributed primarily as platform CLI binaries rather than an official embedded npm runtime. Its tagged Node embedding example explicitly says it is not production-ready, depends on experimental Node WASI, communicates through temporary stdin/stdout/stderr files, and requires plugin/compiled Wasm lifecycle management. Shipping or repackaging its platform binaries would create a new multi-platform release authority and synchronous Wasm execution still needs an independently proven termination boundary. Javy is rejected for M13 v1 in this form.
+
+#### Evidence outcome and developer resolution
+
+- The developer exactly approved `typescript@6.0.3` for Tier 1 parsing on 2026-08-23.
+- Reject `oxc-parser@0.146.0` for v1 because its speed benefit does not justify native/platform supply-chain expansion.
+- Reject the evaluated prebuilt QuickJS 0.32.0 variant because it cannot prove the approved hard memory cap.
+- Reject Javy 9.1.0 for v1 because there is no suitable official embedded npm distribution and its current Node path adds binary/WASI/lifecycle authority.
+- No isolate was selected.
+- The developer chose **Defer Tier 2** on 2026-08-23. The controlling scope amendment is recorded at the top of this decision.
+
+No ordinary Node child, shell/npm delegation, Node `vm`, or unrestricted fallback becomes permissible because the evaluated isolates failed.
+
 ### Committed artifact and drift authority
 
 The generated static schema file and `.framerfordevs/schema-build.lock.json` are committed. Regenerating only immediately before push without a persisted artifact is rejected because it would:
@@ -405,7 +490,7 @@ A schema operation is bounded to one project/environment document. Initial limit
 7. Returns validation issues, exact deterministic change IDs/classifications, candidate structure/contract hashes, current revision IDs, and a canonical plan hash.
 8. Returns no secret, content values, actor metadata, or hidden cross-tenant detail.
 
-Plan is read-only and cannot reserve or publish IDs. New resource IDs are represented by source keys in the plan; final server IDs are returned after apply.
+Plan is read-only and cannot reserve or publish IDs. New resource IDs are represented by source keys in the plan; final server IDs are returned after apply. The pure planner may use deterministic ephemeral valid UUIDs internally to reuse M5/M6 validation and classification, but never returns, persists, reserves, or accepts them as mappings. Project-qualified change IDs derive from collection source key, field source key, and change code, so exact acknowledgements remain stable when apply replaces ephemeral IDs with newly allocated server IDs.
 
 ### Apply
 
@@ -474,6 +559,7 @@ Content:
 
 - List entries with bounded keyset pagination and exact locale
 - Create an entry, optionally with initial draft mutations, atomically
+- Rename locale-neutral entry metadata through a locale-scoped access path with exact `expectedNameVersion`
 - Get one exact-locale draft and optimistic versions
 - Save exact-locale shared/localized draft mutations
 - Get publication status and validation plan
@@ -481,6 +567,10 @@ Content:
 - Unpublish exact locale from the exact current publication state
 
 No entry delete, collection delete, force overwrite, fallback locale, unrestricted query, or generic arbitrary operation endpoint is added.
+
+### Approved entry-rename contract resolution — 2026-08-25
+
+The local editor's required rename workflow reuses the already approved M7 optimistic rename kernel through `PATCH /collections/{collectionKey}/locales/{locale}/entries/{entryId}`. The locale remains in the route only to preserve current locale-access checks; the bounded display name remains locale-neutral metadata. The exact request contains only `displayName` and `expectedNameVersion`, requires `authoring:draft:write` or management `content.write`, suppresses canonical no-ops, advances only `nameVersion`, and returns the tenant-neutral entry summary. A stale version maps to closed `DRAFT_CONFLICT` detail at `expectedNameVersion`; there is no force flag. Rename intentionally has no command receipt because the established M7 operation is naturally idempotent under exact name/version authority and does not write draft content.
 
 ### Public value mutations
 
@@ -570,7 +660,6 @@ M12 commands remain compatible. M13 adds at least:
 
 ```text
 ffd schema export
-ffd schema build [--check] [--json]
 ffd schema plan [--json]
 ffd schema push --acknowledge <change-id>... [--json]
 ffd editor
@@ -587,7 +676,7 @@ Final names are locked by command-contract tests before implementation completio
 Rules:
 
 - Machine-readable `--json` output is stable, content-safe, and written only to stdout; diagnostics go to stderr.
-- `schema build` is optional, explicit, non-interactive, credential-blind, and never invoked by another CLI/editor command. Normal mode atomically updates only its owned static output/build manifest; `--check` writes nothing and uses the standard drift exit behavior.
+- No M13 v1 CLI command executes schema code or accepts an execution-enabling bypass.
 - Risky schema changes exit with exact IDs until each is supplied. There is no broad `--yes` bypass.
 - Non-interactive operation is the default; optional TTY confirmation cannot be required by automation.
 - Mutation files are bounded, resolved within the project unless explicitly absolute by a documented option, rejected if symlinks violate policy, and never copied into logs/cache.
@@ -700,9 +789,9 @@ No current migration/snapshot is modified. Applied migrations remain immutable.
 - Authorization before schema/content loading where non-enumeration requires it
 - Strict request schemas with excess-property rejection and fixed byte/count/depth/path bounds
 - Parameterized Drizzle access and composite tenant predicates/FKs
-- No authenticated CLI path or server executes schema modules; the optional explicit `schema build` executes composition code only in a capability-denied, credential-blind isolate upstream of the unchanged static extractor
-- `schema build` constructs no credential/keychain/API services, receives no credential/config/transport capability, runs with no network/host APIs, and is never auto-triggered by authenticated or editor commands
-- Arbitrary composition code is still real code: credential exfiltration through the build runtime is closed by capability omission, while ordinary host-toolchain/install supply-chain risk remains explicit and accepted rather than mislabeled as sandbox safety
+- No authenticated CLI path, editor, or server executes schema modules; Tier 1 remains static and experimental Tier 2 is a separately invoked credential-blind worker
+- Tier 1 extraction occurs before credential construction, accepts only the closed static grammar, and rejects every executable/import/dynamic construct through the release-blocking adversarial corpus
+- Experimental Tier 2 is default-off, reports its non-hard memory limit, and cannot introduce a Node child, `vm`, shell/npm delegation, unrestricted loader, or other weaker fallback
 - No force-save, implicit fallback, broad write scope, credential impersonation, or client-selected tenant widening
 - Generic invalid-credential behavior and immediate database-backed revocation checks
 - Secret/content/schema-body redaction from logs, traces, metrics, audits, errors, caches, generated files, and docs
@@ -854,20 +943,25 @@ Task-appropriate format, lint, structure, type, unit, integration, contract, acc
 
 ## Implementation sequence and gates
 
-1. **Evidence-slice authorization gate:** developer approves or amends the non-package architecture and may authorize only the isolated dependency/performance evaluation; feature implementation and final package selection remain blocked.
-2. **Critical dependency/performance evidence gate:** when the developer separately starts evaluation, compare the named parser/transpiler/isolate candidates, review exact provenance/tarballs/lockfile/audits, run the adversarial capability slice and measured schema-build baseline, append results to this record, and stop. This gate is not feature implementation and was not started by design approval.
-3. **Dependency/performance and implementation-authorization gate:** developer approves exact selected dependencies/digests, measured budgets, and residual risks, then separately authorizes implementation. The Tier 2 v1 no-third-party-import boundary and complete architecture are already design-approved.
-4. **Security/compatibility slices:** prove restricted static schema extraction with the complete adversarial no-execution corpus, the selected compose runner's capability denial and credential unreachability, candidate hash parity, form-package extraction, and loopback token isolation before broad changes.
-5. **Contract/kernel stage:** add source/actor/Authoring contracts and pure schema/content translation kernels with targeted tests.
-6. **Database schema gate:** update Drizzle only; stop for developer migration generation, full inspection, developer application, and read-only verification.
-7. **Principal/actor refactor:** make existing schema/entry/publication kernels actor-aware while preserving dashboard user behavior.
-8. **Authoring read/content API:** implement isolated transport, scope-aware auth, content read/write/publication wrappers, SDK, and integration tests.
-9. **Schema plan/apply:** implement source reconciliation, structural hashes, atomic project apply, receipts, audits/outbox, and CLI export/plan/push.
-10. **Presentation authority:** add presentation-only publication and the dedicated dashboard editor; prove hash separation.
-11. **Form extraction/local editor:** migrate dashboard to the package, add loopback editor, live schema drift behavior, and complete UX/security tests.
-12. **Builder retirement:** remove dashboard structure controls/routes only after export/push and presentation workflows pass end to end.
-13. **Docs/public artifacts/release staging:** add guides, Authoring reference, changelog/Changesets, tarball review, and clean fixture proof. No package publication.
-14. **Final automated and manual review:** update progress/context, report all gates and blocked rollout choices, and stop for developer review. Do not commit.
+1. **Evidence-slice authorization gate — complete:** the developer separately started M13 work on 2026-08-23; only isolated dependency/performance evaluation was permitted before the second gate.
+2. **Critical dependency/performance evidence gate — complete:** evidence recommends TypeScript, rejects Oxc/Javy for v1, and rejects prebuilt QuickJS because its hard memory cap is not enforceable. No feature implementation occurred.
+3. **Initial architecture resolution gate — superseded:** the developer first deferred Tier 2, enabling the Tier 1 foundation without accepting a weaker isolate.
+4. **Exact TypeScript dependency gate — complete:** the developer approved `typescript@6.0.3` as the Tier 1 syntax-tree parser on 2026-08-23, with no Tier 1 transpilation/compiler-host/tsconfig/plugin/module-resolution authority.
+5. **Tier 1 foundation authorization and implementation — complete:** the dependency-free type contract package, closed reducer, strict bounded decoder, canonical bytes/digest, scrubbed worker, hostile corpus, package, and clean-fixture evidence pass.
+6. **Experimental Tier 2 dependency/risk gate — complete:** the developer approved exact QuickJS core/release-sync 0.32.0 as default-off experimental functionality. Issue #255 blocks only Tier 2 production/default enablement and hard-memory proof.
+7. **Experimental Tier 2 runtime foundation and explicit build command — implemented:** fixed transpilation, bounded local modules, compose helpers, closed guest registry, capability-denied empty-environment worker, interruption/output validation, deterministic Tier 1 output/hash parity, atomic artifact/manifest ownership, check-mode drift, and packaged hostile/import-graph proof pass. Only explicit credential-blind `schema build` consumes it; authenticated and editor paths never invoke it.
+8. **Broader implementation-authorization gate — complete:** the developer authorized continued M13 work subject to the existing database/migration/release gates.
+9. **Security/compatibility slices — complete:** form-package extraction, browser-safe ownership, loopback token isolation, opener sanitization, and controlled browser/package proof pass.
+10. **Contract/kernel stage — complete:** source/actor/Authoring contracts and pure schema/content translation kernels pass targeted and integration tests.
+11. **Database schema gate — complete:** the developer generated and applied migrations `0013` and `0014`; full inspection and read-only verification pass.
+12. **Principal/actor refactor — complete:** schema/entry/publication kernels are actor-aware, preserve dashboard user behavior, and attribute credential writes honestly.
+13. **Authoring read/content API and CLI — implemented:** isolated transport, scope-aware auth, content read/write/publication wrappers, exact SDK, bounded CLI list/get/create/update/publish/unpublish workflows, rollback-contained successful HTTP lifecycle proof, and the complete adversarial operation matrix exist.
+14. **Schema plan/apply — implemented:** source reconciliation, structural hashes, atomic project apply, receipts, audits/outbox, exact SDK transport, credential-safe CLI export/plan/push with lock v2/retry authority, and successful/adversarial HTTP apply/replay/no-op/stale/acknowledgement/command-conflict proof exist.
+15. **Presentation authority — implemented:** strict stable-ID presentation get/publish contracts, project-lock serialization, immutable revisions, synchronized active presentation, exact replay/conflict authority, unchanged structure/contract hashes, credential-aware audit/outbox, public/internal routes, Promise/Effect SDK parity, and the complete dashboard editor pass repository, HTTP, rollback, query-plan, interaction, route, accessibility, coverage, and build gates.
+16. **Form extraction/local editor — complete:** dashboard package migration, hardened loopback editor, live drift/read-only projection, conflict/publication UX, axe, packaged launch, and controlled Firefox proof pass.
+17. **Builder retirement — complete and manually accepted:** manual scenarios 1–10 and 12–13 established accepted parity, the developer approved retirement, dashboard structure controls were removed, and legacy authenticated mutation routes return stable `410 DASHBOARD_SCHEMA_AUTHORING_RETIRED` without reaching mutation repositories. Scenario 11 then confirmed retained content, Presentation, Delivery, navigation, administration, and read-only current-structure authority.
+18. **Docs/public artifacts/release staging — complete:** task guides, exact Authoring reference, Changeset, compiled examples, tarball review, and Docker/package evidence pass. No package publication occurred.
+19. **Final automated and manual review — complete:** final full readiness passes 1,184 tests after retirement and locale-authority fixes, Tier 2 remains experimental/default-off, developer-approved exact stale-fixture cleanup plus post-run invariants pass, all 13 manual scenarios are accepted, and the developer closed M13. The commit remains developer-controlled.
 
 A failed compatibility slice or migration review stops implementation and returns to design rather than forcing the selected architecture.
 
@@ -875,12 +969,10 @@ A failed compatibility slice or migration review stops implementation and return
 
 - A clean TypeScript fixture defines every supported field kind with `@framerfordevs/schema` and produces deterministic canonical structure.
 - A Tier 1-only project needs no build command or build artifact.
-- Exact parser/transpiler/isolate packages and versions are developer-approved from recorded provenance, tarball, lockfile, audit, hostile-fixture, packaging, and performance evidence before feature implementation starts.
-- Tier 2 v1 rejects third-party/bare package imports and Node/native/plugin capabilities while accepting only the compose export and bounded local modules.
-- Representative and boundary schema-build baselines satisfy the approved cold p95, host RSS, guest memory/stack, output, and interruption budgets.
-- An optional Tier 2 fixture uses callable helpers, factories, loops, mapping, spread, and fluent composition; `ffd schema build` emits byte-stable Tier 1 output that passes the identical restricted extractor and strict decoder.
-- Tier 2 output/build manifest are committed and drift-checked; plan/push/check/editor never auto-build and reject or become read-only on stale output without executing composition source.
-- Hostile Tier 2 code cannot observe credentials, keychain/config files, host APIs, or Tooling/Authoring network transport, and failure cannot change the prior generated pair.
+- Exact `typescript@6.0.3` parser use is developer-approved from recorded provenance, tarball, audit, hostile-fixture, packaging, and parse-performance evidence before feature implementation starts.
+- Experimental Tier 2 remains explicit/default-off, reports `memoryLimitHard: false`, and cannot be production/default enabled while issue #255 is unresolved.
+- Calls, functions, loops, mapping, spread, factories, fluent builders, dynamic expressions, local-module composition, bare imports, Node/native/plugin capabilities, and executable fallbacks fail the Tier 1 closed extractor.
+- Experimental Tier 2 accepts language composition and bounded local modules while rejecting bare/Node/native/dynamic/plugin imports; its output passes the identical Tier 1 validator and canonical hash.
 - Existing hosted schemas export to code without changing stable IDs, contract hashes, content, presentation, or publication pointers.
 - Source-key API-key renames preserve stable IDs and receive the existing breaking classification/acknowledgement behavior.
 - Unknown/reused/reparented source identities fail before persistence.
@@ -907,7 +999,7 @@ A failed compatibility slice or migration review stops implementation and return
 
 ## Manual review
 
-The developer will verify:
+The developer verified scenarios 1–10 and 12–13 first, then separately approved builder retirement. Retirement was implemented and revalidated before the developer accepted scenario 11 last, preserving the governing no-retirement-before-parity gate. All 13 scenarios are accepted.
 
 1. Export an existing dashboard-authored project to code and review readable source identities/configuration.
 2. Change a label/layout in the dashboard and confirm code/types do not drift.
@@ -997,15 +1089,15 @@ Bounded complete schema documents, bulk persistence, weighted quotas, keyset con
 
 ### UX and DX
 
-The authoring model is explicitly two-tiered. Tier 1 is the safest and simplest path: readable source keys, typed declarative code, no build, and no code execution, but no factories, loops, spread, mapping, or fluent composition. Optional Tier 2 restores those language ergonomics through `defineField`/`defineCollection`/`defineSchema` and local factories, then emits a committed Tier 1 artifact through a separate credential-blind command. This is closer to Sanity's authoring ergonomics but deliberately not identical: Sanity trusts unrestricted config/transitive code in its authenticated CLI process, while this design separates composition from every authenticated operation. Exact plan diagnostics, machine output, the one-install local editor, live drift display, complete generated forms, and unchanged database-backed content semantics support both humans and agents.
+Tier 1 remains the safe default: readable source keys, typed declarative code, no build, and no code execution. Explicit experimental Tier 2 restores factories, functions, loops, spread, mapping, fluent composition, and bounded local modules, but not npm/Node imports. It is visibly experimental and cannot become production/default enabled until hard memory isolation is fixed. Exact plan diagnostics, machine output, the one-install local editor, live drift display, complete generated forms, and unchanged database-backed content semantics support humans and agents.
 
 ### Maintainability
 
-Separate Authoring v1, declarative schema contracts with one restricted extractor and one optional reviewed compose runner, a controlled form package, shared Effect kernels, and explicit package ownership avoid coupling the browser/editor to server internals or reopening M9–M12.
+Separate Authoring v1, one restricted non-executing extractor, one explicitly isolated experimental compose runner, a controlled form package, shared Effect kernels, and explicit package ownership avoid coupling the browser/editor to server internals or reopening M9–M12. QuickJS/WASM adds an explicit binary provenance/update/release obligation and cannot be treated as an incidental implementation detail.
 
 ## Developer-approved decisions
 
-The developer approved all decisions below on 2026-08-23 without authorizing implementation. Items 12 and 14 still require recorded evidence and a second exact dependency/performance approval before implementation may begin:
+The developer approved decisions 1–19 on 2026-08-23, then decisions 20–21 for deferral and the Tier 1 foundation. Decision 22 reactivates items 11–14 as default-off experimental functionality and authorizes broader M13 implementation. Decision 23 limits issue #255's blocking effect to Tier 2 production/default enablement and hard-memory proof. Existing developer-controlled gates remain:
 
 1. Add separate Authoring API v1 and keep Tooling v1 read-only.
 2. Add immutable server-persisted source keys for collections, fields/list items, and enum options while keeping domain IDs server-generated.
@@ -1017,12 +1109,17 @@ The developer approved all decisions below on 2026-08-23 without authorizing imp
 8. Add credential-aware CMS actor attribution rather than attributing writes to credential issuers.
 9. Add Authoring SDK/CLI entry operations using API-key paths translated to stable-ID mutations.
 10. Statically extract a closed declarative TypeScript subset without importing or executing project code; prohibit an execution bypass and treat the adversarial extractor corpus as a release-blocking security gate.
-11. Add optional `ffd schema build [--check] [--json]` as a separately invoked, first-party, capability-denied and credential-blind composition step; commit/drift-check its static Tier 1 output and build manifest, expose callable helpers only through `@framerfordevs/schema/compose`, and never auto-trigger it from authenticated/editor commands.
-12. Require a separately authorized pre-implementation evidence slice for preferred `typescript@6.0.3` and `quickjs-emscripten`/`@jitl/quickjs-wasmfile-release-sync`, with `oxc-parser` and Bytecode Alliance Javy as named comparisons; require exact-version provenance/tarball/lockfile/audit/hostile-fixture evidence and a second approval before selection or feature implementation.
-13. Accept the explicit Tier 2 v1 import boundary: first-party compose helpers plus bounded local modules, with no arbitrary npm packages, Node built-ins, native addons, or user loaders/plugins.
-14. Require measured cold schema-build baselines before implementation authorization, initially targeting representative p95 ≤2 seconds, bounded-maximum p95 ≤5 seconds, guest memory ≤64 MiB, and peak host RSS ≤256 MiB; any revision requires explicit approval.
+11. Add optional `ffd schema build [--check] [--json]`, compose helpers, and a committed output/build manifest; until issue #255 is resolved, the implementation remains explicit experimental/default-off and no authenticated/editor command may invoke it.
+12. Require exact-version provenance/tarball/lockfile/audit/hostile-fixture evidence. **TypeScript 6.0.3 and QuickJS core/release-sync 0.32.0 are exactly approved for implementation; QuickJS remains rejected for production resource acceptance.**
+13. Accept only first-party compose helpers plus bounded local modules, with no arbitrary npm packages, Node built-ins, native addons, dynamic imports, or user loaders/plugins.
+14. Retain the measured latency/RSS evidence, but keep hard guest-memory acceptance blocked until a fixed runtime passes a new evidence gate.
 15. Ship the initial local editor as `ffd editor` with a loopback BFF; do not expose hosted bearer authority to the browser or widen Authoring CORS.
-16. Extract the generated form into a shared private package and complete sidebar/multi-form/accessibility behavior.
-17. Retire dashboard structure-authoring routes/UI only after export/push/presentation parity passes.
+16. **Shared content form — implemented:** private `@framerfordevs/content-form` owns the minimal projected DTO, exhaustive controlled renderer, lazy Portable Text, tabs/groups/sidebar, partition/default/mutation/API-key helpers, management and Authoring adapters, and instance-local ID/focus behavior; dashboard migration passes all-kind/value/read-only/multi-form/accessibility, coverage, and production-bundle gates.
+17. **Approved and implemented after parity:** retire dashboard collection creation and structure mutation while retaining content, presentation, Delivery, and read-only current-structure authority; legacy authenticated mutation routes return stable `410 DASHBOARD_SCHEMA_AUTHORING_RETIRED`.
 18. Authorize the proposed Drizzle changes and later developer-controlled migration workflow under migration name `add_code_first_authoring_authorities`.
 19. Keep npm publication, OAuth production rollout, migration generation/application, commits, and milestone acceptance developer-controlled.
+20. Defer Tier 2 schema build from M13 v1 after the evidence gate found no eligible isolate. Ship only the Tier 1 closed static extractor; add no compose command/export/configuration/manifest, transpiler, isolate dependency, or project-code execution fallback. Reintroduction requires a future approved architecture and evidence gate.
+21. Authorize the phased Tier 1 foundation: add the approved parser, closed extractor, deterministic canonicalization, hostile no-execution tests, initial `@framerfordevs/schema` type contracts, package/export checks, and clean fixture proof.
+22. Reintroduce Tier 2 with exact QuickJS core/release-sync 0.32.0 only as explicit experimental/default-off, require every result to report `memoryLimitHard: false`, preserve all credential/capability/import/timeout/output controls, and keep issue #255 visible. Authorize broader M13 implementation while retaining migration, publication, rollout, commit, builder-retirement, and milestone-acceptance gates.
+23. Scope issue #255 to block only Tier 2 production/default enablement and the hard-memory-isolation test. It does not block remaining implementation, automated/manual testing unrelated to that limit, or M13 acceptance while Tier 2 stays experimental/default-off and accurately documented.
+24. Keep `candidateStructureHash` always present and nullable: return `null` only when a collection candidate contains unallocated new identities, return the real candidate hash when all stable IDs are known, bind the plan with deterministic `planHash`, and return authoritative structure hashes after apply.

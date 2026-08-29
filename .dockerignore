@@ -3,6 +3,7 @@
 .agents
 .repos
 knowledge_base
+tmp
 tools/webhook-test-receiver
 
 **/dist
@@ -14,6 +15,7 @@ tools/webhook-test-receiver
 **/.astro
 **/.turbo
 .turbo
+**/coverage
 
 **/.wrangler
 **/.alchemy

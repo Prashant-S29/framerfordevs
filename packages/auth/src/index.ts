@@ -13,11 +13,23 @@ import { decodeProtectedHeader } from "jose";
 
 export const OFFICIAL_CLI_OAUTH_CLIENT_ID = "framerfordevs-cli";
 export const TOOLING_READ_SCOPE = "tooling:read";
+export const AUTHORING_READ_SCOPE = "authoring:read";
+export const AUTHORING_DRAFT_WRITE_SCOPE = "authoring:draft:write";
+export const AUTHORING_CONTENT_PUBLISH_SCOPE = "authoring:content:publish";
+export const AUTHORING_SCHEMA_PUSH_SCOPE = "authoring:schema:push";
+export const CLI_API_OAUTH_SCOPES = [
+  TOOLING_READ_SCOPE,
+  AUTHORING_READ_SCOPE,
+  AUTHORING_DRAFT_WRITE_SCOPE,
+  AUTHORING_CONTENT_PUBLISH_SCOPE,
+  AUTHORING_SCHEMA_PUSH_SCOPE,
+] as const;
+export type CliApiOAuthScope = (typeof CLI_API_OAUTH_SCOPES)[number];
 export const CLI_OAUTH_SCOPES = [
   "openid",
   "profile",
   "offline_access",
-  TOOLING_READ_SCOPE,
+  ...CLI_API_OAUTH_SCOPES,
 ] as const;
 export const CLI_OAUTH_GRANT_TYPES = [DEVICE_CODE_GRANT_TYPE, "refresh_token"] as const;
 
@@ -240,7 +252,7 @@ export async function ensureOfficialCliOAuthAuthority(
 
 export const auth = createAuth();
 
-/** Builds a verifier that validates protocol cryptography before narrowing Tooling claims. */
+/** Builds a verifier that validates protocol cryptography before narrowing official CLI claims. */
 export function makeToolingOAuthAccessTokenVerifier(
   options: ToolingOAuthAccessTokenVerifierOptions = {},
 ) {
@@ -249,7 +261,10 @@ export function makeToolingOAuthAccessTokenVerifier(
   const issuer = options.issuer ?? new URL("/api/auth", env.BETTER_AUTH_URL).toString();
   const resource = options.resource ?? env.TOOLING_API_RESOURCE;
 
-  return async (token: string): Promise<ToolingOAuthPrincipal | null> => {
+  return async (
+    token: string,
+    requiredScope: CliApiOAuthScope = TOOLING_READ_SCOPE,
+  ): Promise<ToolingOAuthPrincipal | null> => {
     if (!enabled || token.length === 0 || token.length > 16_384) return null;
 
     try {
@@ -282,7 +297,7 @@ export function makeToolingOAuthAccessTokenVerifier(
         payload.sub.length > 255 ||
         typeof payload.exp !== "number" ||
         scopes === null ||
-        !scopes.has(TOOLING_READ_SCOPE)
+        !scopes.has(requiredScope)
       ) {
         return null;
       }

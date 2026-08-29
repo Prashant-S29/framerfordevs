@@ -16,6 +16,7 @@ const allowedRoutes = [
 
 const apiReferenceUrls = new Set([
   "/api-reference",
+  "/api-reference/authoring/v1",
   "/api-reference/delivery/v1",
   "/api-reference/preview/v1",
   "/api-reference/tooling/v1",
@@ -35,6 +36,7 @@ const forbiddenPublicTerms = [
 describe("developer portal public boundary", () => {
   it("indexes only the closed public contract registry", () => {
     expect(publicContractRegistryKeys).toEqual([
+      "authoring/v1",
       "delivery/v1",
       "preview/v1",
       "tooling/v1",

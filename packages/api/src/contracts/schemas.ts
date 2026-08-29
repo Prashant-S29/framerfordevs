@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
 import { ApiSuccessSchema } from "./api-response";
-import { ProjectRole, projectRoleValues } from "./access";
+import { ApiCredentialId, ProjectRole, projectRoleValues } from "./access";
 import {
   type CollectionFieldKind as M6CollectionFieldKindType,
   type FieldConfigurationByKind,
@@ -226,6 +226,7 @@ export type SchemaChangeClassification = typeof SchemaChangeClassification.Type;
 
 export const schemaChangeCodeValues = [
   "collection.metadata.updated",
+  "collection.api_key.updated",
   "schema.format.upgraded",
   "schema.currency_profile.updated",
   "editor_layout.updated",
@@ -576,7 +577,8 @@ export class PublishedSchemaRevision extends Schema.Class<PublishedSchemaRevisio
   nonBreakingChangeCount: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
   potentiallyBreakingChangeCount: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
   breakingChangeCount: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
-  publishedByUserId: AuthUserId,
+  publishedByUserId: Schema.NullOr(AuthUserId),
+  publishedByCredentialId: Schema.NullOr(ApiCredentialId),
   publishedAt: IsoDateTime,
   fields: PublishedSchemaFields,
   editorLayout: EditorLayout,

@@ -345,6 +345,23 @@ afterAll(async () => {
 }, 60_000);
 
 describe.sequential("Tooling OAuth HTTP readiness", () => {
+  it("exports complete code-owned schema authority through the Authoring OAuth grant", async () => {
+    const response = await api
+      .get(`/api/authoring/v1/projects/${projectId}/environments/${environmentId}/schema/export`)
+      .set(bearer(accessToken));
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.headers["ratelimit-limit"]).toBeTypeOf("string");
+    expect(response.body.data.project.collections).toHaveLength(2);
+    expect(response.body.data.collections).toHaveLength(2);
+    expect(response.body.data.fields.length).toBeGreaterThan(0);
+    expect(response.body.data.current.projectManifestHash).toMatch(/^[0-9a-f]{64}$/u);
+    expect(JSON.stringify(response.body)).not.toContain("workspaceId");
+    expect(JSON.stringify(response.body)).not.toContain("displayLabel");
+    expect(JSON.stringify(response.body)).not.toContain(accessToken);
+  });
+
   it("discovers OAuth-authorized projects and environments through signed continuation cursors", async () => {
     const first = await api.get("/api/tooling/v1/projects?limit=1").set(bearer(accessToken));
     const firstData = successData(first);

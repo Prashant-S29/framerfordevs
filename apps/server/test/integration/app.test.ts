@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
+import { request as requestHttp } from "node:http";
 
+import { authoringLimits } from "@framerfordevs/api/contracts/authoring";
 import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
 import {
+  AUTHORING_SCHEMA_PUSH_SCOPE,
   CLI_OAUTH_GRANT_TYPES,
   CLI_OAUTH_SCOPES,
   createAuth,
@@ -30,7 +33,7 @@ import express from "express";
 import request from "supertest";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { createApp } from "../../src/app";
+import { classifyAuthoringEndpoint, createApp } from "../../src/app";
 
 const app = createApp();
 const testEmailPattern = "m0-%@example.test";
@@ -38,7 +41,9 @@ const password = "M0-Test-Password-123!";
 const oauthTestUserIds = new Set<string>();
 const publicArtifacts = generatePublicArtifacts();
 
-function expectedPublicArtifact(key: "delivery/v1" | "preview/v1" | "tooling/v1"): string {
+function expectedPublicArtifact(
+  key: "authoring/v1" | "delivery/v1" | "preview/v1" | "tooling/v1",
+): string {
   const artifact = publicArtifacts.find((candidate) => candidate.key === key);
   if (artifact === undefined) throw new Error(`Missing test artifact: ${key}`);
   return artifact.bytes;
@@ -61,6 +66,62 @@ async function createTestUser(email: string) {
 
   expect(response.status).toBe(200);
   return agent;
+}
+
+interface RawHttpResponse {
+  readonly status: number;
+  readonly headers: Readonly<Record<string, string | ReadonlyArray<string> | undefined>>;
+  readonly body: string;
+}
+
+async function withListeningApp<A>(work: (port: number) => Promise<A>): Promise<A> {
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    server.close();
+    throw new Error("Authoring test server did not bind a TCP port.");
+  }
+  try {
+    return await work(address.port);
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+  }
+}
+
+function rawAuthoringPost(
+  port: number,
+  path: string,
+  chunks: ReadonlyArray<string>,
+  contentLength?: number,
+): Promise<RawHttpResponse> {
+  return new Promise((resolve, reject) => {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (contentLength === undefined) headers["Transfer-Encoding"] = "chunked";
+    else headers["Content-Length"] = String(contentLength);
+    const outbound = requestHttp(
+      { hostname: "127.0.0.1", port, path, method: "POST", headers },
+      (incoming) => {
+        const body: Array<Buffer> = [];
+        incoming.on("data", (chunk: Buffer) => body.push(chunk));
+        incoming.on("end", () =>
+          resolve({
+            status: incoming.statusCode ?? 0,
+            headers: incoming.headers,
+            body: Buffer.concat(body).toString("utf8"),
+          }),
+        );
+      },
+    );
+    outbound.on("error", reject);
+    for (const chunk of chunks) outbound.write(chunk);
+    outbound.end();
+  });
 }
 
 afterAll(async () => {
@@ -288,6 +349,311 @@ describe("CORS policy", () => {
     expect(response.headers["access-control-allow-origin"]).toBe("*");
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.body.error.code).toBe("SERVICE_UNAVAILABLE");
+  });
+});
+
+describe("Authoring HTTP isolation", () => {
+  const planPath =
+    "/api/authoring/v1/projects/019fae8b-1234-7000-8000-000000000001/environments/019fae8b-1234-7000-8000-000000000002/schema/plan";
+  const collectionPath =
+    "/api/authoring/v1/projects/019fae8b-1234-7000-8000-000000000001/environments/019fae8b-1234-7000-8000-000000000002/collections/articles";
+  const formPath = `${collectionPath}/form`;
+  const presentationPath = `${collectionPath}/presentation`;
+  const entriesPath = `${collectionPath}/locales/en-US/entries`;
+  const entryPath = `${entriesPath}/019fae8b-1234-7000-8000-000000000003`;
+  const draftPath = `${entryPath}/draft`;
+  const publicationPath = `${entryPath}/publication`;
+
+  it("classifies every Authoring operation into a closed metric endpoint", () => {
+    expect([
+      classifyAuthoringEndpoint("GET", planPath.replace(/\/plan$/u, "/export")),
+      classifyAuthoringEndpoint("POST", planPath),
+      classifyAuthoringEndpoint("POST", planPath.replace(/\/plan$/u, "/apply")),
+      classifyAuthoringEndpoint("GET", presentationPath),
+      classifyAuthoringEndpoint("POST", presentationPath),
+      classifyAuthoringEndpoint("GET", formPath),
+      classifyAuthoringEndpoint("GET", entriesPath),
+      classifyAuthoringEndpoint("POST", entriesPath),
+      classifyAuthoringEndpoint("PATCH", entryPath),
+      classifyAuthoringEndpoint("GET", draftPath),
+      classifyAuthoringEndpoint("PATCH", draftPath),
+      classifyAuthoringEndpoint("GET", publicationPath),
+      classifyAuthoringEndpoint("POST", `${publicationPath}/validate`),
+      classifyAuthoringEndpoint("POST", `${publicationPath}/publish`),
+      classifyAuthoringEndpoint("POST", `${publicationPath}/unpublish`),
+    ]).toEqual([
+      "schema_export",
+      "schema_plan",
+      "schema_apply",
+      "presentation_get",
+      "presentation_publish",
+      "form_get",
+      "entry_list",
+      "entry_create",
+      "entry_rename",
+      "entry_get",
+      "entry_save",
+      "publication_status",
+      "publication_validate",
+      "publication_publish",
+      "publication_unpublish",
+    ]);
+    expect(classifyAuthoringEndpoint("DELETE", entryPath)).toBeNull();
+    expect(classifyAuthoringEndpoint("GET", "/openapi.json")).toBeNull();
+  });
+
+  it("serves exact Authoring-only OpenAPI bytes without management CORS", async () => {
+    const specification = await request(app)
+      .get("/api/authoring/v1/openapi.json")
+      .set("Origin", "https://consumer.example");
+    const reference = await request(app).get("/api/authoring/v1/docs");
+
+    expect(specification.status).toBe(200);
+    expect(specification.text).toBe(expectedPublicArtifact("authoring/v1"));
+    expect(specification.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(specification.headers["access-control-allow-credentials"]).toBeUndefined();
+    expect(specification.headers["x-content-type-options"]).toBe("nosniff");
+    expect(specification.body.info.title).toBe("Framer for Developers Authoring API");
+    expect(Object.keys(specification.body.paths)).toHaveLength(12);
+    expect(JSON.stringify(specification.body)).not.toContain("workspaceId");
+    expect(JSON.stringify(specification.body)).not.toContain("credentialId");
+    expect(reference.status).toBe(200);
+    expect(reference.text).toContain("Framer for Devs Authoring API");
+    expect(reference.text).toContain("/api/authoring/v1/openapi.json");
+  });
+
+  it("rejects origins, preflights, cookies, and missing bearer authority", async () => {
+    const origin = await request(app)
+      .post(planPath)
+      .set("Origin", "http://localhost:3001")
+      .send({ project: { collections: [] } });
+    const preflight = await request(app)
+      .options(planPath)
+      .set("Origin", "http://localhost:3001")
+      .set("Access-Control-Request-Method", "POST");
+    const cookie = await request(app)
+      .post(planPath)
+      .set("Cookie", "better-auth.session_token=ignored")
+      .send({ project: { collections: [] } });
+    const formRead = await request(app).get(formPath);
+    const presentationRead = await request(app).get(presentationPath);
+    const presentationWrite = await request(app).post(presentationPath).send({});
+    const contentRead = await request(app).get(entriesPath);
+    const contentCreate = await request(app)
+      .post(entriesPath)
+      .send({
+        displayName: "Post",
+        schemaRevisionId: "019fae8b-1234-7000-8000-000000000004",
+        contractHash: "a".repeat(64),
+        commandId: "019fae8b-1234-7000-8000-000000000005",
+        mutations: [],
+      });
+    const rename = await request(app)
+      .patch(entryPath)
+      .send({ displayName: "Renamed", expectedNameVersion: 1 });
+    const draftRead = await request(app).get(draftPath);
+    const draftWrite = await request(app)
+      .patch(draftPath)
+      .send({
+        schemaRevisionId: "019fae8b-1234-7000-8000-000000000004",
+        contractHash: "a".repeat(64),
+        commandId: "019fae8b-1234-7000-8000-000000000005",
+        expectedSharedVersion: 0,
+        expectedLocalizedVersion: 0,
+        mutations: [{ operation: "set", scope: "localized", path: ["title"], value: "Hello" }],
+      });
+    const publicationStatus = await request(app).get(publicationPath);
+    const publicationValidation = await request(app).post(`${publicationPath}/validate`).send({});
+
+    expect(origin.status).toBe(403);
+    expect(preflight.status).toBe(403);
+    for (const response of [origin, preflight, cookie]) {
+      expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+      expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
+      expect(response.headers["cache-control"]).toBe("no-store");
+      expect(response.headers["referrer-policy"]).toBe("no-referrer");
+    }
+    for (const response of [
+      cookie,
+      formRead,
+      presentationRead,
+      presentationWrite,
+      contentRead,
+      contentCreate,
+      rename,
+      draftRead,
+      draftWrite,
+      publicationStatus,
+      publicationValidation,
+    ]) {
+      expect(response.status).toBe(401);
+      expect(response.body.error.code).toBe("UNAUTHORIZED");
+      expect(response.headers["www-authenticate"]).toBe('Bearer realm="authoring"');
+      expect(response.headers["cache-control"]).toBe("no-store");
+    }
+  });
+
+  it("rejects origins and preflights consistently across every Authoring operation", async () => {
+    const operations = [
+      { method: "GET", path: planPath.replace("/plan", "/export") },
+      { method: "POST", path: planPath },
+      { method: "POST", path: planPath.replace("/plan", "/apply") },
+      { method: "GET", path: formPath },
+      { method: "GET", path: presentationPath },
+      { method: "POST", path: presentationPath },
+      { method: "GET", path: entriesPath },
+      { method: "POST", path: entriesPath },
+      { method: "PATCH", path: entryPath },
+      { method: "GET", path: draftPath },
+      { method: "PATCH", path: draftPath },
+      { method: "GET", path: publicationPath },
+      { method: "POST", path: `${publicationPath}/validate` },
+      { method: "POST", path: `${publicationPath}/publish` },
+      { method: "POST", path: `${publicationPath}/unpublish` },
+    ] as const;
+    const operationRequest = (method: (typeof operations)[number]["method"], path: string) => {
+      if (method === "GET") return request(app).get(path);
+      if (method === "PATCH") return request(app).patch(path);
+      return request(app).post(path);
+    };
+
+    for (const operation of operations) {
+      const origin = await operationRequest(operation.method, operation.path).set(
+        "Origin",
+        "http://localhost:3001",
+      );
+      const preflight = await request(app)
+        .options(operation.path)
+        .set("Origin", "http://localhost:3001")
+        .set("Access-Control-Request-Method", operation.method);
+      for (const response of [origin, preflight]) {
+        expect(response.status).toBe(403);
+        expect(response.body.error.code).toBe("FORBIDDEN");
+        expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+        expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
+        expect(response.headers["cache-control"]).toBe("no-store");
+      }
+    }
+  });
+
+  it("rejects duplicate and credential-bearing query parameters before authentication", async () => {
+    const responses = await Promise.all([
+      request(app).get(`${entriesPath}?cursor=first&cursor=second`),
+      request(app).get(`${entriesPath}?limit=1&limit=2`),
+      request(app).get(`${entriesPath}?token=secret`),
+      request(app).get(`${entriesPath}?authorization=Bearer%20secret`),
+    ]);
+    for (const response of responses) {
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe("VALIDATION_ERROR");
+      expect(JSON.stringify(response.body)).not.toContain("secret");
+      expect(response.headers["cache-control"]).toBe("no-store");
+    }
+  });
+
+  it("enforces malformed, early-length, and streamed chunked body limits", async () => {
+    await withListeningApp(async (port) => {
+      const malformed = await rawAuthoringPost(port, planPath, ['{"project":', "}"]);
+      const oversizedBody = JSON.stringify({
+        project: { collections: [] },
+        padding: "x".repeat(authoringLimits.requestBytes),
+      });
+      const earlyOversized = await rawAuthoringPost(
+        port,
+        planPath,
+        [oversizedBody],
+        Buffer.byteLength(oversizedBody),
+      );
+      const streamedOversized = await rawAuthoringPost(port, planPath, [
+        oversizedBody.slice(0, 32_768),
+        oversizedBody.slice(32_768),
+      ]);
+
+      expect(malformed.status).toBe(400);
+      expect(JSON.parse(malformed.body).error.code).toBe("VALIDATION_ERROR");
+      for (const response of [earlyOversized, streamedOversized]) {
+        expect(response.status).toBe(413);
+        expect(JSON.parse(response.body).error.code).toBe("REQUEST_TOO_LARGE");
+        expect(response.headers["cache-control"]).toBe("no-store");
+      }
+    });
+  });
+
+  it("rejects unsupported methods and mutation content types across the closed route set", async () => {
+    const mutationRoutes = [
+      { method: "POST", path: planPath },
+      { method: "POST", path: planPath.replace("/plan", "/apply") },
+      { method: "POST", path: presentationPath },
+      { method: "POST", path: entriesPath },
+      { method: "PATCH", path: entryPath },
+      { method: "PATCH", path: draftPath },
+      { method: "POST", path: `${publicationPath}/validate` },
+      { method: "POST", path: `${publicationPath}/publish` },
+      { method: "POST", path: `${publicationPath}/unpublish` },
+    ] as const;
+    const mutationRequest = (method: (typeof mutationRoutes)[number]["method"], path: string) =>
+      method === "PATCH" ? request(app).patch(path) : request(app).post(path);
+    for (const route of mutationRoutes) {
+      const response = await mutationRequest(route.method, route.path)
+        .set("Content-Type", "text/plain")
+        .send("{}");
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe("VALIDATION_ERROR");
+      expect(response.headers["cache-control"]).toBe("no-store");
+    }
+
+    const knownPaths = [
+      planPath.replace("/plan", "/export"),
+      planPath,
+      planPath.replace("/plan", "/apply"),
+      formPath,
+      presentationPath,
+      entriesPath,
+      entryPath,
+      draftPath,
+      publicationPath,
+      `${publicationPath}/validate`,
+      `${publicationPath}/publish`,
+      `${publicationPath}/unpublish`,
+    ];
+    for (const path of knownPaths) {
+      const response = await request(app).delete(path);
+      expect(response.status).toBe(405);
+      expect(response.body.error.code).toBe("NOT_FOUND");
+      expect(response.headers.allow).toBe("GET, POST, PATCH, OPTIONS");
+      expect(response.headers.location).toBeUndefined();
+    }
+  });
+
+  it("rejects unsupported content, malformed JSON, unauthenticated bodies, and methods", async () => {
+    const wrongType = await request(app)
+      .post(planPath)
+      .set("Content-Type", "text/plain")
+      .send("{}");
+    const malformed = await request(app)
+      .post(planPath)
+      .set("Content-Type", "application/json")
+      .send('{"project":');
+    const excess = await request(app)
+      .post(planPath)
+      .send({ project: { collections: [] }, workspaceId: "hidden" });
+    const query = await request(app)
+      .post(`${planPath}?force=true`)
+      .send({
+        project: { collections: [] },
+      });
+    const method = await request(app).get(planPath);
+
+    expect(wrongType.status).toBe(400);
+    expect(wrongType.body.error.code).toBe("VALIDATION_ERROR");
+    expect(malformed.status).toBe(400);
+    expect(malformed.body.error.code).toBe("VALIDATION_ERROR");
+    expect(excess.status).toBe(401);
+    expect(excess.body.error.code).toBe("UNAUTHORIZED");
+    expect(query.status).toBe(400);
+    expect(query.body.error.code).toBe("VALIDATION_ERROR");
+    expect(method.status).toBe(405);
+    expect(method.headers.allow).toBe("GET, POST, PATCH, OPTIONS");
   });
 });
 
@@ -807,6 +1173,10 @@ describe.sequential("official CLI OAuth device authorization", () => {
       resource: env.TOOLING_API_RESOURCE,
     });
     const principal = await verifyAccessToken(token.body.access_token);
+    const authoringPrincipal = await verifyAccessToken(
+      token.body.access_token,
+      AUTHORING_SCHEMA_PUSH_SCOPE,
+    );
     expect(principal).toEqual(
       expect.objectContaining({
         kind: "oauth_user",
@@ -815,6 +1185,7 @@ describe.sequential("official CLI OAuth device authorization", () => {
       }),
     );
     expect(principal?.scopes.includes("tooling:read")).toBe(true);
+    expect(authoringPrincipal?.scopes.includes(AUTHORING_SCHEMA_PUSH_SCOPE)).toBe(true);
 
     const [header, payload, signature] = String(token.body.access_token).split(".");
     expect(header).toBeDefined();

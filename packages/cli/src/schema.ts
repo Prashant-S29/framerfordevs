@@ -12,13 +12,25 @@ const ApiKey = Schema.String.pipe(
   Schema.pattern(/^[a-z][a-z0-9_]{0,62}$/u),
   Schema.filter((value) => !value.includes("__") && !value.endsWith("_")),
 );
+const SourceKey = Schema.String.pipe(
+  Schema.minLength(1),
+  Schema.maxLength(63),
+  Schema.pattern(/^[a-z][a-z0-9_-]{0,62}$/u),
+  Schema.filter(
+    (value) =>
+      !value.includes("--") &&
+      !value.includes("__") &&
+      !value.endsWith("-") &&
+      !value.endsWith("_"),
+  ),
+);
 const EnvironmentKey = Schema.String.pipe(
   Schema.minLength(1),
   Schema.maxLength(63),
   Schema.pattern(/^[a-z][a-z0-9-]{0,62}$/u),
   Schema.filter((value) => !value.includes("--") && !value.endsWith("-")),
 );
-const RelativeOutputPath = Schema.String.pipe(
+export const RelativeProjectPath = Schema.String.pipe(
   Schema.minLength(1),
   Schema.maxLength(240),
   Schema.filter((value) => {
@@ -48,15 +60,41 @@ const ApiBaseUrl = Schema.String.pipe(
   }),
 );
 
-export class CliConfig extends Schema.Class<CliConfig>("CliConfig")(
+const CliConfigBase = {
+  apiBaseUrl: ApiBaseUrl,
+  projectId: Uuid,
+  environment: EnvironmentKey,
+  output: RelativeProjectPath,
+} as const;
+
+export class CliConfigV1 extends Schema.Class<CliConfigV1>("CliConfigV1")(
   Schema.Struct({
     schemaVersion: Schema.Literal(1),
-    apiBaseUrl: ApiBaseUrl,
-    projectId: Uuid,
-    environment: EnvironmentKey,
-    output: RelativeOutputPath,
+    ...CliConfigBase,
   }).annotations({ parseOptions: { onExcessProperty: "error" } }),
 ) {}
+
+export class CliSchemaBuildConfig extends Schema.Class<CliSchemaBuildConfig>(
+  "CliSchemaBuildConfig",
+)(
+  Schema.Struct({ entry: RelativeProjectPath }).annotations({
+    parseOptions: { onExcessProperty: "error" },
+  }),
+) {}
+
+export class CliConfigV2 extends Schema.Class<CliConfigV2>("CliConfigV2")(
+  Schema.Struct({
+    schemaVersion: Schema.Literal(2),
+    ...CliConfigBase,
+    schema: RelativeProjectPath,
+    schemaBuild: Schema.optionalWith(CliSchemaBuildConfig, { exact: true }),
+  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+) {}
+
+export const CliConfig = Schema.Union(CliConfigV1, CliConfigV2).annotations({
+  identifier: "CliConfig",
+});
+export type CliConfig = typeof CliConfig.Type;
 
 export type JsonValue = null | boolean | number | string | ReadonlyArray<JsonValue> | JsonObject;
 export interface JsonObject {
@@ -244,9 +282,103 @@ export class LockedCollection extends Schema.Class<LockedCollection>("LockedColl
 }) {}
 
 export class GeneratedFileDigest extends Schema.Class<GeneratedFileDigest>("GeneratedFileDigest")({
-  path: RelativeOutputPath,
+  path: RelativeProjectPath,
   sha256: Digest,
 }) {}
+
+export class SchemaBuildInputDigest extends Schema.Class<SchemaBuildInputDigest>(
+  "SchemaBuildInputDigest",
+)({
+  path: RelativeProjectPath,
+  sha256: Digest,
+}) {}
+
+export class SchemaBuildManifest extends Schema.Class<SchemaBuildManifest>("SchemaBuildManifest")({
+  formatVersion: Schema.Literal(1),
+  runtime: Schema.Literal("quickjs-emscripten-0.32.0-experimental"),
+  memoryLimitHard: Schema.Literal(false),
+  typescriptVersion: Schema.Literal("6.0.3"),
+  composePackage: Schema.Literal("@framerfordevs/schema/compose"),
+  inputs: Schema.Array(SchemaBuildInputDigest).pipe(Schema.minItems(1), Schema.maxItems(32)),
+  output: Schema.Struct({
+    path: RelativeProjectPath,
+    sha256: Digest,
+  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+}) {}
+
+export class AuthoringLockedCollection extends Schema.Class<AuthoringLockedCollection>(
+  "AuthoringLockedCollection",
+)({ sourceKey: SourceKey, collectionId: Uuid, apiKey: ApiKey }) {}
+
+export class AuthoringLockedField extends Schema.Class<AuthoringLockedField>(
+  "AuthoringLockedField",
+)({
+  collectionSourceKey: SourceKey,
+  sourceKey: SourceKey,
+  fieldId: Uuid,
+  apiKey: Schema.NullOr(ApiKey),
+}) {}
+
+export class AuthoringLockedEnumOption extends Schema.Class<AuthoringLockedEnumOption>(
+  "AuthoringLockedEnumOption",
+)({
+  collectionSourceKey: SourceKey,
+  fieldSourceKey: SourceKey,
+  sourceKey: SourceKey,
+  optionId: Uuid,
+}) {}
+
+export class AuthoringSchemaLock extends Schema.Class<AuthoringSchemaLock>("AuthoringSchemaLockV2")(
+  Schema.Struct({
+    lockVersion: Schema.Literal(2),
+    authoringApi: Schema.Literal("authoring/v1"),
+    projectId: Uuid,
+    environmentId: Uuid,
+    environmentKey: EnvironmentKey,
+    projectSha256: Digest,
+    schemaFileSha256: Digest,
+    projectManifestHash: Digest,
+    revisionIds: Schema.Record({
+      key: SourceKey,
+      value: Uuid,
+    }),
+    structureHashes: Schema.Record({ key: SourceKey, value: Digest }),
+    contractHashes: Schema.Record({ key: SourceKey, value: Digest }),
+    collections: Schema.Array(AuthoringLockedCollection).pipe(Schema.maxItems(100)),
+    fields: Schema.Array(AuthoringLockedField).pipe(Schema.maxItems(10_000)),
+    enumOptions: Schema.Array(AuthoringLockedEnumOption).pipe(Schema.maxItems(10_000)),
+  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+) {}
+
+export const ContentMutationOperation = Schema.Literal(
+  "entry.create",
+  "entry.update",
+  "entry.publish",
+  "entry.unpublish",
+);
+export type ContentMutationOperation = typeof ContentMutationOperation.Type;
+
+export class ContentMutationRetryJournal extends Schema.Class<ContentMutationRetryJournal>(
+  "ContentMutationRetryJournal",
+)(
+  Schema.Struct({
+    formatVersion: Schema.Literal(1),
+    operation: ContentMutationOperation,
+    commandId: Uuid,
+    fingerprint: Digest,
+  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+) {}
+
+export class SchemaMutationRetryJournal extends Schema.Class<SchemaMutationRetryJournal>(
+  "SchemaMutationRetryJournal",
+)(
+  Schema.Struct({
+    formatVersion: Schema.Literal(1),
+    operation: Schema.Literal("schema.apply"),
+    commandId: Uuid,
+    fingerprint: Digest,
+  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+) {}
 
 export class SchemaLock extends Schema.Class<SchemaLock>("SchemaLock")({
   lockVersion: Schema.Literal(1),

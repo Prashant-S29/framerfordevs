@@ -316,6 +316,7 @@ beforeAll(async () => {
     workspaceId: ids.workspace,
     projectId: ids.project,
     environmentId: ids.environment,
+    sourceKey: "articles",
     apiKey: "articles",
     displayName: "Articles",
     description: null,
@@ -331,6 +332,7 @@ beforeAll(async () => {
       projectId: ids.project,
       environmentId: ids.environment,
       collectionId: ids.collection,
+      sourceKey: "title-00000001",
       parentFieldId: null,
       nodeRole: "root",
       referenceCollectionId: null,
@@ -354,6 +356,7 @@ beforeAll(async () => {
       projectId: ids.project,
       environmentId: ids.environment,
       collectionId: ids.collection,
+      sourceKey: "body-00000002",
       parentFieldId: null,
       nodeRole: "root",
       referenceCollectionId: null,
@@ -389,6 +392,7 @@ beforeAll(async () => {
       currencyRegistryProfile: null,
       editorLayout: null,
       schemaHash: "1".repeat(64),
+      structureHash: "a".repeat(64),
       commandId: randomUUID(),
       commandFingerprint: "2".repeat(64),
       publishedByUserId: ownerId,
@@ -410,6 +414,7 @@ beforeAll(async () => {
       currencyRegistryProfile: null,
       editorLayout: null,
       schemaHash: "3".repeat(64),
+      structureHash: "b".repeat(64),
       commandId: randomUUID(),
       commandFingerprint: "4".repeat(64),
       publishedByUserId: ownerId,
@@ -433,6 +438,7 @@ beforeAll(async () => {
     draftBaseRevisionId: ids.schemaTwo,
     currentPublishedRevisionId: ids.schemaTwo,
     currentPublishedSequence: 2,
+    currentPublishedStructureHash: "b".repeat(64),
     validationProfile: "ffd-fields@1",
     currencyRegistryProfile: null,
     editorLayout: null,
@@ -749,6 +755,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
         draftBaseRevisionId: null,
         currentPublishedRevisionId: null,
         currentPublishedSequence: 0,
+        currentPublishedStructureHash: null,
       })
       .where(eq(cmsCollectionSchemaHead.collectionId, ids.collection));
     try {
@@ -768,6 +775,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
           draftBaseRevisionId: ids.schemaTwo,
           currentPublishedRevisionId: ids.schemaTwo,
           currentPublishedSequence: 2,
+          currentPublishedStructureHash: "b".repeat(64),
         })
         .where(eq(cmsCollectionSchemaHead.collectionId, ids.collection));
     }

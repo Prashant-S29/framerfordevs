@@ -299,6 +299,75 @@ describe.sequential("platform API contracts", () => {
       },
     ],
     [
+      "platform/projects/collections/schema/presentation/get",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+      },
+    ],
+    [
+      "platform/projects/collections/schema/presentation/publish",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        collectionId: "019fae8b-1234-7000-8000-000000000003",
+        commandId: "019fae8b-1234-7000-8000-000000000004",
+        expectedRevisionId: "019fae8b-1234-7000-8000-000000000005",
+        expectedSequence: 1,
+        presentation: {
+          displayName: "Posts",
+          description: null,
+          fields: [
+            {
+              fieldId: "019fae8b-1234-7000-8000-000000000006",
+              displayLabel: "Title",
+              position: 0,
+              editor: {
+                helpText: null,
+                placeholder: null,
+                visibleToRoles: ["owner", "developer"],
+                editableByRoles: ["owner", "developer"],
+              },
+              enumOptions: [],
+            },
+          ],
+          editorLayout: {
+            version: 1,
+            tabs: [
+              {
+                id: "019fae8b-1234-7000-8000-000000000007",
+                title: "Content",
+                description: null,
+                position: 0,
+                visibleToRoles: ["owner", "developer"],
+                groups: [
+                  {
+                    id: "019fae8b-1234-7000-8000-000000000008",
+                    title: "Main",
+                    description: null,
+                    position: 0,
+                    columns: 1,
+                    visibleToRoles: ["owner", "developer"],
+                    fields: [
+                      {
+                        id: "019fae8b-1234-7000-8000-000000000009",
+                        fieldId: "019fae8b-1234-7000-8000-000000000006",
+                        position: 0,
+                        helpTextOverride: null,
+                        visibleToRoles: ["owner", "developer"],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+            sidebarGroups: [],
+          },
+        },
+      },
+    ],
+    [
       "platform/projects/collections/schema/form/getDraft",
       {
         projectId: "019fae8b-1234-7000-8000-000000000001",
@@ -824,6 +893,108 @@ describe.sequential("platform API contracts", () => {
     expect(repeated.body.json.data.error.code).toBe("INVALID_STATE_TRANSITION");
   });
 
+  it("returns stable code-authority gone responses for every retired dashboard schema mutation", async () => {
+    const collectionId = "019fae8b-1234-7000-8000-000000000003";
+    const fieldId = "019fae8b-1234-7000-8000-000000000004";
+    const commandId = "019fae8b-1234-7000-8000-000000000005";
+    const scope = { projectId, environmentId, collectionId };
+    const field = {
+      apiKey: "title",
+      displayLabel: "Title",
+      kind: "short_text",
+      required: true,
+      localization: "localized",
+      deprecated: false,
+      editor: {
+        helpText: null,
+        placeholder: null,
+        visibleToRoles: ["owner", "developer"],
+        editableByRoles: ["owner", "developer"],
+      },
+      configuration: {},
+    };
+    const retiredMutations: ReadonlyArray<readonly [string, object]> = [
+      [
+        "platform/projects/collections/create",
+        { projectId, environmentId, apiKey: "posts", displayName: "Posts", description: null },
+      ],
+      [
+        "platform/projects/collections/update",
+        { ...scope, version: 1, draftVersion: 1, displayName: "Posts", description: null },
+      ],
+      [
+        "platform/projects/collections/schema/fields/create",
+        { ...scope, parentFieldId: null, draftVersion: 1, field },
+      ],
+      [
+        "platform/projects/collections/schema/fields/update",
+        { ...scope, fieldId, draftVersion: 1, field },
+      ],
+      [
+        "platform/projects/collections/schema/fields/replace",
+        { ...scope, draftVersion: 1, authoringVersion: 1, fields: [] },
+      ],
+      [
+        "platform/projects/collections/schema/fields/remove",
+        { ...scope, fieldId, draftVersion: 1 },
+      ],
+      [
+        "platform/projects/collections/schema/fields/reorder",
+        { ...scope, parentFieldId: null, draftVersion: 1, fieldIds: [fieldId] },
+      ],
+      [
+        "platform/projects/collections/schema/layout/update",
+        {
+          ...scope,
+          draftVersion: 1,
+          editorLayout: {
+            version: 1,
+            tabs: [
+              {
+                id: "019fae8b-1234-7000-8000-000000000006",
+                title: "Content",
+                description: null,
+                position: 0,
+                visibleToRoles: ["owner", "developer"],
+                groups: [
+                  {
+                    id: "019fae8b-1234-7000-8000-000000000007",
+                    title: "Main",
+                    description: null,
+                    position: 0,
+                    columns: 1,
+                    visibleToRoles: ["owner", "developer"],
+                    fields: [],
+                  },
+                ],
+              },
+            ],
+            sidebarGroups: [],
+          },
+        },
+      ],
+      [
+        "platform/projects/collections/schema/publish",
+        {
+          ...scope,
+          draftVersion: 1,
+          expectedPublishedRevisionId: null,
+          commandId,
+          acknowledgedChangeIds: [],
+        },
+      ],
+    ];
+
+    for (const [path, input] of retiredMutations) {
+      const response = await rpc(firstAgent, path, input);
+      expect(response.status, path).toBe(410);
+      expect(response.body.json.data.error.code, path).toBe("DASHBOARD_SCHEMA_AUTHORING_RETIRED");
+      expect(response.body.json.data.message, path).toBe(
+        "Collection structure is managed through code-first schema authoring.",
+      );
+    }
+  });
+
   it("manages canonical project locales with strict lifecycle and validation contracts", async () => {
     const initial = await rpc(firstAgent, "platform/projects/locales/list", {
       projectId,
@@ -1038,7 +1209,7 @@ describe.sequential("platform API contracts", () => {
       environmentId,
       family: "management",
       name: "Tooling CI key",
-      scopes: ["schema.read"],
+      scopes: ["schema.read", "content.read"],
       expiresAt: null,
     });
     const managementKey = management.body.json.data.key;
@@ -1062,6 +1233,47 @@ describe.sequential("platform API contracts", () => {
     const otherTenant = await request(app)
       .get(`/api/tooling/v1/projects/${randomUUID()}/environments/main/schema/manifest?limit=20`)
       .set("Authorization", `Bearer ${managementKey}`);
+    const authoringProject = {
+      collections: [
+        {
+          sourceKey: "posts",
+          apiKey: "posts",
+          fields: [
+            {
+              sourceKey: "title",
+              apiKey: "title",
+              kind: "short_text",
+              required: true,
+              localization: "localized",
+              configuration: {},
+            },
+          ],
+        },
+      ],
+    };
+    const authoringBase = `/api/authoring/v1/projects/${projectId}/environments/${environmentId}/schema`;
+    const authoringPlan = await request(app)
+      .post(`${authoringBase}/plan`)
+      .set("Authorization", `Bearer ${managementKey}`)
+      .send({ project: authoringProject });
+    const authoringExportWithoutPublication = await request(app)
+      .get(`${authoringBase}/export`)
+      .set("Authorization", `Bearer ${managementKey}`);
+    const authoringEntriesWithoutCollection = await request(app)
+      .get(
+        `/api/authoring/v1/projects/${projectId}/environments/${environmentId}/collections/posts/locales/en-US/entries`,
+      )
+      .set("Authorization", `Bearer ${managementKey}`);
+    const authoringApplyDenied = await request(app)
+      .post(`${authoringBase}/apply`)
+      .set("Authorization", `Bearer ${managementKey}`)
+      .send({
+        project: authoringProject,
+        commandId: randomUUID(),
+        expectedCurrent: { projectManifestHash: "a".repeat(64), revisionIds: {} },
+        expectedPlanHash: "a".repeat(64),
+        acknowledgedChangeIds: [],
+      });
 
     expect(management.status).toBe(200);
     expect(managementKey).toMatch(/^ffd_mgmt_[0-9a-f-]{36}_[A-Za-z0-9_-]{43}$/u);
@@ -1083,6 +1295,17 @@ describe.sequential("platform API contracts", () => {
     expect(notModified.text).toBe("");
     expect(discoveryDenied.status).toBe(403);
     expect(otherTenant.status).toBe(403);
+    expect(authoringPlan.status).toBe(401);
+    expect(authoringPlan.body.error.code).toBe("CREDENTIAL_INVALID");
+    expect(authoringPlan.headers["cache-control"]).toBe("no-store");
+    expect(authoringPlan.headers["ratelimit-limit"]).toBeTypeOf("string");
+    expect(authoringExportWithoutPublication.status).toBe(409);
+    expect(authoringExportWithoutPublication.body.error.code).toBe("PUBLISHED_SCHEMA_REQUIRED");
+    expect(authoringEntriesWithoutCollection.status).toBe(404);
+    expect(authoringEntriesWithoutCollection.body.error.code).toBe("NOT_FOUND");
+    expect(authoringApplyDenied.status).toBe(401);
+    expect(authoringApplyDenied.body.error.code).toBe("CREDENTIAL_INVALID");
+    expect(JSON.stringify(authoringPlan.body)).not.toContain(managementKey);
 
     const manifestAudits = await db
       .select({ id: auditEvent.id })

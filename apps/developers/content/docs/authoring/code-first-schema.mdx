@@ -1,0 +1,101 @@
+---
+title: Publish a Code-First Schema
+description: Define stable schema identities, review a server plan, acknowledge exact changes, and publish atomically.
+---
+
+## 1. Install the schema and CLI packages
+
+```bash
+pnpm add -D @framerfordevs/schema
+pnpm add --global @framerfordevs/cli
+```
+
+Node.js 22 or newer is required.
+
+## 2. Link one project environment
+
+```bash
+ffd login --api https://api.example.com --open
+ffd link \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --environment main \
+  --output src/framerfordevs \
+  --schema framerfordevs.schema.ts
+```
+
+This writes non-executable `framerfordevs.config.json` version 2. OAuth authority stays in the native credential store; configuration and locks contain no credentials. Code-first authority lives in `.framerfordevs/schema.lock.json` v2, while optional generated-consumer ownership remains separate in `.framerfordevs/generated.lock.json`.
+
+For an existing hosted schema, bootstrap stable source identities before editing:
+
+```bash
+ffd schema export
+```
+
+Export refuses to overwrite unowned or locally modified source.
+
+## 3. Define structure declaratively
+
+```ts
+import type { CollectionSchema, ProjectSchema } from "@framerfordevs/schema";
+
+const articles = {
+  sourceKey: "articles",
+  apiKey: "articles",
+  fields: [
+    {
+      sourceKey: "title",
+      apiKey: "title",
+      kind: "short_text",
+      required: true,
+      localization: "localized",
+      configuration: { maxLength: 160 },
+    },
+  ],
+} as const satisfies CollectionSchema;
+
+export default {
+  collections: [articles],
+} as const satisfies ProjectSchema;
+```
+
+Keep each `sourceKey` stable when renaming an API key. Tier 1 accepts a closed declarative TypeScript grammar and statically reduces it without importing or executing the module. Calls, spread, functions, runtime imports, globals, loaders, and arbitrary packages fail closed before credentials or network clients are constructed.
+
+## 4. Review the server plan
+
+```bash
+ffd schema plan
+ffd schema plan --json
+```
+
+The server validates the complete project and returns stable change IDs classified as non-breaking, potentially breaking, or breaking. Validation issues exit with status `2`; no partial write occurs.
+
+## 5. Apply with exact acknowledgement
+
+If the plan contains risky changes, pass every and only the returned risky change ID:
+
+```bash
+ffd schema push \
+  --acknowledge CHANGE_ID_1 \
+  --acknowledge CHANGE_ID_2
+```
+
+Broad confirmation is not supported. Push obtains a fresh plan, binds the request to exact current authority and the exact plan hash, and applies all identities, immutable revisions, heads, audit records, outbox events, and the command receipt in one transaction. A transport-uncertain retry reuses a content-free command journal; changed authority fails closed for reconciliation.
+
+## 6. Check generated consumers in CI
+
+```bash
+FFD_MANAGEMENT_TOKEN="$CI_SECRET" ffd schema check --json
+```
+
+Use an environment-bound management credential with only the permissions needed by the operation. Do not commit the token.
+
+## Dashboard authority
+
+Dashboard collection creation and structure mutation are retired. Legacy authenticated mutation routes return stable `410 DASHBOARD_SCHEMA_AUTHORING_RETIRED` responses rather than changing drafts. Use schema code for structure, the hosted content editor for entries, and Delivery settings for exposure.
+
+Use the hosted Presentation editor for labels, help, placeholders, order, groups, tabs, sidebars, and role visibility. Publishing presentation creates a new immutable revision while preserving code-owned structure and contract hashes.
+
+## Experimental composition
+
+`ffd schema build` can explicitly produce Tier 1 source from bounded local composition code. It is default-off, credential-blind, and never runs implicitly from plan, push, or the editor. The QuickJS runtime reports `memoryLimitHard: false`; upstream issue `justjake/quickjs-emscripten#255` blocks production/default Tier 2 activation.

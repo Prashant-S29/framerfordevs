@@ -1,7 +1,7 @@
 {
   "name": "@framerfordevs/sdk",
   "version": "0.0.0",
-  "description": "Framework-independent Framer for Developers Delivery, Preview, and webhook SDK",
+  "description": "Framework-independent Framer for Developers Delivery, Preview, Authoring, and webhook SDK",
   "homepage": "https://github.com/Prashant-S29/framerfordevs#readme",
   "bugs": {
     "url": "https://github.com/Prashant-S29/framerfordevs/issues"
@@ -32,6 +32,10 @@
       "types": "./dist/effect.d.mts",
       "import": "./dist/effect.mjs"
     },
+    "./authoring": {
+      "types": "./dist/authoring.d.mts",
+      "import": "./dist/authoring.mjs"
+    },
     "./webhooks": {
       "types": "./dist/webhooks.d.mts",
       "import": "./dist/webhooks.mjs"
@@ -53,9 +57,13 @@
     "test:unit": "vitest run src",
     "test:coverage": "vitest run --coverage"
   },
+  "dependencies": {
+    "@framerfordevs/schema": "workspace:*"
+  },
   "devDependencies": {
     "@effect/vitest": "0.30.0",
     "@framerfordevs/config": "workspace:*",
+    "@framerfordevs/content-form": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "3.2.7",
     "effect": "^3.22.0",

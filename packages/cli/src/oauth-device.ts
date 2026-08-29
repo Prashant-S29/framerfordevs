@@ -13,7 +13,8 @@ import {
 } from "./errors";
 
 const clientId = "framerfordevs-cli";
-const scope = "openid profile offline_access tooling:read";
+const scope =
+  "openid profile offline_access tooling:read authoring:read authoring:draft:write authoring:content:publish authoring:schema:push";
 const deviceGrant = "urn:ietf:params:oauth:grant-type:device_code";
 const maximumResponseBytes = 64 * 1_024;
 const requestTimeoutMs = 15_000;
@@ -80,7 +81,10 @@ function openBrowser(url: string): Promise<void> {
   const parsed = new URL(url);
   if (
     parsed.protocol !== "https:" &&
-    !(parsed.protocol === "http:" && parsed.hostname === "localhost")
+    !(
+      parsed.protocol === "http:" &&
+      (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1")
+    )
   ) {
     return Promise.reject(new Error("Browser URL is unsafe."));
   }
@@ -91,7 +95,14 @@ function openBrowser(url: string): Promise<void> {
         ? ["rundll32", ["url.dll,FileProtocolHandler", parsed.toString()]]
         : ["xdg-open", [parsed.toString()]];
   return new Promise((resolve, reject) => {
-    const child = spawn(command, arguments_, { detached: true, stdio: "ignore", shell: false });
+    const environment = { ...process.env };
+    delete environment["FFD_MANAGEMENT_TOKEN"];
+    const child = spawn(command, arguments_, {
+      detached: true,
+      stdio: "ignore",
+      shell: false,
+      env: environment,
+    });
     child.once("error", reject);
     child.once("spawn", () => {
       child.unref();

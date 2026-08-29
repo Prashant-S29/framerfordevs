@@ -45,6 +45,8 @@ function makeTelemetryCapture(): TelemetryCapture {
       recordPreviewAuditFailure: () => Effect.void,
       recordToolingRequest: () => Effect.void,
       recordToolingOAuthVerification: () => Effect.void,
+      recordAuthoringAuthentication: () => Effect.void,
+      recordAuthoringRequest: () => Effect.void,
       recordRateLimitDecision: (event) =>
         Effect.sync(() => {
           decisions.push(event);
