@@ -6,10 +6,10 @@ Pi loads this file into every project session and keeps it in the system context
 
 1. Inspect `git status` and recent `git log`; Git is authoritative for branch, commit, and worktree state.
 2. Read `knowledge_base/context.md`. Read only the product/PRD sections, rules, learnings, and decisions mapped there that the task changes, consumes, or must preserve.
-3. Read the status/tracker/current-work section of `knowledge_base/progress.md` and only the active milestone section of `knowledge_base/milestone.md`.
+3. Read the status/tracker/current-work section of `knowledge_base/progress.md`, the roadmap summary, and only the next design target or active milestone section of `knowledge_base/milestone.md`.
 4. Inspect owning source, tests, manifests, exports, configuration, and migration history before editing.
 5. Load every matching `.agents/skills/*/SKILL.md`; follow referenced material selectively. For Effect work, also use stable-v3 references under `.repos/effect/` when local guides are insufficient.
-6. Work only on the active milestone unless the developer explicitly authorizes another workstream. Ask before destructive work or a materially larger refactor not already authorized.
+6. Work only on the active milestone unless the developer explicitly authorizes another workstream. When no implementation milestone is active, design only the named next design target. Ask before destructive work or a materially larger refactor not already authorized.
 
 Do not preload all historical decisions, milestone journals, learnings, or rules. Start from current code and the selective maps; follow actual imports/contracts to additional context.
 

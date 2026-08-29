@@ -1,7 +1,8 @@
 # Milestone Rules
 
-- Work on only the active milestone unless the developer explicitly changes scope.
-- Do not one-shot the CMS.
+- Work on only the active milestone unless the developer explicitly changes scope. When no implementation milestone is active, design only the named next design target.
+- A numbered roadmap entry records approved sequence and bounded intent; it does not authorize its design or implementation. Do not design later entries ahead of the current target.
+- Do not one-shot the CMS or combine roadmap slices merely because they share a product surface.
 - Add tests with the implementation, not afterward.
 - Meet all applicable milestone success criteria.
 - Update `knowledge_base/progress.md`, `knowledge_base/context.md`, and `knowledge_base/learnings.md` before requesting review.

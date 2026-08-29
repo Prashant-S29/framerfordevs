@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestones 0–13 are developer-approved and committed. Repository/context optimization is complete and awaiting developer review before the next milestone is defined.
-**Active milestone:** None — this is an explicitly authorized pre-milestone maintenance workstream.
+**Overall status:** Milestones 0–13 and post-M13 repository/context normalization are developer-approved and committed. M14–M30 are sequenced with detailed design context.
+**Next design target:** M14 — Control-plane bootstrap contracts. No implementation milestone is active until its design is approved.
 **Last updated:** 2026-08-29
 
 ## Status legend
@@ -9,6 +9,8 @@
 - `[ ]` Not started
 - `[~]` In progress
 - `[x]` Complete
+- `[D]` Design pending
+- `[P]` Planned and sequenced; design not started
 - `[R]` Awaiting developer review
 - `[A]` Developer approved
 - `[!]` Blocked
@@ -31,10 +33,27 @@
 | 11  | Events, webhooks, invalidation          | `[A]`  |            868 | `fef7205` |
 | 12  | Developer portal and generated tooling  | `[A]`  |            962 | `4e87908` |
 | 13  | Code-first authoring and local editor   | `[A]`  |          1,184 | `9c68942` |
+| 14  | Control-plane bootstrap contracts       | `[D]`  |              — | —         |
+| 15  | Governance automation parity            | `[P]`  |              — | —         |
+| 16  | Operational administration and recovery | `[P]`  |              — | —         |
+| 17  | Hosted surface separation               | `[P]`  |              — | —         |
+| 18  | Studio mount and security runtime       | `[P]`  |              — | —         |
+| 19  | Studio content and localization         | `[P]`  |              — | —         |
+| 20  | Studio editorial lifecycle              | `[P]`  |              — | —         |
+| 21  | Client handover and editorial safety    | `[P]`  |              — | —         |
+| 22  | Data durability and portability         | `[P]`  |              — | —         |
+| 23  | Production security and operations      | `[P]`  |              — | —         |
+| 24  | Environment lifecycle and promotion     | `[P]`  |              — | —         |
+| 25  | Managed assets and media                | `[P]`  |              — | —         |
+| 26  | Workflow automation and scheduling      | `[P]`  |              — | —         |
+| 27  | Visual-builder readiness contracts      | `[P]`  |              — | —         |
+| 28  | Visual Studio composition               | `[P]`  |              — | —         |
+| 29  | Visual publication and dependencies     | `[P]`  |              — | —         |
+| 30  | Renderer SDK and framework adapters     | `[P]`  |              — | —         |
 
-The next milestone is intentionally undefined until this maintenance workstream is approved. Earlier M14–M16 placeholders are not active plans.
+M14 is the only design target. M15–M30 preserve the developer-approved sequence and detailed context but are not designed or authorized for implementation.
 
-## Current maintenance workstream
+## Post-M13 repository/context normalization
 
 - `[x]` Reconcile M13 approval with Git commit `9c68942` and remove stale pending status.
 - `[x]` Rewrite this file as one ordered, concise milestone record rather than interleaved checklists and reverse-ordered evidence.
@@ -44,9 +63,9 @@ The next milestone is intentionally undefined until this maintenance workstream 
 - `[x]` Improve repository discovery and enforce ordered progress, concise learnings, complete decision routing, test placement, established domain ownership, universal implementation/test ownership, and repeated sibling-prefix ownership across all 16 workspaces plus root scripts.
 - `[x]` Reorganize the repository-wide flat module families into dedicated owner directories, including every colocated implementation/test pair, the complete API contract surface, deeper API kernels/services/operations/scripts, CLI command/schema/editor/generator workflows, dashboard features, package modules, UI prefix families, developer-portal checks, and utility scripts. Preserve generated route conventions, package export paths, direct imports, and runtime behavior without introducing internal barrels.
 - `[x]` Remove the obsolete ignored 92 MiB `tmp/` tree containing M13 evidence, fixtures, package archives, installs, and an applied-migration draft; all contents were reproducible or already recorded in authoritative sources.
-- `[x]` Pass formatting, lint, generalized structure enforcement, contract drift, all 15 type-check tasks, 1,184 tests, coverage, and all eight production builds with the worker stopped for shared-database gates. Across server, worker, CLI, dashboard, and developer-portal outputs, all 1,089 JS/CSS artifact counts remain unchanged while aggregate output decreases by 822,525 raw bytes and 201,790 gzip bytes to 43,467,370 raw/8,706,685 gzip; legal and optimizer annotations remain preserved, and the server remains seven chunks, and rebuilt PostgreSQL/Redis/server/web/worker services are healthy.
+- `[x]` Pass formatting, lint, generalized structure enforcement, contract drift, all 15 type-check tasks, 1,184 tests, coverage, and all eight production builds with the worker stopped for shared-database gates. Across server, worker, CLI, dashboard, and developer-portal outputs, all 1,089 JS/CSS artifact counts remain unchanged while aggregate output decreases by 822,525 raw bytes and 201,790 gzip bytes to 43,467,370 raw/8,706,685 gzip; legal and optimizer annotations remain preserved; the server remains seven chunks, and rebuilt PostgreSQL/Redis/server/web/worker services are healthy.
 - `[x]` After a worker-isolation mistake projected two test graphs, obtain explicit cleanup approval, delete only the reconciled scope in a guarded transaction, verify zero residue, rerun all 138 server integration tests with the worker stopped, and restore it healthy. The existing worker-isolation learning already covers the prevention rule.
-- `[R]` Stop for developer review before defining or implementing the next milestone.
+- `[A]` Developer approved and committed the normalization as `cd31102`; it is the structural and context baseline for M14 onward.
 
 ## Completed milestone record
 
@@ -142,6 +161,78 @@ The next milestone is intentionally undefined until this maintenance workstream 
 - Dashboard collection/field/layout/schema publication mutation is retired with stable authenticated `410 DASHBOARD_SCHEMA_AUTHORING_RETIRED`; content, editorial Presentation, Delivery, navigation, and read-only structure remain.
 - Developer generated/applied `0013_add_code_first_authoring_authorities` and `0014_normalize_authoring_actor_foreign_keys`; final readiness passed 1,184 tests; commit `9c68942`.
 
+## Planned milestone record
+
+These entries remain concise because `milestone.md` owns the detailed pending context. M14 still requires a design; M15–M30 must not be designed or implemented ahead of their developer gate. The original pre-normalization M14–M16 scope is retained explicitly in M21–M23 and M27 rather than discarded.
+
+### Milestone 14 — Control-plane bootstrap contracts
+
+- Next design target: portable workspace/project bootstrap, linking, capability inspection, and Studio-registration primitives with exact HTTP/SDK/CLI authority.
+
+### Milestone 15 — Governance automation parity
+
+- Sequence memberships, invitations, role/policy administration, locales, and current-environment inspection after M14 contracts establish the portable boundary.
+
+### Milestone 16 — Operational administration and recovery
+
+- Sequence credentials, webhooks, audit/security visibility, and recovery-safe project operations without transferring unrestricted authority to browser clients.
+
+### Milestone 17 — Hosted surface separation
+
+- Separate marketing/docs/auth entry at `framerfordevs.com` from resilient administration/recovery at `dashboard.framerfordevs.com`, retaining editorial UI only until Studio parity exists.
+
+### Milestone 18 — Studio mount and security runtime
+
+- Establish the framework-neutral SPA, configured-path mount, Web Standards BFF/adapters, registration/session handoff, and exact browser-safe route boundary.
+
+### Milestone 19 — Studio content and localization
+
+- Move role-projected browsing, generated forms, shared/exact-locale drafts, validation, save/conflict handling, and large-collection UX into Studio.
+
+### Milestone 20 — Studio editorial lifecycle
+
+- Add revision restore, Presentation, Preview, publication, local-editor convergence, and parity-gated retirement of duplicate hosted editorial authority.
+
+### Milestone 21 — Client handover and editorial safety
+
+- Preserve the original handover scope through client-focused navigation, exact collection/field/locale restrictions, review submission, revision comparison, translation/publication indicators, accessible recovery-safe forms, activity, and authenticated handover links.
+
+### Milestone 22 — Data durability and portability
+
+- Preserve backup/restore, corruption detection, bounded stable-ID import/export, retention/cleanup authority, self-host compatibility/versioning, and recovery drills for immutable and idempotent state.
+
+### Milestone 23 — Production security and operational readiness
+
+- Preserve rate limits/SLOs, host/operator isolation, worker egress/cloud-metadata hardening, security and dependency scanning, load/soak/failover proof, alerts, dashboards, and rollback/recovery runbooks.
+
+### Milestone 24 — Environment lifecycle and promotion
+
+- Introduce user-visible environments beyond `main` and explicit environment-scoped promotion/configuration authority without identity ambiguity.
+
+### Milestone 25 — Managed assets and media
+
+- Add secure uploads/storage, media-library authority, metadata/transformation contracts, and compatibility with existing external-asset fields.
+
+### Milestone 26 — Workflow automation and scheduling
+
+- Extend M21 review safety with advanced approval transitions, review notes, and scheduled exact-locale publication while preserving immutable publication, audit, and outbox semantics.
+
+### Milestone 27 — Visual-builder readiness contracts
+
+- Preserve the original visual-readiness scope: stable-ID CMS bindings, provider/dependency/invalidation/renderer contracts, compatibility fixtures, binding-impact analysis, and proof that visual enablement requires no CMS migration.
+
+### Milestone 28 — Visual Studio composition
+
+- Add stable visual resources and permission-aware page composition, responsive styling, data binding, navigation, SEO, tokens, and custom developer-component workflows to Studio.
+
+### Milestone 29 — Visual publication and dependencies
+
+- Add immutable visual revisions/publications, preview, binding-impact analysis, dependency graphs, targeted route invalidation, and atomic events/audits.
+
+### Milestone 30 — Renderer SDK and framework adapters
+
+- Add a versioned canonical renderer contract plus initial supported CSR/SSR/static adapters while preserving developer-owned infrastructure; stop the numbered roadmap after this visual baseline.
+
 ## Current validation and release state
 
 - Accepted M13 baseline: `pnpm run ready` passed 1,184 tests, 15 type-check tasks, public-contract drift, formatting, lint, structure, coverage, and eight builds with the independent worker stopped during shared-database gates and healthy afterward.
@@ -169,12 +260,10 @@ Agents did not generate or apply these migrations. Developer-generated/applied a
 | `0012`        | M12           | CLI OAuth device authorization                         |
 | `0013`–`0014` | M13           | Code-first source/hash/receipt authority and actor FKs |
 
-## Next direction — not yet a milestone
+## Roadmap and next gate
 
-The developer’s approved product direction is a three-surface model over shared API authority:
-
-1. `framerfordevs.com` for marketing, documentation, and authentication entry.
-2. `dashboard.framerfordevs.com` for hosted account/workspace/project control-plane operations and recovery.
-3. A framework-neutral, project-specific Studio mounted at a developer-configured path for content, editorial layout, preview, and the future visual editor.
-
-Every meaningful operation must also be available through stable, noninteractive, machine-readable CLI/SDK contracts so agents do not require browser workflows. The next milestone’s exact scope and design will be created only after this maintenance workstream receives developer approval.
+- `knowledge_base/milestone.md` is authoritative for the approved M14–M30 sequence, detailed pending context, original M14–M16 preservation, boundaries, and selective reading pointers.
+- M14 is design-pending. The next agent may prepare its design and decision record, but implementation starts only after explicit developer approval.
+- M15–M30 are contextualized pending milestones, not approved designs; work must continue one milestone at a time and later entries may be split during their own design.
+- Managed hosting, external backend/data adapters, billing, analytics, and plugins remain unsequenced long-term product directions until M30 is accepted.
+- Package publication/versioning, production OAuth, production domains/configuration, deployments, migrations, Tier 2 activation, and milestone acceptance remain developer-controlled.

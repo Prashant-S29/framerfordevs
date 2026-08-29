@@ -1,14 +1,14 @@
 # Agent Session Context
 
 **Last updated:** 2026-08-29
-**Current phase:** M13 accepted and committed; pre-milestone repository/context optimization awaiting developer review
-**Active milestone:** None
+**Current phase:** Post-M13 maintenance is accepted and committed; M14–M30 are sequenced with detailed pending context
+**Next design target:** M14 — Control-plane bootstrap contracts; no implementation is authorized before design approval
 
 ## Start here
 
 1. Inspect `git status` and recent `git log`.
 2. Read root `AGENTS.md` and this file; Pi auto-loads `AGENTS.md` across compaction.
-3. Read the status/tracker/current-work sections of `knowledge_base/progress.md` and only the active section of `knowledge_base/milestone.md`.
+3. Read the status/tracker/current-work sections of `knowledge_base/progress.md`, the roadmap summary, and only the next design target or active milestone section of `knowledge_base/milestone.md`.
 4. Use `knowledge_base/rules/index.md` and `knowledge_base/decisions/index.md` to load only domains the task changes, consumes, or must preserve.
 5. Search learning titles by domain; do not read `learnings.md` sequentially unless the task is genuinely cross-cutting.
 6. Inspect owning source, tests, manifests, exports, configuration, and migration history before planning.
@@ -20,7 +20,7 @@ Read relevant sections of `product.md` and `prd/cms.md` for behavioral work. Do 
 - Explicit current developer instruction, product/PRD, relevant rules/active criteria/approved decisions, then status documents govern intent in that order.
 - Committed source, tests, configuration, migrations, and generated artifacts describe executable truth; Git describes repository state.
 - Report drift instead of silently choosing an authority.
-- Work only on an active milestone or an explicitly authorized workstream. The current workstream is repository/context optimization; the next product milestone is not yet defined.
+- Work only on an approved active milestone or an explicitly authorized workstream. M14 is the next design target, but its implementation is not active until the developer approves its design.
 
 ## Product direction
 
@@ -33,7 +33,7 @@ The intended surfaces are:
 - Developer-configured project path such as `/studio`: framework-neutral, role-projected content/editorial/preview/future visual Studio.
 - HTTP/CLI/SDK: complete machine-readable parity so agents do not require browser workflows.
 
-This direction is a product requirement, not an active implementation milestone.
+The approved execution sequence is: portable control-plane authority and automation parity; hosted surface separation; secure framework-neutral Studio; client handover/editorial safety; data durability and production hardening; advanced CMS operations; preserved visual-readiness contracts; visual composition/publication; and a renderer SDK baseline. `milestone.md` maps M14–M30 with detailed context and explicitly preserves every point from the original pre-normalization M14–M16. Managed hosting, external data, billing, analytics, and plugins remain unsequenced long-term directions in `product.md` until this baseline is accepted.
 
 ## Stack and workspace ownership
 
@@ -97,7 +97,7 @@ Packages never import application source. Cross-package imports use declared exp
 | M12        | Tooling v1, OAuth-capable CLI, SDK/generation, public contracts, docs portal                 |
 | M13        | Code-first schema/content Authoring v1, SDK/CLI, local editor, builder retirement            |
 
-M0–M13 are developer-approved and committed; M13 commit is `9c68942`. See `progress.md` for ordered milestone outcomes, migrations, test totals, and release state.
+M0–M13 are developer-approved and committed; M13 commit is `9c68942`. Post-M13 repository/context normalization is committed at `cd31102` and is the structural baseline. See `progress.md` for ordered outcomes, migrations, validation, roadmap status, and release state.
 
 ## Architecture landmarks
 
@@ -121,4 +121,4 @@ The subsequent maintenance workstream also passes the complete readiness gate wi
 
 ## Current work and next gate
 
-The `Current maintenance workstream` in `progress.md` is complete: the KB and mandatory rules are compact/selective, flat module families are grouped repository-wide, structure enforcement prevents pair/prefix drift, obsolete `tmp/` is absent, stable exports/build conventions are preserved, and full validation passes. Stop for developer approval. Only then design the next milestone for the hosted control plane, framework-neutral project Studio, and complete agent-first CLI/SDK authority.
+The detailed M14–M30 roadmap is now sequenced, with the original M14 client-handover, M15 production-hardening, and M16 visual-readiness obligations explicitly mapped into M21–M23 and M27. The next agent should design only M14: portable Control Plane v1 bootstrap contracts for workspace/project create, discover, link, capability inspection, and Studio-registration primitives with exact HTTP/SDK/CLI authority. It must use the settled three-surface, shared-authority, hosted-recovery, browser-credential-isolation, stable-identity, and post-refactor module-ownership context in `milestone.md`. Do not implement M14, design M15, publish packages, activate production OAuth, deploy, or create/apply migrations until the corresponding developer gate.
