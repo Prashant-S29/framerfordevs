@@ -840,26 +840,8 @@ export class CmsCollectionPage extends Schema.Class<CmsCollectionPage>("CmsColle
 }) {}
 
 export const ListCollectionsInputSchema = Schema.standardSchemaV1(ListCollectionsInput);
-export const CreateCollectionInputSchema = Schema.standardSchemaV1(CreateCollectionInput);
 export const GetCollectionInputSchema = Schema.standardSchemaV1(GetCollectionInput);
-export const UpdateCollectionInputSchema = Schema.standardSchemaV1(UpdateCollectionInput);
 export const GetCollectionDraftInputSchema = Schema.standardSchemaV1(GetCollectionDraftInput);
-export const CreateCollectionFieldInputSchema = Schema.standardSchemaV1(CreateCollectionFieldInput);
-export const UpdateCollectionFieldInputSchema = Schema.standardSchemaV1(UpdateCollectionFieldInput);
-export const ReplaceCollectionDraftFieldsInputSchema = Schema.standardSchemaV1(
-  ReplaceCollectionDraftFieldsInput,
-);
-export const RemoveCollectionFieldInputSchema = Schema.standardSchemaV1(RemoveCollectionFieldInput);
-export const ReorderCollectionFieldsInputSchema = Schema.standardSchemaV1(
-  ReorderCollectionFieldsInput,
-);
-export const UpdateEditorLayoutInputSchema = Schema.standardSchemaV1(UpdateEditorLayoutInput);
-export const ValidateCollectionSchemaInputSchema = Schema.standardSchemaV1(
-  ValidateCollectionSchemaInput,
-);
-export const PublishCollectionSchemaInputSchema = Schema.standardSchemaV1(
-  PublishCollectionSchemaInput,
-);
 export const GetLatestPublishedSchemaInputSchema = Schema.standardSchemaV1(
   GetLatestPublishedSchemaInput,
 );
@@ -877,9 +859,6 @@ export const CmsCollectionPageOutputSchema = Schema.standardSchemaV1(
 );
 export const CollectionDraftSchemaOutputSchema = Schema.standardSchemaV1(
   ApiSuccessSchema(CollectionDraftSchema),
-);
-export const CollectionSchemaValidationOutputSchema = Schema.standardSchemaV1(
-  ApiSuccessSchema(CollectionSchemaValidation),
 );
 export const PublishedSchemaRevisionOutputSchema = Schema.standardSchemaV1(
   ApiSuccessSchema(PublishedSchemaRevision),

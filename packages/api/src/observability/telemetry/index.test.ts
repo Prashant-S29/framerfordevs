@@ -25,8 +25,6 @@ describe("Effect metrics", () => {
         yield* telemetry.recordDefect("rpc");
         yield* telemetry.recordCredentialVerification({ family: "delivery", outcome: "success" });
         yield* telemetry.recordLocaleMutation({ action: "create", outcome: "success" });
-        yield* telemetry.recordSchemaMutation({ action: "field_update", outcome: "success" });
-        yield* telemetry.recordSchemaValidation({ outcome: "invalid" });
         yield* telemetry.recordSchemaPublication({
           outcome: "success",
           severity: "breaking",

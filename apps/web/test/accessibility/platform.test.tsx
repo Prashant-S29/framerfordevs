@@ -35,7 +35,7 @@ import {
 import { AddLocaleDialog } from "@/components/project/locale-settings";
 import { CreateEntryDialog } from "@/components/entry/collection-entries";
 import { PublicationCard, RenameEntryDialog } from "@/components/entry/editor";
-import { CodeManagedStructureCard } from "@/components/schema-builder";
+import { CodeManagedStructureCard } from "@/components/collection-overview";
 import {
   CreateInvalidationMappingDialog,
   CreateWebhookEndpointDialog,

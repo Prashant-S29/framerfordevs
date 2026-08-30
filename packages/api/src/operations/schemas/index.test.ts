@@ -1,4 +1,4 @@
-import { assert, describe, it, layer } from "@effect/vitest";
+import { assert, describe, layer } from "@effect/vitest";
 import { Effect, Exit, Layer, Schema } from "effect";
 
 import {
@@ -13,15 +13,10 @@ import {
 } from "../../contracts/presentation/management";
 import {
   CollectionDraftSchema,
-  CollectionSchemaValidation,
-  SchemaChangeSet,
   GetCollectionDraftInput,
   GetLatestPublishedSchemaInput,
   GetPublishedSchemaRevisionInput,
-  PublishCollectionSchemaInput,
   PublishedSchemaRevision,
-  ReplaceCollectionDraftFieldsInput,
-  ValidateCollectionSchemaInput,
 } from "../../contracts/schema";
 import { TelemetryLive } from "../../observability/telemetry";
 import {
@@ -35,10 +30,6 @@ import {
   getLatestPublishedSchema,
   getPublishedSchemaRevision,
   publishCollectionPresentation,
-  publishCollectionSchema,
-  rejectRetiredDashboardSchemaAuthoring,
-  replaceCollectionDraftFields,
-  validateCollectionSchema,
 } from "./index";
 
 const projectId = "019fae8b-1234-7000-8000-000000000001";
@@ -164,20 +155,6 @@ const revision = Schema.decodeUnknownSync(PublishedSchemaRevision)({
   editorLayout,
 });
 
-const validation = CollectionSchemaValidation.make({
-  valid: true,
-  issues: [],
-  schemaHash: revision.schemaHash,
-  contractHash: revision.contractHash,
-  changes: SchemaChangeSet.make({
-    items: [],
-    nonBreakingCount: 0,
-    potentiallyBreakingCount: 0,
-    breakingCount: 0,
-    requiresAcknowledgement: false,
-  }),
-});
-
 const presentation = Schema.decodeUnknownSync(AuthoringCollectionPresentation)({
   displayName: "Articles",
   description: null,
@@ -218,9 +195,6 @@ const RepositoryTest = Layer.succeed(SchemaRepository, {
   ...makeSchemaRepository(),
   getCollection: () => Effect.sync(() => (calls.push("getCollection"), draft.collection)),
   getDraft: () => Effect.sync(() => (calls.push("getDraft"), draft)),
-  validateSchema: () => Effect.sync(() => (calls.push("validateSchema"), validation)),
-  publishSchema: () => Effect.sync(() => (calls.push("publishSchema"), revision)),
-  replaceFields: () => Effect.sync(() => (calls.push("replaceFields"), draft)),
   getLatestPublished: () => Effect.sync(() => (calls.push("getLatestPublished"), revision)),
   getPublishedRevision: () => Effect.sync(() => (calls.push("getPublishedRevision"), revision)),
 });
@@ -232,19 +206,6 @@ const PresentationRepositoryTest = Layer.succeed(AuthoringPresentationRepository
 const OperationTest = Layer.mergeAll(RepositoryTest, PresentationRepositoryTest, TelemetryLive);
 
 describe("schema operations", () => {
-  it.effect("returns stable code-authority failure for retired dashboard mutations", () =>
-    Effect.gen(function* () {
-      const exit = yield* Effect.exit(rejectRetiredDashboardSchemaAuthoring());
-      assert.isTrue(Exit.isFailure(exit));
-      if (Exit.isFailure(exit)) {
-        assert.match(
-          JSON.stringify(exit.cause.toJSON()),
-          /DashboardSchemaAuthoringRetiredFailure/u,
-        );
-      }
-    }),
-  );
-
   layer(OperationTest)((it) => {
     it.effect("forwards schema lifecycle workflows through a replaceable repository", () =>
       Effect.gen(function* () {
@@ -253,20 +214,6 @@ describe("schema operations", () => {
         yield* getCollectionDraft(
           "user-1",
           yield* Schema.decodeUnknown(GetCollectionDraftInput)(scope),
-        );
-        yield* validateCollectionSchema(
-          "user-1",
-          yield* Schema.decodeUnknown(ValidateCollectionSchemaInput)(scope),
-        );
-        yield* replaceCollectionDraftFields(
-          "user-1",
-          yield* Schema.decodeUnknown(ReplaceCollectionDraftFieldsInput)({
-            ...scope,
-            draftVersion: 2,
-            authoringVersion: 1,
-            fields: [],
-          }),
-          "request-schema-replace",
         );
         yield* getCollectionPresentation(
           "user-1",
@@ -283,17 +230,6 @@ describe("schema operations", () => {
           }),
           "request-presentation-operation",
         );
-        yield* publishCollectionSchema(
-          "user-1",
-          yield* Schema.decodeUnknown(PublishCollectionSchemaInput)({
-            ...scope,
-            draftVersion: 2,
-            expectedPublishedRevisionId: null,
-            commandId,
-            acknowledgedChangeIds: [],
-          }),
-          "request-schema-operation",
-        );
         yield* getLatestPublishedSchema(
           "user-1",
           yield* Schema.decodeUnknown(GetLatestPublishedSchemaInput)(scope),
@@ -305,13 +241,10 @@ describe("schema operations", () => {
 
         assert.deepEqual(calls, [
           "getDraft",
-          "validateSchema",
-          "replaceFields",
           "getCollection",
           "getPresentation",
           "getCollection",
           "publishPresentation",
-          "publishSchema",
           "getLatestPublished",
           "getPublishedRevision",
         ]);

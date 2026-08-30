@@ -28,23 +28,6 @@ export interface LocaleMutationMetric {
   readonly outcome: "success" | "failure";
 }
 
-export interface SchemaMutationMetric {
-  readonly action:
-    | "collection_create"
-    | "collection_update"
-    | "field_create"
-    | "field_update"
-    | "field_replace"
-    | "field_remove"
-    | "field_reorder"
-    | "layout_update";
-  readonly outcome: "success" | "failure";
-}
-
-export interface SchemaValidationMetric {
-  readonly outcome: "valid" | "invalid" | "failure";
-}
-
 export interface SchemaPublicationMetric {
   readonly outcome: "success" | "failure";
   readonly severity: "none" | "non_breaking" | "potentially_breaking" | "breaking";
@@ -161,8 +144,6 @@ export interface TelemetryService {
     event: CredentialVerificationMetric,
   ) => Effect.Effect<void>;
   readonly recordLocaleMutation: (event: LocaleMutationMetric) => Effect.Effect<void>;
-  readonly recordSchemaMutation: (event: SchemaMutationMetric) => Effect.Effect<void>;
-  readonly recordSchemaValidation: (event: SchemaValidationMetric) => Effect.Effect<void>;
   readonly recordSchemaPublication: (event: SchemaPublicationMetric) => Effect.Effect<void>;
   readonly recordEntryPublication: (event: EntryPublicationMetric) => Effect.Effect<void>;
   readonly recordEntryPublicationValidationFailure: (
@@ -208,16 +189,6 @@ const credentialVerificationCount = Metric.counter("credential_verifications_tot
 
 const localeMutationCount = Metric.counter("project_locale_mutations_total", {
   description: "Project locale mutation outcomes by bounded action and result",
-  incremental: true,
-});
-
-const schemaMutationCount = Metric.counter("cms_schema_mutations_total", {
-  description: "CMS schema mutation outcomes by bounded action and result",
-  incremental: true,
-});
-
-const schemaValidationCount = Metric.counter("cms_schema_validations_total", {
-  description: "CMS schema validation outcomes",
   incremental: true,
 });
 
@@ -367,17 +338,6 @@ export const TelemetryLive = Layer.succeed(Telemetry, {
       ),
       1,
     ),
-  recordSchemaMutation: (event) =>
-    Metric.update(
-      Metric.tagged(
-        Metric.tagged(schemaMutationCount, "action", event.action),
-        "outcome",
-        event.outcome,
-      ),
-      1,
-    ),
-  recordSchemaValidation: (event) =>
-    Metric.update(Metric.tagged(schemaValidationCount, "outcome", event.outcome), 1),
   recordSchemaPublication: (event) => {
     const labels = Metric.tagged(
       Metric.tagged(

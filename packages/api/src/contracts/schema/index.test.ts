@@ -1,7 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Exit, Schema } from "effect";
 
-import { EffectSchemaToJsonSchemaConverter } from "../response/effect-schema-converter";
 import { decodeCollectionCursor, encodeCollectionCursor } from "./cursor";
 import {
   AcknowledgedSchemaChangeIds,
@@ -12,14 +11,9 @@ import {
   CollectionFieldOrder,
   CollectionId,
   CreateCollectionFieldInput,
-  CreateCollectionFieldInputSchema,
-  CreateCollectionInputSchema,
   defaultFieldEditorMetadata,
   OutboxEventId,
-  PublishCollectionSchemaInputSchema,
-  PublishedSchemaRevisionOutputSchema,
   ReplaceCollectionDraftFieldsInput,
-  ReplaceCollectionDraftFieldsInputSchema,
   SchemaPublicationCommandId,
   SchemaRevisionId,
 } from "./index";
@@ -213,24 +207,6 @@ describe("collection schema contracts", () => {
       assert.isTrue(Exit.isFailure(malformed));
     }),
   );
-
-  it("converts collection, field, publication, and revision contracts into OpenAPI JSON Schema", async () => {
-    const converter = new EffectSchemaToJsonSchemaConverter();
-    const schemas = await Promise.all([
-      converter.convert(CreateCollectionInputSchema, { strategy: "input" }),
-      converter.convert(CreateCollectionFieldInputSchema, { strategy: "input" }),
-      converter.convert(ReplaceCollectionDraftFieldsInputSchema, { strategy: "input" }),
-      converter.convert(PublishCollectionSchemaInputSchema, { strategy: "input" }),
-      converter.convert(PublishedSchemaRevisionOutputSchema, { strategy: "output" }),
-    ]);
-    const serialized = schemas.map(([, jsonSchema]) => JSON.stringify(jsonSchema)).join("\n");
-
-    assert.isTrue(schemas.every(([required]) => required));
-    assert.include(serialized, "environmentId");
-    assert.include(serialized, "configuration");
-    assert.include(serialized, "acknowledgedChangeIds");
-    assert.include(serialized, "schemaHash");
-  });
 
   it.effect.prop(
     "every accepted API key is already canonical and idempotent",

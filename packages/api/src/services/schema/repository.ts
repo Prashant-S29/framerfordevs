@@ -2805,9 +2805,20 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
   };
 }
 
+type SchemaRepositoryService = Pick<
+  ReturnType<typeof makeSchemaRepository>,
+  | "listCollections"
+  | "getCollection"
+  | "getDraft"
+  | "getPublishedRevision"
+  | "getLatestPublished"
+  | "getDraftForm"
+  | "getPublishedForm"
+>;
+
 export class SchemaRepository extends Context.Tag("SchemaRepository")<
   SchemaRepository,
-  ReturnType<typeof makeSchemaRepository>
+  SchemaRepositoryService
 >() {}
 
 export const SchemaRepositoryLive = Layer.succeed(SchemaRepository, makeSchemaRepository());

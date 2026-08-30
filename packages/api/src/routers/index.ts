@@ -81,9 +81,6 @@ import {
   CmsCollectionOutputSchema,
   CmsCollectionPageOutputSchema,
   CollectionDraftSchemaOutputSchema,
-  CollectionSchemaValidationOutputSchema,
-  CreateCollectionFieldInputSchema,
-  CreateCollectionInputSchema,
   GetCollectionDraftInputSchema,
   GetCollectionInputSchema,
   GetDraftGeneratedFormInputSchema,
@@ -92,15 +89,7 @@ import {
   GetPublishedGeneratedFormInputSchema,
   GetPublishedSchemaRevisionInputSchema,
   ListCollectionsInputSchema,
-  PublishCollectionSchemaInputSchema,
   PublishedSchemaRevisionOutputSchema,
-  RemoveCollectionFieldInputSchema,
-  ReplaceCollectionDraftFieldsInputSchema,
-  ReorderCollectionFieldsInputSchema,
-  UpdateCollectionFieldInputSchema,
-  UpdateCollectionInputSchema,
-  UpdateEditorLayoutInputSchema,
-  ValidateCollectionSchemaInputSchema,
 } from "../contracts/schema";
 import {
   CreateInvalidationRouteMappingInputSchema,
@@ -196,8 +185,6 @@ import {
   getPublishedSchemaRevision,
   listCollections,
   publishCollectionPresentation,
-  rejectRetiredDashboardSchemaAuthoring,
-  validateCollectionSchema,
 } from "../operations/schemas";
 import {
   archiveProject,
@@ -629,17 +616,6 @@ export const appRouter = {
               "Collections loaded.",
             ),
           ),
-        create: protectedProcedure
-          .input(CreateCollectionInputSchema)
-          .output(CmsCollectionOutputSchema)
-          .handler(({ context }) =>
-            executeProcedure(
-              context,
-              "api.schema.collection.create",
-              rejectRetiredDashboardSchemaAuthoring(),
-              "Collection created.",
-            ),
-          ),
         get: protectedProcedure
           .input(GetCollectionInputSchema)
           .output(CmsCollectionOutputSchema)
@@ -649,17 +625,6 @@ export const appRouter = {
               "api.schema.collection.get",
               getCollection(context.session.user.id, input),
               "Collection loaded.",
-            ),
-          ),
-        update: protectedProcedure
-          .input(UpdateCollectionInputSchema)
-          .output(CmsCollectionOutputSchema)
-          .handler(({ context }) =>
-            executeProcedure(
-              context,
-              "api.schema.collection.update",
-              rejectRetiredDashboardSchemaAuthoring(),
-              "Collection updated.",
             ),
           ),
         deliveryConfiguration: {
@@ -864,76 +829,6 @@ export const appRouter = {
                 ),
               ),
           },
-          fields: {
-            create: protectedProcedure
-              .input(CreateCollectionFieldInputSchema)
-              .output(CollectionDraftSchemaOutputSchema)
-              .handler(({ context }) =>
-                executeProcedure(
-                  context,
-                  "api.schema.field.create",
-                  rejectRetiredDashboardSchemaAuthoring(),
-                  "Field created.",
-                ),
-              ),
-            update: protectedProcedure
-              .input(UpdateCollectionFieldInputSchema)
-              .output(CollectionDraftSchemaOutputSchema)
-              .handler(({ context }) =>
-                executeProcedure(
-                  context,
-                  "api.schema.field.update",
-                  rejectRetiredDashboardSchemaAuthoring(),
-                  "Field updated.",
-                ),
-              ),
-            replace: protectedProcedure
-              .input(ReplaceCollectionDraftFieldsInputSchema)
-              .output(CollectionDraftSchemaOutputSchema)
-              .handler(({ context }) =>
-                executeProcedure(
-                  context,
-                  "api.schema.field.replace",
-                  rejectRetiredDashboardSchemaAuthoring(),
-                  "Schema fields saved.",
-                ),
-              ),
-            remove: protectedProcedure
-              .input(RemoveCollectionFieldInputSchema)
-              .output(CollectionDraftSchemaOutputSchema)
-              .handler(({ context }) =>
-                executeProcedure(
-                  context,
-                  "api.schema.field.remove",
-                  rejectRetiredDashboardSchemaAuthoring(),
-                  "Field removed.",
-                ),
-              ),
-            reorder: protectedProcedure
-              .input(ReorderCollectionFieldsInputSchema)
-              .output(CollectionDraftSchemaOutputSchema)
-              .handler(({ context }) =>
-                executeProcedure(
-                  context,
-                  "api.schema.field.reorder",
-                  rejectRetiredDashboardSchemaAuthoring(),
-                  "Fields reordered.",
-                ),
-              ),
-          },
-          layout: {
-            update: protectedProcedure
-              .input(UpdateEditorLayoutInputSchema)
-              .output(CollectionDraftSchemaOutputSchema)
-              .handler(({ context }) =>
-                executeProcedure(
-                  context,
-                  "api.schema.layout.update",
-                  rejectRetiredDashboardSchemaAuthoring(),
-                  "Editor layout updated.",
-                ),
-              ),
-          },
           presentation: {
             get: protectedProcedure
               .input(GetCollectionPresentationInputSchema)
@@ -986,28 +881,6 @@ export const appRouter = {
                 ),
               ),
           },
-          validate: protectedProcedure
-            .input(ValidateCollectionSchemaInputSchema)
-            .output(CollectionSchemaValidationOutputSchema)
-            .handler(({ context, input }) =>
-              executeProcedure(
-                context,
-                "api.schema.validate",
-                validateCollectionSchema(context.session.user.id, input),
-                "Schema validation completed.",
-              ),
-            ),
-          publish: protectedProcedure
-            .input(PublishCollectionSchemaInputSchema)
-            .output(PublishedSchemaRevisionOutputSchema)
-            .handler(({ context }) =>
-              executeProcedure(
-                context,
-                "api.schema.publish",
-                rejectRetiredDashboardSchemaAuthoring(),
-                "Schema published.",
-              ),
-            ),
           published: {
             getLatest: protectedProcedure
               .input(GetLatestPublishedSchemaInputSchema)

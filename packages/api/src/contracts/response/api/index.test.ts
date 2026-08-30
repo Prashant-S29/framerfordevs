@@ -19,7 +19,6 @@ import {
   ConflictFailure,
   CredentialInvalidFailure,
   DatabaseFailure,
-  DashboardSchemaAuthoringRetiredFailure,
   DeliveryCursorInvalidFailure,
   DeliveryCursorStaleFailure,
   DeliveryQueryInvalidFailure,
@@ -233,7 +232,6 @@ describe("application error mapping", () => {
       ],
     }),
     SchemaChangeAcknowledgementRequiredFailure.make({ requiredChanges: [] }),
-    DashboardSchemaAuthoringRetiredFailure.make(),
     PublishedSchemaRequiredFailure.make(),
     EntryDraftConflictFailure.make({
       details: [
@@ -401,12 +399,6 @@ describe("application error mapping", () => {
           "retryable": false,
           "status": 409,
           "tag": "SchemaChangeAcknowledgementRequiredFailure",
-        },
-        {
-          "code": "DASHBOARD_SCHEMA_AUTHORING_RETIRED",
-          "retryable": false,
-          "status": 410,
-          "tag": "DashboardSchemaAuthoringRetiredFailure",
         },
         {
           "code": "PUBLISHED_SCHEMA_REQUIRED",
@@ -670,7 +662,6 @@ describe("application error mapping", () => {
           "false:null:COMMAND_CONFLICT:409",
           "false:null:CONFLICT:409",
           "false:null:CREDENTIAL_INVALID:401",
-          "false:null:DASHBOARD_SCHEMA_AUTHORING_RETIRED:410",
           "false:null:DELIVERY_CURSOR_INVALID:400",
           "false:null:DELIVERY_CURSOR_STALE:409",
           "false:null:DELIVERY_QUERY_INVALID:400",
@@ -737,7 +728,6 @@ describe("application error mapping", () => {
       "COMMAND_CONFLICT",
       "CONFLICT",
       "CREDENTIAL_INVALID",
-      "DASHBOARD_SCHEMA_AUTHORING_RETIRED",
       "DELIVERY_CURSOR_INVALID",
       "DELIVERY_CURSOR_STALE",
       "DELIVERY_QUERY_INVALID",

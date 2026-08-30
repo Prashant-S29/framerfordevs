@@ -2,7 +2,7 @@
 
 **Overall status:** Milestones 0–13 and post-M13 repository/context normalization are developer-approved and committed. M14 design is proposed for developer review; M15–M30 remain sequenced context only.
 **Next gate:** Developer approval or requested revision of the M14 Control Plane v1 design. No implementation milestone is active.
-**Last updated:** 2026-08-29
+**Last updated:** 2026-08-30
 
 ## Status legend
 
@@ -158,7 +158,7 @@ M14 is the only designed pending milestone and awaits developer review. M15–M3
 - Added bearer-only Authoring v1, Promise/Effect SDK paths, schema/content CLI workflows, generated forms, immutable editorial Presentation, exact-locale content publication, and a loopback-only `ffd editor` that keeps hosted authority out of browser code/storage.
 - Experimental Tier 2 uses credential-blind QuickJS 0.32.0 only to emit verified Tier 1 output; it remains explicit/default-off and reports `memoryLimitHard: false`. Upstream issue #255 still blocks production/default enablement and hard-memory proof.
 - Manual scenarios 1–5 proved export/hash/type parity, presentation-only revisions, code push, stable rename identity, exact acknowledgements, and reciprocal collection creation. Scenarios 6–7 proved OAuth/scope/actor authority plus CLI/SDK/Delivery/webhook lifecycles. Scenarios 8–10 proved conflict recovery, drift-safe live forms, and browser/process secret isolation. Scenarios 11–13 proved dashboard builder retirement, portal coherence, and Tier 2 isolation/staleness.
-- Dashboard collection/field/layout/schema publication mutation is retired with stable authenticated `410 DASHBOARD_SCHEMA_AUTHORING_RETIRED`; content, editorial Presentation, Delivery, navigation, and read-only structure remain.
+- Dashboard collection/field/layout/schema-publication mutation procedures are removed completely with no pre-release compatibility tombstones; content, editorial Presentation, Delivery, navigation, and read-only structure remain.
 - Developer generated/applied `0013_add_code_first_authoring_authorities` and `0014_normalize_authoring_actor_foreign_keys`; final readiness passed 1,184 tests; commit `9c68942`.
 
 ## Planned milestone record
@@ -237,10 +237,11 @@ These entries remain concise because `milestone.md` owns the detailed pending co
 
 - Accepted M13 baseline: `pnpm run ready` passed 1,184 tests, 15 type-check tasks, public-contract drift, formatting, lint, structure, coverage, and eight builds with the independent worker stopped during shared-database gates and healthy afterward.
 - Reported final suites include 723 API, 138 server, 115 dashboard, 105 CLI, 18 SDK, and 13 content-form tests. Focused retirement/authority suites passed 19 API, 22 dashboard/accessibility, and 78 server tests.
-- Current SDK/CLI boundary correction: full `pnpm run ready` passes 1,190 tests, 15 type-check tasks, public-contract drift, formatting, lint, structure, coverage, and eight builds; CLI rises to 110 tests and SDK to 19. Packaged credential-blind extraction/build, schema/Presentation/content, and loopback-editor workflows pass. The independent worker was stopped for shared-database gates and restored healthy.
+- SDK/CLI boundary correction at `d63f215`: full `pnpm run ready` passed 1,190 tests, 15 type-check tasks, public-contract drift, formatting, lint, structure, coverage, and eight builds; CLI rose to 110 tests and SDK to 19. Packaged credential-blind extraction/build, schema/Presentation/content, and loopback-editor workflows passed.
+- Current pre-release dashboard route removal: full readiness passes 1,177 tests, including 721 API and 127 server tests, with the same 15 type-check, contract, formatting, lint, structure, coverage, and eight-build gates. The independent worker was stopped for shared-database gates and restored healthy.
 - Canonical Authoring OpenAPI SHA-256 is `d9500549cd95067857b87f494b77375e3d575c4832589478858e125ab3f31205`.
 - The live schema records migrations through `0014`; post-cleanup source/hash/actor/head/FK/receipt/webhook invariants and supported outbox projection were clean at acceptance.
-- Schema, SDK, and CLI release Changesets/package metadata are staged but versions are still `0.0.0`; no package has been published. The current review worktree implements the approved removal of schema push and Presentation mutation from public Authoring SDK methods/DTOs and preserves those workflows in the CLI.
+- Schema, SDK, and CLI release Changesets/package metadata remain at version `0.0.0`; no package has been published. The committed SDK boundary removes schema push and Presentation mutation from public Authoring SDK methods/DTOs while preserving those workflows in the CLI.
 - Production OAuth rollout, production configuration, deployment, and Tier 2 production/default activation have not occurred.
 
 ## Database migration record

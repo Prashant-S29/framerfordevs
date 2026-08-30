@@ -26,7 +26,7 @@ import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";
 
-export function SchemaBuilder({
+export function CollectionOverview({
   projectId,
   collectionId,
 }: {

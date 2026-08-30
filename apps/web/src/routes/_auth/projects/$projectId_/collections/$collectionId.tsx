@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { SchemaBuilder } from "@/components/schema-builder";
+import { CollectionOverview } from "@/components/collection-overview";
 
 export const Route = createFileRoute("/_auth/projects/$projectId_/collections/$collectionId")({
   loader: async ({ context, params }) => {
@@ -35,5 +35,5 @@ export const Route = createFileRoute("/_auth/projects/$projectId_/collections/$c
 
 function CollectionSchemaRoute() {
   const { projectId, collectionId } = Route.useParams();
-  return <SchemaBuilder projectId={projectId} collectionId={collectionId} />;
+  return <CollectionOverview projectId={projectId} collectionId={collectionId} />;
 }

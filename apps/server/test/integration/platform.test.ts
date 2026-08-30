@@ -271,31 +271,11 @@ describe.sequential("platform API contracts", () => {
       },
     ],
     [
-      "platform/projects/collections/create",
-      {
-        projectId: "019fae8b-1234-7000-8000-000000000001",
-        environmentId: "019fae8b-1234-7000-8000-000000000002",
-        apiKey: "posts",
-        displayName: "Posts",
-        description: null,
-      },
-    ],
-    [
       "platform/projects/collections/schema/draft/get",
       {
         projectId: "019fae8b-1234-7000-8000-000000000001",
         environmentId: "019fae8b-1234-7000-8000-000000000002",
         collectionId: "019fae8b-1234-7000-8000-000000000003",
-      },
-    ],
-    [
-      "platform/projects/collections/schema/layout/update",
-      {
-        projectId: "019fae8b-1234-7000-8000-000000000001",
-        environmentId: "019fae8b-1234-7000-8000-000000000002",
-        collectionId: "019fae8b-1234-7000-8000-000000000003",
-        draftVersion: 1,
-        editorLayout: { version: 1, tabs: [], sidebarGroups: [] },
       },
     ],
     [
@@ -385,41 +365,6 @@ describe.sequential("platform API contracts", () => {
       },
     ],
     [
-      "platform/projects/collections/schema/fields/create",
-      {
-        projectId: "019fae8b-1234-7000-8000-000000000001",
-        environmentId: "019fae8b-1234-7000-8000-000000000002",
-        collectionId: "019fae8b-1234-7000-8000-000000000003",
-        draftVersion: 1,
-        apiKey: "title",
-        displayLabel: "Title",
-        kind: "short_text",
-        required: true,
-        localization: "localized",
-        deprecated: false,
-        configuration: {},
-      },
-    ],
-    [
-      "platform/projects/collections/schema/fields/replace",
-      {
-        projectId: "019fae8b-1234-7000-8000-000000000001",
-        environmentId: "019fae8b-1234-7000-8000-000000000002",
-        collectionId: "019fae8b-1234-7000-8000-000000000003",
-        draftVersion: 1,
-        authoringVersion: 1,
-        fields: [],
-      },
-    ],
-    [
-      "platform/projects/collections/schema/validate",
-      {
-        projectId: "019fae8b-1234-7000-8000-000000000001",
-        environmentId: "019fae8b-1234-7000-8000-000000000002",
-        collectionId: "019fae8b-1234-7000-8000-000000000003",
-      },
-    ],
-    [
       "platform/projects/collections/schema/published/getLatest",
       {
         projectId: "019fae8b-1234-7000-8000-000000000001",
@@ -433,18 +378,6 @@ describe.sequential("platform API contracts", () => {
         projectId: "019fae8b-1234-7000-8000-000000000001",
         environmentId: "019fae8b-1234-7000-8000-000000000002",
         collectionId: "019fae8b-1234-7000-8000-000000000003",
-      },
-    ],
-    [
-      "platform/projects/collections/update",
-      {
-        projectId: "019fae8b-1234-7000-8000-000000000001",
-        environmentId: "019fae8b-1234-7000-8000-000000000002",
-        collectionId: "019fae8b-1234-7000-8000-000000000003",
-        version: 1,
-        draftVersion: 1,
-        displayName: "Posts",
-        description: null,
       },
     ],
     [
@@ -465,55 +398,6 @@ describe.sequential("platform API contracts", () => {
         access: "protected",
         publicAccessAcknowledged: false,
         fields: [],
-      },
-    ],
-    [
-      "platform/projects/collections/schema/fields/update",
-      {
-        projectId: "019fae8b-1234-7000-8000-000000000001",
-        environmentId: "019fae8b-1234-7000-8000-000000000002",
-        collectionId: "019fae8b-1234-7000-8000-000000000003",
-        fieldId: "019fae8b-1234-7000-8000-000000000004",
-        draftVersion: 1,
-        apiKey: "title",
-        displayLabel: "Title",
-        kind: "short_text",
-        required: true,
-        localization: "localized",
-        deprecated: false,
-        configuration: {},
-      },
-    ],
-    [
-      "platform/projects/collections/schema/fields/remove",
-      {
-        projectId: "019fae8b-1234-7000-8000-000000000001",
-        environmentId: "019fae8b-1234-7000-8000-000000000002",
-        collectionId: "019fae8b-1234-7000-8000-000000000003",
-        fieldId: "019fae8b-1234-7000-8000-000000000004",
-        draftVersion: 1,
-      },
-    ],
-    [
-      "platform/projects/collections/schema/fields/reorder",
-      {
-        projectId: "019fae8b-1234-7000-8000-000000000001",
-        environmentId: "019fae8b-1234-7000-8000-000000000002",
-        collectionId: "019fae8b-1234-7000-8000-000000000003",
-        draftVersion: 1,
-        fieldIds: ["019fae8b-1234-7000-8000-000000000004"],
-      },
-    ],
-    [
-      "platform/projects/collections/schema/publish",
-      {
-        projectId: "019fae8b-1234-7000-8000-000000000001",
-        environmentId: "019fae8b-1234-7000-8000-000000000002",
-        collectionId: "019fae8b-1234-7000-8000-000000000003",
-        draftVersion: 1,
-        expectedPublishedRevisionId: null,
-        commandId: "019fae8b-1234-7000-8000-000000000005",
-        acknowledgedChangeIds: [],
       },
     ],
     [
@@ -891,108 +775,6 @@ describe.sequential("platform API contracts", () => {
     expect(enabled.body.json.data).toMatchObject({ key: "cms", status: "enabled" });
     expect(repeated.status).toBe(409);
     expect(repeated.body.json.data.error.code).toBe("INVALID_STATE_TRANSITION");
-  });
-
-  it("returns stable code-authority gone responses for every retired dashboard schema mutation", async () => {
-    const collectionId = "019fae8b-1234-7000-8000-000000000003";
-    const fieldId = "019fae8b-1234-7000-8000-000000000004";
-    const commandId = "019fae8b-1234-7000-8000-000000000005";
-    const scope = { projectId, environmentId, collectionId };
-    const field = {
-      apiKey: "title",
-      displayLabel: "Title",
-      kind: "short_text",
-      required: true,
-      localization: "localized",
-      deprecated: false,
-      editor: {
-        helpText: null,
-        placeholder: null,
-        visibleToRoles: ["owner", "developer"],
-        editableByRoles: ["owner", "developer"],
-      },
-      configuration: {},
-    };
-    const retiredMutations: ReadonlyArray<readonly [string, object]> = [
-      [
-        "platform/projects/collections/create",
-        { projectId, environmentId, apiKey: "posts", displayName: "Posts", description: null },
-      ],
-      [
-        "platform/projects/collections/update",
-        { ...scope, version: 1, draftVersion: 1, displayName: "Posts", description: null },
-      ],
-      [
-        "platform/projects/collections/schema/fields/create",
-        { ...scope, parentFieldId: null, draftVersion: 1, field },
-      ],
-      [
-        "platform/projects/collections/schema/fields/update",
-        { ...scope, fieldId, draftVersion: 1, field },
-      ],
-      [
-        "platform/projects/collections/schema/fields/replace",
-        { ...scope, draftVersion: 1, authoringVersion: 1, fields: [] },
-      ],
-      [
-        "platform/projects/collections/schema/fields/remove",
-        { ...scope, fieldId, draftVersion: 1 },
-      ],
-      [
-        "platform/projects/collections/schema/fields/reorder",
-        { ...scope, parentFieldId: null, draftVersion: 1, fieldIds: [fieldId] },
-      ],
-      [
-        "platform/projects/collections/schema/layout/update",
-        {
-          ...scope,
-          draftVersion: 1,
-          editorLayout: {
-            version: 1,
-            tabs: [
-              {
-                id: "019fae8b-1234-7000-8000-000000000006",
-                title: "Content",
-                description: null,
-                position: 0,
-                visibleToRoles: ["owner", "developer"],
-                groups: [
-                  {
-                    id: "019fae8b-1234-7000-8000-000000000007",
-                    title: "Main",
-                    description: null,
-                    position: 0,
-                    columns: 1,
-                    visibleToRoles: ["owner", "developer"],
-                    fields: [],
-                  },
-                ],
-              },
-            ],
-            sidebarGroups: [],
-          },
-        },
-      ],
-      [
-        "platform/projects/collections/schema/publish",
-        {
-          ...scope,
-          draftVersion: 1,
-          expectedPublishedRevisionId: null,
-          commandId,
-          acknowledgedChangeIds: [],
-        },
-      ],
-    ];
-
-    for (const [path, input] of retiredMutations) {
-      const response = await rpc(firstAgent, path, input);
-      expect(response.status, path).toBe(410);
-      expect(response.body.json.data.error.code, path).toBe("DASHBOARD_SCHEMA_AUTHORING_RETIRED");
-      expect(response.body.json.data.message, path).toBe(
-        "Collection structure is managed through code-first schema authoring.",
-      );
-    }
   });
 
   it("manages canonical project locales with strict lifecycle and validation contracts", async () => {

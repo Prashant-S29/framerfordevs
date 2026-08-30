@@ -87,10 +87,6 @@ export class SchemaChangeAcknowledgementRequiredFailure extends Schema.TaggedErr
   requiredChanges: SchemaChanges,
 }) {}
 
-export class DashboardSchemaAuthoringRetiredFailure extends Schema.TaggedError<DashboardSchemaAuthoringRetiredFailure>(
-  "DashboardSchemaAuthoringRetiredFailure",
-)("DashboardSchemaAuthoringRetiredFailure", {}) {}
-
 export class PublishedSchemaRequiredFailure extends Schema.TaggedError<PublishedSchemaRequiredFailure>(
   "PublishedSchemaRequiredFailure",
 )("PublishedSchemaRequiredFailure", {}) {}
@@ -294,7 +290,6 @@ export type ApplicationError =
   | CollectionKeyConflictFailure
   | SchemaInvalidFailure
   | SchemaChangeAcknowledgementRequiredFailure
-  | DashboardSchemaAuthoringRetiredFailure
   | PublishedSchemaRequiredFailure
   | EntryDraftConflictFailure
   | EntryCommandConflictFailure
@@ -351,7 +346,6 @@ export const apiErrorHttpStatus = {
   COLLECTION_KEY_CONFLICT: 409,
   SCHEMA_INVALID: 422,
   SCHEMA_CHANGE_ACKNOWLEDGEMENT_REQUIRED: 409,
-  DASHBOARD_SCHEMA_AUTHORING_RETIRED: 410,
   PUBLISHED_SCHEMA_REQUIRED: 409,
   ENTRY_DRAFT_CONFLICT: 409,
   ENTRY_COMMAND_CONFLICT: 409,
@@ -564,12 +558,6 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
         ...(details.length === 0 ? {} : { details }),
       };
     }
-    case "DashboardSchemaAuthoringRetiredFailure":
-      return {
-        code: "DASHBOARD_SCHEMA_AUTHORING_RETIRED",
-        message: "Collection structure is managed through code-first schema authoring.",
-        retryable: false,
-      };
     case "PublishedSchemaRequiredFailure":
       return {
         code: "PUBLISHED_SCHEMA_REQUIRED",

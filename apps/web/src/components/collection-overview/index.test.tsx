@@ -9,7 +9,7 @@ import axe from "axe-core";
 import { Schema } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { CodeManagedStructureCard, DeliveryConfigurationCard } from "./schema-builder";
+import { CodeManagedStructureCard, DeliveryConfigurationCard } from "./index";
 
 const ids = {
   project: "019fae8b-1234-7000-8000-000000000001",
@@ -89,7 +89,7 @@ function renderConfiguration(canConfigure = true, hasPublishedSchema = true) {
 
 afterEach(cleanup);
 
-describe("retired dashboard structure authoring", () => {
+describe("code-managed collection structure", () => {
   it("shows current code-managed fields without structure mutation controls", () => {
     render(<CodeManagedStructureCard fields={fields} revisionId={ids.collection} />);
 

@@ -118,7 +118,7 @@
 
 ## 2026-08-05 — Hydration transitions must preserve React hook order
 
-**Incorrect assumption or decision:** `SchemaBuilder` returned its loading state before calling its reorder mutation hook. Loader-prefetched tests usually began with query data available, but a real hydration/refetch transition rendered first without the hook and then with it.
+**Incorrect assumption or decision:** A query-backed component returned its loading state before calling all of its hooks. Loader-prefetched tests usually began with query data available, but a real hydration/refetch transition rendered first without the later hook and then with it.
 
 **Learning:** Route-loader prefetch is an optimization, not a guarantee that client query hooks are immediately resolved. Every render path in a component must execute hooks in identical order. Prevention: Keep all hooks above loading/error returns, enforce `react-hooks/rules-of-hooks` in the workspace linter, and include cold-loading transitions when reviewing query-backed routes.
 
@@ -128,7 +128,7 @@
 
 **Incorrect assumption or decision:** Treating granular field mutations as a sufficient editing architecture would require the JSON view to execute a sequence of optimistic mutations. A failure or version conflict in the middle could leave only part of the user's schema applied, while visual and JSON state could diverge.
 
-**Learning:** Granular resource APIs and an authoring-document boundary solve different problems. Multi-view editors should share a bounded versioned local document and submit it through one server-authoritative atomic operation; granular APIs can remain for focused compatibility use. Prevention: `fields.replace` validates the complete prospective tree under the existing lock/version/authorization order, preserves only active supplied IDs, generates new IDs server-side, rejects reparenting, reconciles root layout placements, and commits fields/head/version/audit together. PostgreSQL integration verifies duplicate-key failure leaves the draft unchanged. Browser parsing and sample inference are bounded but remain advisory.
+**Learning:** Structural schema changes require one bounded project document and one server-authoritative atomic plan/apply operation. Prevention: Authoring v1 revalidates and reclassifies the complete project candidate under database locks, reconciles server-owned stable identities, requires exact risky-change acknowledgements, and commits revisions, heads, receipts, audits, and outbox state atomically. Do not expose granular dashboard structure-mutation procedures.
 
 ---
 
