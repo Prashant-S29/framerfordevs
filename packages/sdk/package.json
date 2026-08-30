@@ -57,9 +57,6 @@
     "test:unit": "vitest run src",
     "test:coverage": "vitest run --coverage"
   },
-  "dependencies": {
-    "@framerfordevs/schema": "workspace:*"
-  },
   "devDependencies": {
     "@effect/vitest": "0.30.0",
     "@framerfordevs/config": "workspace:*",

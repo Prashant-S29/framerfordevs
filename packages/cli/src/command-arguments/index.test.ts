@@ -65,6 +65,29 @@ describe("CLI command arguments", () => {
     expect(create.command).toEqual(["entry", "create"]);
     expect(stringFlag(create, "mutations")).toBe("mutations.json");
 
+    const presentationGet = parseArguments([
+      "presentation",
+      "get",
+      "--collection",
+      "posts",
+      "--json",
+    ]);
+    const presentationPublish = parseArguments([
+      "presentation",
+      "publish",
+      "--collection",
+      "posts",
+      "--file",
+      "presentation.json",
+      "--json",
+    ]);
+    validateFlags(presentationGet);
+    validateFlags(presentationPublish);
+    expect(stringFlag(presentationPublish, "file")).toBe("presentation.json");
+    expect(() =>
+      validateFlags(parseArguments(["presentation", "publish", "--schema", "x"])),
+    ).toThrowError("CLI_FLAG_INVALID");
+
     const editor = parseArguments(["editor"]);
     validateFlags(editor);
     validateFlags(parseArguments(["editor", "--token-stdin"]));

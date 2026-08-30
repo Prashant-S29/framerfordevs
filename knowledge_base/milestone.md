@@ -7,7 +7,7 @@
 Every milestone must:
 
 1. Implement one bounded authority slice and one coherent user/developer outcome without weakening product invariants.
-2. Deliver stable HTTP plus noninteractive CLI/SDK parity for every meaningful operation introduced by that milestone; UI-only authority is incomplete.
+2. Deliver stable HTTP for every meaningful operation and noninteractive CLI parity for developer/agent automation; expose SDK methods only for approved content/runtime integration under `decisions/public-http-cli-and-sdk-surface-boundary.md`.
 3. Add deterministic success, failure, authorization, boundary, regression, accessibility, load, concurrency, and failure-injection coverage as applicable.
 4. Preserve typed Effect errors/Layers/runtime boundaries, API envelopes, tenant isolation, bounded validation, redaction, observability, stable identities, immutable revisions/publications, and exact-locale authority.
 5. Pass applicable formatting, lint, structure, contract drift, type-check, test, coverage, build, audit, database-invariant, package, and runtime gates.
@@ -17,7 +17,7 @@ Every milestone must:
 ## Roadmap sizing and sequencing rules
 
 - M13 is the upper bound that future milestones must avoid approaching. Do not combine a new authority model, multiple product surfaces, release rollout, and broad UX migration.
-- Establish portable contracts and server authority before depending UI surfaces; add matching CLI/SDK paths in the same milestone rather than as cleanup.
+- Establish portable contracts and server authority before depending UI surfaces; add matching noninteractive CLI paths in the same milestone, while SDK inclusion requires a separate content/runtime justification.
 - Build the secure Studio runtime before moving editorial workflows, then complete client-handover safety and production readiness before visual work.
 - Freeze stable visual bindings before visual composition, add visual publication/dependency authority before renderers, and stop this roadmap after the renderer baseline.
 - Design, approve, implement, validate, and review one milestone at a time. A pending entry supplies context but does not authorize design or implementation ahead of its gate.
@@ -52,19 +52,19 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ### Milestone 14 — Control-plane bootstrap contracts
 
-**Status:** Next design target; design pending and implementation unauthorized.
+**Status:** Design proposed in `decisions/m14-control-plane-bootstrap-contracts-design.md`; scoped SDK/CLI correction implemented in the current review worktree, remainder awaiting developer approval, and M14 implementation unauthorized.
 
 **Summary:** Establish the first portable Control Plane v1 slice so workspace/project bootstrap no longer depends on hosted-dashboard internals.
 
 - Define bounded create, discover/list, get, link, archive/recovery boundary, capability inspection, and initial Studio-registration primitives without absorbing governance or Studio runtime work.
-- Preserve one server authority across dashboard, HTTP, SDK, and CLI; every mutation needs tenant scope, honest actor attribution, idempotency or optimistic concurrency, audit behavior, and deterministic errors.
-- Add versioned HTTP/OpenAPI/public-contract ownership plus Promise/Effect SDK methods and stable noninteractive CLI JSON/exit-code behavior in the same design.
+- Preserve one server authority across dashboard, HTTP, and CLI; every mutation needs tenant scope, honest actor attribution, idempotency or optimistic concurrency, audit behavior, and deterministic errors.
+- Add versioned HTTP/OpenAPI/public-contract ownership and stable noninteractive CLI JSON/exit-code behavior; Control Plane v1 is intentionally excluded from the content/runtime SDK.
 - Reconcile user sessions, OAuth CLI tokens, service credentials, exact grants, pagination, secret-safe output, and project/environment identity for each route.
 - Decide package/app ownership and compatibility without breaking existing Management/oRPC behavior, M12 public tooling, M13 Authoring, package exports, or generated artifacts.
 - Treat Studio registration as control-plane metadata only; do not implement the Studio SPA/BFF, governance breadth, credential/webhook administration, or hosted-surface migration.
 - Require success/failure/tenant-isolation/authorization/replay/concurrency/contract/package/load evidence and identify any schema change requiring a developer-generated migration.
 
-**Read before design:** `product.md` product surfaces; `prd/cms.md` §§6.1, 7, 14, 19, 21; M2, M3, M12, and M13 decisions; current platform operations, public-contract registry, SDK, CLI, and dashboard project flows.
+**Read before design:** `product.md` product surfaces; `prd/cms.md` §§6.1, 7, 14, 19, 21; M2, M3, M12, M13, and the public HTTP/CLI/SDK boundary decision; current platform operations, public-contract registry, CLI, and dashboard project flows.
 
 ### Milestone 15 — Governance automation parity
 
@@ -76,12 +76,12 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 - Expose memberships, invitations, role assignment, policy administration, project locale administration, and current-`main` environment inspection through portable contracts.
 - Preserve last-owner protection, invitation lifecycle, collection/field/locale restrictions, exact action policy, project/environment scope, and permission-filtered responses.
-- Make direct HTTP, SDK, CLI, and hosted UI operations share the same repository/services and actor/audit/concurrency authority.
+- Make direct HTTP, CLI, and hosted UI operations share the same repository/services and actor/audit/concurrency authority; do not add governance methods to the content/runtime SDK.
 - Keep browser and CLI grants least-privileged; distinguish user-session governance from noninteractive automation and never infer issuer authority for credential actors.
 - Provide bounded list/search/pagination and stable machine-readable failures so agents can reconcile governance state without scraping UI.
 - Do not introduce multi-environment lifecycle, content Studio UX, credential/webhook administration, billing, or recovery operations assigned elsewhere.
 
-**Read before design:** M2–M4 and M12 decisions; platform/access/locale contracts, policy service, membership/invitation operations, dashboard access/locale UI, SDK/CLI command conventions.
+**Read before design:** M2–M4, M12, and the public HTTP/CLI/SDK boundary decision; platform/access/locale contracts, policy service, membership/invitation operations, dashboard access/locale UI, and CLI command conventions.
 
 ### Milestone 16 — Operational administration and recovery
 
@@ -95,7 +95,7 @@ Post-M13 repository/context normalization is developer-approved and committed at
 - Add webhook destination/subscription/mapping/attempt/replay administration without weakening encryption, SSRF, signing, retry, lease, or worker-only-delivery boundaries.
 - Provide bounded audit/security visibility and recovery-safe project operations appropriate to owners/developers while filtering resources and sensitive fields by policy.
 - Keep sensitive recovery and management routes server-side and hosted-control-plane-owned; Studio browser code must never receive management/refresh credentials.
-- Add HTTP/SDK/CLI parity, dry-run/confirmation gates where destructive, optimistic/idempotent authority, deterministic pagination, and complete audits.
+- Add stable HTTP and complete CLI parity, dry-run/confirmation gates where destructive, optimistic/idempotent authority, deterministic pagination, and complete audits; secret and recovery administration never enters the application SDK.
 - Exclude production topology hardening, Studio implementation, multi-environment lifecycle, and commercial administration.
 
 **Read before design:** M3, M11–M13 decisions; credential services, webhook services/worker, audit schema/operations, CLI credential-store/OAuth patterns, security and API rules.
@@ -238,7 +238,7 @@ Post-M13 repository/context normalization is developer-approved and committed at
 - Scope memberships/policies, locales, credentials, webhooks, schemas, entries, publications, Delivery/Preview/Authoring, Studio registration, audits, and quotas exactly by environment.
 - Define explicit schema/content/config promotion or copy workflows with dry-run, conflict classification, acknowledgements, stable/remapped identity rules, and no implicit production writes.
 - Keep Delivery exact-locale behavior and immutable publications independent per environment; no cross-environment fallback or credential acceptance.
-- Add HTTP/SDK/CLI/control-plane/Studio environment selection parity and prevent ambiguous defaults in noninteractive automation.
+- Add HTTP/CLI/control-plane/Studio environment lifecycle and selection parity, prevent ambiguous defaults in automation, and keep SDK environment support to explicit runtime/content selection rather than lifecycle administration.
 
 **Read before design:** PRD §7; M2–M5, M8–M13 decisions; current environment columns/services/contracts, CLI config/locks, control-plane and Studio outputs.
 
@@ -254,7 +254,7 @@ Post-M13 repository/context normalization is developer-approved and committed at
 - Define stable asset identity, project/environment ownership, metadata, variants/transforms, lifecycle, references, publication pinning, and deletion/dependency behavior.
 - Bound file size/type/count, streaming/memory, image/document processing, URLs, malware/content checks, and transformation resource use.
 - Keep storage credentials/signing server-side; protect upload/download routes against tenant leakage, path traversal, SSRF, malicious formats, and unbounded remote fetches.
-- Project assets through role/field/locale permissions into generated forms, Studio, Delivery/Preview, SDK/CLI, import/export, audits, and events.
+- Project assets through role/field/locale permissions into generated forms, Studio, Delivery/Preview, content SDK methods where justified, CLI import/export, audits, and events; storage administration stays outside the SDK.
 - Preserve portability through replaceable storage/delivery providers and explicit immutable publication behavior.
 
 **Read before design:** PRD §§8.6, 21–22; M3, M6, M8–M11 decisions; external-asset contracts/forms, Studio work, webhook/invalidation and backup boundaries.
@@ -271,7 +271,7 @@ Post-M13 repository/context normalization is developer-approved and committed at
 - Define workflow identity/versioning, optimistic/idempotent commands, exact locale/environment/resource scope, actor attribution, audits, notifications/events, and safe history.
 - Add scheduled exact-locale publish/unpublish with immutable requested authority, cancellation/rescheduling, stale-draft/schema/reference detection, and no silent revalidation bypass.
 - Ensure only the worker executes due schedules, with durable claiming, retries, crash recovery, bounded backlog, observability, and atomic publication/audit/outbox semantics.
-- Expose complete HTTP/SDK/CLI/Studio parity, machine-safe dry-runs/status, timezone/clock rules, accessible review queues, and clear failure/recovery states.
+- Expose complete HTTP/CLI/Studio parity, machine-safe dry-runs/status, timezone/clock rules, accessible review queues, and clear failure/recovery states; add SDK methods only if a separate trusted content-integration need is proven.
 - Preserve immediate publication paths and do not couple workflow/scheduling to future visual-site publication before M29 designs that authority.
 
 **Read before design:** M3–M4, M7–M8, M11, M13 decisions; M21 handover behavior, publication repositories, worker lease patterns, event/webhook systems.
@@ -326,7 +326,7 @@ Post-M13 repository/context normalization is developer-approved and committed at
 - Compile page dependency manifests and targeted route/semantic invalidation, including explicit shared dependencies, without global invalidation by default.
 - Add visual Preview source/version authority separated from published rendering, with role-safe projection and no draft leakage.
 - Commit visual publication pointers, audits, outbox/events, dependency state, and idempotent receipts atomically with rollback/concurrency proof.
-- Expose HTTP/SDK/CLI/Studio parity while leaving concrete framework rendering and managed deployment to later product work.
+- Expose HTTP/CLI/Studio administration parity while leaving SDK exposure to M30 renderer consumption and managed deployment to later product work.
 
 **Read before design:** M5, M8, M10–M11, M13, M27 decisions/contracts; schema classification, publication snapshots/events, invalidation mappings, Preview authority.
 
@@ -354,5 +354,5 @@ Managed hosting, external backend/data adapters, billing, analytics, and a plugi
 ## Cross-cutting blocked and developer-controlled gates
 
 - QuickJS issue #255 continues to block Tier 2 production/default activation and hard-memory proof; it does not block M14–M30.
-- Schema/SDK/CLI package versioning/publication, OAuth production rollout, production domains/configuration, deployments, and milestone acceptance remain separate developer-controlled gates.
+- Schema/SDK/CLI package versioning/publication, OAuth production rollout, production domains/configuration, deployments, and milestone acceptance remain separate developer-controlled gates; the staged SDK exports must remain within the implemented content/runtime boundary through first publication.
 - No pending milestone may silently move schema structure back into hosted visual authoring, expose management credentials to Studio browser code, add locale fallback, replace stable IDs with labels/API/source keys, or weaken immutable/idempotent authority.

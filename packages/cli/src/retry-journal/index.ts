@@ -10,12 +10,14 @@ import { canonicalJsonBytes, toJsonValue } from "../canonical";
 import { CliRetryJournalConflictError, CliRetryJournalError } from "../errors";
 import {
   ContentMutationRetryJournal,
+  PresentationMutationRetryJournal,
   SchemaMutationRetryJournal,
   type ContentMutationOperation,
 } from "../schema";
 
 const relativePath = ".framerfordevs/retry/schema-apply.json";
 const contentRelativePath = ".framerfordevs/retry/content-command.json";
+const presentationRelativePath = ".framerfordevs/retry/presentation-publish.json";
 const maximumBytes = 2_048;
 
 async function sync(path: string) {
@@ -247,3 +249,110 @@ export const clearSchemaApplyCommand = Effect.fn("cli.retry.schema.apply.clear")
         : CliRetryJournalError.make({ operation: "clear", cause }),
   });
 });
+
+async function readExistingPresentation(path: string) {
+  try {
+    const status = await lstat(path);
+    if (!status.isFile() || status.isSymbolicLink() || status.size > maximumBytes) {
+      throw CliRetryJournalConflictError.make();
+    }
+    const value: unknown = JSON.parse(await readFile(path, "utf8"));
+    return Schema.decodeUnknownSync(PresentationMutationRetryJournal)(value, {
+      onExcessProperty: "error",
+    });
+  } catch (cause) {
+    if (typeof cause === "object" && cause !== null && Reflect.get(cause, "code") === "ENOENT") {
+      return null;
+    }
+    if (cause instanceof CliRetryJournalConflictError) throw cause;
+    throw CliRetryJournalConflictError.make();
+  }
+}
+
+export const acquirePresentationPublishCommand = Effect.fn(
+  "cli.retry.presentation.publish.acquire",
+)(function* (projectRoot: string, fingerprint: string) {
+  const path = join(projectRoot, presentationRelativePath);
+  return yield* Effect.tryPromise({
+    try: async () => {
+      const existing = await readExistingPresentation(path);
+      if (existing !== null) {
+        if (existing.fingerprint !== fingerprint) throw CliRetryJournalConflictError.make();
+        return existing;
+      }
+      const parent = dirname(path);
+      await mkdir(parent, { recursive: true });
+      const [parentStatus, projectReal, parentReal] = await Promise.all([
+        lstat(parent),
+        realpath(projectRoot),
+        realpath(parent),
+      ]);
+      const parentRelative = relative(projectReal, parentReal);
+      if (
+        !parentStatus.isDirectory() ||
+        parentStatus.isSymbolicLink() ||
+        parentRelative === ".." ||
+        parentRelative.startsWith(`..${sep}`)
+      ) {
+        throw CliRetryJournalConflictError.make();
+      }
+      const journal = PresentationMutationRetryJournal.make({
+        formatVersion: 1,
+        operation: "presentation.publish",
+        commandId: randomUUID(),
+        fingerprint,
+      });
+      const temporary = `${path}.${randomUUID()}.tmp`;
+      try {
+        await writeFile(temporary, canonicalJsonBytes(toJsonValue(journal)), {
+          encoding: "utf8",
+          flag: "wx",
+          mode: 0o600,
+        });
+        await sync(temporary);
+        try {
+          await link(temporary, path);
+        } catch (cause) {
+          if (
+            typeof cause === "object" &&
+            cause !== null &&
+            Reflect.get(cause, "code") === "EEXIST"
+          ) {
+            const raced = await readExistingPresentation(path);
+            if (raced?.fingerprint === fingerprint) return raced;
+            throw CliRetryJournalConflictError.make();
+          }
+          throw cause;
+        }
+        await sync(path);
+        await sync(parent);
+      } finally {
+        await rm(temporary, { force: true });
+      }
+      return journal;
+    },
+    catch: (cause) =>
+      cause instanceof CliRetryJournalConflictError
+        ? cause
+        : CliRetryJournalError.make({ operation: "presentation.acquire", cause }),
+  });
+});
+
+export const clearPresentationPublishCommand = Effect.fn("cli.retry.presentation.publish.clear")(
+  function* (projectRoot: string, commandId: string) {
+    const path = join(projectRoot, presentationRelativePath);
+    yield* Effect.tryPromise({
+      try: async () => {
+        const existing = await readExistingPresentation(path);
+        if (existing === null) return;
+        if (existing.commandId !== commandId) throw CliRetryJournalConflictError.make();
+        await rm(path);
+        await sync(dirname(path));
+      },
+      catch: (cause) =>
+        cause instanceof CliRetryJournalConflictError
+          ? cause
+          : CliRetryJournalError.make({ operation: "presentation.clear", cause }),
+    });
+  },
+);

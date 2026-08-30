@@ -380,6 +380,17 @@ export class SchemaMutationRetryJournal extends Schema.Class<SchemaMutationRetry
   }).annotations({ parseOptions: { onExcessProperty: "error" } }),
 ) {}
 
+export class PresentationMutationRetryJournal extends Schema.Class<PresentationMutationRetryJournal>(
+  "PresentationMutationRetryJournal",
+)(
+  Schema.Struct({
+    formatVersion: Schema.Literal(1),
+    operation: Schema.Literal("presentation.publish"),
+    commandId: Uuid,
+    fingerprint: Digest,
+  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+) {}
+
 export class SchemaLock extends Schema.Class<SchemaLock>("SchemaLock")({
   lockVersion: Schema.Literal(1),
   generatorVersion: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(32)),

@@ -45,12 +45,12 @@ Promise and Effect clients recursively validate requests and responses, reject r
 
 ## Grant only required authority
 
-| Workflow                                  | OAuth grant                 | Management permission                               |
-| ----------------------------------------- | --------------------------- | --------------------------------------------------- |
-| Export/read forms and entries             | `authoring:read`            | `schema.read` or `content.read`, by operation       |
-| Plan/apply schema or publish presentation | `authoring:schema:push`     | `schema.read`, `schema.write`, and `schema.publish` |
-| Create, rename, or save drafts            | `authoring:draft:write`     | `content.write`                                     |
-| Publish or unpublish content              | `authoring:content:publish` | `content.publish`                                   |
+| Workflow                                       | OAuth grant                 | Management permission                               |
+| ---------------------------------------------- | --------------------------- | --------------------------------------------------- |
+| Read forms, Presentation metadata, and entries | `authoring:read`            | `schema.read` or `content.read`, by operation       |
+| CLI schema plan/apply or Presentation publish  | `authoring:schema:push`     | `schema.read`, `schema.write`, and `schema.publish` |
+| Create, rename, or save drafts                 | `authoring:draft:write`     | `content.write`                                     |
+| Publish or unpublish content                   | `authoring:content:publish` | `content.publish`                                   |
 
 Credential writes are audited as the credential, not as the user who issued it.
 

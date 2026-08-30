@@ -27,6 +27,12 @@ export {
 
 const WORKER_TIMEOUT_MILLIS = 5_000;
 
+function workerUrl() {
+  return import.meta.url.endsWith(".mjs")
+    ? new URL("./experimental-schema-build-worker.mjs", import.meta.url)
+    : new URL("./schema/experimental-build/worker", import.meta.url);
+}
+
 function buildError(
   code:
     | "experimental_opt_in_required"
@@ -50,7 +56,7 @@ export const runExperimentalSchemaBuild = Effect.fn("cli.schema.build.experiment
   return yield* Effect.async<ExperimentalSchemaBuildOutput, ExperimentalSchemaBuildError>(
     (resume) => {
       let settled = false;
-      const worker = new Worker(new URL("./schema/experimental-build/worker", import.meta.url), {
+      const worker = new Worker(workerUrl(), {
         workerData: validatedInput,
         env: {},
         execArgv: [],

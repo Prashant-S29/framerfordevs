@@ -5,6 +5,7 @@
 - Keep `progress.md` ordered by milestone, current, factual, and concise. Preserve consequential outcomes, accepted evidence, migration ownership, manual corrections, commit IDs, blockers, and release state—not command-by-command journals.
 - Keep `context.md` a concise zero-context entrypoint: current phase, selective discovery, invariants, workspace/architecture map, completed capability summary, decision routing, validation baseline, and next scope. Replace obsolete context instead of appending history.
 - Keep `decisions/index.md` as the selective routing table. Decision records retain load-bearing rationale but are read only when current work changes, consumes, or must preserve their domain.
+- Every new milestone/design document that adds or changes operations must classify each surface as canonical HTTP, noninteractive CLI, hosted UI/Studio, and optional content/runtime SDK; SDK inclusion requires explicit integration justification and an audit of existing exports/consumers.
 - Record only consequential product/architecture mistakes, discarded assumptions, constraint violations, and prevention rules in `learnings.md`. Each entry contains `Incorrect assumption or decision`, `Learning`, and only when unresolved one concise `Status` line.
 - Do not record ordinary command failures, missing tools, typos, harmless execution mistakes, or duplicate milestone status in learnings.
 - Never erase a still-relevant lesson merely because the defect was fixed; compress it without removing the durable prevention rule.

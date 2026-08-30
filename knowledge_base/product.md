@@ -127,7 +127,8 @@ The product uses separate interfaces over shared server authority:
 - **Marketing and documentation (`framerfordevs.com`):** product discovery, documentation, and authentication entry.
 - **Hosted control plane (`dashboard.framerfordevs.com`):** account, workspace, project, membership, credential, webhook, environment, billing, security, recovery, and Studio-registration administration. It remains available when a customer application is unavailable.
 - **Project Studio (developer-configured application path):** a framework-neutral, role-projected editorial application for content, localization, editorial layout, preview, and future visual editing. Developers mount it at a configured path such as `/studio`; clients and developers use the same Studio with different authority.
-- **CLI and SDK:** complete machine-readable access to every meaningful control-plane and project operation so developers and agents do not depend on browser workflows.
+- **CLI:** complete noninteractive machine access to meaningful control-plane and project operations so developers and agents do not depend on browser workflows.
+- **Application and renderer SDKs:** focused content, Preview, Delivery, webhook/invalidation, generated-contract, and rendering integration for developer-owned websites; they do not mirror account, secret, or operational administration.
 
 These are multiple clients of common APIs, not separate business-rule authorities. Sensitive account and credential recovery remains in the hosted control plane; browser Studio code never owns unrestricted management credentials.
 
@@ -226,7 +227,7 @@ When managed hosting is enabled:
 10. UX for clients and DX for developers are equally important.
 11. Performance and predictable delivery are core product requirements.
 12. Every capability must be designed to compose with future capabilities.
-13. Every meaningful UI operation must have a stable HTTP and CLI/SDK automation path.
+13. Every meaningful UI operation must have a stable HTTP contract and a noninteractive CLI path when it is developer/agent automation; SDK exposure is reserved for content/runtime integration.
 14. Hosted account administration and project-specific Studio editing are separate UX surfaces over shared authorization and audit authority.
 
 ## Primary users

@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestones 0–13 and post-M13 repository/context normalization are developer-approved and committed. M14–M30 are sequenced with detailed design context.
-**Next design target:** M14 — Control-plane bootstrap contracts. No implementation milestone is active until its design is approved.
+**Overall status:** Milestones 0–13 and post-M13 repository/context normalization are developer-approved and committed. M14 design is proposed for developer review; M15–M30 remain sequenced context only.
+**Next gate:** Developer approval or requested revision of the M14 Control Plane v1 design. No implementation milestone is active.
 **Last updated:** 2026-08-29
 
 ## Status legend
@@ -33,7 +33,7 @@
 | 11  | Events, webhooks, invalidation          | `[A]`  |            868 | `fef7205` |
 | 12  | Developer portal and generated tooling  | `[A]`  |            962 | `4e87908` |
 | 13  | Code-first authoring and local editor   | `[A]`  |          1,184 | `9c68942` |
-| 14  | Control-plane bootstrap contracts       | `[D]`  |              — | —         |
+| 14  | Control-plane bootstrap contracts       | `[R]`  |              — | —         |
 | 15  | Governance automation parity            | `[P]`  |              — | —         |
 | 16  | Operational administration and recovery | `[P]`  |              — | —         |
 | 17  | Hosted surface separation               | `[P]`  |              — | —         |
@@ -51,7 +51,7 @@
 | 29  | Visual publication and dependencies     | `[P]`  |              — | —         |
 | 30  | Renderer SDK and framework adapters     | `[P]`  |              — | —         |
 
-M14 is the only design target. M15–M30 preserve the developer-approved sequence and detailed context but are not designed or authorized for implementation.
+M14 is the only designed pending milestone and awaits developer review. M15–M30 preserve the developer-approved sequence and detailed context but are not designed or authorized for implementation.
 
 ## Post-M13 repository/context normalization
 
@@ -163,11 +163,11 @@ M14 is the only design target. M15–M30 preserve the developer-approved sequenc
 
 ## Planned milestone record
 
-These entries remain concise because `milestone.md` owns the detailed pending context. M14 still requires a design; M15–M30 must not be designed or implemented ahead of their developer gate. The original pre-normalization M14–M16 scope is retained explicitly in M21–M23 and M27 rather than discarded.
+These entries remain concise because `milestone.md` owns the detailed pending context. M14 has a proposed decision record awaiting developer approval; M15–M30 must not be designed or implemented ahead of their developer gate. The original pre-normalization M14–M16 scope is retained explicitly in M21–M23 and M27 rather than discarded.
 
 ### Milestone 14 — Control-plane bootstrap contracts
 
-- Next design target: portable workspace/project bootstrap, linking, capability inspection, and Studio-registration primitives with exact HTTP/SDK/CLI authority.
+- Proposed design: `knowledge_base/decisions/m14-control-plane-bootstrap-contracts-design.md` defines portable workspace/project bootstrap and recovery, exact principal/grant authority, receipt idempotency, signed cursors, inert Studio-registration metadata, and shared HTTP/CLI/dashboard/link authority. The developer approved the cross-cutting scoped SDK model: Control Plane v1 has `sdkSupported: false` and the CLI is the complete agent/operator surface. The current review worktree completed the pre-publication correction: public Authoring no longer exports schema plan/apply or Presentation mutation methods/DTOs; schema/editor workflows use a strict CLI-owned client; `ffd presentation get/publish` provides exact-authority noninteractive parity with content-free retry state; package dependencies, docs, runtime forbidden-symbol checks, pre-auth graphs, and packaged workflows are aligned. No Authoring HTTP, server/domain/database behavior, migration, data, generated public artifact, package publication, or M14 feature implementation changed. The rest of M14 awaits explicit developer approval.
 
 ### Milestone 15 — Governance automation parity
 
@@ -237,9 +237,10 @@ These entries remain concise because `milestone.md` owns the detailed pending co
 
 - Accepted M13 baseline: `pnpm run ready` passed 1,184 tests, 15 type-check tasks, public-contract drift, formatting, lint, structure, coverage, and eight builds with the independent worker stopped during shared-database gates and healthy afterward.
 - Reported final suites include 723 API, 138 server, 115 dashboard, 105 CLI, 18 SDK, and 13 content-form tests. Focused retirement/authority suites passed 19 API, 22 dashboard/accessibility, and 78 server tests.
+- Current SDK/CLI boundary correction: full `pnpm run ready` passes 1,190 tests, 15 type-check tasks, public-contract drift, formatting, lint, structure, coverage, and eight builds; CLI rises to 110 tests and SDK to 19. Packaged credential-blind extraction/build, schema/Presentation/content, and loopback-editor workflows pass. The independent worker was stopped for shared-database gates and restored healthy.
 - Canonical Authoring OpenAPI SHA-256 is `d9500549cd95067857b87f494b77375e3d575c4832589478858e125ab3f31205`.
 - The live schema records migrations through `0014`; post-cleanup source/hash/actor/head/FK/receipt/webhook invariants and supported outbox projection were clean at acceptance.
-- Schema, SDK, and CLI release Changesets/package metadata are staged but versions are still `0.0.0`; no package has been published.
+- Schema, SDK, and CLI release Changesets/package metadata are staged but versions are still `0.0.0`; no package has been published. The current review worktree implements the approved removal of schema push and Presentation mutation from public Authoring SDK methods/DTOs and preserves those workflows in the CLI.
 - Production OAuth rollout, production configuration, deployment, and Tier 2 production/default activation have not occurred.
 
 ## Database migration record
@@ -263,7 +264,7 @@ Agents did not generate or apply these migrations. Developer-generated/applied a
 ## Roadmap and next gate
 
 - `knowledge_base/milestone.md` is authoritative for the approved M14–M30 sequence, detailed pending context, original M14–M16 preservation, boundaries, and selective reading pointers.
-- M14 is design-pending. The next agent may prepare its design and decision record, but implementation starts only after explicit developer approval.
+- M14 design is proposed and awaiting developer review. Implementation starts only after explicit developer approval.
 - M15–M30 are contextualized pending milestones, not approved designs; work must continue one milestone at a time and later entries may be split during their own design.
 - Managed hosting, external backend/data adapters, billing, analytics, and plugins remain unsequenced long-term product directions until M30 is accepted.
 - Package publication/versioning, production OAuth, production domains/configuration, deployments, migrations, Tier 2 activation, and milestone acceptance remain developer-controlled.

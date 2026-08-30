@@ -1,7 +1,5 @@
 // Provides bounded Promise and Effect clients for the originless Authoring v1 protocol.
 
-import type { ProjectSchema } from "@framerfordevs/schema";
-import { isProjectSchema } from "@framerfordevs/schema/validate";
 import { Effect, Schema, Stream } from "effect";
 
 import { AuthoringEditorLayout, AuthoringFieldEditor, AuthoringGeneratedForm } from "./form.js";
@@ -84,38 +82,6 @@ const ApiKey = Schema.String.pipe(
   Schema.pattern(/^[a-z][a-z0-9_]{0,62}$/u),
   Schema.filter((value) => !value.includes("__") && !value.endsWith("_")),
 );
-const reservedSourceKeys = new Set([
-  "id",
-  "entry_id",
-  "collection_id",
-  "locale",
-  "schema_revision",
-  "publication_id",
-  "publication_sequence",
-  "created_at",
-  "updated_at",
-  "published_at",
-  "_meta",
-  "__proto__",
-  "prototype",
-  "constructor",
-]);
-const SourceKey = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(63),
-  Schema.pattern(/^[a-z][a-z0-9_-]{0,62}$/u),
-  Schema.filter(
-    (value) =>
-      !value.includes("--") &&
-      !value.includes("__") &&
-      !value.endsWith("-") &&
-      !value.endsWith("_") &&
-      !reservedSourceKeys.has(value),
-  ),
-);
-const ProjectDocument = Schema.declare<ProjectSchema>(isProjectSchema, {
-  identifier: "SdkAuthoringProjectSchemaDocument",
-});
 const Cursor = Schema.String.pipe(
   Schema.minLength(1),
   Schema.maxLength(512),
@@ -151,30 +117,6 @@ const UnsetMutation = Schema.Struct({
 export const AuthoringMutationSchema = Schema.Union(SetMutation, UnsetMutation).annotations({
   identifier: "SdkAuthoringMutation",
 });
-
-export class AuthoringSchemaAuthority extends Schema.Class<AuthoringSchemaAuthority>(
-  "SdkAuthoringSchemaAuthority",
-)({
-  projectManifestHash: Digest,
-  revisionIds: Schema.Record({ key: SourceKey, value: Uuid }),
-}) {}
-
-export class AuthoringSchemaPlanRequest extends Schema.Class<AuthoringSchemaPlanRequest>(
-  "SdkAuthoringSchemaPlanRequest",
-)({ project: ProjectDocument }) {}
-
-export class AuthoringSchemaApplyRequest extends Schema.Class<AuthoringSchemaApplyRequest>(
-  "SdkAuthoringSchemaApplyRequest",
-)({
-  project: ProjectDocument,
-  commandId: Uuid,
-  expectedCurrent: AuthoringSchemaAuthority,
-  expectedPlanHash: Digest,
-  acknowledgedChangeIds: Schema.Array(Digest).pipe(
-    Schema.maxItems(10_000),
-    Schema.filter((values) => new Set(values).size === values.length),
-  ),
-}) {}
 
 export class AuthoringEnumOptionPresentation extends Schema.Class<AuthoringEnumOptionPresentation>(
   "SdkAuthoringEnumOptionPresentation",
@@ -220,15 +162,6 @@ export class AuthoringCollectionPresentation extends Schema.Class<AuthoringColle
   }).annotations({ parseOptions: { onExcessProperty: "error" } }),
 ) {}
 
-export class AuthoringPublishPresentationRequest extends Schema.Class<AuthoringPublishPresentationRequest>(
-  "SdkAuthoringPublishPresentationRequest",
-)({
-  commandId: Uuid,
-  expectedRevisionId: Uuid,
-  expectedSequence: PositiveVersion,
-  presentation: AuthoringCollectionPresentation,
-}) {}
-
 export class AuthoringPresentationRevision extends Schema.Class<AuthoringPresentationRevision>(
   "SdkAuthoringPresentationRevision",
 )({
@@ -245,16 +178,6 @@ export class AuthoringPresentationRevision extends Schema.Class<AuthoringPresent
 export class AuthoringPresentationSnapshot extends Schema.Class<AuthoringPresentationSnapshot>(
   "SdkAuthoringPresentationSnapshot",
 )({
-  revision: AuthoringPresentationRevision,
-  presentation: AuthoringCollectionPresentation,
-}) {}
-
-export class AuthoringPublishPresentationResult extends Schema.Class<AuthoringPublishPresentationResult>(
-  "SdkAuthoringPublishPresentationResult",
-)({
-  commandId: Uuid,
-  replayed: Schema.Boolean,
-  noOp: Schema.Boolean,
   revision: AuthoringPresentationRevision,
   presentation: AuthoringCollectionPresentation,
 }) {}
@@ -308,154 +231,6 @@ export class AuthoringUnpublishRequest extends Schema.Class<AuthoringUnpublishRe
   commandId: Uuid,
   expectedStateVersion: Version,
   expectedPublicationId: Schema.NullOr(Uuid),
-}) {}
-
-export class AuthoringCollectionIdentity extends Schema.Class<AuthoringCollectionIdentity>(
-  "SdkAuthoringCollectionIdentity",
-)({ sourceKey: SourceKey, collectionId: Uuid, apiKey: ApiKey }) {}
-
-export class AuthoringFieldIdentity extends Schema.Class<AuthoringFieldIdentity>(
-  "SdkAuthoringFieldIdentity",
-)({
-  collectionSourceKey: SourceKey,
-  sourceKey: SourceKey,
-  fieldId: Uuid,
-  apiKey: Schema.NullOr(ApiKey),
-}) {}
-
-export class AuthoringEnumOptionIdentity extends Schema.Class<AuthoringEnumOptionIdentity>(
-  "SdkAuthoringEnumOptionIdentity",
-)({
-  collectionSourceKey: SourceKey,
-  fieldSourceKey: SourceKey,
-  sourceKey: SourceKey,
-  optionId: Uuid,
-}) {}
-
-export class AuthoringSchemaValidationIssue extends Schema.Class<AuthoringSchemaValidationIssue>(
-  "SdkAuthoringSchemaValidationIssue",
-)({
-  path: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
-  code: Schema.String.pipe(
-    Schema.minLength(1),
-    Schema.maxLength(64),
-    Schema.pattern(/^[a-z][a-z0-9_]{0,63}$/u),
-  ),
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
-}) {}
-
-const SchemaChangeCode = Schema.Literal(
-  "collection.metadata.updated",
-  "collection.api_key.updated",
-  "schema.format.upgraded",
-  "schema.currency_profile.updated",
-  "editor_layout.updated",
-  "field.added.optional",
-  "field.added.required",
-  "field.api_key.updated",
-  "field.label.updated",
-  "field.kind.updated",
-  "field.required.enabled",
-  "field.required.disabled",
-  "field.localization.updated",
-  "field.deprecated",
-  "field.undeprecated",
-  "field.position.updated",
-  "field.structure.updated",
-  "field.configuration.updated",
-  "field.editor.updated",
-  "field.removed",
-);
-
-export class AuthoringSchemaChange extends Schema.Class<AuthoringSchemaChange>(
-  "SdkAuthoringSchemaChange",
-)({
-  changeId: Digest,
-  code: SchemaChangeCode,
-  classification: Schema.Literal("non_breaking", "potentially_breaking", "breaking"),
-  collectionSourceKey: SourceKey,
-  fieldSourceKey: Schema.NullOr(SourceKey),
-  summary: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
-}) {}
-
-const AllocatedSchemaCandidate = Schema.Struct({
-  collectionSourceKey: SourceKey,
-  collectionId: Uuid,
-  currentRevisionId: Schema.NullOr(Uuid),
-  containsUnallocatedIdentities: Schema.Literal(false),
-  candidateStructureHash: Digest,
-  candidateContractHash: Digest,
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
-const UnallocatedSchemaCandidate = Schema.Struct({
-  collectionSourceKey: SourceKey,
-  collectionId: Schema.NullOr(Uuid),
-  currentRevisionId: Schema.NullOr(Uuid),
-  containsUnallocatedIdentities: Schema.Literal(true),
-  candidateStructureHash: Schema.Null,
-  candidateContractHash: Schema.NullOr(Digest),
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
-export const AuthoringSchemaCandidate = Schema.Union(
-  AllocatedSchemaCandidate,
-  UnallocatedSchemaCandidate,
-).annotations({ identifier: "SdkAuthoringSchemaCandidate" });
-
-export class AuthoringAppliedRevision extends Schema.Class<AuthoringAppliedRevision>(
-  "SdkAuthoringAppliedRevision",
-)({
-  collectionSourceKey: SourceKey,
-  collectionId: Uuid,
-  revisionId: Uuid,
-  structureHash: Digest,
-  contractHash: Digest,
-  changed: Schema.Boolean,
-}) {}
-
-export class AuthoringSchemaExport extends Schema.Class<AuthoringSchemaExport>(
-  "SdkAuthoringSchemaExport",
-)({
-  project: ProjectDocument,
-  current: AuthoringSchemaAuthority,
-  collections: Schema.Array(AuthoringCollectionIdentity).pipe(Schema.maxItems(100)),
-  fields: Schema.Array(AuthoringFieldIdentity).pipe(Schema.maxItems(10_000)),
-  enumOptions: Schema.Array(AuthoringEnumOptionIdentity).pipe(Schema.maxItems(10_000)),
-  revisions: Schema.Array(AuthoringAppliedRevision).pipe(Schema.maxItems(100)),
-}) {}
-
-const AuthoringSchemaPlanBase = {
-  current: AuthoringSchemaAuthority,
-  changes: Schema.Array(AuthoringSchemaChange).pipe(Schema.maxItems(10_000)),
-  candidates: Schema.Array(AuthoringSchemaCandidate).pipe(Schema.maxItems(100)),
-} as const;
-export const AuthoringSchemaPlan = Schema.Union(
-  Schema.Struct({
-    ...AuthoringSchemaPlanBase,
-    valid: Schema.Literal(true),
-    planHash: Digest,
-    issues: Schema.Array(AuthoringSchemaValidationIssue).pipe(Schema.maxItems(50)),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
-  Schema.Struct({
-    ...AuthoringSchemaPlanBase,
-    valid: Schema.Literal(false),
-    planHash: Schema.Null,
-    issues: Schema.Array(AuthoringSchemaValidationIssue).pipe(
-      Schema.minItems(1),
-      Schema.maxItems(50),
-    ),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
-).annotations({ identifier: "SdkAuthoringSchemaPlan" });
-export type AuthoringSchemaPlan = typeof AuthoringSchemaPlan.Type;
-
-export class AuthoringSchemaApply extends Schema.Class<AuthoringSchemaApply>(
-  "SdkAuthoringSchemaApply",
-)({
-  commandId: Uuid,
-  replayed: Schema.Boolean,
-  noOp: Schema.Boolean,
-  projectManifestHash: Digest,
-  collections: Schema.Array(AuthoringCollectionIdentity).pipe(Schema.maxItems(100)),
-  fields: Schema.Array(AuthoringFieldIdentity).pipe(Schema.maxItems(10_000)),
-  enumOptions: Schema.Array(AuthoringEnumOptionIdentity).pipe(Schema.maxItems(10_000)),
-  revisions: Schema.Array(AuthoringAppliedRevision).pipe(Schema.maxItems(100)),
 }) {}
 
 export class AuthoringEntrySummary extends Schema.Class<AuthoringEntrySummary>(
@@ -916,18 +691,6 @@ export function authoringV1(options: AuthoringClientOptions) {
           AuthoringPresentationSnapshot,
           input,
         ),
-      publish: (
-        collectionKey: string,
-        body: AuthoringPublishPresentationRequest,
-        input: ClientRequestOptions = {},
-      ) =>
-        request(
-          `${collectionPath(collectionKey)}/presentation`,
-          "POST",
-          requestBody(AuthoringPublishPresentationRequest, body),
-          AuthoringPublishPresentationResult,
-          input,
-        ),
     },
     form: {
       get: (collectionKey: string, input: ClientRequestOptions = {}) =>
@@ -936,26 +699,6 @@ export function authoringV1(options: AuthoringClientOptions) {
           "GET",
           undefined,
           AuthoringGeneratedForm,
-          input,
-        ),
-    },
-    schema: {
-      export: (input: ClientRequestOptions = {}) =>
-        request(`${root}/schema/export`, "GET", undefined, AuthoringSchemaExport, input),
-      plan: (body: AuthoringSchemaPlanRequest, input: ClientRequestOptions = {}) =>
-        request(
-          `${root}/schema/plan`,
-          "POST",
-          requestBody(AuthoringSchemaPlanRequest, body),
-          AuthoringSchemaPlan,
-          input,
-        ),
-      apply: (body: AuthoringSchemaApplyRequest, input: ClientRequestOptions = {}) =>
-        request(
-          `${root}/schema/apply`,
-          "POST",
-          requestBody(AuthoringSchemaApplyRequest, body),
-          AuthoringSchemaApply,
           input,
         ),
     },
@@ -1243,22 +986,10 @@ export function authoringV1Effect(options: AuthoringClientOptions) {
     presentation: {
       get: (collection: string, input?: ClientRequestOptions) =>
         wrap(() => client.presentation.get(collection, input)),
-      publish: (
-        collection: string,
-        body: AuthoringPublishPresentationRequest,
-        input?: ClientRequestOptions,
-      ) => wrap(() => client.presentation.publish(collection, body, input)),
     },
     form: {
       get: (collection: string, input?: ClientRequestOptions) =>
         wrap(() => client.form.get(collection, input)),
-    },
-    schema: {
-      export: (input?: ClientRequestOptions) => wrap(() => client.schema.export(input)),
-      plan: (body: AuthoringSchemaPlanRequest, input?: ClientRequestOptions) =>
-        wrap(() => client.schema.plan(body, input)),
-      apply: (body: AuthoringSchemaApplyRequest, input?: ClientRequestOptions) =>
-        wrap(() => client.schema.apply(body, input)),
     },
     entries: {
       list: (collection: string, locale: string, input?: AuthoringListOptions) =>

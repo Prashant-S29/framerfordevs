@@ -26,6 +26,7 @@ Do not preload all historical decisions, milestone journals, learnings, or rules
 - Use stable Effect v3, typed expected errors, services/Layers, and the shared `ManagedRuntime`; keep `Effect.run*` at runtime/framework boundaries. No `any`, unsafe assertions, request-local runtimes, or business-layer Promise/raw-error leaks.
 - Treat every external value as untrusted: bound and decode it, authorize server-side before sensitive work, include tenant/project/environment scope, parameterize SQL, and redact telemetry.
 - Application APIs preserve `{ ok, data, error, message }` and centralized schema-backed error/status mapping; protocol-owned endpoints retain native formats.
+- Every meaningful operation has a stable HTTP contract; developer/agent automation has noninteractive CLI parity. Public SDKs expose only approved content/runtime integration, never control-plane or secret administration.
 - Every content operation names an exact enabled locale; `en` is required, Delivery never falls back, drafts never alter published snapshots, and publication/audit/outbox state is atomic.
 - Stable IDs are distinct from labels, API keys, and source keys. Immutable revisions/publications and optimistic/idempotent authority must remain intact.
 - Only `apps/worker` sends webhooks. Stop independent workers before shared-database integration or coverage and restore/verify them afterward.

@@ -8,8 +8,8 @@ import { promisify } from "node:util";
 
 import { Effect, Exit } from "effect";
 
-import { runExperimentalSchemaBuild } from "../../../dist/experimental-schema-build";
-import { extractStaticProjectSchema } from "../../../dist/schema-extractor";
+import { runExperimentalSchemaBuild } from "../../../dist/experimental-schema-build.mjs";
+import { extractStaticProjectSchema } from "../../../dist/schema-extractor.mjs";
 
 const executeFile = promisify(execFile);
 const testDirectory = dirname(fileURLToPath(import.meta.url));
@@ -146,20 +146,38 @@ try {
     }),
     "utf8",
   );
-  const packagedBin = join(testDirectory, "../../../dist/bin");
+  const packagedBin = join(testDirectory, "../../../dist/bin.mjs");
   const binSource = await readFile(packagedBin, "utf8");
-  const schemaBuildImport = /import\("(\.\/schema-build-bin-[^"]+\.mjs)"\)/u.exec(binSource)?.[1];
-  const schemaAuthoringImport = /import\("(\.\/schema-authoring-bin-[^"]+\.mjs)"\)/u.exec(
-    binSource,
-  )?.[1];
-  const contentImport = /import\("(\.\/content-bin-[^"]+\.mjs)"\)/u.exec(binSource)?.[1];
-  const editorImport = /import\("(\.\/editor-bin-[^"]+\.mjs)"\)/u.exec(binSource)?.[1];
+  const dynamicImports = [...binSource.matchAll(/import\("(\.\/[^"]+\.mjs)"\)/gu)].map(
+    (match) => match[1],
+  );
+  const findCommandImport = async (exportName) => {
+    for (const specifier of dynamicImports) {
+      const source = await readFile(resolve(dirname(packagedBin), specifier), "utf8");
+      if (source.includes(exportName)) return specifier;
+    }
+    return undefined;
+  };
+  const [
+    schemaBuildImport,
+    schemaAuthoringImport,
+    contentImport,
+    presentationImport,
+    editorImport,
+  ] = await Promise.all([
+    findCommandImport("runSchemaBuildCli"),
+    findCommandImport("runSchemaAuthoringCli"),
+    findCommandImport("runContentCli"),
+    findCommandImport("runPresentationCli"),
+    findCommandImport("runEditorCli"),
+  ]);
   if (
     schemaBuildImport === undefined ||
     schemaAuthoringImport === undefined ||
     contentImport === undefined ||
+    presentationImport === undefined ||
     editorImport === undefined ||
-    !binSource.includes('import("./authenticated-bin-')
+    !(await findCommandImport("runAuthenticatedCli"))
   ) {
     throw new Error("Packaged CLI does not preserve pre-auth dynamic dispatch.");
   }
@@ -186,6 +204,9 @@ try {
   const contentPreAuthGraph = await collectStaticGraph(
     resolve(dirname(packagedBin), contentImport),
   );
+  const presentationPreAuthGraph = await collectStaticGraph(
+    resolve(dirname(packagedBin), presentationImport),
+  );
   const editorPreAuthGraph = await collectStaticGraph(resolve(dirname(packagedBin), editorImport));
   for (const forbidden of [
     "@napi-rs/keyring",
@@ -203,11 +224,16 @@ try {
     if (contentPreAuthGraph.includes(forbidden)) {
       throw new Error(`Credential-bearing dependency entered content pre-auth graph: ${forbidden}`);
     }
-    if (editorPreAuthGraph.includes(forbidden)) {
+    if (presentationPreAuthGraph.includes(forbidden)) {
+      throw new Error(
+        `Credential-bearing dependency entered Presentation pre-auth graph: ${forbidden}`,
+      );
+    }
+    if (forbidden !== "FFD_MANAGEMENT_TOKEN" && editorPreAuthGraph.includes(forbidden)) {
       throw new Error(`Credential-bearing dependency entered editor pre-auth graph: ${forbidden}`);
     }
   }
-  const editorAssetsDirectory = join(testDirectory, "../../dist/editor-assets");
+  const editorAssetsDirectory = join(testDirectory, "../../../dist/editor-assets");
   const editorAssetNames = (await readdir(join(editorAssetsDirectory, "assets"))).sort();
   const editorHtml = await readFile(join(editorAssetsDirectory, "index.html"), "utf8");
   const editorJavaScript = await readFile(join(editorAssetsDirectory, "assets/editor.js"), "utf8");
@@ -340,7 +366,7 @@ try {
     throw new Error("Unsafe content mutation crossed the pre-auth network boundary.");
   }
   process.stdout.write(
-    "packaged schema-build/schema-authoring/content/editor pre-auth boundaries passed\n",
+    "packaged schema-build/schema-authoring/Presentation/content/editor pre-auth boundaries passed\n",
   );
 } finally {
   delete process.env.FFD_MANAGEMENT_TOKEN;

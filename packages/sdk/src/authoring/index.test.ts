@@ -3,6 +3,7 @@ import { strict as nodeAssert } from "node:assert";
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Stream } from "effect";
 
+import * as authoringSurface from "./index";
 import { authoringV1, authoringV1Effect } from "./index";
 
 const id = "019fae8b-1234-7000-8000-000000000001";
@@ -15,47 +16,12 @@ const summary = {
   updatedAt: "2026-08-24T00:00:00.000Z",
 };
 const validation = { valid: true, issues: [], capped: false };
-const authority = { projectManifestHash: "a".repeat(64), revisionIds: {} };
 const publicationSize = {
   documentBytes: 1,
   referenceManifestBytes: 1,
   combinedBytes: 2,
   maximumBytes: 1_048_576,
   bucket: "small" as const,
-};
-const project = {
-  collections: [
-    {
-      sourceKey: "articles",
-      apiKey: "articles",
-      fields: [
-        {
-          sourceKey: "title",
-          apiKey: "title",
-          kind: "short_text" as const,
-          required: true,
-          localization: "localized" as const,
-          configuration: {},
-        },
-      ],
-    },
-  ],
-};
-const schemaExport = {
-  project,
-  current: authority,
-  collections: [],
-  fields: [],
-  enumOptions: [],
-  revisions: [],
-};
-const schemaPlan = {
-  current: authority,
-  changes: [],
-  candidates: [],
-  valid: true,
-  planHash: "a".repeat(64),
-  issues: [],
 };
 const generatedForm = {
   source: "published" as const,
@@ -147,12 +113,6 @@ const presentationRevision = {
   publishedAt: "2026-08-24T00:00:00.000Z",
 };
 const presentationSnapshot = { revision: presentationRevision, presentation };
-const presentationResult = {
-  commandId: id,
-  replayed: false,
-  noOp: false,
-  ...presentationSnapshot,
-};
 const allFieldConfigurations = [
   ["short_text", {}],
   ["long_text", {}],
@@ -198,17 +158,6 @@ const allKindsForm = {
   editableFieldIds: [],
   currencyMinorUnits: { USD: 2 },
 };
-const schemaApply = {
-  commandId: id,
-  replayed: false,
-  noOp: false,
-  projectManifestHash: "a".repeat(64),
-  collections: [],
-  fields: [],
-  enumOptions: [],
-  revisions: [],
-};
-
 function success(data: object = {}) {
   return new Response(JSON.stringify({ ok: true, data, error: null, message: "Completed." }), {
     status: 200,
@@ -229,12 +178,7 @@ describe("Authoring v1 client", () => {
         requests.push({ url, init });
         if (url.endsWith("/presentation") && init?.method === "GET")
           return Promise.resolve(success(presentationSnapshot));
-        if (url.endsWith("/presentation") && init?.method === "POST")
-          return Promise.resolve(success(presentationResult));
         if (url.endsWith("/form")) return Promise.resolve(success(generatedForm));
-        if (url.endsWith("/schema/export")) return Promise.resolve(success(schemaExport));
-        if (url.endsWith("/schema/plan")) return Promise.resolve(success(schemaPlan));
-        if (url.endsWith("/schema/apply")) return Promise.resolve(success(schemaApply));
         if (url.includes("?limit="))
           return Promise.resolve(success({ items: [], nextCursor: null }));
         if (url.endsWith("/entries") && init?.method === "POST")
@@ -372,22 +316,7 @@ describe("Authoring v1 client", () => {
     });
 
     await client.presentation.get("articles");
-    await client.presentation.publish("articles", {
-      commandId: id,
-      expectedRevisionId: id,
-      expectedSequence: 1,
-      presentation,
-    });
     await client.form.get("articles");
-    await client.schema.export();
-    await client.schema.plan({ project });
-    await client.schema.apply({
-      project,
-      commandId: id,
-      expectedCurrent: authority,
-      expectedPlanHash: "a".repeat(64),
-      acknowledgedChangeIds: [],
-    });
     await client.entries.list("articles", "en-US", { limit: 20 });
     await client.entries.create("articles", "en-US", {
       displayName: "Post",
@@ -429,26 +358,10 @@ describe("Authoring v1 client", () => {
       expectedPublicationId: id,
     });
 
-    assert.strictEqual(requests.length, 15);
+    assert.strictEqual(requests.length, 11);
     assert.deepStrictEqual(
       requests.map((request) => request.init?.method),
-      [
-        "GET",
-        "POST",
-        "GET",
-        "GET",
-        "POST",
-        "POST",
-        "GET",
-        "POST",
-        "PATCH",
-        "GET",
-        "PATCH",
-        "GET",
-        "POST",
-        "POST",
-        "POST",
-      ],
+      ["GET", "GET", "GET", "POST", "PATCH", "GET", "PATCH", "GET", "POST", "POST", "POST"],
     );
     for (const request of requests) {
       assert.strictEqual(request.init?.redirect, "error");
@@ -458,8 +371,39 @@ describe("Authoring v1 client", () => {
       );
       assert.notInclude(request.url, "secret-token");
     }
-    assert.include(requests[6]?.url ?? "", "limit=20");
-    assert.strictEqual(requests[12]?.init?.body, "{}");
+    assert.include(requests[2]?.url ?? "", "limit=20");
+    assert.strictEqual(requests[8]?.init?.body, "{}");
+  });
+
+  it("exposes only content/runtime Authoring methods", () => {
+    const client = authoringV1({
+      baseUrl: "https://api.example.test",
+      projectId: id,
+      environmentId,
+      token: "token",
+      fetch: () => Promise.resolve(success()),
+    });
+    assert.deepStrictEqual(Object.keys(client).sort(), [
+      "entries",
+      "form",
+      "helpers",
+      "presentation",
+    ]);
+    assert.deepStrictEqual(Object.keys(client.presentation), ["get"]);
+    assert.notProperty(client, "schema");
+    assert.notProperty(client.presentation, "publish");
+    for (const forbidden of [
+      "AuthoringSchemaAuthority",
+      "AuthoringSchemaPlanRequest",
+      "AuthoringSchemaApplyRequest",
+      "AuthoringSchemaExport",
+      "AuthoringSchemaPlan",
+      "AuthoringSchemaApply",
+      "AuthoringPublishPresentationRequest",
+      "AuthoringPublishPresentationResult",
+    ]) {
+      assert.notProperty(authoringSurface, forbidden);
+    }
   });
 
   it("recursively decodes every current generated-form kind", async () => {
@@ -684,25 +628,10 @@ describe("Authoring v1 client", () => {
       token: "token",
       fetch: () => Promise.resolve(new Response(JSON.stringify({ ok: true, data: [] }))),
     });
-    await nodeAssert.rejects(() => malformed.schema.export(), /envelope is invalid/u);
+    await nodeAssert.rejects(() => malformed.presentation.get("articles"), /envelope is invalid/u);
   });
 
   it("rejects nested response drift and runtime-invalid request bodies", async () => {
-    const invalidExport = authoringV1({
-      baseUrl: "https://api.example.test",
-      projectId: id,
-      environmentId,
-      token: "token",
-      fetch: () =>
-        Promise.resolve(
-          success({
-            ...schemaExport,
-            current: { ...authority, unexpected: true },
-          }),
-        ),
-    });
-    await nodeAssert.rejects(() => invalidExport.schema.export(), /unexpected/u);
-
     const invalidForm = authoringV1({
       baseUrl: "https://api.example.test",
       projectId: id,
@@ -768,15 +697,6 @@ describe("Authoring v1 client", () => {
     });
     await nodeAssert.rejects(() => invalidPresentation.presentation.get("articles"), /unexpected/u);
 
-    const invalidPlan = authoringV1({
-      baseUrl: "https://api.example.test",
-      projectId: id,
-      environmentId,
-      token: "token",
-      fetch: () => Promise.resolve(success({ ...schemaPlan, planHash: null })),
-    });
-    await nodeAssert.rejects(() => invalidPlan.schema.plan({ project }), /planHash/u);
-
     const invalidRequest = authoringV1({
       baseUrl: "https://api.example.test",
       projectId: id,
@@ -784,19 +704,6 @@ describe("Authoring v1 client", () => {
       token: "token",
       fetch: () => Promise.resolve(success()),
     });
-    nodeAssert.throws(
-      () =>
-        Reflect.apply(invalidRequest.presentation.publish, invalidRequest.presentation, [
-          "articles",
-          {
-            commandId: id,
-            expectedRevisionId: id,
-            expectedSequence: 1,
-            presentation: { ...presentation, apiKey: "forbidden" },
-          },
-        ]),
-      /apiKey/u,
-    );
     nodeAssert.throws(
       () =>
         Reflect.apply(invalidRequest.entries.rename, invalidRequest.entries, [
@@ -847,14 +754,8 @@ describe("Authoring v1 client", () => {
 
     const effectClient = authoringV1Effect({
       ...options,
-      fetch: (input) =>
-        Promise.resolve(
-          String(input).includes("/entries")
-            ? success({ items: [], nextCursor: null })
-            : success(schemaExport),
-        ),
+      fetch: () => Promise.resolve(success({ items: [], nextCursor: null })),
     });
-    const response = await Effect.runPromise(effectClient.schema.export());
     const effectPresentationClient = authoringV1Effect({
       ...options,
       fetch: () => Promise.resolve(success(presentationSnapshot)),
@@ -865,7 +766,6 @@ describe("Authoring v1 client", () => {
     const pages = await Effect.runPromise(
       Stream.runCollect(effectClient.entries.pages("articles", "en-US")),
     );
-    assert.strictEqual(response.status, 200);
     assert.strictEqual(effectPresentation.status, 200);
     assert.strictEqual(pages.length, 1);
   });

@@ -2,9 +2,9 @@
 
 import { randomBytes } from "node:crypto";
 
-import { authoringV1 } from "@framerfordevs/sdk/authoring";
 import { Effect, Layer, ManagedRuntime } from "effect";
 
+import { makeAuthoringOperatorClient } from "../../authoring/client";
 import { canonicalJsonBytes, sha256, toJsonValue } from "../../canonical";
 import { createEditorAuthoringHandler, makeEditorAuthoringGateway } from "../authoring";
 import { loadPackagedEditorAssets } from "../assets";
@@ -205,7 +205,7 @@ const liveDependencies: EditorOnlineDependencies = {
     ).environmentId;
   },
   loadHostedProject: async (prepared, environmentId, token) => {
-    const client = authoringV1({
+    const client = makeAuthoringOperatorClient({
       baseUrl: prepared.config.apiBaseUrl,
       token,
       projectId: prepared.config.projectId,

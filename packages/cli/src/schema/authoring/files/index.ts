@@ -6,7 +6,7 @@ import type {
   AuthoringCollectionIdentity,
   AuthoringEnumOptionIdentity,
   AuthoringFieldIdentity,
-} from "@framerfordevs/sdk/authoring";
+} from "../../../authoring/client";
 import { open, lstat, mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, join, relative, sep } from "node:path";

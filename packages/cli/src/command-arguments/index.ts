@@ -79,6 +79,8 @@ export function validateFlags(arguments_: ParsedArguments): void {
     "schema plan": { json: "boolean" },
     "schema push": { acknowledge: "strings", json: "boolean" },
     "schema check": { "allow-metadata-only": "boolean", json: "boolean" },
+    "presentation get": { collection: "string", json: "boolean" },
+    "presentation publish": { collection: "string", file: "string", json: "boolean" },
     "entry list": { collection: "string", locale: "string", json: "boolean" },
     "entry get": { collection: "string", entry: "string", locale: "string", json: "boolean" },
     "entry create": {

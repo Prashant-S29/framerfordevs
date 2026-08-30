@@ -91,6 +91,18 @@ Plan and push verify any experimental build manifest without executing Tier 2, t
 
 Plan returns exact server change IDs/classifications and exits `2` for validation issues. Push performs a fresh plan and requires the supplied acknowledgement set to equal every potentially-breaking/breaking change ID—duplicates, missing IDs, extra IDs, and broad confirmation are rejected without applying. It then journals only a command UUID and canonical fingerprint before the mutation request, applies exact current/plan authority, clears the journal after a confirmed response, and writes lock v2 from server-returned stable mappings. Transport uncertainty retains the content-free journal: an unchanged plan reuses the command UUID, while changed authority fails closed with a journal conflict pending reconciliation.
 
+## Presentation commands
+
+```sh
+ffd presentation get --collection <key> --json > presentation.json
+# Edit only the presentation object while preserving document authority.
+ffd presentation publish --collection <key> --file presentation.json --json
+```
+
+Get emits a strictly versioned, credential-free document containing exact project, environment, collection, revision, and sequence authority plus the read-only editorial Presentation. Publish accepts only a project-contained regular non-symlinked JSON file up to 1 MiB, requires its authority to match the linked config and `--collection`, and submits the complete Presentation atomically. It journals only a command UUID and canonical fingerprint; confirmed responses clear the journal, while transport uncertainty preserves the same idempotency authority. Schema structure is never accepted in this workflow.
+
+Presentation mutation is intentionally a CLI/HTTP/hosted-editor operation and is not exposed by the application SDK.
+
 ## Content commands
 
 ```sh

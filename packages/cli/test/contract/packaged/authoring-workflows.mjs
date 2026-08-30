@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 
 const executeFile = promisify(execFile);
 const directory = dirname(fileURLToPath(import.meta.url));
-const packagedBin = join(directory, "../../../dist/bin");
+const packagedBin = join(directory, "../../../dist/bin.mjs");
 const root = await mkdtemp(join(tmpdir(), "ffd-packaged-authoring-"));
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
@@ -45,6 +45,66 @@ const summary = {
   updatedAt: "2026-08-24T00:00:00.000Z",
 };
 const validation = { valid: true, issues: [], capped: false };
+const presentation = {
+  displayName: "Posts",
+  description: null,
+  fields: [
+    {
+      fieldId,
+      displayLabel: "Title",
+      position: 0,
+      editor: {
+        helpText: null,
+        placeholder: null,
+        visibleToRoles: ["developer"],
+        editableByRoles: ["developer"],
+      },
+      enumOptions: [],
+    },
+  ],
+  editorLayout: {
+    version: 1,
+    tabs: [
+      {
+        id: "019fae8b-1234-7000-8000-000000000008",
+        title: "Content",
+        description: null,
+        position: 0,
+        visibleToRoles: ["developer"],
+        groups: [
+          {
+            id: "019fae8b-1234-7000-8000-000000000009",
+            title: "Main",
+            description: null,
+            position: 0,
+            columns: 1,
+            visibleToRoles: ["developer"],
+            fields: [
+              {
+                id: "019fae8b-1234-7000-8000-000000000010",
+                fieldId,
+                position: 0,
+                helpTextOverride: null,
+                visibleToRoles: ["developer"],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    sidebarGroups: [],
+  },
+};
+const presentationRevision = {
+  collectionId,
+  revisionId,
+  previousRevisionId: null,
+  sequence: 1,
+  schemaHash: "c".repeat(64),
+  structureHash,
+  contractHash: digest,
+  publishedAt: "2026-08-24T00:00:00.000Z",
+};
 const requests = [];
 
 function success(response, data) {
@@ -162,6 +222,25 @@ const server = createServer(async (request, response) => {
             changed: false,
           },
         ],
+      });
+      return;
+    }
+    if (url.pathname.endsWith("/presentation") && request.method === "GET") {
+      success(response, { revision: presentationRevision, presentation });
+      return;
+    }
+    if (url.pathname.endsWith("/presentation") && request.method === "POST") {
+      success(response, {
+        commandId: requestBody.commandId,
+        replayed: false,
+        noOp: false,
+        revision: {
+          ...presentationRevision,
+          previousRevisionId: revisionId,
+          revisionId: "019fae8b-1234-7000-8000-000000000011",
+          sequence: 2,
+        },
+        presentation: requestBody.presentation,
       });
       return;
     }
@@ -352,6 +431,12 @@ try {
   results.push(await run(["schema", "export"]));
   results.push(await run(["schema", "plan"]));
   results.push(await run(["schema", "push"]));
+  const presentationDocument = await run(["presentation", "get", "--collection", "posts"]);
+  presentationDocument.presentation.displayName = "Editorial posts";
+  await writeFile(join(root, "presentation.json"), JSON.stringify(presentationDocument), "utf8");
+  results.push(
+    await run(["presentation", "publish", "--collection", "posts", "--file", "presentation.json"]),
+  );
   results.push(
     await run([
       "entry",
@@ -425,14 +510,23 @@ try {
     !generated.includes("satisfies ProjectSchema") ||
     `${generated}${stateBytes}`.includes(token) ||
     stateBytes.includes("Fixture value") ||
-    stateFiles.some((path) => path.includes("retry/content-command.json"))
+    stateFiles.some(
+      (path) =>
+        path.includes("retry/content-command.json") ||
+        path.includes("retry/presentation-publish.json"),
+    )
   ) {
     throw new Error("Packaged Authoring workflow persisted secret/content/retry authority.");
   }
   if (!requests.some((request) => request.path.endsWith("/schema/apply"))) {
     throw new Error("Packaged schema apply was not observed.");
   }
-  process.stdout.write("packaged Authoring schema and content workflows passed\n");
+  if (
+    !requests.some((request) => request.path.endsWith("/presentation") && request.method === "POST")
+  ) {
+    throw new Error("Packaged Presentation publication was not observed.");
+  }
+  process.stdout.write("packaged Authoring schema, Presentation, and content workflows passed\n");
 } finally {
   await new Promise((resolve) => server.close(resolve));
   await rm(root, { recursive: true, force: true });

@@ -107,7 +107,8 @@ The CMS exposes one server-authoritative resource model through three intentiona
 
 - The hosted control plane manages accounts, workspaces, projects, members, credentials, webhooks, environments, security/recovery, and Studio registration.
 - A framework-neutral project Studio is mounted at a developer-configured application path and provides role-projected content, localization, editorial layout, Preview, publication, and future visual editing.
-- Public HTTP APIs plus CLI/SDK commands expose every meaningful control-plane and authoring action with stable machine-readable contracts, noninteractive operation, idempotency/concurrency authority, and honest actor attribution.
+- Stable public HTTP APIs expose every supported control-plane and authoring action. The CLI provides complete noninteractive developer/agent automation with deterministic contracts, idempotency/concurrency authority, and honest actor attribution.
+- Application and renderer SDKs expose only approved content/runtime integration—Delivery, Preview, content authoring, generated contracts, webhook/invalidation helpers, assets where applicable, and rendering—not account, governance, secret, recovery, or operational administration.
 
 Project creation and mutation have one backend authority even when both the hosted dashboard and CLI invoke them. Studio browser code must not receive unrestricted management credentials; sensitive operations use exact server-side routes and short-lived user/session authority. The hosted control plane remains a bootstrap and recovery surface when the project application or Studio is unavailable.
 
@@ -561,7 +562,7 @@ Expected CLI flow begins with authenticated control-plane bootstrap and continue
 login → workspace/project create or link → configure access/integrations → schema export/check/plan/push → generate → content automation
 ```
 
-Every command intended for agents supports stable JSON, deterministic errors/exit codes, bounded pagination, noninteractive operation, explicit dry-run or acknowledgement gates where applicable, and secret-safe output. Generated artifacts identify project, environment, locale contract, and schema revision. Tooling warns when generated contracts are stale. Content-only changes never require type regeneration; published schema changes may.
+Every command intended for agents supports stable JSON, deterministic errors/exit codes, bounded pagination, noninteractive operation, explicit dry-run or acknowledgement gates where applicable, and secret-safe output. The CLI—not the application SDK—is the complete agent/operator surface. Generated artifacts identify project, environment, locale contract, and schema revision. Tooling warns when generated contracts are stale. Content-only changes never require type regeneration; published schema changes may.
 
 ## 20. Client experience
 

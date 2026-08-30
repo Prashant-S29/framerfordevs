@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const directory = dirname(fileURLToPath(import.meta.url));
-const packagedBin = join(directory, "../../../dist/bin");
+const packagedBin = join(directory, "../../../dist/bin.mjs");
 const root = await mkdtemp(join(tmpdir(), "ffd-packaged-editor-"));
 const fakeBin = join(root, "bin");
 const openedUrlPath = join(root, "opened-url.txt");

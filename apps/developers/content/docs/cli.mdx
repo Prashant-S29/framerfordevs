@@ -92,6 +92,15 @@ Export bootstraps stable source identities from hosted authority. Plan staticall
 
 See [Publish a code-first schema](/docs/authoring/code-first-schema).
 
+## Presentation Automation
+
+```bash
+ffd presentation get --collection articles --json > presentation.json
+ffd presentation publish --collection articles --file presentation.json --json
+```
+
+Get emits a credential-free versioned document with exact project, environment, collection, revision, and sequence authority. Edit only its `presentation` value. Publish requires the file to remain a bounded regular file inside the linked project, rejects authority drift and excess properties, and preserves an idempotent content-free retry journal after uncertain transport. Presentation mutation is a CLI/HTTP/hosted-editor operation, not an application SDK method.
+
 ## Content Automation
 
 `ffd entry` supports bounded list/get/create/update/publish/unpublish workflows. Mutation files are strict project-relative JSON and never enter retry journals. Exact draft and locale-publication authority is obtained before each write.

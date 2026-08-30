@@ -277,6 +277,8 @@ function commandEffect(
         "ffd schema plan",
         "ffd schema push --acknowledge <change-id>...",
         "ffd schema check [--allow-metadata-only]",
+        "ffd presentation get --collection <key>",
+        "ffd presentation publish --collection <key> --file <presentation.json>",
         "ffd entry list --collection <key> --locale <tag>",
         "ffd entry get --collection <key> --entry <id> --locale <tag>",
         "ffd entry create --collection <key> --locale <tag> --name <name> [--mutations <file>]",

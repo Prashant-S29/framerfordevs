@@ -1,9 +1,9 @@
 // Loads credential and network authority only after local schema extraction has succeeded.
 
 import type { ProjectSchema } from "@framerfordevs/schema";
-import { authoringV1 } from "@framerfordevs/sdk/authoring";
 import { Effect, ManagedRuntime } from "effect";
 
+import { makeAuthoringOperatorClient } from "../../../authoring/client";
 import { writeAuthoringSchemaLock } from "../files";
 import { canonicalJsonBytes, sha256, toJsonValue } from "../../../canonical";
 import { CredentialStore, CredentialStoreLive } from "../../../credential-store";
@@ -65,7 +65,7 @@ const clientAuthority = Effect.fn("cli.authoring.authority.resolve")(function* (
   const environmentId = yield* resolveEnvironmentId(tooling, config.projectId, config.environment);
   return {
     environmentId,
-    client: authoringV1({
+    client: makeAuthoringOperatorClient({
       baseUrl: config.apiBaseUrl,
       token,
       projectId: config.projectId,

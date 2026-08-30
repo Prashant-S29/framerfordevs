@@ -16,6 +16,11 @@ async function main() {
     await runSchemaAuthoringCli(rawArguments);
     return;
   }
+  if (rawArguments[0] === "presentation") {
+    const { runPresentationCli } = await import("./presentation/bin/index.js");
+    await runPresentationCli(rawArguments);
+    return;
+  }
   if (rawArguments[0] === "entry") {
     const { runContentCli } = await import("./content/bin/index.js");
     await runContentCli(rawArguments);

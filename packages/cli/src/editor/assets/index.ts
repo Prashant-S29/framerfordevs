@@ -84,5 +84,8 @@ export async function loadEditorAssetsFrom(root: string): Promise<EditorStaticAs
 }
 
 export function loadPackagedEditorAssets(): Promise<EditorStaticAssets> {
-  return loadEditorAssetsFrom(fileURLToPath(new URL("./index", import.meta.url)));
+  const assets = import.meta.url.endsWith(".mjs")
+    ? new URL("./editor-assets", import.meta.url)
+    : new URL("../../../dist/editor-assets", import.meta.url);
+  return loadEditorAssetsFrom(fileURLToPath(assets));
 }

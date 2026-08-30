@@ -94,7 +94,15 @@ Use an environment-bound management credential with only the permissions needed 
 
 Dashboard collection creation and structure mutation are retired. Legacy authenticated mutation routes return stable `410 DASHBOARD_SCHEMA_AUTHORING_RETIRED` responses rather than changing drafts. Use schema code for structure, the hosted content editor for entries, and Delivery settings for exposure.
 
-Use the hosted Presentation editor for labels, help, placeholders, order, groups, tabs, sidebars, and role visibility. Publishing presentation creates a new immutable revision while preserving code-owned structure and contract hashes.
+Use the hosted Presentation editor for labels, help, placeholders, order, groups, tabs, sidebars, and role visibility. Publishing Presentation creates a new immutable revision while preserving code-owned structure and contract hashes. Agents can perform the same editorial-metadata workflow without an SDK administration method:
+
+```bash
+ffd presentation get --collection articles --json > presentation.json
+# Edit only the presentation object.
+ffd presentation publish --collection articles --file presentation.json --json
+```
+
+The file carries exact project/environment/collection/revision/sequence authority, contains no credential, and must stay inside the linked project. Schema structure remains a separate `ffd schema` workflow.
 
 ## Experimental composition
 

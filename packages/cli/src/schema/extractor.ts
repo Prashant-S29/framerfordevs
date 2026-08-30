@@ -26,6 +26,12 @@ export {
 
 const WORKER_TIMEOUT_MILLIS = 3_000;
 
+function workerUrl() {
+  return import.meta.url.endsWith(".mjs")
+    ? new URL("./static-schema-extractor-worker.mjs", import.meta.url)
+    : new URL("./static-extractor/worker", import.meta.url);
+}
+
 function extractionError(
   code: "entry_invalid" | "worker_failed" | "worker_timeout" | "worker_protocol_invalid",
 ) {
@@ -47,7 +53,7 @@ export const extractStaticProjectSchema = Effect.fn("cli.schema.extract.static")
   return yield* Effect.async<ExtractedStaticProjectSchema, StaticSchemaExtractionError>(
     (resume) => {
       let settled = false;
-      const worker = new Worker(new URL("./static-extractor/worker", import.meta.url), {
+      const worker = new Worker(workerUrl(), {
         workerData: validatedInput,
         env: {},
         execArgv: [],

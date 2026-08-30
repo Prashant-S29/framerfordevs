@@ -1,8 +1,8 @@
 # Agent Session Context
 
 **Last updated:** 2026-08-29
-**Current phase:** Post-M13 maintenance is accepted and committed; M14–M30 are sequenced with detailed pending context
-**Next design target:** M14 — Control-plane bootstrap contracts; no implementation is authorized before design approval
+**Current phase:** M14 Control Plane v1 bootstrap design is proposed for developer review; implementation remains unauthorized
+**Next gate:** Developer approval or requested revision of the M14 design
 
 ## Start here
 
@@ -20,7 +20,7 @@ Read relevant sections of `product.md` and `prd/cms.md` for behavioral work. Do 
 - Explicit current developer instruction, product/PRD, relevant rules/active criteria/approved decisions, then status documents govern intent in that order.
 - Committed source, tests, configuration, migrations, and generated artifacts describe executable truth; Git describes repository state.
 - Report drift instead of silently choosing an authority.
-- Work only on an approved active milestone or an explicitly authorized workstream. M14 is the next design target, but its implementation is not active until the developer approves its design.
+- Work only on an approved active milestone or an explicitly authorized workstream. M14 design is proposed for review, but its implementation is not active until the developer approves it.
 
 ## Product direction
 
@@ -31,7 +31,7 @@ The intended surfaces are:
 - `framerfordevs.com`: marketing, documentation, authentication entry.
 - `dashboard.framerfordevs.com`: hosted account/workspace/project control plane and recovery.
 - Developer-configured project path such as `/studio`: framework-neutral, role-projected content/editorial/preview/future visual Studio.
-- HTTP/CLI/SDK: complete machine-readable parity so agents do not require browser workflows.
+- Stable HTTP plus the CLI: complete machine-readable agent/developer automation. The public SDK is intentionally limited to content/runtime integration and never mirrors control-plane or secret administration.
 
 The approved execution sequence is: portable control-plane authority and automation parity; hosted surface separation; secure framework-neutral Studio; client handover/editorial safety; data durability and production hardening; advanced CMS operations; preserved visual-readiness contracts; visual composition/publication; and a renderer SDK baseline. `milestone.md` maps M14–M30 with detailed context and explicitly preserves every point from the original pre-normalization M14–M16. Managed hosting, external data, billing, analytics, and plugins remain unsequenced long-term directions in `product.md` until this baseline is accepted.
 
@@ -55,7 +55,7 @@ packages/content-form    browser-safe role-projected form renderer
 packages/db              Drizzle schema and immutable migration history
 packages/public-contracts canonical public artifact registry
 packages/schema          declarative code-schema contract/validator
-packages/sdk             public Promise/Effect clients and helpers
+packages/sdk             scoped content/runtime Promise/Effect clients and helpers
 packages/ui              shared UI primitives
 ```
 
@@ -81,6 +81,7 @@ Packages never import application source. Cross-package imports use declared exp
 - Tier 2 is explicit, credential-blind, experimental/default-off, and reports `memoryLimitHard: false`; QuickJS issue #255 blocks production/default activation and hard-memory proof.
 - Server-generated collection/field/enum IDs reconcile through stable source keys; plan never reserves IDs.
 - Authoring v1 is bearer-only, originless, redirect-free, `no-store`, and separate from read-only Tooling v1.
+- The unpublished public SDK is content/runtime-scoped: public Authoring retains exact-locale content plus read-only form/Presentation metadata, while schema push and Presentation mutation live in HTTP and the CLI-owned operator client.
 - Browser editor code never receives hosted bearer/refresh/management authority or persists hosted content.
 - Dashboard structure mutations return authenticated `410 DASHBOARD_SCHEMA_AUTHORING_RETIRED`; content, editorial Presentation, Delivery, navigation, and read-only structure remain.
 
@@ -117,8 +118,8 @@ M0–M13 are developer-approved and committed; M13 commit is `9c68942`. Post-M13
 
 Accepted M13 baseline: `pnpm run ready` passed 1,184 tests, 15 type-check tasks, contract drift, formatting, lint, structure, coverage, and eight builds. Reported suites include 723 API, 138 server, 115 dashboard, 105 CLI, 18 SDK, and 13 content-form tests. Shared-database gates ran without the independent worker; residue/invariants were clean and the worker was restored healthy.
 
-The subsequent maintenance workstream also passes the complete readiness gate with the same 1,184 tests and 15 type-check tasks. All 1,089 production JS/CSS artifact counts remain stable; aggregate output is 43,467,370 raw/8,706,685 gzip bytes, down 822,525/201,790 bytes from the pre-refactor baseline. The worker was stopped for shared-database gates and restored healthy afterward.
+The subsequent repository-normalization workstream also passed the complete readiness gate with the same 1,184 tests and 15 type-check tasks. All 1,089 production JS/CSS artifact counts remained stable; aggregate output was 43,467,370 raw/8,706,685 gzip bytes, down 822,525/201,790 bytes from the pre-refactor baseline. The current SDK/CLI boundary correction passes full readiness with 1,190 tests, 15 type-check tasks, contract drift, coverage, and eight builds, plus packaged schema/Presentation/content/editor workflows. The worker was stopped for shared-database gates and restored healthy afterward.
 
 ## Current work and next gate
 
-The detailed M14–M30 roadmap is now sequenced, with the original M14 client-handover, M15 production-hardening, and M16 visual-readiness obligations explicitly mapped into M21–M23 and M27. The next agent should design only M14: portable Control Plane v1 bootstrap contracts for workspace/project create, discover, link, capability inspection, and Studio-registration primitives with exact HTTP/SDK/CLI authority. It must use the settled three-surface, shared-authority, hosted-recovery, browser-credential-isolation, stable-identity, and post-refactor module-ownership context in `milestone.md`. Do not implement M14, design M15, publish packages, activate production OAuth, deploy, or create/apply migrations until the corresponding developer gate.
+The detailed M14–M30 roadmap is sequenced, with the original M14 client-handover, M15 production-hardening, and M16 visual-readiness obligations explicitly mapped into M21–M23 and M27. The developer approved `knowledge_base/decisions/public-http-cli-and-sdk-surface-boundary.md`: stable HTTP is canonical, the CLI is the complete agent/operator surface, and the public SDK is limited to content/runtime integration. The current review worktree implements the required pre-publication correction by narrowing public Authoring methods/DTOs, moving excluded schema/editor transport to a CLI-owned client, and adding exact-authority Presentation get/publish commands. The proposed M14 design now treats that boundary as a prerequisite and defines Control Plane HTTP/CLI/dashboard authority with `sdkSupported: false`. The rest of M14 still awaits developer approval or revision. Do not implement M14, design M15, publish packages, activate production OAuth, deploy, or create/apply migrations until the corresponding developer gate.

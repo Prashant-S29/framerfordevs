@@ -4,6 +4,10 @@
 
 **Date:** 2026-08-23
 
+## Post-M13 public SDK scope amendment — approved 2026-08-29
+
+The developer approved `public-http-cli-and-sdk-surface-boundary.md` before any package publication. Stable Authoring HTTP and the complete CLI remain authoritative, but the public application SDK is content/runtime-focused rather than a mirror of every Authoring operation. The current review worktree keeps exact-locale content operations and read-only form/Presentation metadata, removes schema export/plan/apply and Presentation publication methods/DTOs from public `./authoring`, moves schema/editor transport to a strict CLI-owned client, and adds noninteractive Presentation get/publish CLI workflows. This supersedes the broad SDK parity requirements in this historical record without changing accepted M13 server/domain/database/dashboard behavior, data, or HTTP compatibility.
+
 ## Superseded scope amendment — Tier 2 deferred
 
 After the required evidence gate proved that no evaluated Tier 2 isolate satisfies the approved hard resource/capability contract, the developer selected **Defer Tier 2**. M13 v1 implements only the Tier 1 closed static TypeScript schema path. It does not ship `ffd schema build`, `schemaBuild` configuration, a build manifest, `@framerfordevs/schema/compose`, a transpiler, QuickJS/Javy, or any project-code execution path. Functions, loops, mapping, spread, factories, fluent builders, local-module composition, and npm imports remain unsupported.

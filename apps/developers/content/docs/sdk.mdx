@@ -58,7 +58,7 @@ const authoring = authoringV1({
 const form = await authoring.form.get("articles");
 ```
 
-Promise and Effect clients cover schema export/plan/apply, immutable presentation publication, role-projected forms, optimistic entry rename and draft writes, validation, and exact-locale publish/unpublish. Requests and responses are recursively decoded and bounded. Redirects, stale authority, repeated cursors, and force-overwrite behavior fail closed.
+Promise and Effect clients cover read-only Presentation and role-projected form metadata, optimistic entry rename and draft writes, validation, and exact-locale content publish/unpublish. Requests and responses are recursively decoded and bounded. Redirects, stale authority, repeated cursors, and force-overwrite behavior fail closed. Schema export/plan/push and Presentation mutation are stable HTTP and CLI workflows, not application SDK methods.
 
 See [Automate content workflows](/docs/authoring/automate-content).
 
