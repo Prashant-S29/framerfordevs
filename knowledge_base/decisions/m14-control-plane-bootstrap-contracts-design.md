@@ -6,7 +6,19 @@
 
 ## Developer-approved SDK boundary amendment — 2026-08-29
 
-The developer approved the scoped SDK model while reviewing this proposal. Stable HTTP remains canonical and the CLI becomes the complete agent/developer automation surface, but the public application SDK is limited to content/runtime integration. Control Plane v1 therefore has no SDK client and declares `sdkSupported: false`. The previously identified unpublished M13 Authoring SDK/CLI correction is implemented in the current review worktree and is now a compatibility prerequisite M14 must preserve. This amendment is approved; the remainder of the M14 design still awaits explicit developer approval.
+The developer approved the scoped SDK model while reviewing this proposal. Stable HTTP remains canonical and the CLI becomes the complete agent/developer automation surface, but the public application SDK is limited to content/runtime integration. Control Plane v1 therefore has no SDK client and declares `sdkSupported: false`. The previously identified unpublished M13 Authoring SDK/CLI correction is committed at `d63f215` and is now a compatibility prerequisite M14 must preserve. This amendment is approved; the remainder of the M14 design still awaits explicit developer approval.
+
+## Review clarifications — 2026-08-30
+
+The developer directed the proposal to close validated review gaps under `knowledge_base/rules/decision-rules.md` before another review and explicitly approved management-credential CMS enablement in M14. This revision therefore:
+
+- Permits an exact project/primary-environment management credential carrying `project.capability.manage` to enable CMS, with honest credential attribution added to `project_capability`; workspace/project creation, enumeration, archive, and restore remain user-only.
+- Makes Studio-registration create/update conflicts explicit: receipt replay wins first; otherwise create-only against an existing row and stale positive versions return `VERSION_CONFLICT`, while update-only against an absent or foreign row returns non-enumerating `NOT_FOUND`.
+- Persists a command receipt for every successful Studio-registration `PUT`, including no-ops, so command IDs cannot be reused with changed intent and ambiguous no-op responses replay deterministically without version or audit noise.
+- Confirms `ffd link` is authenticated and online-only. The current unpublished offline-trusting behavior is not retained as a compatibility mode; config v2 may still be authored through its documented exact JSON contract when no network command is desired.
+- Defines receipt growth as one compact row per distinct committed receipt-bearing command, with replays adding none, and requires row-count/age evidence plus approved rate budgets before M14 acceptance; retention/deletion remains M22 authority.
+
+The committed baseline at `5f6480d` also removes pre-release dashboard schema-authoring compatibility tombstones. M14 preserves the resulting absent mutation procedures, retained read-only structure/Presentation/content/Delivery paths, and canonical Authoring v1 authority rather than recreating retired dashboard routes.
 
 ## Decision summary
 
@@ -16,9 +28,9 @@ The design uses:
 
 - A new bearer-only, originless `/api/control-plane/v1` family rather than publishing dashboard oRPC or extending read-only Tooling v1
 - The same platform repository/policy workflows for Better Auth session users, OAuth CLI users, and exact project-bound management credentials
-- User-only workspace discovery/creation, project creation/listing/archive/restore, and capability enablement
-- Exact project read/update and environment-scoped Studio-registration reads/writes for eligible OAuth users or management credentials
-- Persisted command receipts for create-like mutations and optimistic resource versions for mutable lifecycle transitions
+- User-only workspace discovery/creation and project creation/listing/archive/restore
+- Exact project read/update, CMS capability enablement, and environment-scoped Studio-registration reads/writes for eligible OAuth users or management credentials
+- Persisted command receipts for create-like mutations and every Studio-registration `PUT`, plus optimistic resource versions for mutable lifecycle transitions
 - Signed, short-lived, principal/scope/filter-bound public cursors rather than exposing the unsigned internal dashboard cursor format
 - One optional, versioned Studio registration per project environment containing only an application origin and mount path; it grants no session, redirect, runtime, or browser credential authority
 - A canonical OpenAPI 3.1 artifact, closed public-registry entry marked `sdkSupported: false`, bounded CLI command family, source-controlled docs, and compatibility baseline
@@ -50,8 +62,8 @@ M14 extends these committed seams:
 - M4 project creation already inserts required enabled `en` atomically.
 - M12 already provides the fixed official CLI OAuth client, audience-bound access/refresh authority, secure keychain persistence, read-only Tooling v1 discovery, a closed public registry, SDK/CLI packaging, and atomic local writes.
 - M13 already generalizes the OAuth verifier to route-specific grants, distinguishes OAuth users from management credentials, preserves honest credential attribution in CMS workflows, and establishes bearer-only originless Authoring v1.
-- The post-M13 boundary correction narrows public Authoring SDK methods to content/runtime use, gives excluded schema/editor calls a strict CLI-owned client, and adds exact-authority Presentation get/publish CLI workflows without changing Authoring HTTP.
-- The dashboard already provides session-backed workspace/project create/list/get/update/archive and CMS enablement through oRPC.
+- The post-M13 boundary correction committed at `d63f215` narrows public Authoring SDK methods to content/runtime use, gives excluded schema/editor calls a strict CLI-owned client, and adds exact-authority Presentation get/publish CLI workflows without changing Authoring HTTP.
+- The dashboard already provides session-backed workspace/project create/list/get/update/archive and CMS enablement through oRPC. Retired pre-release dashboard schema-structure mutation procedures and their compatibility tombstones are absent from the committed `5f6480d` baseline.
 - `ffd link` writes safe non-secret config v2 atomically, but currently trusts caller-supplied project/environment values and performs no online authorization, identity, archive-state, or capability check.
 
 The gaps are:
@@ -63,7 +75,7 @@ The gaps are:
 5. Workspace and project creation have no persisted command receipt, so a response loss cannot be distinguished safely from a second create attempt; workspace names are intentionally non-unique.
 6. Project restore was explicitly deferred by M2, leaving archive without a portable recovery path.
 7. There is no durable project/environment Studio-registration identity or metadata for M18 to consume.
-8. Current platform mutation functions assume a user actor. Exact management-credential project update or Studio-registration mutation needs an honest credential actor in audits and any actor-bearing row.
+8. Current platform mutation functions assume a user actor. Exact management-credential project update, capability enablement, or Studio-registration mutation needs an honest credential actor in audits and any actor-bearing row.
 9. The public-registry forbidden-surface check correctly blocks accidental raw `platform.workspaces` publication, but it has no explicit allowlisted Control Plane family.
 10. The dashboard and public clients would diverge if a second repository or policy implementation were added instead of adapting principals into the existing platform authority.
 
@@ -74,12 +86,12 @@ The gaps are:
 - Control Plane v1 contracts and isolated Express transport
 - Workspace create/list/get
 - Project create/list/get/update/archive/restore
-- Initial CMS capability selection during project creation, capability inspection, and user-authorized CMS enablement
+- Initial CMS capability selection during user-authored project creation, capability inspection, and policy/scope-authorized CMS enablement
 - Online project/environment verification for `ffd link`
 - One versioned Studio-registration resource per project/environment with read and create/update behavior
 - Better Auth session-to-user, OAuth-user-to-user, and exact management-credential principal adapters
 - New narrow OAuth grants for control-plane read, write, and project lifecycle operations
-- Persisted create-like command receipts, canonical fingerprints, replay/conflict semantics, optimistic versions, audits, and failure injection
+- Persisted create-like and Studio-registration command receipts, canonical fingerprints, replay/conflict semantics, optimistic versions, audits, and failure injection
 - Signed keyset pagination for public workspace/project lists
 - Canonical OpenAPI/public-registry artifact, CLI commands, docs, and package/contract evidence
 - Preservation of the implemented content/runtime-only SDK boundary, without adding a Control Plane SDK
@@ -105,7 +117,7 @@ The gaps are:
 3. Tooling v1 stays originless and read-only; Authoring v1, Delivery v1, Preview v1, webhook v1, and existing dashboard oRPC remain compatibility-stable.
 4. Public Control Plane v1 is bearer-only, originless, redirect-free, cookie-independent, `no-store`, and rejects browser `Origin` and preflight requests.
 5. OAuth scope is necessary but never sufficient. Current workspace membership, project role, archive state, capability state, and exact tenant/environment policy are rechecked on every request.
-6. Management credentials remain exact project/environment actors. They cannot enumerate workspaces/projects, create workspace/project resources, archive/restore projects, or become user sessions.
+6. Management credentials remain exact project/environment actors. They cannot enumerate workspaces/projects, create workspace/project resources, archive/restore projects, or become user sessions. An exact primary-environment credential may enable CMS only with `project.capability.manage` and honest credential attribution.
 7. Every mutation is either receipt-idempotent or guarded by an exact optimistic resource version. Replays never duplicate state/audits, and stale writers never silently win.
 8. Project keys remain immutable and reserved across archive/restore. Archive deletes or disables no child resource; restore reactivates access to preserved state.
 9. Studio registration is metadata only. It creates no browser authority, redirect, cookie, token, secret, adapter, BFF route, or proof that a Studio deployment exists.
@@ -239,9 +251,9 @@ M14 adds `project.restore` to the user action registry and grants it only to the
 
 `GET /projects/{projectId}/capabilities` returns every known capability with stable ID when materialized, key, status, version, and change timestamp. Absence projects as disabled, preserving the current M2 representation.
 
-`PUT /projects/{projectId}/capabilities/cms` accepts only `commandId`. It supports only the existing `absent -> enabled` transition, requires an active project and `project.capability.manage`, and returns `{ capability, replayed }`. It is available to session/OAuth users only because the existing `project_capability.changed_by_user_id` authority cannot honestly represent a credential and M14 does not introduce a misleading attribution or a cross-schema actor refactor merely to use an otherwise available credential scope.
+`PUT /projects/{projectId}/capabilities/cms` accepts only `commandId`. It supports only the existing `absent -> enabled` transition, requires an active project and `project.capability.manage`, and returns `{ capability, replayed }`. Receipt replay is evaluated first; the exact committed enable command replays, while a new command against an already-enabled capability returns `INVALID_STATE_TRANSITION` and persists no receipt. Session/OAuth users use current project policy. An exact management credential may enable CMS only when it is bound to that project’s primary environment and carries `project.capability.manage`; the capability row and audit identify the credential, never its issuer.
 
-Management credentials may inspect capabilities with `project.read`; they cannot mutate them in Control Plane v1. Capability disablement remains deferred.
+M14 normalizes `project_capability` change attribution to exactly one user or credential actor rather than leaving the already-issued management scope without a canonical operation or recording misleading user attribution. This does not let credentials create/list projects, enable arbitrary capability keys, disable capabilities, or mutate a foreign/non-primary environment. Capability disablement remains deferred.
 
 ### Studio registration
 
@@ -286,7 +298,9 @@ Mount paths are canonical absolute application paths, 1–240 UTF-8 bytes, begin
 
 - `expectedVersion: null` means create only.
 - A positive expected version means update only.
-- Same desired values under the exact current version are a no-op.
+- Same desired values under the exact current version are a no-op with no version increment or audit, but the successful command still persists its immutable receipt.
+- Receipt lookup/replay occurs before evaluating current create/update state. An exact committed command replays even when its original `expectedVersion: null` now observes the created row.
+- For a new command, create-only against an existing registration returns `VERSION_CONFLICT`; update-only against an absent or foreign registration returns `NOT_FOUND`; a mismatched positive current version returns `VERSION_CONFLICT`.
 - Create/update is receipt-idempotent and optimistic, with `{ registration, created, replayed, noOp }` output.
 - User actors require `project.update`.
 - Management credentials require `project.update` and exact matching project/environment authority.
@@ -320,16 +334,16 @@ Existing oRPC names and response contracts remain stable. Dashboard project crea
 
 The exact operation matrix is:
 
-| Operation                            | Management credential authority                            |
-| ------------------------------------ | ---------------------------------------------------------- |
-| Workspace create/list/get            | Denied                                                     |
-| Project create/list                  | Denied; no enumeration                                     |
-| Exact project get/capability inspect | `project.read`, matching project; no scope widening        |
-| Project update                       | `project.update`, matching project and primary environment |
-| Project archive/restore              | Denied                                                     |
-| Capability enable                    | Denied in M14                                              |
-| Studio registration get              | `project.read`, matching project/environment               |
-| Studio registration put              | `project.update`, matching project/environment             |
+| Operation                            | Management credential authority                                       |
+| ------------------------------------ | --------------------------------------------------------------------- |
+| Workspace create/list/get            | Denied                                                                |
+| Project create/list                  | Denied; no enumeration                                                |
+| Exact project get/capability inspect | `project.read`, matching project; no scope widening                   |
+| Project update                       | `project.update`, matching project and primary environment            |
+| Project archive/restore              | Denied                                                                |
+| Capability enable                    | `project.capability.manage`, matching project and primary environment |
+| Studio registration get              | `project.read`, matching project/environment                          |
+| Studio registration put              | `project.update`, matching project/environment                        |
 
 Delivery and Preview credentials fail generically. Revoked, expired, rotated, wrong-family, wrong-scope, foreign-project, and foreign-environment credentials cannot fall back to OAuth/session behavior.
 
@@ -343,7 +357,7 @@ type ControlPlaneActor =
   | { kind: "credential"; id: ApiCredentialId };
 ```
 
-Workspace/project creation and lifecycle operations narrow to the user branch before persistence. Project update audits and Studio-registration actor columns support either branch. Credential actors are never attributed to `createdByUserId`, `archivedByUserId`, or the credential issuer.
+Workspace/project creation and lifecycle operations narrow to the user branch before persistence. Project update audits, capability-change actor columns, and Studio-registration actor columns support either branch. Credential actors are never attributed to `createdByUserId`, `archivedByUserId`, or the credential issuer.
 
 Responses do not expose actor identity. Audit rows retain existing bounded actor type/ID and resource scope.
 
@@ -359,19 +373,20 @@ M14 adds one bounded control-plane command receipt authority for create-like mut
 - Canonical request fingerprint SHA-256
 - Workspace ID and optional project/environment scope
 - Result resource type and stable result ID
+- Closed result disposition (`created | updated | no_op`) needed to reproduce Studio-registration replay flags without storing response JSON
 - Created timestamp
 
-No request body, name, description, URL, path, secret, token, response JSON, or arbitrary metadata is stored. Receipts are immutable and have no M14 deletion path; retention is explicitly deferred to M22.
+No request body, name, description, URL, path, secret, token, response JSON, or arbitrary metadata is stored. Receipts are immutable and have no M14 deletion path; retention is explicitly deferred to M22. Growth is exactly one compact row per distinct committed workspace create, project create, capability enable, or Studio-registration `PUT` command, including successful registration no-ops; exact replays add no row. M14 records row count, age distribution, write rate, and bytes-per-row evidence so M22 receives measured authority rather than a fabricated forecast.
 
-The fingerprint includes operation, actual actor kind/ID, canonical tenant scope, and exact normalized input. A command ID with the same operation/actor/fingerprint replays; any mismatch returns `COMMAND_CONFLICT`. A replay reauthorizes current access before loading the current result and creates no second audit. Loss of current authority returns the same non-enumerating denial as an ordinary read.
+The fingerprint includes operation, actual actor kind/ID, canonical tenant scope, and exact normalized input. A command ID with the same operation/actor/fingerprint replays; any mismatch returns `COMMAND_CONFLICT`. A replay reauthorizes current access before loading the current result and creates no second audit. The stored result disposition reproduces the original `created`/`noOp` flags while `replayed` becomes true; it does not preserve mutable response JSON. Loss of current authority returns the same non-enumerating denial as an ordinary read.
 
-Workspace/project/capability/Studio-registration creation writes state, audit, and receipt in one transaction. Failure injection proves no receipt survives without its state and no state survives without its receipt/audit.
+Workspace/project/capability/Studio-registration state changes write state, audit, and receipt in one transaction. A successful Studio-registration no-op writes only its receipt in the same locked transaction, reserving the command ID without version or audit noise. Failure injection proves no state-changing receipt survives without its state/audit, no state survives without its receipt/audit, and no no-op receipt is reported before it commits.
 
 ### Optimistic operations
 
 Project update/archive/restore require the exact project version. Studio registration update requires the exact registration version. Conditional updates increment once; stale requests return `VERSION_CONFLICT`. No force flag, wildcard version, last-write-wins retry, or server-selected merge is provided.
 
-No-op project/registration updates return success without a version increment, audit, or new receipt beyond replaying an already committed create command.
+No-op project updates return success without a version increment or audit and have no command receipt because project update is version-only. Every successful Studio-registration `PUT`, including a no-op, commits or replays a receipt; no-op registration commands still avoid version increments and audits.
 
 ### Locking
 
@@ -442,13 +457,13 @@ Initial public bounds are:
 
 Global and principal rate policies are separate from Tooling/Authoring. Costs are bounded by operation class: reads/list pages, create/update, lifecycle, and Studio writes. Identities are opaque digests and metrics use only closed operation/principal/outcome/status/cost buckets.
 
-No production throughput target is invented during design. Implementation records deterministic representative list and contention baselines and obtains developer approval for any release budget.
+No production throughput target is invented during design. Implementation records deterministic representative list and contention baselines, receipt row count/age/write-rate/size evidence, and obtains developer approval for concrete global/principal capacities, bursts, and operation costs. M14 cannot be accepted or released with placeholder policies or without those approved budgets.
 
 ## SDK exclusion and pre-publication correction
 
 Control Plane v1 has no `@framerfordevs/sdk/control-plane` export. Its public-registry entry is canonical and documented but explicitly sets `sdkSupported: false`. Developers and agents use the CLI; hosted clients use their approved transport adapter over the same server authority.
 
-The approved pre-publication SDK boundary from `public-http-cli-and-sdk-surface-boundary.md` is already implemented in the current review worktree. M14 must preserve it:
+The approved pre-publication SDK boundary from `public-http-cli-and-sdk-surface-boundary.md` is committed at `d63f215`. M14 must preserve it:
 
 - Delivery, Preview, exact-locale content operations, read-only generated-form/Presentation metadata, webhook verification, invalidation, and generated contract helpers remain public.
 - Schema export/plan/apply and Presentation publish methods/DTOs remain absent from public `./authoring`.
@@ -489,9 +504,9 @@ Rules:
 - OAuth tokens remain in the OS keychain. Scope denial returns a stable re-login diagnostic rather than attempting a management fallback.
 - Exit code 0 means accepted success/replay/no-op; ordinary typed failure remains 1; existing schema-check drift exit 2 remains unchanged.
 
-`ffd link` keeps config v2 and its existing required flags/output keys for compatibility. Before writing, it authenticates, gets the exact project, resolves the named environment from the returned stable environment authority, requires an active project and enabled CMS capability, and then writes atomically. It returns additive workspace/project/environment IDs and capability status but no bearer data. It never creates, enables, restores, or registers anything implicitly.
+`ffd link` keeps config v2 and its existing required flags/output keys for compatibility. It is an authenticated online verification command with no offline, pre-authentication, or trust-caller mode. Before writing, it authenticates, gets the exact project, resolves the named environment from the returned stable environment authority, requires an active project and enabled CMS capability, and then writes atomically. It returns additive workspace/project/environment IDs and capability status but no bearer data. It never creates, enables, restores, or registers anything implicitly.
 
-Keeping config v2 avoids forcing all M13 schema/editor commands through a config migration before M24 designs multiple user-visible environments. The stable project ID plus immutable current `main` key remain authoritative; the online link response supplies the environment ID for callers that need it.
+Keeping config v2 avoids forcing all M13 schema/editor commands through a config migration before M24 designs multiple user-visible environments. The stable project ID plus immutable current `main` key remain authoritative; the online link response supplies the environment ID for callers that need it. Because the CLI remains unpublished at `0.0.0`, replacing offline trust is a pre-publication correctness/security correction rather than a released compatibility break. A caller that deliberately needs no network command may author the documented exact non-secret JSON contract directly, but `ffd link` never writes unverified authority.
 
 ## Hosted dashboard behavior
 
@@ -545,7 +560,7 @@ Expected additions:
 - UUID command ID primary key
 - Closed operation, actor type/ID, SHA-256 fingerprint
 - Workspace ID, nullable project/environment IDs with composite tenant foreign keys
-- Result resource type/ID and created timestamp
+- Result resource type/ID, closed `created | updated | no_op` disposition, and created timestamp
 - Checks and indexes for actor/operation lookup and tenant result recovery
 
 ### Studio registration
@@ -558,6 +573,13 @@ Expected additions:
 - Exactly-one user-or-credential creator and changer references
 - Composite management-credential foreign keys and supporting indexes
 - URL/path/check constraints matching application validation where PostgreSQL can enforce them safely
+
+### Project capability actor authority
+
+- Make `changed_by_user_id` nullable and add nullable `changed_by_credential_id` plus `changed_by_credential_environment_id`
+- Require either one user changer or the complete credential-ID/environment pair, never both or a partial credential actor
+- Add the exact `(credential, workspace, project, environment)` management-credential foreign key and supporting indexes; application policy additionally proves that the recorded credential environment is the project’s current primary environment
+- Preserve existing user-authored capability rows and the singleton `(project_id, key)` capability authority
 
 ### Project restore authority
 
@@ -597,24 +619,24 @@ Business workflows remain named `Effect.fn` values with typed expected errors an
 
 ## Security and threat model
 
-| Threat                                         | Control                                                                                     |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Publish dashboard internals accidentally       | Closed `control-plane/v1` registry source and forbidden-surface tests                       |
-| OAuth token grants tenant authority by itself  | Current membership/role/policy recheck at repository boundary                               |
-| Management credential enumerates account       | No workspace/project list/create routes for credentials; exact project/environment match    |
-| Credential impersonates issuer                 | Explicit credential actor, transactional audit, exactly-one registration actor columns      |
-| Browser steals/uses CLI bearer                 | Origin/preflight rejection, no CORS, cookie independence, no Control Plane SDK export       |
-| Cross-tenant ID substitution                   | Authorization before sensitive loads, composite scope predicates/FKs, non-enumeration       |
-| Duplicate create after timeout                 | Persisted command receipt and canonical fingerprint in same transaction                     |
-| Command ID reused with changed intent          | Actor/operation/scope/input-bound fingerprint and `COMMAND_CONFLICT`                        |
-| Cursor tampering/reuse                         | HMAC, expiry, rotation, principal/route/scope/filter/limit binding                          |
-| Archive causes data loss                       | Soft archive only, no cascade, explicit restore/version authority                           |
-| Lifecycle credential abuse                     | Archive/restore remain user-owner only and have a separate OAuth grant                      |
-| Malicious Studio origin/path                   | Closed canonical schemas, no fetch/redirect/trust/runtime consumption in M14                |
-| Studio registration becomes browser credential | Metadata contains no secret/session/token and creates no browser route                      |
-| Secret/PII leak through outputs                | Closed projections; no token/email/credential metadata/actor/body in responses or telemetry |
-| Unbounded account/list abuse                   | Keyset pages, no totals, byte bounds, weighted global/principal quotas                      |
-| Partial mutation/audit/receipt                 | One transaction and failure injection at every persistence stage                            |
+| Threat                                         | Control                                                                                           |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Publish dashboard internals accidentally       | Closed `control-plane/v1` registry source and forbidden-surface tests                             |
+| OAuth token grants tenant authority by itself  | Current membership/role/policy recheck at repository boundary                                     |
+| Management credential enumerates account       | No workspace/project list/create routes for credentials; exact project/environment match          |
+| Credential impersonates issuer                 | Explicit credential actor, transactional audit, exactly-one capability/registration actor columns |
+| Browser steals/uses CLI bearer                 | Origin/preflight rejection, no CORS, cookie independence, no Control Plane SDK export             |
+| Cross-tenant ID substitution                   | Authorization before sensitive loads, composite scope predicates/FKs, non-enumeration             |
+| Duplicate create after timeout                 | Persisted command receipt and canonical fingerprint in same transaction                           |
+| Command ID reused with changed intent          | Actor/operation/scope/input-bound fingerprint and `COMMAND_CONFLICT`                              |
+| Cursor tampering/reuse                         | HMAC, expiry, rotation, principal/route/scope/filter/limit binding                                |
+| Archive causes data loss                       | Soft archive only, no cascade, explicit restore/version authority                                 |
+| Lifecycle credential abuse                     | Archive/restore remain user-owner only and have a separate OAuth grant                            |
+| Malicious Studio origin/path                   | Closed canonical schemas, no fetch/redirect/trust/runtime consumption in M14                      |
+| Studio registration becomes browser credential | Metadata contains no secret/session/token and creates no browser route                            |
+| Secret/PII leak through outputs                | Closed projections; no token/email/credential metadata/actor/body in responses or telemetry       |
+| Unbounded account/list abuse                   | Keyset pages, no totals, byte bounds, weighted global/principal quotas                            |
+| Partial mutation/audit/receipt                 | One transaction and failure injection at every persistence stage                                  |
 
 Dependency additions are not expected. If implementation evidence requires one, package provenance/license/audit and developer approval occur before adoption.
 
@@ -657,6 +679,7 @@ No current Delivery/Preview/Authoring/worker load budget is weakened.
 - Mount-path root/dot/double/trailing/encoded/control/backslash and length cases
 - Actor union and exact operation authorization matrix
 - Canonical command fingerprints under key-order changes and actor/scope/operation differences
+- Registration create-only/update-only/current-version transition matrix and closed receipt result dispositions
 - Signed cursor round-trip, tamper, expiry, previous-key rotation, principal/route/workspace/status/limit mismatch
 - Control Plane OpenAPI complete canonical bytes, operation IDs, security per route, and public exclusions
 - Existing five public artifact bytes/digests unchanged
@@ -672,12 +695,14 @@ No current Delivery/Preview/Authoring/worker load budget is weakened.
 ### PostgreSQL integration
 
 - Atomic workspace/project/capability/registration state + receipt + audit
-- Same-command exact replay and changed-fingerprint conflict
+- Registration no-op receipt commit/replay with no version/audit mutation, preserved result disposition, and changed-fingerprint conflict
+- Registration create-only existing, update-only absent, stale-version, and concurrent-create outcomes
+- Same-command exact replay, changed-fingerprint conflict, and new-command capability re-enable `INVALID_STATE_TRANSITION` without an orphan receipt
 - Response-loss simulation and replay recovery
 - Concurrent same workspace/project key/command ID and singleton registration races
 - Project update/archive/restore exact version and no-op behavior
 - Archive preserves all child rows and restore recovers reachability without rewriting them
-- Credential-authored project update/registration has exact actor audit/FKs and no issuer attribution
+- Credential-authored project update/capability enable/registration has exact actor audit/FKs and no issuer attribution
 - Cross-workspace/project/environment/credential isolation and composite FK rejection
 - Failure injection after every state/audit/receipt stage leaves no partial authority
 - Representative `EXPLAIN` assertions for lists, receipts, registration, and credential scope
@@ -685,8 +710,9 @@ No current Delivery/Preview/Authoring/worker load budget is weakened.
 ### HTTP/security
 
 - Every path, method, content type, query, body, response envelope, status, request ID, no-store, and rate header
+- Studio receipt replay before state conflict, create-only existing `VERSION_CONFLICT`, update-only absent `NOT_FOUND`, and stale positive `VERSION_CONFLICT`
 - OAuth read/write/lifecycle grant matrix plus current role matrix
-- Management credential matrix, primary-environment project update rule, exact Studio environment, and family denial
+- Management credential matrix, primary-environment project update/capability rule, exact Studio environment, and family denial
 - Foreign/nonexistent non-enumeration and known-member forbidden behavior
 - Revoked/expired/rotated credential and OAuth membership/scope changes
 - Browser Origin/preflight, cookies-without-bearer, duplicate auth/query, token-in-query, redirects, traversal, malformed/oversized/chunked JSON, and extra-field rejection
@@ -727,7 +753,7 @@ The developer should verify at least:
 4. Use two tenants and restricted roles to confirm workspace/project lists, direct IDs, lifecycle, capability, and Studio registration cannot enumerate or cross scope.
 5. Archive a real test project, confirm Tooling/Authoring/Delivery/Preview reject it under existing contracts, restore it, and confirm preserved configuration/content becomes reachable without republishing or identity change.
 6. Register and update one Studio origin/path from dashboard and CLI, inspect exact metadata, and confirm no network probe, redirect, browser route, token, cookie, or secret is created.
-7. Use a narrowly scoped management credential to prove exact project/registration reads and permitted updates while workspace/project enumeration, creation, lifecycle, and capability mutation remain denied.
+7. Use a narrowly scoped management credential to prove exact project/registration reads, permitted project/registration updates, and CMS enablement with `project.capability.manage`, while workspace/project enumeration, creation, lifecycle, foreign/non-primary capability mutation, and capability disablement remain denied.
 8. Inspect canonical public docs/artifacts, packed CLI, narrowed SDK, browser assets/storage/network, logs/traces/metrics/audits, and local config for forbidden administration contracts or credentials.
 
 ## Alternatives rejected
@@ -788,19 +814,19 @@ Developers and agents gain the exact bootstrap path required by the PRD—login,
 
 ### Correctness
 
-Stable IDs, atomic default resources, command receipts, exact fingerprints, signed cursors, optimistic versions, preserved archive state, and one shared repository prevent duplicate or divergent authority.
+Stable IDs, atomic default resources, command receipts with closed result dispositions, exact registration conflict semantics, exact fingerprints, signed cursors, optimistic versions, preserved archive state, and one shared repository prevent duplicate or divergent authority.
 
 ### Security
 
-Narrow OAuth grants, originless bearer transport, no cookie ambiguity, exact management credential scope, owner-only lifecycle, server policy, non-enumeration, bounded URL/path metadata, and honest actor audits preserve least privilege and browser credential isolation.
+Narrow OAuth grants, originless bearer transport, no cookie ambiguity, exact primary-environment management credential scope, owner-only lifecycle, exactly-one capability/registration actor attribution, server policy, non-enumeration, bounded URL/path metadata, and honest audits preserve least privilege and browser credential isolation.
 
 ### Reliability
 
-Transactional receipts/audits, replay recovery, soft archive/restore, failure injection, bounded clients, and no hidden mutation retry prevent partial bootstrap state and ambiguous automation.
+Transactional receipts/audits, deterministic no-op replay, replay-before-conflict ordering, soft archive/restore, failure injection, bounded clients, and no hidden mutation retry prevent partial bootstrap state and ambiguous automation.
 
 ### Performance
 
-Keyset pages, no totals, direct scoped IDs, indexed receipt/registration lookups, bounded representations, and separate quotas avoid account scans and keep control-plane work isolated from delivery and worker capacity.
+Keyset pages, no totals, direct scoped IDs, indexed receipt/registration lookups, measured receipt growth, bounded representations, and evidence-approved separate quotas avoid account scans and keep control-plane work isolated from delivery and worker capacity.
 
 ### UX
 
@@ -808,7 +834,7 @@ The dashboard retains familiar workflows and adds explicit restore/registration 
 
 ### DX
 
-One canonical OpenAPI family, stable CLI commands, verified online linking, precise errors, preserved config v2, and an intentionally smaller application SDK let humans and agents bootstrap without scraping or expanding website packages into administration clients.
+One canonical OpenAPI family, stable CLI commands, explicitly online verified linking, precise create/update conflict semantics, preserved config v2, and an intentionally smaller application SDK let humans and agents bootstrap without scraping or expanding website packages into administration clients.
 
 ### Observability
 
@@ -826,9 +852,9 @@ Developer approval authorizes these M14 design decisions, but not implementation
 2. Keep dashboard Better Auth sessions on protected oRPC for M14 while sharing the exact domain authority; defer public cookie/session transport to M17.
 3. Expose the exact workspace/project/capability/Studio-registration route set listed above.
 4. Add `control-plane:read`, `control-plane:write`, and `control-plane:project:lifecycle` to the fixed official CLI OAuth authority.
-5. Restrict workspace/project discovery, creation, archive/restore, and capability mutation to user actors; permit management credentials only for exact approved project/registration operations.
+5. Restrict workspace/project discovery, creation, and archive/restore to user actors; permit management credentials only for exact approved project update, capability inspection/CMS enablement, and Studio-registration operations, with primary-environment binding where project-wide mutation requires it.
 6. Add project restore as a soft lifecycle reversal using a new owner-only `project.restore` action and existing version/archive columns.
-7. Add persisted bounded command receipts for create-like operations and retain optimistic versions for update/lifecycle operations.
+7. Add persisted bounded command receipts for create-like operations and every Studio-registration `PUT`, including no-ops, while retaining optimistic versions for update/lifecycle operations.
 8. Add signed, expiring, principal/scope/filter-bound public workspace/project cursors while preserving internal dashboard cursors.
 9. Allow project creation to enable initial CMS capability atomically without creating schema/content/integration resources.
 10. Add one inert, versioned Studio registration per exact environment containing only canonical application origin and mount path.
