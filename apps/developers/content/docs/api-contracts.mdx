@@ -8,13 +8,14 @@ description: Use generated wire references only when you need exact operations, 
 Most integrations should begin with the task-oriented guides. The API contract area is available when you need exact HTTP details.
 
 - [Authoring v1](/api-reference/authoring/v1)
+- [Control Plane v1](/api-reference/control-plane/v1)
 - [Delivery v1](/api-reference/delivery/v1)
 - [Preview v1](/api-reference/preview/v1)
 - [Tooling v1](/api-reference/tooling/v1)
 - [Webhook data v1](/api-reference/webhooks/v1)
 
-Delivery, Preview, and Tooling pages are generated from their canonical OpenAPI 3.1 artifacts. Webhook data is rendered from canonical JSON Schema 2020-12. The developer portal does not maintain a second copy of request or response definitions.
+Authoring, Control Plane, Delivery, Preview, and Tooling pages are generated from their canonical OpenAPI 3.1 artifacts. Webhook data is rendered from canonical JSON Schema 2020-12. The developer portal does not maintain a second copy of request or response definitions.
 
-Browser request execution is disabled in the generated references. Preview and Tooling are server/CLI-oriented boundaries, and the documentation site never proxies or stores user credentials.
+Browser request execution is disabled in the generated references. Control Plane, Preview, and Tooling are server/CLI-oriented boundaries, and the documentation site never proxies or stores user credentials.
 
 Raw immutable artifacts remain downloadable under `/specs/**`.

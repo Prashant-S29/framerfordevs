@@ -41,6 +41,25 @@ export class StoredCredentialInvalidError extends Schema.TaggedError<StoredCrede
   "StoredCredentialInvalidError",
 )("StoredCredentialInvalidError", {}) {}
 
+export class ControlPlaneHttpError extends Schema.TaggedError<ControlPlaneHttpError>(
+  "ControlPlaneHttpError",
+)("ControlPlaneHttpError", {
+  status: Schema.Number.pipe(Schema.int(), Schema.between(0, 599)),
+  code: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
+  retryable: Schema.Boolean,
+}) {}
+
+export class ControlPlaneResponseTooLargeError extends Schema.TaggedError<ControlPlaneResponseTooLargeError>(
+  "ControlPlaneResponseTooLargeError",
+)("ControlPlaneResponseTooLargeError", {}) {}
+
+export class ControlPlaneTransportError extends Schema.TaggedError<ControlPlaneTransportError>(
+  "ControlPlaneTransportError",
+)("ControlPlaneTransportError", {
+  operation: Schema.String,
+  cause: Schema.Defect,
+}) {}
+
 export class ToolingHttpError extends Schema.TaggedError<ToolingHttpError>("ToolingHttpError")(
   "ToolingHttpError",
   {

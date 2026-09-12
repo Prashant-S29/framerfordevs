@@ -7,8 +7,10 @@ import { Effect, Exit } from "effect";
 
 import {
   acquireContentCommand,
+  acquireControlPlaneCommand,
   acquireSchemaApplyCommand,
   clearContentCommand,
+  clearControlPlaneCommand,
   clearSchemaApplyCommand,
 } from "./index";
 
@@ -51,6 +53,32 @@ it.live(
           assert.notInclude(contentBytes, "title");
           assert.notInclude(contentBytes, "token");
           yield* clearContentCommand(root, content.commandId);
+
+          const suppliedCommandId = "019fae8b-1234-7000-8000-000000000001";
+          const controlPlane = yield* acquireControlPlaneCommand(
+            root,
+            "workspace.create",
+            "e".repeat(64),
+            suppliedCommandId,
+          );
+          const controlPlaneReplay = yield* acquireControlPlaneCommand(
+            root,
+            "workspace.create",
+            "e".repeat(64),
+            suppliedCommandId,
+          );
+          assert.strictEqual(controlPlaneReplay.commandId, suppliedCommandId);
+          assert.strictEqual(controlPlane.commandId, suppliedCommandId);
+          const controlPlaneBytes = yield* Effect.promise(() =>
+            readFile(join(root, ".framerfordevs/retry/control-plane-command.json"), "utf8"),
+          );
+          assert.notInclude(controlPlaneBytes, "Workspace name");
+          assert.notInclude(controlPlaneBytes, "token");
+          const controlPlaneConflict = yield* Effect.exit(
+            acquireControlPlaneCommand(root, "project.create", "f".repeat(64)),
+          );
+          assert.isTrue(Exit.isFailure(controlPlaneConflict));
+          yield* clearControlPlaneCommand(root, controlPlane.commandId);
         }),
       (root) => Effect.promise(() => rm(root, { recursive: true, force: true })),
     ),

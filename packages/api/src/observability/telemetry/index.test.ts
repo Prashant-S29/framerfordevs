@@ -49,6 +49,14 @@ describe("Effect metrics", () => {
         });
         yield* telemetry.recordPreviewQueryRejection("credential_in_query");
         yield* telemetry.recordPreviewAuditFailure();
+        yield* telemetry.recordControlPlaneRequest({
+          operation: "project_create",
+          subject: "oauth_user",
+          outcome: "success",
+          statusFamily: "2xx",
+          costBucket: "5",
+          durationMs: 19,
+        });
         yield* telemetry.recordToolingRequest({
           endpoint: "manifest",
           subject: "oauth_user",

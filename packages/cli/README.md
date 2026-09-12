@@ -2,7 +2,7 @@
 
 Official OAuth device CLI and deterministic public-schema generator for Framer for Developers.
 
-> Release status: M13 release staging. No npm publication is performed automatically from this repository.
+> Release status: unpublished at version `0.0.0`. No npm publication is performed automatically from this repository.
 
 ## Install
 
@@ -42,9 +42,25 @@ FFD_MANAGEMENT_TOKEN="$CI_SECRET" ffd schema check --json
 
 Do not run interactive login in CI. The token is read only from the process environment and is never written to project configuration or schema locks.
 
+## Control Plane bootstrap
+
+Control Plane commands provide complete noninteractive workspace/project bootstrap, capability, lifecycle, and inert Studio-registration automation. Every command requires an explicit `--api <origin>` and supports stable `--json` output. List commands return one bounded page; they never silently enumerate an account.
+
+```sh
+ffd workspace list --api https://api.example.com --limit 20 --json
+ffd workspace create --api https://api.example.com --name "Workspace" --json
+ffd project create --api https://api.example.com --workspace WORKSPACE_ID --name "Project" --key project --enable-cms --json
+ffd project capabilities --api https://api.example.com --project PROJECT_ID --json
+ffd studio registration set --api https://api.example.com --project PROJECT_ID --environment-id ENVIRONMENT_ID --origin https://app.example.com --path /studio --json
+```
+
+Receipt-backed mutations persist only a command UUID and canonical fingerprint until a confirmed response. An uncertain response retains that authority for exact replay, while changed command intent fails closed. Archive requires current version plus exact project-key confirmation; no lifecycle command has a force mode.
+
+Control Plane administration is intentionally absent from `@framerfordevs/sdk`.
+
 ## Configuration
 
-`ffd link` writes exact, non-executable JSON to `framerfordevs.config.json`:
+`ffd link` authenticates online, verifies exact active project, primary-environment, access, and CMS authority, then writes exact, non-executable JSON to `framerfordevs.config.json`:
 
 ```json
 {

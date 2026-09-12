@@ -14,7 +14,7 @@ import {
 
 const clientId = "framerfordevs-cli";
 const scope =
-  "openid profile offline_access tooling:read authoring:read authoring:draft:write authoring:content:publish authoring:schema:push";
+  "openid profile offline_access tooling:read authoring:read authoring:draft:write authoring:content:publish authoring:schema:push control-plane:read control-plane:write control-plane:project:lifecycle";
 const deviceGrant = "urn:ietf:params:oauth:grant-type:device_code";
 const maximumResponseBytes = 64 * 1_024;
 const requestTimeoutMs = 15_000;

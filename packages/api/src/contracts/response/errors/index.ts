@@ -168,6 +168,22 @@ export class ToolingResponseTooLargeFailure extends Schema.TaggedError<ToolingRe
   "ToolingResponseTooLargeFailure",
 )("ToolingResponseTooLargeFailure", {}) {}
 
+export class ControlPlaneCommandConflictFailure extends Schema.TaggedError<ControlPlaneCommandConflictFailure>(
+  "ControlPlaneCommandConflictFailure",
+)("ControlPlaneCommandConflictFailure", {}) {}
+
+export class ControlPlaneCursorInvalidFailure extends Schema.TaggedError<ControlPlaneCursorInvalidFailure>(
+  "ControlPlaneCursorInvalidFailure",
+)("ControlPlaneCursorInvalidFailure", {}) {}
+
+export class ControlPlaneRequestTooLargeFailure extends Schema.TaggedError<ControlPlaneRequestTooLargeFailure>(
+  "ControlPlaneRequestTooLargeFailure",
+)("ControlPlaneRequestTooLargeFailure", {}) {}
+
+export class ControlPlaneResponseTooLargeFailure extends Schema.TaggedError<ControlPlaneResponseTooLargeFailure>(
+  "ControlPlaneResponseTooLargeFailure",
+)("ControlPlaneResponseTooLargeFailure", {}) {}
+
 export class AuthoringStaleSchemaFailure extends Schema.TaggedError<AuthoringStaleSchemaFailure>(
   "AuthoringStaleSchemaFailure",
 )("AuthoringStaleSchemaFailure", {}) {}
@@ -307,6 +323,10 @@ export type ApplicationError =
   | ToolingCursorInvalidFailure
   | ToolingConcurrentSchemaChangeFailure
   | ToolingResponseTooLargeFailure
+  | ControlPlaneCommandConflictFailure
+  | ControlPlaneCursorInvalidFailure
+  | ControlPlaneRequestTooLargeFailure
+  | ControlPlaneResponseTooLargeFailure
   | AuthoringStaleSchemaFailure
   | AuthoringDraftConflictFailure
   | AuthoringPublicationConflictFailure
@@ -362,6 +382,9 @@ export const apiErrorHttpStatus = {
   TOOLING_CURSOR_INVALID: 400,
   TOOLING_CONCURRENT_SCHEMA_CHANGE: 409,
   TOOLING_RESPONSE_TOO_LARGE: 413,
+  CONTROL_PLANE_CURSOR_INVALID: 400,
+  CONTROL_PLANE_REQUEST_TOO_LARGE: 413,
+  CONTROL_PLANE_RESPONSE_TOO_LARGE: 413,
   STALE_SCHEMA: 409,
   DRAFT_CONFLICT: 409,
   PUBLICATION_CONFLICT: 409,
@@ -670,6 +693,30 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
       return {
         code: "TOOLING_RESPONSE_TOO_LARGE",
         message: "The Tooling response exceeds the maximum size.",
+        retryable: false,
+      };
+    case "ControlPlaneCommandConflictFailure":
+      return {
+        code: "COMMAND_CONFLICT",
+        message: "The command identifier was already used for a different Control Plane operation.",
+        retryable: false,
+      };
+    case "ControlPlaneCursorInvalidFailure":
+      return {
+        code: "CONTROL_PLANE_CURSOR_INVALID",
+        message: "The Control Plane cursor is invalid, expired, or does not match this request.",
+        retryable: false,
+      };
+    case "ControlPlaneRequestTooLargeFailure":
+      return {
+        code: "CONTROL_PLANE_REQUEST_TOO_LARGE",
+        message: "The Control Plane request exceeds the maximum size.",
+        retryable: false,
+      };
+    case "ControlPlaneResponseTooLargeFailure":
+      return {
+        code: "CONTROL_PLANE_RESPONSE_TOO_LARGE",
+        message: "The Control Plane response exceeds the maximum size.",
         retryable: false,
       };
     case "AuthoringStaleSchemaFailure":

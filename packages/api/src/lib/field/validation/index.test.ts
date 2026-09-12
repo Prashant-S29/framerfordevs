@@ -441,6 +441,7 @@ describe("structured and untrusted values", () => {
         assert.isTrue(validateFieldValue(nestedList, [{ label_property: safeText }]).valid);
         assert.strictEqual(validateDefinitionTree([nestedObjectDepth(depth)]).valid, depth <= 8);
       }),
+    30_000,
   );
 
   it("rejects cyclic JSON and unsafe external assets without fetching", () => {

@@ -56,6 +56,7 @@ export default defineConfig(({ mode }) => ({
               { path: "/api/search" },
               { path: "/api-reference" },
               { path: "/api-reference/authoring/v1" },
+              { path: "/api-reference/control-plane/v1" },
               { path: "/api-reference/delivery/v1" },
               { path: "/api-reference/preview/v1" },
               { path: "/api-reference/tooling/v1" },

@@ -3,6 +3,7 @@
 // Verifies accessible semantics across platform management controls without owning component behavior.
 
 import { ApiCredential, ProjectMember } from "@framerfordevs/api/contracts/access/index";
+import { StudioRegistration } from "@framerfordevs/api/contracts/control-plane/index";
 import { ProjectLocale } from "@framerfordevs/api/contracts/locale/index";
 import { Project } from "@framerfordevs/api/contracts/platform/index";
 import {
@@ -25,6 +26,8 @@ import { ArchiveProjectDialog } from "@/components/project/archive-dialog";
 import { CreateProjectDialog } from "@/components/project/create-dialog";
 import { CreateWorkspaceDialog } from "@/components/create-workspace-dialog";
 import { EditProjectDialog } from "@/components/project/edit-dialog";
+import { RestoreProjectDialog } from "@/components/project/restore-dialog";
+import { StudioRegistrationSettings } from "@/components/project/studio-registration";
 import { LocaleTabs } from "@/components/entry/locale-tabs";
 import {
   CredentialRow,
@@ -204,6 +207,54 @@ describe("platform management accessibility", () => {
   it("has accessible destructive-confirmation semantics", async () => {
     renderWithQueryClient(<ArchiveProjectDialog project={project} />);
     await expectOpenDialogToHaveNoViolations(/archive project/i, "alertdialog");
+  });
+
+  it("has accessible project restoration semantics", async () => {
+    renderWithQueryClient(
+      <RestoreProjectDialog
+        project={Schema.decodeUnknownSync(Project)({
+          ...project,
+          version: 2,
+          archivedAt: "2026-08-14T00:00:00.000Z",
+        })}
+      />,
+    );
+    await expectOpenDialogToHaveNoViolations(/restore project/i, "alertdialog");
+  });
+
+  it("has accessible inert Studio registration semantics", async () => {
+    const queryClient = new QueryClient();
+    const registration = Schema.decodeUnknownSync(StudioRegistration)({
+      id: "019fae8b-1234-7000-8000-000000000009",
+      projectId: project.id,
+      environmentId: project.environment.id,
+      applicationOrigin: "https://studio.example.test",
+      mountPath: "/studio",
+      version: 1,
+      createdAt: "2026-08-14T00:00:00.000Z",
+      updatedAt: "2026-08-14T00:00:00.000Z",
+    });
+    const options = orpc.platform.projects.studioRegistration.get.queryOptions({
+      input: { projectId: project.id, environmentId: project.environment.id },
+    });
+    queryClient.setQueryData(options.queryKey, {
+      ok: true,
+      data: registration,
+      error: null,
+      message: "Studio registration loaded.",
+    });
+    const { container } = renderWithQueryClient(
+      <StudioRegistrationSettings project={project} canWrite />,
+      queryClient,
+    );
+
+    expect(await screen.findByLabelText("Application origin")).toBeTruthy();
+    expect(screen.getByLabelText("Mount path")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save registration" })).toBeTruthy();
+    expect(
+      screen.getByText(/grants no session, redirect, or browser credential authority/i),
+    ).toBeTruthy();
+    expect((await axe.run(container)).violations).toEqual([]);
   });
 
   it("has accessible invitation creation semantics", async () => {

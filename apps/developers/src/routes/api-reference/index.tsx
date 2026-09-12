@@ -16,6 +16,11 @@ const families = [
     title: "Authoring v1",
   },
   {
+    description: "Workspace, project, capability, lifecycle, and Studio bootstrap automation.",
+    family: "control-plane/v1",
+    title: "Control Plane v1",
+  },
+  {
     description: "Published, explicit-locale content reads and immutable publications.",
     family: "delivery/v1",
     title: "Delivery v1",

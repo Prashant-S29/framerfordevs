@@ -67,6 +67,32 @@ export interface PreviewReadMetric {
   readonly durationMs: number;
 }
 
+export type ControlPlaneOperation =
+  | "workspace_list"
+  | "workspace_create"
+  | "workspace_get"
+  | "project_list"
+  | "project_create"
+  | "project_get"
+  | "project_update"
+  | "project_archive"
+  | "project_restore"
+  | "capability_list"
+  | "capability_enable"
+  | "studio_registration_get"
+  | "studio_registration_put";
+export type ControlPlaneSubject = "oauth_user" | "management_credential" | "unknown";
+export type ControlPlaneCostBucket = "1" | "3" | "5";
+
+export interface ControlPlaneRequestMetric {
+  readonly operation: ControlPlaneOperation;
+  readonly subject: ControlPlaneSubject;
+  readonly outcome: "success" | "failure";
+  readonly statusFamily: StatusFamily;
+  readonly costBucket: ControlPlaneCostBucket;
+  readonly durationMs: number;
+}
+
 export type ToolingEndpoint = "projects" | "environments" | "manifest" | "revision";
 export type ToolingSubject = "oauth_user" | "management_credential" | "unknown";
 export type ToolingResponseSizeBucket = "none" | "small" | "medium" | "large" | "near_limit";
@@ -154,6 +180,7 @@ export interface TelemetryService {
     category: PreviewQueryRejectionCategory,
   ) => Effect.Effect<void>;
   readonly recordPreviewAuditFailure: () => Effect.Effect<void>;
+  readonly recordControlPlaneRequest: (event: ControlPlaneRequestMetric) => Effect.Effect<void>;
   readonly recordToolingRequest: (event: ToolingRequestMetric) => Effect.Effect<void>;
   readonly recordToolingOAuthVerification: (
     outcome: "success" | "invalid" | "failure",
@@ -239,6 +266,17 @@ const previewReadLatency = Metric.histogram(
   "cms_preview_read_duration_ms",
   MetricBoundaries.exponential({ start: 1, factor: 2, count: 16 }),
   "Preview read duration in milliseconds",
+);
+
+const controlPlaneRequestCount = Metric.counter("control_plane_requests_total", {
+  description: "Control Plane request outcomes by closed operation, subject, status, and cost",
+  incremental: true,
+});
+
+const controlPlaneRequestLatency = Metric.histogram(
+  "control_plane_request_duration_ms",
+  MetricBoundaries.exponential({ start: 1, factor: 2, count: 12 }),
+  "Control Plane request duration in milliseconds",
 );
 
 const toolingRequestCount = Metric.counter("tooling_requests_total", {
@@ -406,6 +444,27 @@ export const TelemetryLive = Layer.succeed(Telemetry, {
   recordPreviewQueryRejection: (category) =>
     Metric.update(Metric.tagged(previewQueryRejectionCount, "category", category), 1),
   recordPreviewAuditFailure: () => Metric.update(previewAuditFailureCount, 1),
+  recordControlPlaneRequest: (event) => {
+    const label = <Type, In, Out>(metric: Metric.Metric<Type, In, Out>) =>
+      Metric.tagged(
+        Metric.tagged(
+          Metric.tagged(
+            Metric.tagged(metric, "operation", event.operation),
+            "subject",
+            event.subject,
+          ),
+          "outcome",
+          event.outcome,
+        ),
+        "status_family",
+        event.statusFamily,
+      );
+    const count = Metric.tagged(label(controlPlaneRequestCount), "cost", event.costBucket);
+    const latency = Metric.tagged(label(controlPlaneRequestLatency), "cost", event.costBucket);
+    return Effect.all([Metric.update(count, 1), Metric.update(latency, event.durationMs)]).pipe(
+      Effect.asVoid,
+    );
+  },
   recordToolingRequest: (event) => {
     const label = <Type, In, Out>(metric: Metric.Metric<Type, In, Out>) =>
       Metric.tagged(

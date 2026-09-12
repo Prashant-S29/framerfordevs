@@ -133,6 +133,10 @@ describe("access contracts", () => {
         yield* Schema.decodeUnknown(ProjectPermissionAction)("project.member.locale.update"),
         "project.member.locale.update",
       );
+      assert.strictEqual(
+        yield* Schema.decodeUnknown(ProjectPermissionAction)("project.restore"),
+        "project.restore",
+      );
       const exits = yield* Effect.all([
         Effect.exit(Schema.decodeUnknown(ProjectRole)("admin")),
         Effect.exit(Schema.decodeUnknown(ProjectPermissionAction)("project.delete")),

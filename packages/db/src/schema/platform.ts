@@ -14,6 +14,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
+import { apiCredential } from "./access";
 import { user } from "./auth";
 
 const platformId = (name: string) =>
@@ -185,9 +186,11 @@ export const projectCapability = pgTable(
     key: varchar("key", { length: 63 }).notNull(),
     status: varchar("status", { length: 16 }).notNull(),
     version: integer("version").default(1).notNull(),
-    changedByUserId: text("changed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
+    changedByCredentialEnvironmentId: uuid("changed_by_credential_environment_id"),
     createdAt: platformTimestamp("created_at").defaultNow().notNull(),
     updatedAt: platformTimestamp("updated_at").defaultNow().notNull(),
   },
@@ -197,11 +200,35 @@ export const projectCapability = pgTable(
       columns: [table.projectId, table.workspaceId],
       foreignColumns: [project.id, project.workspaceId],
     }).onDelete("restrict"),
+    foreignKey({
+      name: "project_capability_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.changedByCredentialEnvironmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     unique("project_capability_project_key_unique").on(table.projectId, table.key),
+    check(
+      "project_capability_changed_actor_exactly_one",
+      sql`(${table.changedByUserId} is not null and ${table.changedByCredentialId} is null and ${table.changedByCredentialEnvironmentId} is null) or (${table.changedByUserId} is null and ${table.changedByCredentialId} is not null and ${table.changedByCredentialEnvironmentId} is not null)`,
+    ),
     check("project_capability_key_valid", sql`${table.key} ~ '^[a-z][a-z0-9_]{0,62}$'`),
     check("project_capability_status_valid", sql`${table.status} in ('enabled', 'disabled')`),
     check("project_capability_version_positive", sql`${table.version} > 0`),
-    index("project_capability_changed_by_user_idx").on(table.changedByUserId),
+    index("project_capability_changed_by_user_idx")
+      .on(table.changedByUserId)
+      .where(sql`${table.changedByUserId} is not null`),
+    index("project_capability_changed_by_credential_idx")
+      .on(table.changedByCredentialId, table.changedByCredentialEnvironmentId)
+      .where(sql`${table.changedByCredentialId} is not null`),
   ],
 );
 
@@ -332,6 +359,21 @@ export const projectCapabilityRelations = relations(projectCapability, ({ one })
     relationName: "projectCapabilityChanger",
     fields: [projectCapability.changedByUserId],
     references: [user.id],
+  }),
+  changedByCredential: one(apiCredential, {
+    relationName: "projectCapabilityCredentialChanger",
+    fields: [
+      projectCapability.changedByCredentialId,
+      projectCapability.workspaceId,
+      projectCapability.projectId,
+      projectCapability.changedByCredentialEnvironmentId,
+    ],
+    references: [
+      apiCredential.id,
+      apiCredential.workspaceId,
+      apiCredential.projectId,
+      apiCredential.environmentId,
+    ],
   }),
 }));
 

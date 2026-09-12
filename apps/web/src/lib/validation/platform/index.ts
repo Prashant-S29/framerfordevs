@@ -44,6 +44,7 @@ export const projectFormSchema = z.object({
       "Use lowercase letters, numbers, and single hyphens.",
     ),
   description: z.string().trim().max(500, "Descriptions can contain at most 500 characters."),
+  enableCms: z.boolean(),
 });
 
 export const editProjectFormSchema = projectFormSchema.pick({

@@ -106,6 +106,13 @@
       "when": 1787515349928,
       "tag": "0014_normalize_authoring_actor_foreign_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1788112052784,
+      "tag": "0015_add_control_plane_bootstrap_authorities",
+      "breakpoints": true
     }
   ]
 }

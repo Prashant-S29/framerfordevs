@@ -133,6 +133,15 @@ export class CreateProjectInput extends Schema.Class<CreateProjectInput>("Create
   name: ProjectName,
   key: ProjectKey,
   description: Schema.NullOr(ProjectDescription),
+  initialCapabilities: Schema.optionalWith(
+    Schema.Array(Schema.Literal("cms")).pipe(
+      Schema.maxItems(1),
+      Schema.filter((capabilities) => new Set(capabilities).size === capabilities.length, {
+        message: () => "Initial capabilities must be unique.",
+      }),
+    ),
+    { default: () => [] },
+  ),
 }) {}
 
 export class ListProjectsInput extends Schema.Class<ListProjectsInput>("ListProjectsInput")({
@@ -154,6 +163,11 @@ export class UpdateProjectInput extends Schema.Class<UpdateProjectInput>("Update
 }) {}
 
 export class ArchiveProjectInput extends Schema.Class<ArchiveProjectInput>("ArchiveProjectInput")({
+  projectId: ProjectId,
+  version: ResourceVersion,
+}) {}
+
+export class RestoreProjectInput extends Schema.Class<RestoreProjectInput>("RestoreProjectInput")({
   projectId: ProjectId,
   version: ResourceVersion,
 }) {}
@@ -233,6 +247,7 @@ export const ListProjectsInputSchema = Schema.standardSchemaV1(ListProjectsInput
 export const GetProjectInputSchema = Schema.standardSchemaV1(GetProjectInput);
 export const UpdateProjectInputSchema = Schema.standardSchemaV1(UpdateProjectInput);
 export const ArchiveProjectInputSchema = Schema.standardSchemaV1(ArchiveProjectInput);
+export const RestoreProjectInputSchema = Schema.standardSchemaV1(RestoreProjectInput);
 export const EnableCapabilityInputSchema = Schema.standardSchemaV1(EnableCapabilityInput);
 
 export const WorkspaceOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(Workspace));

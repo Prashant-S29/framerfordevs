@@ -17,12 +17,18 @@ export const AUTHORING_READ_SCOPE = "authoring:read";
 export const AUTHORING_DRAFT_WRITE_SCOPE = "authoring:draft:write";
 export const AUTHORING_CONTENT_PUBLISH_SCOPE = "authoring:content:publish";
 export const AUTHORING_SCHEMA_PUSH_SCOPE = "authoring:schema:push";
+export const CONTROL_PLANE_READ_SCOPE = "control-plane:read";
+export const CONTROL_PLANE_WRITE_SCOPE = "control-plane:write";
+export const CONTROL_PLANE_PROJECT_LIFECYCLE_SCOPE = "control-plane:project:lifecycle";
 export const CLI_API_OAUTH_SCOPES = [
   TOOLING_READ_SCOPE,
   AUTHORING_READ_SCOPE,
   AUTHORING_DRAFT_WRITE_SCOPE,
   AUTHORING_CONTENT_PUBLISH_SCOPE,
   AUTHORING_SCHEMA_PUSH_SCOPE,
+  CONTROL_PLANE_READ_SCOPE,
+  CONTROL_PLANE_WRITE_SCOPE,
+  CONTROL_PLANE_PROJECT_LIFECYCLE_SCOPE,
 ] as const;
 export type CliApiOAuthScope = (typeof CLI_API_OAUTH_SCOPES)[number];
 export const CLI_OAUTH_SCOPES = [

@@ -47,6 +47,7 @@ export const projectPermissionActionValues = [
   "project.read",
   "project.update",
   "project.archive",
+  "project.restore",
   "project.capability.manage",
   "project.member.read",
   "project.member.invite",

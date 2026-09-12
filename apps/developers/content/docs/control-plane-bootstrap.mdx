@@ -1,0 +1,124 @@
+---
+title: Bootstrap a Project with the CLI
+description: Create or select a workspace and project, enable CMS, and link a local codebase through verified Control Plane authority.
+---
+
+{/* Documents agent-safe bootstrap commands without exposing bearer material or SDK administration. */}
+
+Use the Control Plane commands when you need to bootstrap a project without navigating the hosted dashboard. Every command is noninteractive, supports `--json`, and requires an explicit API origin.
+
+Control Plane administration is intentionally not part of `@framerfordevs/sdk`. Use the CLI for developer and agent automation.
+
+## 1. Authenticate
+
+```bash
+ffd login --api https://api.example.com --open
+```
+
+Login requests the read, write, and project-lifecycle grants used by the commands below. Existing credentials do not silently gain new grants; log in again if the CLI reports a scope denial.
+
+## 2. Create or Select a Workspace
+
+List one bounded page:
+
+```bash
+ffd workspace list --api https://api.example.com --limit 20 --json
+```
+
+Create a workspace when needed:
+
+```bash
+ffd workspace create \
+  --api https://api.example.com \
+  --name "Documentation" \
+  --json
+```
+
+Save the returned stable workspace ID. To safely replay a command after an uncertain response, rerun the same command; the CLI retains only its command ID and request fingerprint until success. You may also supply `--command-id UUID` explicitly.
+
+## 3. Create a CMS Project
+
+```bash
+ffd project create \
+  --api https://api.example.com \
+  --workspace WORKSPACE_ID \
+  --name "Developer Site" \
+  --key developer-site \
+  --enable-cms \
+  --json
+```
+
+The response includes the stable project ID and primary `main` environment ID. Project creation does not create schemas, entries, credentials, webhooks, or Studio registration.
+
+For an existing project, inspect capability state:
+
+```bash
+ffd project capabilities \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --json
+```
+
+If CMS is disabled, enable it explicitly:
+
+```bash
+ffd project capability enable \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --capability cms \
+  --json
+```
+
+## 4. Link the Local Codebase
+
+```bash
+ffd link \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --environment main \
+  --output src/framerfordevs \
+  --schema framerfordevs.schema.ts \
+  --json
+```
+
+`ffd link` is always online. Before writing `framerfordevs.config.json`, it verifies the exact project identity, active state, primary environment, current access, and enabled CMS capability. It never creates, restores, or enables resources implicitly.
+
+If you deliberately need no network command, author the documented [exact non-secret configuration contract](/docs/cli#project-configuration) directly instead of using `ffd link`.
+
+## 5. Publish Schema Structure
+
+Create `framerfordevs.schema.ts`, then run:
+
+```bash
+ffd schema plan
+ffd schema push --acknowledge CHANGE_ID
+```
+
+Continue with [Publish a code-first schema](/docs/authoring/code-first-schema) for stable source identities, planning, acknowledgement, and publication behavior.
+
+## Lifecycle Safety
+
+Archive requires both the current project version and exact project key:
+
+```bash
+ffd project archive \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --expected-version 3 \
+  --confirm-key developer-site \
+  --json
+```
+
+Restore is a separate owner-only operation:
+
+```bash
+ffd project restore \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --expected-version 4 \
+  --json
+```
+
+There is no force, permanent-delete, bulk, or interactive confirmation mode.
+
+See the [Control Plane v1 API contract](/api-reference/control-plane/v1) for exact request, response, and error schemas.

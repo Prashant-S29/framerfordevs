@@ -2,6 +2,7 @@
 
 export const publicContractFamilies = [
   "authoring",
+  "control-plane",
   "delivery",
   "preview",
   "tooling",
@@ -30,6 +31,7 @@ export interface PublicContractMetadataEntry {
 
 export const publicContractRegistryKeys = [
   "authoring/v1",
+  "control-plane/v1",
   "delivery/v1",
   "preview/v1",
   "tooling/v1",
@@ -47,6 +49,18 @@ export const publicContractMetadata = {
     sdkSupported: false,
     baselinePath: "baselines/authoring/v1/openapi.json",
     baselineDigest: "d9500549cd95067857b87f494b77375e3d575c4832589478858e125ab3f31205",
+    deprecatedAt: null,
+    sunsetAt: null,
+  },
+  "control-plane/v1": {
+    family: "control-plane",
+    major: "v1",
+    kind: "openapi",
+    outputPath: "artifacts/control-plane/v1/openapi.json",
+    portalRoute: "/api-reference/control-plane/v1",
+    sdkSupported: false,
+    baselinePath: "baselines/control-plane/v1/openapi.json",
+    baselineDigest: "747cc0c897ed2738adb5bbc476aee6a284d0f10e89ca8208c3a813a59890a935",
     deprecatedAt: null,
     sunsetAt: null,
   },

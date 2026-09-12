@@ -369,6 +369,25 @@ export class ContentMutationRetryJournal extends Schema.Class<ContentMutationRet
   }).annotations({ parseOptions: { onExcessProperty: "error" } }),
 ) {}
 
+export const ControlPlaneMutationOperation = Schema.Literal(
+  "workspace.create",
+  "project.create",
+  "project.capability.enable",
+  "studio_registration.put",
+);
+export type ControlPlaneMutationOperation = typeof ControlPlaneMutationOperation.Type;
+
+export class ControlPlaneMutationRetryJournal extends Schema.Class<ControlPlaneMutationRetryJournal>(
+  "ControlPlaneMutationRetryJournal",
+)(
+  Schema.Struct({
+    formatVersion: Schema.Literal(1),
+    operation: ControlPlaneMutationOperation,
+    commandId: Uuid,
+    fingerprint: Digest,
+  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+) {}
+
 export class SchemaMutationRetryJournal extends Schema.Class<SchemaMutationRetryJournal>(
   "SchemaMutationRetryJournal",
 )(

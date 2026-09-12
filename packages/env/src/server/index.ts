@@ -28,6 +28,8 @@ const validatedEnv = createEnv({
     RATE_LIMIT_FINGERPRINT_SECRET: z.string().min(32).optional(),
     DELIVERY_CURSOR_SECRET: z.string().min(32).optional(),
     DELIVERY_CURSOR_PREVIOUS_SECRET: z.string().min(32).optional(),
+    CONTROL_PLANE_CURSOR_SECRET: z.string().min(32).optional(),
+    CONTROL_PLANE_CURSOR_PREVIOUS_SECRET: z.string().min(32).optional(),
     WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID: z
       .string()
       .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u)
@@ -94,6 +96,13 @@ if (
   validatedEnv.DELIVERY_CURSOR_SECRET === validatedEnv.DELIVERY_CURSOR_PREVIOUS_SECRET
 ) {
   throw new Error("Delivery cursor active and previous secrets must be different.");
+}
+
+if (
+  validatedEnv.CONTROL_PLANE_CURSOR_SECRET !== undefined &&
+  validatedEnv.CONTROL_PLANE_CURSOR_SECRET === validatedEnv.CONTROL_PLANE_CURSOR_PREVIOUS_SECRET
+) {
+  throw new Error("Control Plane cursor active and previous secrets must be different.");
 }
 
 if (

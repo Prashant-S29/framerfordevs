@@ -97,6 +97,36 @@ describe("CLI command arguments", () => {
     );
   });
 
+  it("accepts only the explicit Control Plane automation flags", () => {
+    const create = parseArguments([
+      "project",
+      "create",
+      "--api",
+      "https://api.example.com",
+      "--workspace",
+      "workspace-id",
+      "--name",
+      "Project",
+      "--key",
+      "project",
+      "--enable-cms",
+      "--command-id",
+      "019fae8b-1234-7000-8000-000000000001",
+      "--json",
+    ]);
+    validateFlags(create);
+    expect(create.command).toEqual(["project", "create"]);
+    expect(booleanFlag(create, "enable-cms")).toBe(true);
+    expect(stringFlag(create, "api")).toBe("https://api.example.com");
+
+    expect(() => validateFlags(parseArguments(["project", "restore", "--force"]))).toThrowError(
+      "CLI_FLAG_INVALID",
+    );
+    expect(() => validateFlags(parseArguments(["workspace", "list", "--offline"]))).toThrowError(
+      "CLI_FLAG_INVALID",
+    );
+  });
+
   it.each([
     ["duplicate", ["login", "--api", "https://one.example", "--api", "https://two.example"]],
     ["unknown", ["generate", "--allow-breaking"]],

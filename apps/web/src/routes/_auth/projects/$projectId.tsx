@@ -21,6 +21,8 @@ import { EditProjectDialog } from "@/components/project/edit-dialog";
 import { ProjectAccessSettings } from "@/components/project/access-settings";
 import { ProjectCollections } from "@/components/project/collections";
 import { ProjectLocaleSettings } from "@/components/project/locale-settings";
+import { RestoreProjectDialog } from "@/components/project/restore-dialog";
+import { StudioRegistrationSettings } from "@/components/project/studio-registration";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/_auth/projects/$projectId")({
@@ -61,6 +63,7 @@ function ProjectDetail() {
   const isArchived = project.archivedAt !== null;
   const canUpdate = allowedActions.has("project.update");
   const canArchive = allowedActions.has("project.archive");
+  const canRestore = allowedActions.has("project.restore");
   const canManageCapability = allowedActions.has("project.capability.manage");
   const canReadLocales = allowedActions.has("locale.read");
   const canManageLocales = allowedActions.has("locale.manage");
@@ -97,6 +100,8 @@ function ProjectDetail() {
               {canUpdate ? <EditProjectDialog key={project.version} project={project} /> : null}
               {canArchive ? <ArchiveProjectDialog project={project} /> : null}
             </div>
+          ) : isArchived && canRestore ? (
+            <RestoreProjectDialog project={project} />
           ) : null}
         </div>
         <p className="text-muted-foreground max-w-3xl text-sm">
@@ -168,6 +173,10 @@ function ProjectDetail() {
           ) : null}
         </Card>
       </section>
+
+      {cms?.status === "enabled" ? (
+        <StudioRegistrationSettings project={project} canWrite={canUpdate} />
+      ) : null}
 
       {cms?.status === "enabled" && canReadSchemas ? (
         <ProjectCollections

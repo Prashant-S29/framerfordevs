@@ -52,7 +52,7 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ### Milestone 14 — Control-plane bootstrap contracts
 
-**Status:** Design proposed in `decisions/m14-control-plane-bootstrap-contracts-design.md`; scoped SDK/CLI correction implemented in the current review worktree, remainder awaiting developer approval, and M14 implementation unauthorized.
+**Status:** Design approved in `decisions/m14-control-plane-bootstrap-contracts-design.md`; implementation, automated readiness, and all eight delegated manual-review scenarios are complete after applied, read-only-verified migration `0015_add_control_plane_bootstrap_authorities`; explicit developer acceptance is pending.
 
 **Summary:** Establish the first portable Control Plane v1 slice so workspace/project bootstrap no longer depends on hosted-dashboard internals.
 

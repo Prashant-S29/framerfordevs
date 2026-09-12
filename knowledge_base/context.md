@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-08-29
-**Current phase:** M14 Control Plane v1 bootstrap design is proposed for developer review; implementation remains unauthorized
-**Next gate:** Developer approval or requested revision of the M14 design
+**Last updated:** 2026-09-10
+**Current phase:** M14 Control Plane v1 bootstrap implementation, automated readiness, and delegated manual review are complete; explicit developer acceptance is pending
+**Next gate:** Explicit developer M14 acceptance; M15 remains unauthorized
 
 ## Start here
 
@@ -20,7 +20,7 @@ Read relevant sections of `product.md` and `prd/cms.md` for behavioral work. Do 
 - Explicit current developer instruction, product/PRD, relevant rules/active criteria/approved decisions, then status documents govern intent in that order.
 - Committed source, tests, configuration, migrations, and generated artifacts describe executable truth; Git describes repository state.
 - Report drift instead of silently choosing an authority.
-- Work only on an approved active milestone or an explicitly authorized workstream. M14 design is proposed for review, but its implementation is not active until the developer approves it.
+- Work only on an approved active milestone or an explicitly authorized workstream. M14 is the sole active implementation milestone; M15+ remain unauthorized.
 
 ## Product direction
 
@@ -107,6 +107,7 @@ M0–M13 are developer-approved and committed; M13 commit is `9c68942`. Post-M13
 - **Code authoring kernels:** `packages/api/src/lib/authoring/`
 - **Authoring repositories:** `packages/api/src/services/authoring/`
 - **Authoring HTTP:** `packages/api/src/operations/authoring/public/index.ts`, `apps/server/src/app.ts`
+- **Control Plane:** `packages/api/src/contracts/control-plane/`, `packages/api/src/operations/control-plane/`, `packages/api/src/services/control-plane/`, `apps/server/src/control-plane-router.ts`, `packages/cli/src/control-plane-command/`
 - **Schema/fields/forms:** `packages/api/src/services/schema/repository.ts`, `packages/api/src/lib/field/validation/index.ts`, `packages/content-form/`
 - **Entries/publication:** `packages/api/src/services/entry/repository.ts`, `packages/api/src/services/publication/repository.ts`
 - **Delivery/Preview:** `packages/api/src/services/delivery/read-repository.ts`, `packages/api/src/services/preview/repository.ts`
@@ -122,4 +123,4 @@ The subsequent repository-normalization workstream also passed the complete read
 
 ## Current work and next gate
 
-The detailed M14–M30 roadmap is sequenced, with the original M14 client-handover, M15 production-hardening, and M16 visual-readiness obligations explicitly mapped into M21–M23 and M27. The developer approved and committed `knowledge_base/decisions/public-http-cli-and-sdk-surface-boundary.md`: stable HTTP is canonical, the CLI is the complete agent/operator surface, and the public SDK is limited to content/runtime integration. The committed `5f6480d` baseline completely removes the retired pre-release dashboard schema-authoring procedures and their dedicated error/route-adapter/telemetry surface while preserving read-only structure, Presentation, content, Delivery, and canonical Authoring v1. The proposed M14 design treats the SDK/CLI boundary as a prerequisite and defines Control Plane HTTP/CLI/dashboard authority with `sdkSupported: false`. Review clarification permits exact primary-environment management credentials to enable CMS with honest attribution, freezes Studio registration conflict/no-op receipt semantics, makes `ffd link` online-only, and requires measured receipt growth plus approved rate budgets before acceptance. The rest of M14 still awaits developer approval or revision. Do not implement M14, design M15, publish packages, activate production OAuth, deploy, or create/apply migrations until the corresponding developer gate.
+The detailed M14–M30 roadmap is sequenced, with the original M14 client-handover, M15 production-hardening, and M16 visual-readiness obligations explicitly mapped into M21–M23 and M27. The developer-approved HTTP/CLI/SDK boundary keeps stable HTTP canonical, the CLI complete for automation, and the public SDK limited to content/runtime integration. M14 implements the approved Control Plane contracts, shared domain authority, bearer-only HTTP transport, complete explicit-origin CLI, online linking, hosted controls, signed cursors, receipts, quotas, telemetry, canonical artifact/docs, and `sdkSupported: false`. Developer-generated/applied migration `0015_add_control_plane_bootstrap_authorities` was fully inspected and verified read-only. All eight delegated manual scenarios passed, including bootstrap/link/schema continuity, dashboard/CLI parity, dropped-response replay, tenant/role/credential isolation, inert Studio metadata, archive/restore cross-surface preservation, and artifact/package/secret inspection. The review corrected deterministic-error retry-journal clearing and the expected missing-Studio toast. Post-review readiness passes 1,259 tests, coverage, contracts, formatting, lint, structure, types, and eight builds with zero Turbo cache hits; all 256 integration tests pass with the independent worker stopped, manual residue is absent, temporary OAuth is removed, and the normal worker is healthy. The Control Plane OpenAPI artifact/baseline digest is `747cc0c897ed2738adb5bbc476aee6a284d0f10e89ca8208c3a813a59890a935`. M14 awaits only explicit developer acceptance. Do not design M15, publish packages, activate production OAuth, deploy, create/apply further migrations, commit, or accept the milestone without the corresponding developer gate.

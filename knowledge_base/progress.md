@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestones 0–13 and post-M13 repository/context normalization are developer-approved and committed. M14 design is proposed for developer review; M15–M30 remain sequenced context only.
-**Next gate:** Developer approval or requested revision of the M14 Control Plane v1 design. No implementation milestone is active.
-**Last updated:** 2026-08-30
+**Overall status:** Milestones 0–13 and post-M13 repository/context normalization are developer-approved and committed. M14 implementation, automated readiness, and the delegated manual review are complete; explicit developer acceptance is pending. M15–M30 remain sequenced context only.
+**Next gate:** Explicit developer M14 acceptance; do not begin M15.
+**Last updated:** 2026-09-10
 
 ## Status legend
 
@@ -51,7 +51,7 @@
 | 29  | Visual publication and dependencies     | `[P]`  |              — | —         |
 | 30  | Renderer SDK and framework adapters     | `[P]`  |              — | —         |
 
-M14 is the only designed pending milestone and awaits developer review. M15–M30 preserve the developer-approved sequence and detailed context but are not designed or authorized for implementation.
+M14 is the sole active implementation milestone. M15–M30 preserve the developer-approved sequence and detailed context but are not designed or authorized for implementation.
 
 ## Post-M13 repository/context normalization
 
@@ -163,11 +163,21 @@ M14 is the only designed pending milestone and awaits developer review. M15–M3
 
 ## Planned milestone record
 
-These entries remain concise because `milestone.md` owns the detailed pending context. M14 has a proposed decision record awaiting developer approval; M15–M30 must not be designed or implemented ahead of their developer gate. The original pre-normalization M14–M16 scope is retained explicitly in M21–M23 and M27 rather than discarded.
+These entries remain concise because `milestone.md` owns the detailed pending context. M14 has an approved decision record and active implementation; M15–M30 must not be designed or implemented ahead of their developer gate. The original pre-normalization M14–M16 scope is retained explicitly in M21–M23 and M27 rather than discarded.
 
 ### Milestone 14 — Control-plane bootstrap contracts
 
-- Proposed design: `knowledge_base/decisions/m14-control-plane-bootstrap-contracts-design.md` defines portable workspace/project bootstrap and recovery, exact principal/grant authority, receipt idempotency, signed cursors, inert Studio-registration metadata, and shared HTTP/CLI/dashboard/link authority. The developer approved the cross-cutting scoped SDK model at `d63f215`: Control Plane v1 has `sdkSupported: false` and the CLI is the complete agent/operator surface. The committed `5f6480d` baseline removes the retired dashboard schema-authoring procedures and tombstones M14 must not restore. Review clarification now permits exact primary-environment management credentials with `project.capability.manage` to enable CMS under honest actor attribution, freezes Studio create/update conflict and no-op receipt semantics, makes `ffd link` explicitly online-only, and requires measured receipt growth plus approved concrete rate budgets before acceptance. No M14 feature implementation is authorized; the rest of the design awaits explicit developer approval.
+- Approved design: `knowledge_base/decisions/m14-control-plane-bootstrap-contracts-design.md` defines portable workspace/project bootstrap and recovery, exact principal/grant authority, receipt idempotency, signed cursors, inert Studio-registration metadata, and shared HTTP/CLI/dashboard/link authority. Control Plane v1 has `sdkSupported: false`; the CLI remains the complete agent/operator surface; the retired dashboard authoring routes remain absent. Implementation has added the proposed Drizzle authority and targeted metadata tests for command receipts, Studio registration, and honest project-capability credential attribution. Developer-generated/applied `0015_add_control_plane_bootstrap_authorities` passed full artifact inspection and read-only verification. Migration journal entry `16`, both new tables, expected columns/constraints/indexes/FKs, 18 existing capability rows under the new actor invariant, and zero initial receipt/registration rows are correct.
+- Added closed Control Plane v1 schemas and canonical OpenAPI ownership for all 13 operations: strict/excess-free requests, byte-bounded canonical Studio origin/path metadata, closed errors, OAuth/management authority separation, no-store responses, rejected preflight, and `sdkSupported: false`; 12 focused contract tests and API type-check pass.
+- Added the three fixed CLI OAuth grants, OAuth-only enumeration/creation/lifecycle narrowing, exact management-scope requirements, owner-only `project.restore`, centralized Control Plane failures, canonical actor/operation/scope/input fingerprints, advisory-serialized receipts, and signed principal/route/tenant/filter/limit-bound public cursors with rotation and expiry coverage.
+- Extended the existing `PlatformRepository` rather than introducing a second authority: restore now locks, reauthorizes, versions, clears archive attribution, audits, and is available through the protected dashboard route/UI; dashboard capability enablement now adapts to the receipt-backed shared operation. CMS enable commands serialize exact replay and reject a new command against enabled state without an orphan receipt. Studio registration implements exact environment authorization, receipt-first replay, create-only/update-only/version rules, successful no-op receipts without version/audit noise, archived-write denial, and honest user/credential attribution. Protected dashboard Studio controls use the same operations and retain inert metadata semantics. Shared Control Plane workspace/project creation, retrieval, update, lifecycle, capability inspection, and signed keyset lists now use the same repository authority. The isolated PostgreSQL suite passes 24 scenarios, including concurrent receipt replay, singleton Studio create/update races, list pagination, management-credential attribution, and compact receipt-growth evidence; the worker was stopped and restored healthy. Focused API/CLI/web type, contract, policy, auth, cursor, operation, accessibility, and UI checks pass.
+- Added the canonical Control Plane public-registry artifact and immutable baseline with `sdkSupported: false`, developer-portal API reference/task guide, complete redirect-free bounded CLI HTTP client, explicit-`--api` command family, content-free retry journal, and online exact-authority `ffd link` verification. The developer approved independent 60-second Control Plane token buckets after measured PostgreSQL evidence: global 3,000/capacity 250, OAuth user 120/capacity 20, management credential 120/capacity 20; costs are read/list 1, create 5, update 3, lifecycle 5, and Studio write 5.
+- A mistaken package-script filter ran shared-database suites while the worker was active. After developer-approved exact cleanup, five temporary graphs were removed in a guarded transaction, zero residue was verified, all six affected files/42 tests passed with the worker stopped, and the worker was restored healthy. The existing worker-isolation learning now requires direct focused Vitest execution and reported file-count verification.
+- Completed the bearer-only `/api/control-plane/v1` transport and all 13 routes with exact method/path/content/query/body closure, OAuth-versus-management authentication, weighted global/principal quotas, bounded telemetry, canonical OpenAPI serving, and success/security integration coverage. Completed the complete explicit-`--api` CLI command family, stable machine errors, content-free response-loss journals, exact archive confirmation, and online `ffd link`; no Control Plane authority entered the public SDK.
+- During final readiness, the independent worker was mistakenly restarted before a shared-database gate and claimed rows from one test run. Developer-approved read-only reconciliation identified exactly 10 test users, eight test workspaces, and eight test projects in the failed-run time/prefix scope. The first two guarded cleanup attempts rolled back unchanged on constraint guards; the corrected transaction deleted only the exact tenant graph and users, and read-only verification found zero matching users/workspaces/projects. Clean integration/readiness reruns passed with the worker stopped; the existing worker-isolation learning remains authoritative.
+- Canonical Control Plane artifact and baseline SHA-256 are `747cc0c897ed2738adb5bbc476aee6a284d0f10e89ca8208c3a813a59890a935`. The initial complete readiness gate passed 1,256 tests. Exact patched transitive overrides clear high/critical audit findings and the runtime `qs` advisories; four moderate findings remain only on the repository's Vitest 3 test-tool graph pending a separately reviewed Vitest 4 upgrade.
+- Completed all eight delegated manual-review scenarios with temporary local-only OAuth: native CLI login/whoami, workspace/project bootstrap, verified linking, schema export/plan/push, dashboard/CLI bidirectional projection, dropped-response replay with exactly one resource/receipt/audit, command conflict, tenant and principal-bound cursor isolation, read-only-role denial, exact management-credential permission and actor attribution, inert Studio registration, archive denial across Tooling/Authoring/Delivery/Preview, exact restore preservation, live artifact/docs parity, package-boundary inspection, and secret/content-redaction inspection. Manual review found and corrected two gaps: deterministic non-retryable Control Plane HTTP failures now clear their retry journal while ambiguous transport failures retain it, and the dashboard suppresses the global toast only for the component-owned missing-Studio empty state. Disposable users, credentials, workspaces, projects, content, receipts, audits, OAuth state, browser state, and private evidence were guardedly removed with the worker verified stopped; all target references are absent, temporary OAuth configuration is removed, and the normal PostgreSQL/Redis/server/web/worker stack is healthy.
+- Post-review `TURBO_FORCE=true pnpm run ready` passes 1,259 tests, coverage, contract drift, formatting, lint, structure, all type checks, and eight builds with zero Turbo cache hits and the independent worker stopped for shared-database gates. All 256 integration tests remain green. M14 now awaits only explicit developer acceptance; no commit, release, production OAuth/configuration, deployment, acceptance, or M15 work has occurred.
 
 ### Milestone 15 — Governance automation parity
 
@@ -248,24 +258,25 @@ These entries remain concise because `milestone.md` owns the detailed pending co
 
 Agents did not generate or apply these migrations. Developer-generated/applied artifacts under `packages/db/src/migrations/` are immutable.
 
-| Migration     | Owner         | Purpose                                                |
-| ------------- | ------------- | ------------------------------------------------------ |
-| `0000`–`0001` | Foundation/M2 | Authentication and platform kernel                     |
-| `0002`        | M3            | Memberships, policies, credentials                     |
-| `0003`        | M4            | Project locales and locale access                      |
-| `0004`        | M5            | Versioned collection schemas                           |
-| `0005`        | M6            | Recursive fields, validation, editor layout            |
-| `0006`–`0007` | M7            | Entries, multilingual revisions, entry names           |
-| `0008`        | M8            | Locale publications and Delivery snapshots             |
-| `0009`        | M9            | Delivery configuration and typed read model            |
-| `0010`–`0011` | M11           | Webhook delivery system and outbox limit               |
-| `0012`        | M12           | CLI OAuth device authorization                         |
-| `0013`–`0014` | M13           | Code-first source/hash/receipt authority and actor FKs |
+| Migration     | Owner         | Purpose                                                                             |
+| ------------- | ------------- | ----------------------------------------------------------------------------------- |
+| `0000`–`0001` | Foundation/M2 | Authentication and platform kernel                                                  |
+| `0002`        | M3            | Memberships, policies, credentials                                                  |
+| `0003`        | M4            | Project locales and locale access                                                   |
+| `0004`        | M5            | Versioned collection schemas                                                        |
+| `0005`        | M6            | Recursive fields, validation, editor layout                                         |
+| `0006`–`0007` | M7            | Entries, multilingual revisions, entry names                                        |
+| `0008`        | M8            | Locale publications and Delivery snapshots                                          |
+| `0009`        | M9            | Delivery configuration and typed read model                                         |
+| `0010`–`0011` | M11           | Webhook delivery system and outbox limit                                            |
+| `0012`        | M12           | CLI OAuth device authorization                                                      |
+| `0013`–`0014` | M13           | Code-first source/hash/receipt authority and actor FKs                              |
+| `0015`        | M14           | Control-plane command receipts, Studio registration, and capability actor authority |
 
 ## Roadmap and next gate
 
 - `knowledge_base/milestone.md` is authoritative for the approved M14–M30 sequence, detailed pending context, original M14–M16 preservation, boundaries, and selective reading pointers.
-- M14 design is proposed and awaiting developer review. Implementation starts only after explicit developer approval.
+- M14 design is approved and implementation is active after applied, read-only-verified migration `0015_add_control_plane_bootstrap_authorities`.
 - M15–M30 are contextualized pending milestones, not approved designs; work must continue one milestone at a time and later entries may be split during their own design.
 - Managed hosting, external backend/data adapters, billing, analytics, and plugins remain unsequenced long-term product directions until M30 is accepted.
 - Package publication/versioning, production OAuth, production domains/configuration, deployments, migrations, Tier 2 activation, and milestone acceptance remain developer-controlled.

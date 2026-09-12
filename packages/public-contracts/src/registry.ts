@@ -1,6 +1,7 @@
 // Declares the only public contract sources behind the browser-safe closed registry metadata.
 
 import { authoringOpenApiDocument } from "@framerfordevs/api/contracts/authoring/openapi/index";
+import { controlPlaneOpenApiDocument } from "@framerfordevs/api/contracts/control-plane/openapi/index";
 import { deliveryOpenApiDocument } from "@framerfordevs/api/contracts/delivery/openapi/index";
 import { previewOpenApiDocument } from "@framerfordevs/api/contracts/preview/openapi/index";
 import { toolingOpenApiDocument } from "@framerfordevs/api/contracts/tooling/openapi/index";
@@ -43,6 +44,10 @@ export const publicContractRegistry = {
   "authoring/v1": {
     ...publicContractMetadata["authoring/v1"],
     source: () => authoringOpenApiDocument,
+  },
+  "control-plane/v1": {
+    ...publicContractMetadata["control-plane/v1"],
+    source: () => controlPlaneOpenApiDocument,
   },
   "delivery/v1": {
     ...publicContractMetadata["delivery/v1"],

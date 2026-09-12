@@ -10,6 +10,7 @@
     "preview",
     "---Developer Tools---",
     "authoring",
+    "control-plane-bootstrap",
     "sdk",
     "cli",
     "webhooks",

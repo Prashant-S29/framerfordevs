@@ -117,6 +117,12 @@ import {
   WebhookEndpointPageOutputSchema,
 } from "../contracts/webhook";
 import {
+  ControlPlanePutStudioRegistrationInputSchema,
+  ControlPlanePutStudioRegistrationOutputSchema,
+  ControlPlaneStudioRegistrationScopeSchema,
+  StudioRegistrationOutputSchema,
+} from "../contracts/control-plane";
+import {
   ArchiveProjectInputSchema,
   CapabilityOutputSchema,
   CreateProjectInputSchema,
@@ -127,6 +133,7 @@ import {
   ListWorkspacesInputSchema,
   ProjectOutputSchema,
   ProjectPageOutputSchema,
+  RestoreProjectInputSchema,
   UpdateProjectInputSchema,
   WorkspaceOutputSchema,
   WorkspacePageOutputSchema,
@@ -194,8 +201,13 @@ import {
   getProject,
   listProjects,
   listWorkspaces,
+  restoreProject,
   updateProject,
 } from "../operations/platform";
+import {
+  getStudioRegistrationForSession,
+  putStudioRegistrationForSession,
+} from "../operations/control-plane";
 import { healthCheck, loadPrivateData } from "../operations/system";
 import {
   createInvalidationMapping,
@@ -469,6 +481,45 @@ export const appRouter = {
             "api.platform.project.archive",
             archiveProject(context.session.user.id, input, context.request.requestId),
             "Project archived.",
+          ),
+        ),
+      studioRegistration: {
+        get: protectedProcedure
+          .input(ControlPlaneStudioRegistrationScopeSchema)
+          .output(StudioRegistrationOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.control-plane.studio-registration.get",
+              getStudioRegistrationForSession(context.session.user.id, input),
+              "Studio registration loaded.",
+            ),
+          ),
+        put: protectedProcedure
+          .input(ControlPlanePutStudioRegistrationInputSchema)
+          .output(ControlPlanePutStudioRegistrationOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.control-plane.studio-registration.put",
+              putStudioRegistrationForSession(
+                context.session.user.id,
+                input,
+                context.request.requestId,
+              ),
+              "Studio registration saved.",
+            ),
+          ),
+      },
+      restore: protectedProcedure
+        .input(RestoreProjectInputSchema)
+        .output(ProjectOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.platform.project.restore",
+            restoreProject(context.session.user.id, input, context.request.requestId),
+            "Project restored.",
           ),
         ),
       enableCapability: protectedProcedure

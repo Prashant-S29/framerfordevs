@@ -294,9 +294,9 @@
 
 ## 2026-08-13 — A delivery-enabled local worker must not share an integration-test database
 
-**Incorrect assumption or decision:** The full readiness suite was started while that independent worker remained active. It claimed newly committed test outbox rows before each suite's teardown could remove them.
+**Incorrect assumption or decision:** The full readiness suite was started while that independent worker remained active. It claimed newly committed test outbox rows before each suite's teardown could remove them. A later supposedly focused `pnpm --filter <package> test -- <file>` command was also assumed to preserve the file filter, but the package script already supplied `vitest run`; the extra separator widened execution to the package suite while the worker was healthy.
 
-**Learning:** In-process test isolation cannot control an independently running consumer of the same database. Queue integration suites need a separate database or an explicit operational exclusion around all external workers. Prevention: Stop the local worker before PostgreSQL integration/coverage gates and verify its actual process/container state immediately before the gate; do not rely on a stop command placed after earlier `&&` steps that may short-circuit. Remove only explicitly identified test fixtures if an accidental claim occurs, and restart it only after validation. Production workers and tests should use isolated databases in deployment/CI topology.
+**Learning:** In-process test isolation cannot control an independently running consumer of the same database. Queue integration suites need a separate database or an explicit operational exclusion around all external workers. Prevention: Stop the local worker before PostgreSQL integration/coverage gates and verify its actual process/container state immediately before the gate; do not rely on a stop command placed after earlier `&&` steps that may short-circuit. For focused Vitest execution, use `pnpm --filter <package> exec vitest run <file...>` and confirm the reported file count rather than passing paths through a package test script. Remove only explicitly identified test fixtures if an accidental claim occurs, and restart it only after validation. Production workers and tests should use isolated databases in deployment/CI topology.
 
 ---
 
@@ -473,3 +473,11 @@
 **Incorrect assumption or decision:** Removing `FFD_MANAGEMENT_TOKEN` from Node's `process.env` was treated as removal from the process environment. Node and sanitized opener children no longer observed the key, but Linux retained the original initial-environment bytes in `/proc` for the lifetime of the process.
 
 **Learning:** A secret-bearing process cannot reliably scrub its initial OS environment in portable JavaScript. The long-lived process must start without the secret; clearing a language/runtime map afterward is insufficient. Prevention: `ffd editor --token-stdin` accepts one bounded whitespace-free management token only after credential-blind local schema preparation, rejects simultaneous exported management authority, and keeps the token out of initial OS environment and process arguments. Documentation now prefers OAuth native storage when enabled or a non-exported shell variable piped to this mode. Legacy environment support remains for compatibility but is no longer the recommended secure editor launch.
+
+---
+
+## 2026-08-30 — One database transaction is one sequential connection authority
+
+**Incorrect assumption or decision:** Credential authorization loaded project, environment, and scope rows with `Promise.all` against one Drizzle transaction. PostgreSQL completed the focused scenario, but `pg` warned that a query was started while the same transaction client was already executing another query; pg 9 will reject that pattern.
+
+**Learning:** Independent reads are not safely concurrent when they share one transaction-bound client. Parallel query composition is appropriate only across independently acquired executors; work on one transaction must remain sequential unless the database adapter explicitly provides multiplexing. Prevention: Control Plane credential authorization now performs its three scoped reads sequentially, the management-credential integration scenario passes without the warning, and future transaction helpers must not use `Promise.all` over the same executor.

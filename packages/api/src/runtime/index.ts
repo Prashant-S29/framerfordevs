@@ -22,11 +22,16 @@ import {
   toStatusFamily,
   type AuthoringAuthenticationMetric,
   type AuthoringRequestMetric,
+  type ControlPlaneRequestMetric,
   type PreviewQueryRejectionCategory,
   type ToolingRequestMetric,
 } from "../observability/telemetry";
 import { AccessRepository, AccessRepositoryLive } from "../services/access-repository";
 import { AuthSessionLive, AuthSessionService } from "../services/auth-session";
+import {
+  ControlPlaneCursorSigner,
+  makeControlPlaneCursorSignerLive,
+} from "../services/control-plane/cursor-signer";
 import {
   CredentialAttemptLimiter,
   CredentialAttemptLimiterLive,
@@ -111,6 +116,7 @@ export type ApplicationServices =
   | Telemetry
   | AuthSessionService
   | Database
+  | ControlPlaneCursorSigner
   | DeliveryCursorSigner
   | DeliveryReadRepository
   | DeliveryRepository
@@ -162,6 +168,14 @@ const PrimaryRateLimitStoreLive =
 const rateLimitFingerprintSecret =
   env.RATE_LIMIT_FINGERPRINT_SECRET ?? randomBytes(32).toString("base64url");
 const deliveryCursorSecret = env.DELIVERY_CURSOR_SECRET ?? randomBytes(32).toString("base64url");
+const controlPlaneCursorSecret =
+  env.CONTROL_PLANE_CURSOR_SECRET ?? randomBytes(32).toString("base64url");
+const ControlPlaneCursorSignerLive = makeControlPlaneCursorSignerLive({
+  activeSecret: controlPlaneCursorSecret,
+  ...(env.CONTROL_PLANE_CURSOR_PREVIOUS_SECRET === undefined
+    ? {}
+    : { previousSecret: env.CONTROL_PLANE_CURSOR_PREVIOUS_SECRET }),
+});
 const DeliveryCursorSignerLive = makeDeliveryCursorSignerLive({
   activeSecret: deliveryCursorSecret,
   ...(env.DELIVERY_CURSOR_PREVIOUS_SECRET === undefined
@@ -199,6 +213,7 @@ const InfrastructureLive = Layer.mergeAll(
   TelemetryLive,
   AuthSessionLive,
   DatabaseLive,
+  ControlPlaneCursorSignerLive,
   DeliveryCursorSignerLive,
   DeliveryReadRepositoryLive,
   ToolingCursorSignerLive,
@@ -448,6 +463,12 @@ export function observeHttpRequest(
   durationMs: number,
 ): Promise<void> {
   return applicationRuntime.runPromise(recordHttpRequest(request, status, durationMs));
+}
+
+export function observeControlPlaneRequest(event: ControlPlaneRequestMetric): Promise<void> {
+  return applicationRuntime.runPromise(
+    Effect.flatMap(Telemetry, (telemetry) => telemetry.recordControlPlaneRequest(event)),
+  );
 }
 
 export function observeToolingRequest(event: ToolingRequestMetric): Promise<void> {

@@ -18,17 +18,19 @@ describe("platform form validation", () => {
   });
 
   it.each(["site", "site-2", "product-docs"])('accepts project key "%s"', (key) => {
-    expect(projectFormSchema.safeParse({ name: "Project", key, description: "" }).success).toBe(
-      true,
-    );
+    expect(
+      projectFormSchema.safeParse({ name: "Project", key, description: "", enableCms: true })
+        .success,
+    ).toBe(true);
   });
 
   it.each(["Site", "-site", "site-", "site--docs", "site_docs", "x".repeat(64)])(
     'rejects project key "%s"',
     (key) => {
-      expect(projectFormSchema.safeParse({ name: "Project", key, description: "" }).success).toBe(
-        false,
-      );
+      expect(
+        projectFormSchema.safeParse({ name: "Project", key, description: "", enableCms: true })
+          .success,
+      ).toBe(false);
     },
   );
 
@@ -40,6 +42,7 @@ describe("platform form validation", () => {
         name: "Project",
         key: "project",
         description,
+        enableCms: true,
       }).success,
     ).toBe(false);
     expect(editProjectFormSchema.safeParse({ name: "Project", description }).success).toBe(false);

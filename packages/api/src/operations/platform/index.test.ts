@@ -2,6 +2,12 @@ import { assert, describe, layer } from "@effect/vitest";
 import { Effect, Layer, Schema } from "effect";
 
 import {
+  ControlPlaneCreateProjectResult,
+  ControlPlaneCreateWorkspaceResult,
+  ControlPlaneProject,
+  ControlPlaneWorkspace,
+} from "../../contracts/control-plane";
+import {
   ArchiveProjectInput,
   Capability,
   CreateProjectInput,
@@ -13,6 +19,7 @@ import {
   Project,
   ProjectPage,
   ProjectSummary,
+  RestoreProjectInput,
   UpdateProjectInput,
   Workspace,
   WorkspacePage,
@@ -26,6 +33,7 @@ import {
   getProject,
   listProjects,
   listWorkspaces,
+  restoreProject,
   updateProject,
 } from "./index";
 
@@ -75,6 +83,20 @@ const projectSummary = Schema.decodeUnknownSync(ProjectSummary)({
   createdAt: project.createdAt,
   updatedAt: project.updatedAt,
 });
+const controlPlaneWorkspace = Schema.decodeUnknownSync(ControlPlaneWorkspace)(workspace);
+const controlPlaneProject = Schema.decodeUnknownSync(ControlPlaneProject)({
+  ...project,
+  status: "active",
+  primaryEnvironment: project.environment,
+  effectiveActions: [
+    "project.read",
+    "project.update",
+    "project.archive",
+    "project.capability.manage",
+    "studio_registration.read",
+    "studio_registration.write",
+  ],
+});
 const capability = Schema.decodeUnknownSync(Capability)({
   id: "019fae8b-1234-7000-8000-000000000004",
   key: "cms",
@@ -90,21 +112,27 @@ const operationCalls: Array<string> = [];
 
 const PlatformRepositoryTest = Layer.succeed(PlatformRepository, {
   ...makePlatformRepository(),
-  createWorkspace: () =>
+  createControlPlaneWorkspace: () =>
     Effect.sync(() => {
       createCalls += 1;
-      operationCalls.push("createWorkspace");
-      return workspace;
+      operationCalls.push("createControlPlaneWorkspace");
+      return ControlPlaneCreateWorkspaceResult.make({
+        workspace: controlPlaneWorkspace,
+        replayed: false,
+      });
     }),
   listWorkspaces: () =>
     Effect.sync(() => {
       operationCalls.push("listWorkspaces");
       return workspacePage;
     }),
-  createProject: () =>
+  createControlPlaneProject: () =>
     Effect.sync(() => {
-      operationCalls.push("createProject");
-      return project;
+      operationCalls.push("createControlPlaneProject");
+      return ControlPlaneCreateProjectResult.make({
+        project: controlPlaneProject,
+        replayed: false,
+      });
     }),
   listProjects: () =>
     Effect.sync(() => {
@@ -116,20 +144,25 @@ const PlatformRepositoryTest = Layer.succeed(PlatformRepository, {
       operationCalls.push("getProject");
       return project;
     }),
-  updateProject: () =>
+  updateControlPlaneProject: () =>
     Effect.sync(() => {
-      operationCalls.push("updateProject");
-      return project;
+      operationCalls.push("updateControlPlaneProject");
+      return controlPlaneProject;
     }),
   archiveProject: () =>
     Effect.sync(() => {
       operationCalls.push("archiveProject");
       return project;
     }),
-  enableCapability: () =>
+  restoreProject: () =>
     Effect.sync(() => {
-      operationCalls.push("enableCapability");
-      return capability;
+      operationCalls.push("restoreProject");
+      return project;
+    }),
+  enableControlPlaneCapability: () =>
+    Effect.sync(() => {
+      operationCalls.push("enableControlPlaneCapability");
+      return { capability, replayed: false };
     }),
 });
 
@@ -199,6 +232,14 @@ describe("platform operations", () => {
           }),
           requestId,
         );
+        yield* restoreProject(
+          actor,
+          yield* Schema.decodeUnknown(RestoreProjectInput)({
+            projectId: project.id,
+            version: project.version,
+          }),
+          requestId,
+        );
         yield* enableCapability(
           actor,
           yield* Schema.decodeUnknown(EnableCapabilityInput)({
@@ -210,12 +251,13 @@ describe("platform operations", () => {
 
         assert.deepEqual(operationCalls, [
           "listWorkspaces",
-          "createProject",
+          "createControlPlaneProject",
           "listProjects",
           "getProject",
-          "updateProject",
+          "updateControlPlaneProject",
           "archiveProject",
-          "enableCapability",
+          "restoreProject",
+          "enableControlPlaneCapability",
         ]);
       }),
     );

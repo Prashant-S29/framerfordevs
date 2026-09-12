@@ -27,6 +27,10 @@ import {
 } from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
 import {
+  controlPlaneCommandReceipt,
+  studioRegistration,
+} from "@framerfordevs/db/schema/control-plane";
+import {
   cmsCollection,
   cmsCollectionDeliveryConfig,
   cmsCollectionDeliveryField,
@@ -231,6 +235,27 @@ async function deleteFixture(): Promise<void> {
   const credentialIds = credentialRows.map(({ id }) => id);
 
   await db.transaction(async (transaction) => {
+    if (projectIds.length > 0 || workspaceIds.length > 0 || userIds.length > 0) {
+      await transaction
+        .delete(controlPlaneCommandReceipt)
+        .where(
+          or(
+            ...(projectIds.length > 0
+              ? [inArray(controlPlaneCommandReceipt.projectId, projectIds)]
+              : []),
+            ...(workspaceIds.length > 0
+              ? [inArray(controlPlaneCommandReceipt.workspaceId, workspaceIds)]
+              : []),
+            ...(userIds.length > 0 ? [inArray(controlPlaneCommandReceipt.actorId, userIds)] : []),
+          ),
+        );
+    }
+    if (projectIds.length > 0) {
+      await transaction
+        .delete(studioRegistration)
+        .where(inArray(studioRegistration.projectId, projectIds));
+    }
+
     const outboxSubjects = [...collectionIds, ...entryIds];
     if (outboxSubjects.length > 0)
       await transaction.delete(outboxEvent).where(inArray(outboxEvent.subjectId, outboxSubjects));

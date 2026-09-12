@@ -7,7 +7,7 @@ description: Authenticate, publish code-owned structure, automate content, launc
 
 The `ffd` CLI connects a local codebase to one project environment. It generates deterministic consumer contracts, publishes code-owned schema structure, automates hosted content, and runs the secure localhost editor.
 
-> The package is staged for M13 review but is not yet published to the npm registry.
+> The package is currently unpublished at version `0.0.0`.
 
 ## Interactive Workflow
 
@@ -38,9 +38,15 @@ FFD_MANAGEMENT_TOKEN="$CI_SECRET" ffd schema check --json
 
 Do not run interactive login in CI and never write the management token into repository configuration.
 
+## Control Plane Bootstrap
+
+Workspace, project, capability, lifecycle, and Studio-registration commands use the separate Control Plane v1 contract. Every Control Plane command requires `--api <origin>` and supports one bounded JSON page or operation result. Administration is intentionally absent from the public application SDK.
+
+Start with [Bootstrap a project with the CLI](/docs/control-plane-bootstrap).
+
 ## Project Configuration
 
-`ffd link` writes bounded, non-secret `framerfordevs.config.json` authority containing:
+`ffd link` authenticates online, verifies the exact active project, primary environment, current access, and enabled CMS capability, then writes bounded, non-secret `framerfordevs.config.json` authority containing:
 
 - API origin
 - Project ID

@@ -10,6 +10,10 @@ import {
   projectMembership,
 } from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
+import {
+  controlPlaneCommandReceipt,
+  studioRegistration,
+} from "@framerfordevs/db/schema/control-plane";
 import { projectLocale, projectMembershipLocaleAccess } from "@framerfordevs/db/schema/locale";
 import {
   auditEvent,
@@ -68,6 +72,28 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await db
+    .delete(controlPlaneCommandReceipt)
+    .where(
+      or(
+        eq(controlPlaneCommandReceipt.actorId, firstUserId),
+        eq(controlPlaneCommandReceipt.actorId, secondUserId),
+        eq(controlPlaneCommandReceipt.projectId, projectId),
+        eq(controlPlaneCommandReceipt.workspaceId, firstWorkspaceId),
+        eq(controlPlaneCommandReceipt.workspaceId, secondWorkspaceId),
+      ),
+    );
+  await db
+    .delete(studioRegistration)
+    .where(
+      or(
+        eq(studioRegistration.createdByUserId, firstUserId),
+        eq(studioRegistration.changedByUserId, firstUserId),
+        eq(studioRegistration.createdByUserId, secondUserId),
+        eq(studioRegistration.changedByUserId, secondUserId),
+        eq(studioRegistration.projectId, projectId),
+      ),
+    );
   await db
     .delete(auditEvent)
     .where(

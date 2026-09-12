@@ -261,6 +261,37 @@ describe("PolicyService", () => {
         }),
     );
 
+    it.effect("keeps archive and restore owner-only and outside credential authority", () =>
+      Effect.gen(function* () {
+        const policy = yield* PolicyService;
+        const decisions = yield* Effect.all([
+          policy.decideUser(userRequest("owner", "project.archive")),
+          policy.decideUser(userRequest("owner", "project.restore")),
+          policy.decideUser(userRequest("developer", "project.archive")),
+          policy.decideUser(userRequest("developer", "project.restore")),
+          policy.decideCredential(
+            credentialRequest({
+              family: "management",
+              action: "project.archive",
+              scopes: ["project.update"],
+            }),
+          ),
+          policy.decideCredential(
+            credentialRequest({
+              family: "management",
+              action: "project.restore",
+              scopes: ["project.update"],
+            }),
+          ),
+        ]);
+
+        assert.deepEqual(
+          decisions.map((decision) => decision.allowed),
+          [true, true, false, false, false, false],
+        );
+      }),
+    );
+
     it.effect("keeps credential families disjoint and requires an explicit compatible scope", () =>
       Effect.gen(function* () {
         const policy = yield* PolicyService;

@@ -136,6 +136,65 @@ describe("Tooling principal authentication", () => {
     );
   });
 
+  it.effect("keeps OAuth-only routes closed to every credential family without fallback", () => {
+    let managementCalls = 0;
+    let oauthCalls = 0;
+    let rejectedAttempts = 0;
+    const authenticator = makeToolingPrincipalAuthenticator(
+      () => {
+        managementCalls += 1;
+        return Effect.never;
+      },
+      () => {
+        oauthCalls += 1;
+        return Effect.succeed(null);
+      },
+      () => {
+        rejectedAttempts += 1;
+        return Effect.void;
+      },
+    );
+
+    return Effect.all([
+      Effect.exit(
+        authenticator.authenticateOAuth({
+          token: "ffd_mgmt_invalid",
+          source: "source-1",
+          oauthScope: "control-plane:read",
+        }),
+      ),
+      Effect.exit(
+        authenticator.authenticateOAuth({
+          token: "ffd_del_invalid",
+          source: "source-1",
+          oauthScope: "control-plane:read",
+        }),
+      ),
+      Effect.exit(
+        authenticator.authenticateOAuth({
+          token: "ffd_prev_invalid",
+          source: "source-1",
+          oauthScope: "control-plane:read",
+        }),
+      ),
+    ]).pipe(
+      Effect.tap((results) =>
+        Effect.sync(() => {
+          assert.strictEqual(managementCalls, 0);
+          assert.strictEqual(oauthCalls, 0);
+          assert.strictEqual(rejectedAttempts, 3);
+          for (const result of results) {
+            assert.isTrue(Exit.isFailure(result));
+            if (Exit.isFailure(result)) {
+              const error = Option.getOrUndefined(Cause.failureOption(result.cause));
+              assert.strictEqual(error?._tag, "CredentialInvalidFailure");
+            }
+          }
+        }),
+      ),
+    );
+  });
+
   it.effect("rejects Delivery and Preview credentials without OAuth fallback", () => {
     let oauthCalls = 0;
     const authenticator = makeToolingPrincipalAuthenticator(

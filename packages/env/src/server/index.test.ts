@@ -20,6 +20,8 @@ const environmentKeys = [
   "RATE_LIMIT_FINGERPRINT_SECRET",
   "DELIVERY_CURSOR_SECRET",
   "DELIVERY_CURSOR_PREVIOUS_SECRET",
+  "CONTROL_PLANE_CURSOR_SECRET",
+  "CONTROL_PLANE_CURSOR_PREVIOUS_SECRET",
   "WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID",
   "WEBHOOK_ENCRYPTION_KEYS",
   "WEBHOOK_WORKER_ENABLED",
@@ -54,6 +56,8 @@ beforeEach(() => {
   delete process.env.RATE_LIMIT_FINGERPRINT_SECRET;
   delete process.env.DELIVERY_CURSOR_SECRET;
   delete process.env.DELIVERY_CURSOR_PREVIOUS_SECRET;
+  delete process.env.CONTROL_PLANE_CURSOR_SECRET;
+  delete process.env.CONTROL_PLANE_CURSOR_PREVIOUS_SECRET;
   delete process.env.WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID;
   delete process.env.WEBHOOK_ENCRYPTION_KEYS;
   delete process.env.WEBHOOK_WORKER_ENABLED;
@@ -224,6 +228,20 @@ describe("server environment", () => {
     const cursorSecret = "delivery-cursor-test-secret-at-least-32-characters";
     process.env.DELIVERY_CURSOR_SECRET = cursorSecret;
     process.env.DELIVERY_CURSOR_PREVIOUS_SECRET = cursorSecret;
+
+    const failure = await import("./index").then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+
+    expect(String(failure)).toContain("must be different");
+    expect(String(failure)).not.toContain(cursorSecret);
+  });
+
+  it("rejects identical Control Plane cursor rotation secrets", async () => {
+    const cursorSecret = "control-plane-cursor-test-secret-at-least-32-characters";
+    process.env.CONTROL_PLANE_CURSOR_SECRET = cursorSecret;
+    process.env.CONTROL_PLANE_CURSOR_PREVIOUS_SECRET = cursorSecret;
 
     const failure = await import("./index").then(
       () => undefined,

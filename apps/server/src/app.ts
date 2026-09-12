@@ -157,6 +157,9 @@ import express, {
   type Router,
 } from "express";
 
+import { createControlPlaneRouter } from "./control-plane-router";
+export { classifyControlPlaneRequest } from "./control-plane-router";
+
 const generatedPublicArtifacts = generatePublicArtifacts();
 
 function publicArtifactBytes(key: PublicContractRegistryKey): string {
@@ -1187,7 +1190,6 @@ function createToolingRouter(): Router {
       });
     }
 
-    setToolingHeaders(res);
     setToolingHeaders(res);
     const specificationRoute = req.path === "/openapi.json" || req.path === "/docs";
     if (specificationRoute) {
@@ -2353,6 +2355,7 @@ export interface CreateAppOptions {
   readonly previewApiEnabled?: boolean;
   readonly managementApiReferenceEnabled?: boolean;
   readonly authoringEffectTransform?: ApplicationEffectTransform;
+  readonly controlPlaneEffectTransform?: ApplicationEffectTransform;
 }
 
 export function createApp(options: CreateAppOptions = {}): Express {
@@ -2378,6 +2381,13 @@ export function createApp(options: CreateAppOptions = {}): Express {
   });
 
   app.use("/api/authoring/v1", createAuthoringRouter(options.authoringEffectTransform));
+  app.use(
+    "/api/control-plane/v1",
+    createControlPlaneRouter(
+      publicArtifactBytes("control-plane/v1"),
+      options.controlPlaneEffectTransform,
+    ),
+  );
   app.use("/api/delivery/v1", createDeliveryRouter(deliveryApiEnabled));
   app.use("/api/preview/v1", createPreviewRouter(previewApiEnabled));
   app.use("/api/tooling/v1", createToolingRouter());

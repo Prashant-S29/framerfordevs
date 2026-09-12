@@ -1,5 +1,13 @@
+import { randomUUID } from "node:crypto";
+
 import { Effect, Schema } from "effect";
 
+import {
+  ControlPlaneCommandId,
+  ControlPlaneCreateProjectInput,
+  ControlPlaneCreateWorkspaceRequest,
+  type ControlPlaneProject,
+} from "../../contracts/control-plane";
 import { UnauthorizedFailure } from "../../contracts/response/errors";
 import {
   type ArchiveProjectInput,
@@ -7,15 +15,40 @@ import {
   type CreateProjectInput,
   type CreateWorkspaceInput,
   type EnableCapabilityInput,
+  Environment,
   type GetProjectInput,
   type ListProjectsInput,
   type ListWorkspacesInput,
+  Project,
+  type RestoreProjectInput,
   type UpdateProjectInput,
 } from "../../contracts/platform";
 import { PlatformRepository } from "../../services/platform-repository";
 
 const decodeActorId = (actorId: string) =>
   Schema.decodeUnknown(AuthUserId)(actorId).pipe(Effect.mapError(() => UnauthorizedFailure.make()));
+
+function platformProject(project: ControlPlaneProject): Project {
+  return Project.make({
+    id: project.id,
+    workspaceId: project.workspaceId,
+    name: project.name,
+    key: project.key,
+    description: project.description,
+    version: project.version,
+    archivedAt: project.archivedAt,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+    environment: Environment.make({
+      id: project.primaryEnvironment.id,
+      key: project.primaryEnvironment.key,
+      name: project.primaryEnvironment.name,
+      isPrimary: project.primaryEnvironment.isPrimary,
+      createdAt: project.primaryEnvironment.createdAt,
+    }),
+    capabilities: project.capabilities,
+  });
+}
 
 export const createWorkspace = Effect.fn("platform.workspace.create")(function* (
   actorUserId: string,
@@ -24,7 +57,15 @@ export const createWorkspace = Effect.fn("platform.workspace.create")(function* 
 ) {
   const actorId = yield* decodeActorId(actorUserId);
   const repository = yield* PlatformRepository;
-  return yield* repository.createWorkspace(actorId, input, requestId);
+  const result = yield* repository.createControlPlaneWorkspace(
+    { kind: "user", id: actorId },
+    ControlPlaneCreateWorkspaceRequest.make({
+      commandId: ControlPlaneCommandId.make(randomUUID()),
+      name: input.name,
+    }),
+    requestId,
+  );
+  return result.workspace;
 });
 
 export const listWorkspaces = Effect.fn("platform.workspace.list")(function* (
@@ -44,7 +85,20 @@ export const createProject = Effect.fn("platform.project.create")(function* (
   const actorId = yield* decodeActorId(actorUserId);
   yield* Effect.annotateCurrentSpan({ workspaceId: input.workspaceId });
   const repository = yield* PlatformRepository;
-  return yield* repository.createProject(actorId, input, requestId);
+  const result = yield* repository.createControlPlaneProject(
+    { kind: "user", id: actorId },
+    input.workspaceId,
+    ControlPlaneCreateProjectInput.make({
+      workspaceId: input.workspaceId,
+      commandId: ControlPlaneCommandId.make(randomUUID()),
+      name: input.name,
+      key: input.key,
+      description: input.description,
+      initialCapabilities: input.initialCapabilities,
+    }),
+    requestId,
+  );
+  return platformProject(result.project);
 });
 
 export const listProjects = Effect.fn("platform.project.list")(function* (
@@ -75,7 +129,17 @@ export const updateProject = Effect.fn("platform.project.update")(function* (
   const actorId = yield* decodeActorId(actorUserId);
   yield* Effect.annotateCurrentSpan({ projectId: input.projectId });
   const repository = yield* PlatformRepository;
-  return yield* repository.updateProject(actorId, input, requestId);
+  const result = yield* repository.updateControlPlaneProject(
+    { kind: "user", id: actorId },
+    input.projectId,
+    {
+      expectedVersion: input.version,
+      name: input.name,
+      description: input.description,
+    },
+    requestId,
+  );
+  return platformProject(result);
 });
 
 export const archiveProject = Effect.fn("platform.project.archive")(function* (
@@ -89,6 +153,17 @@ export const archiveProject = Effect.fn("platform.project.archive")(function* (
   return yield* repository.archiveProject(actorId, input, requestId);
 });
 
+export const restoreProject = Effect.fn("platform.project.restore")(function* (
+  actorUserId: string,
+  input: RestoreProjectInput,
+  requestId: string,
+) {
+  const actorId = yield* decodeActorId(actorUserId);
+  yield* Effect.annotateCurrentSpan({ projectId: input.projectId });
+  const repository = yield* PlatformRepository;
+  return yield* repository.restoreProject(actorId, input, requestId);
+});
+
 export const enableCapability = Effect.fn("platform.project.capability.enable")(function* (
   actorUserId: string,
   input: EnableCapabilityInput,
@@ -100,5 +175,11 @@ export const enableCapability = Effect.fn("platform.project.capability.enable")(
     capability: input.capability,
   });
   const repository = yield* PlatformRepository;
-  return yield* repository.enableCapability(actorId, input, requestId);
+  const result = yield* repository.enableControlPlaneCapability(
+    { kind: "user", id: actorId },
+    input.projectId,
+    ControlPlaneCommandId.make(randomUUID()),
+    requestId,
+  );
+  return result.capability;
 });

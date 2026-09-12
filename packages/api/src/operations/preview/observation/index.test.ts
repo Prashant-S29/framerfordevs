@@ -73,6 +73,7 @@ function telemetry(
       Effect.sync(() => {
         auditFailures.push(true);
       }),
+    recordControlPlaneRequest: () => Effect.void,
     recordToolingRequest: () => Effect.void,
     recordToolingOAuthVerification: () => Effect.void,
     recordAuthoringAuthentication: () => Effect.void,

@@ -196,61 +196,65 @@ describe("Tier 1 static schema extractor", () => {
     );
   });
 
-  it.effect("rejects a deterministic 256-case token fuzz corpus without side effects", () => {
-    let state = 0x13c0defd;
-    const next = () => {
-      state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
-      return state;
-    };
-    const tokens = [
-      "{",
-      "}",
-      "[",
-      "]",
-      "(",
-      ")",
-      ":",
-      ",",
-      ".",
-      "?",
-      "=>",
-      "export",
-      "default",
-      "const",
-      "import",
-      "from",
-      "as",
-      "satisfies",
-      "null",
-      "true",
-      "false",
-      "identifier",
-      '"text"',
-      "0",
-      "/*comment*/",
-      "//comment\n",
-      "\u{1f642}",
-    ];
-    return withProject({ "framerfordevs.schema.ts": "" }, (root) =>
-      Effect.gen(function* () {
-        const sentinel = join(root, "sentinel.txt");
-        writeFileSync(sentinel, "unchanged", "utf8");
-        const startedAt = Date.now();
-        for (let caseIndex = 0; caseIndex < 256; caseIndex += 1) {
-          const tokenCount = 1 + (next() % 192);
-          const source = Array.from(
-            { length: tokenCount },
-            () => tokens[next() % tokens.length],
-          ).join(" ");
-          writeFileSync(join(root, "framerfordevs.schema.ts"), source, "utf8");
-          const result = yield* Effect.exit(extract(root));
-          assert.isTrue(Exit.isFailure(result));
-          assert.strictEqual(readFileSync(sentinel, "utf8"), "unchanged");
-        }
-        assert.isBelow(Date.now() - startedAt, 30_000);
-      }),
-    );
-  });
+  it.effect(
+    "rejects a deterministic 256-case token fuzz corpus without side effects",
+    () => {
+      let state = 0x13c0defd;
+      const next = () => {
+        state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+        return state;
+      };
+      const tokens = [
+        "{",
+        "}",
+        "[",
+        "]",
+        "(",
+        ")",
+        ":",
+        ",",
+        ".",
+        "?",
+        "=>",
+        "export",
+        "default",
+        "const",
+        "import",
+        "from",
+        "as",
+        "satisfies",
+        "null",
+        "true",
+        "false",
+        "identifier",
+        '"text"',
+        "0",
+        "/*comment*/",
+        "//comment\n",
+        "\u{1f642}",
+      ];
+      return withProject({ "framerfordevs.schema.ts": "" }, (root) =>
+        Effect.gen(function* () {
+          const sentinel = join(root, "sentinel.txt");
+          writeFileSync(sentinel, "unchanged", "utf8");
+          const startedAt = Date.now();
+          for (let caseIndex = 0; caseIndex < 256; caseIndex += 1) {
+            const tokenCount = 1 + (next() % 192);
+            const source = Array.from(
+              { length: tokenCount },
+              () => tokens[next() % tokens.length],
+            ).join(" ");
+            writeFileSync(join(root, "framerfordevs.schema.ts"), source, "utf8");
+            const result = yield* Effect.exit(extract(root));
+            assert.isTrue(Exit.isFailure(result));
+            assert.strictEqual(readFileSync(sentinel, "utf8"), "unchanged");
+          }
+          assert.isBelow(Date.now() - startedAt, 30_000);
+        }),
+      );
+    },
+    30_000,
+  );
 
   it.effect("rejects graph cycles before evaluation", () =>
     withProject(

@@ -1,4 +1,5 @@
 import { Button } from "@framerfordevs/ui/components/button";
+import { Checkbox } from "@framerfordevs/ui/components/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -60,6 +61,7 @@ export function CreateProjectDialog({
       name: "",
       key: "",
       description: "",
+      enableCms: true,
     },
     validators: { onSubmit: projectFormSchema },
     onSubmit: ({ value }) => {
@@ -69,6 +71,7 @@ export function CreateProjectDialog({
         name: value.name.trim().normalize("NFC"),
         key: value.key.trim(),
         description: description || null,
+        initialCapabilities: value.enableCms ? ["cms"] : [],
       });
     },
   });
@@ -172,6 +175,24 @@ export function CreateProjectDialog({
                   </Field>
                 );
               }}
+            </form.Field>
+            <form.Field name="enableCms">
+              {(field) => (
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id={field.name}
+                    checked={field.state.value}
+                    onCheckedChange={field.handleChange}
+                  />
+                  <div className="flex flex-col gap-1">
+                    <FieldLabel htmlFor={field.name}>Enable CMS capability</FieldLabel>
+                    <FieldDescription>
+                      Creates only the CMS capability authority. Schema and content remain
+                      code-first and empty.
+                    </FieldDescription>
+                  </div>
+                </Field>
+              )}
             </form.Field>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>

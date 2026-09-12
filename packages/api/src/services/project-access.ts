@@ -6,7 +6,7 @@ import {
   projectMembership,
 } from "@framerfordevs/db/schema/access";
 import { projectMembershipLocaleAccess } from "@framerfordevs/db/schema/locale";
-import { project, workspaceMembership } from "@framerfordevs/db/schema/platform";
+import { environment, project, workspaceMembership } from "@framerfordevs/db/schema/platform";
 
 import type { ProjectPermissionAction } from "../contracts/access";
 import type { CmsActor } from "../contracts/authoring";
@@ -24,6 +24,11 @@ export interface UserProjectAccess {
   readonly localeAccessMode: string;
   readonly allowedLocaleIds: ReadonlyArray<string>;
   readonly isWorkspaceOwner: boolean;
+  readonly credentialAuthority: {
+    readonly family: string;
+    readonly scopes: ReadonlyArray<string>;
+    readonly environmentId: string;
+  } | null;
 }
 
 export type UserProjectAuthorization =
@@ -63,6 +68,7 @@ export async function selectUserProjectAccess(
       localeAccessMode: "all",
       allowedLocaleIds: [],
       isWorkspaceOwner: true,
+      credentialAuthority: null,
     };
   }
 
@@ -107,19 +113,47 @@ export async function selectUserProjectAccess(
     localeAccessMode: membership.localeAccessMode,
     allowedLocaleIds,
     isWorkspaceOwner: false,
+    credentialAuthority: null,
   };
 }
 
-export async function authorizeCmsActorProject(
+export interface ActorProjectAuthorizationOptions {
+  readonly targetEnvironmentId?: string | null;
+  readonly requirePrimaryCredentialEnvironment?: boolean;
+}
+
+/** Authorizes the shared user/credential actor while preserving exact credential environment scope. */
+export async function authorizeProjectActor(
   executor: ApplicationExecutor,
   actor: CmsActor,
   projectId: string,
-  environmentId: string,
   action: ProjectPermissionAction,
   requestedLocaleId: string | null = null,
+  options: ActorProjectAuthorizationOptions = {},
 ): Promise<UserProjectAuthorization> {
   if (actor.kind === "user") {
-    return authorizeUserProject(executor, actor.id, projectId, action, requestedLocaleId);
+    const authorization = await authorizeUserProject(
+      executor,
+      actor.id,
+      projectId,
+      action,
+      requestedLocaleId,
+    );
+    if (authorization.kind !== "allowed" || options.targetEnvironmentId == null) {
+      return authorization;
+    }
+    const [environmentRow] = await executor
+      .select({ id: environment.id })
+      .from(environment)
+      .where(
+        and(
+          eq(environment.id, options.targetEnvironmentId),
+          eq(environment.workspaceId, authorization.access.project.workspaceId),
+          eq(environment.projectId, authorization.access.project.id),
+        ),
+      )
+      .limit(1);
+    return environmentRow ? authorization : { kind: "not_found" };
   }
 
   const [credential] = await executor
@@ -129,7 +163,9 @@ export async function authorizeCmsActorProject(
       and(
         eq(apiCredential.id, actor.id),
         eq(apiCredential.projectId, projectId),
-        eq(apiCredential.environmentId, environmentId),
+        options.targetEnvironmentId == null
+          ? undefined
+          : eq(apiCredential.environmentId, options.targetEnvironmentId),
         isNull(apiCredential.revokedAt),
         or(isNull(apiCredential.expiresAt), gt(apiCredential.expiresAt, sql`now()`)),
       ),
@@ -137,28 +173,42 @@ export async function authorizeCmsActorProject(
     .limit(1);
   if (!credential) return { kind: "not_found" };
 
-  const [projectRow, scopeRows] = await Promise.all([
-    executor
-      .select()
-      .from(project)
-      .where(
-        and(eq(project.id, credential.projectId), eq(project.workspaceId, credential.workspaceId)),
-      )
-      .limit(1)
-      .then((rows) => rows[0]),
-    executor
-      .select({ scope: apiCredentialScope.scope })
-      .from(apiCredentialScope)
-      .where(
-        and(
-          eq(apiCredentialScope.credentialId, credential.id),
-          eq(apiCredentialScope.workspaceId, credential.workspaceId),
-          eq(apiCredentialScope.projectId, credential.projectId),
-          eq(apiCredentialScope.environmentId, credential.environmentId),
-        ),
+  const [projectRow] = await executor
+    .select()
+    .from(project)
+    .where(
+      and(eq(project.id, credential.projectId), eq(project.workspaceId, credential.workspaceId)),
+    )
+    .limit(1);
+  const [environmentRow] = await executor
+    .select({ id: environment.id, isPrimary: environment.isPrimary })
+    .from(environment)
+    .where(
+      and(
+        eq(environment.id, credential.environmentId),
+        eq(environment.workspaceId, credential.workspaceId),
+        eq(environment.projectId, credential.projectId),
       ),
-  ]);
-  if (!projectRow) return { kind: "not_found" };
+    )
+    .limit(1);
+  const scopeRows = await executor
+    .select({ scope: apiCredentialScope.scope })
+    .from(apiCredentialScope)
+    .where(
+      and(
+        eq(apiCredentialScope.credentialId, credential.id),
+        eq(apiCredentialScope.workspaceId, credential.workspaceId),
+        eq(apiCredentialScope.projectId, credential.projectId),
+        eq(apiCredentialScope.environmentId, credential.environmentId),
+      ),
+    );
+  if (
+    !projectRow ||
+    !environmentRow ||
+    (options.requirePrimaryCredentialEnvironment === true && !environmentRow.isPrimary)
+  ) {
+    return { kind: "not_found" };
+  }
 
   const access: UserProjectAccess = {
     project: projectRow,
@@ -167,6 +217,11 @@ export async function authorizeCmsActorProject(
     localeAccessMode: "all",
     allowedLocaleIds: [],
     isWorkspaceOwner: false,
+    credentialAuthority: {
+      family: credential.family,
+      scopes: scopeRows.map((row) => row.scope),
+      environmentId: credential.environmentId,
+    },
   };
   const decision = decideCredentialPolicy({
     action,
@@ -177,10 +232,23 @@ export async function authorizeCmsActorProject(
     subjectEnvironmentId: credential.environmentId,
     workspaceId: projectRow.workspaceId,
     projectId: projectRow.id,
-    environmentId,
+    environmentId: environmentRow.id,
     isActive: true,
   });
   return decision.allowed ? { kind: "allowed", access } : { kind: "forbidden", access };
+}
+
+export function authorizeCmsActorProject(
+  executor: ApplicationExecutor,
+  actor: CmsActor,
+  projectId: string,
+  environmentId: string,
+  action: ProjectPermissionAction,
+  requestedLocaleId: string | null = null,
+): Promise<UserProjectAuthorization> {
+  return authorizeProjectActor(executor, actor, projectId, action, requestedLocaleId, {
+    targetEnvironmentId: environmentId,
+  });
 }
 
 export async function authorizeUserProject(

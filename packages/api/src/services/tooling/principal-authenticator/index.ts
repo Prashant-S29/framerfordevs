@@ -24,6 +24,12 @@ export type ToolingPrincipal =
       readonly credential: CredentialPrincipal;
     };
 
+export interface AuthenticateOAuthBearerInput {
+  readonly token: string;
+  readonly source: string;
+  readonly oauthScope?: CliApiOAuthScope;
+}
+
 export interface AuthenticateToolingBearerInput {
   readonly token: string;
   readonly source: string;
@@ -79,6 +85,20 @@ export function makeToolingPrincipalAuthenticator<
   ) => Effect.Effect<void, InvalidAttemptError, InvalidAttemptServices>,
 ) {
   return {
+    authenticateOAuth: Effect.fn("ToolingPrincipalAuthenticator.authenticateOAuth")(function* (
+      input: AuthenticateOAuthBearerInput,
+    ) {
+      if (input.token.startsWith("ffd_")) {
+        yield* assertInvalidAttemptAllowed(input.source);
+        return yield* CredentialInvalidFailure.make();
+      }
+      const principal = yield* verifyOAuth(input.token, input.oauthScope ?? TOOLING_READ_SCOPE);
+      if (principal === null) {
+        yield* assertInvalidAttemptAllowed(input.source);
+        return yield* CredentialInvalidFailure.make();
+      }
+      return principal;
+    }),
     authenticate: Effect.fn("ToolingPrincipalAuthenticator.authenticate")(function* (
       input: AuthenticateToolingBearerInput,
     ) {

@@ -1,12 +1,12 @@
 # Milestone 14 control-plane bootstrap contracts design
 
-**Status:** Proposed for developer approval; implementation is not authorized
+**Status:** Developer-approved; implementation active under the documented gates
 
 **Date:** 2026-08-29
 
 ## Developer-approved SDK boundary amendment — 2026-08-29
 
-The developer approved the scoped SDK model while reviewing this proposal. Stable HTTP remains canonical and the CLI becomes the complete agent/developer automation surface, but the public application SDK is limited to content/runtime integration. Control Plane v1 therefore has no SDK client and declares `sdkSupported: false`. The previously identified unpublished M13 Authoring SDK/CLI correction is committed at `d63f215` and is now a compatibility prerequisite M14 must preserve. This amendment is approved; the remainder of the M14 design still awaits explicit developer approval.
+The developer approved the scoped SDK model while reviewing this proposal. Stable HTTP remains canonical and the CLI becomes the complete agent/developer automation surface, but the public application SDK is limited to content/runtime integration. Control Plane v1 therefore has no SDK client and declares `sdkSupported: false`. The previously identified unpublished M13 Authoring SDK/CLI correction is committed at `d63f215` and is now a compatibility prerequisite M14 must preserve. This amendment is approved and remains a compatibility prerequisite of the subsequently approved complete M14 design.
 
 ## Review clarifications — 2026-08-30
 
@@ -457,7 +457,7 @@ Initial public bounds are:
 
 Global and principal rate policies are separate from Tooling/Authoring. Costs are bounded by operation class: reads/list pages, create/update, lifecycle, and Studio writes. Identities are opaque digests and metrics use only closed operation/principal/outcome/status/cost buckets.
 
-No production throughput target is invented during design. Implementation records deterministic representative list and contention baselines, receipt row count/age/write-rate/size evidence, and obtains developer approval for concrete global/principal capacities, bursts, and operation costs. M14 cannot be accepted or released with placeholder policies or without those approved budgets.
+The developer approved the initial implementation budgets after reviewing deterministic PostgreSQL evidence: 23 repository scenarios completed in 701 ms, while eight committed receipt rows occupied 2,184 bytes total, had a maximum row size of 288 bytes, and spanned 390 ms under replay/contention coverage. Control Plane uses independent 60-second token buckets: global refill 3,000 with capacity 250, OAuth-user refill 120 with capacity 20, and management-credential refill 120 with capacity 20. Weighted costs are read/list 1, create 5, project update 3, lifecycle 5, and Studio write 5. These are protective initial limits rather than a production throughput SLA; future changes require measured evidence and explicit authority.
 
 ## SDK exclusion and pre-publication correction
 
@@ -477,24 +477,25 @@ Existing root, `./client`, `./effect`, `./authoring`, `./webhooks`, and `./inval
 The initial exact commands are:
 
 ```text
-ffd workspace list [--limit <n>] [--cursor <cursor>]
-ffd workspace get --workspace <id>
-ffd workspace create --name <name> [--command-id <uuid>]
-ffd project list --workspace <id> [--status active|archived] [--limit <n>] [--cursor <cursor>]
-ffd project get --project <id>
-ffd project create --workspace <id> --name <name> --key <key> [--description <text>] [--enable-cms] [--command-id <uuid>]
-ffd project update --project <id> --expected-version <n> --name <name> [--description <text>|--clear-description]
-ffd project archive --project <id> --expected-version <n> --confirm-key <key>
-ffd project restore --project <id> --expected-version <n>
-ffd project capabilities --project <id>
-ffd project capability enable --project <id> --capability cms [--command-id <uuid>]
-ffd studio registration get --project <id> --environment-id <id>
-ffd studio registration set --project <id> --environment-id <id> --origin <origin> --path <path> [--expected-version <n>] [--command-id <uuid>]
+ffd workspace list --api <origin> [--limit <n>] [--cursor <cursor>]
+ffd workspace get --api <origin> --workspace <id>
+ffd workspace create --api <origin> --name <name> [--command-id <uuid>]
+ffd project list --api <origin> --workspace <id> [--status active|archived] [--limit <n>] [--cursor <cursor>]
+ffd project get --api <origin> --project <id>
+ffd project create --api <origin> --workspace <id> --name <name> --key <key> [--description <text>] [--enable-cms] [--command-id <uuid>]
+ffd project update --api <origin> --project <id> --expected-version <n> --name <name> [--description <text>|--clear-description]
+ffd project archive --api <origin> --project <id> --expected-version <n> --confirm-key <key>
+ffd project restore --api <origin> --project <id> --expected-version <n>
+ffd project capabilities --api <origin> --project <id>
+ffd project capability enable --api <origin> --project <id> --capability cms [--command-id <uuid>]
+ffd studio registration get --api <origin> --project <id> --environment-id <id>
+ffd studio registration set --api <origin> --project <id> --environment-id <id> --origin <origin> --path <path> [--expected-version <n>] [--command-id <uuid>]
 ffd link --api <origin> --project <id> --environment <key> [--output <path>] [--schema <path>]
 ```
 
 Rules:
 
+- Every Control Plane command requires an explicit `--api <origin>`; no remembered host or environment fallback supplies tenant authority.
 - `--json` remains stable stdout-only machine output; diagnostics and failures go only to stderr.
 - Create-like commands accept a caller command ID or create one before network access and persist only ID/fingerprint in the existing bounded retry journal. No token or body is journaled.
 - Mutation helpers perform no hidden retry after an ambiguous response; replay uses the same journaled command ID.
@@ -844,9 +845,9 @@ Named spans, request correlation, bounded metrics, transactional audits, actor-k
 
 Separate family versioning, shared domain operations, explicit package ownership, inert Studio metadata, unchanged prior-family baselines, and deferral of governance/host/session/environment breadth keep M15–M18 and M24 design space open.
 
-## Approval requested
+## Approved implementation authority
 
-Developer approval authorizes these M14 design decisions, but not implementation until approval is explicit:
+The developer explicitly approved M14 implementation under these design decisions and gates:
 
 1. Add separate bearer-only, originless Control Plane API v1 at `/api/control-plane/v1`.
 2. Keep dashboard Better Auth sessions on protected oRPC for M14 while sharing the exact domain authority; defer public cookie/session transport to M17.

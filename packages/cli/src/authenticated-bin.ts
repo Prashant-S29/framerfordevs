@@ -19,6 +19,13 @@ import {
   loadCliConfig,
 } from "./config";
 import { CredentialStore, CredentialStoreLive } from "./credential-store";
+import {
+  decodeControlPlaneApiOrigin,
+  executeControlPlaneCommand,
+  isControlPlaneCommand,
+  verifyControlPlaneLinkAuthority,
+} from "./control-plane-command";
+import { makeControlPlaneHttpClient } from "./control-plane-http-client";
 import { classifySchemaDrift } from "./diff";
 import {
   GeneratorFileSystem,
@@ -168,6 +175,20 @@ function commandEffect(
       return { command, authenticated: true, apiOrigin: new URL(apiOrigin).origin };
     });
   }
+  if (isControlPlaneCommand(command)) {
+    const apiOrigin = stringFlag(arguments_, "api");
+    if (apiOrigin === undefined) return Effect.fail(new Error("CLI_API_REQUIRED"));
+    return Effect.gen(function* () {
+      const canonicalApiOrigin = yield* decodeControlPlaneApiOrigin(apiOrigin);
+      const token = yield* tokenForOrigin(canonicalApiOrigin);
+      return yield* executeControlPlaneCommand({
+        arguments: arguments_,
+        apiOrigin: canonicalApiOrigin,
+        token,
+        root: process.cwd(),
+      });
+    });
+  }
   if (command === "link") {
     const apiBaseUrl = stringFlag(arguments_, "api");
     const projectId = stringFlag(arguments_, "project");
@@ -189,9 +210,25 @@ function commandEffect(
         },
         { onExcessProperty: "error" },
       ).pipe(Effect.mapError(() => new Error("CLI_CONFIG_INVALID")));
+      const token = yield* tokenForOrigin(config.apiBaseUrl);
+      const controlPlane = makeControlPlaneHttpClient({ baseUrl: config.apiBaseUrl, token });
+      const verified = yield* verifyControlPlaneLinkAuthority(
+        yield* controlPlane.getProject(config.projectId),
+        config.projectId,
+        config.environment,
+      );
+      const project = verified.project;
       const path = resolve(process.cwd(), "framerfordevs.config.json");
       yield* atomicWrite(path, canonicalJsonBytes(toJsonValue(config)));
-      return { command, path, projectId: config.projectId, environment: config.environment };
+      return {
+        command,
+        path,
+        workspaceId: project.workspaceId,
+        projectId: project.id,
+        environment: project.primaryEnvironment.key,
+        environmentId: project.primaryEnvironment.id,
+        cmsStatus: verified.cmsStatus,
+      };
     });
   }
   if (command === "schema pull") {
@@ -270,6 +307,19 @@ function commandEffect(
         "ffd login --api <origin> [--open]",
         "ffd logout --api <origin>",
         "ffd whoami --api <origin>",
+        "ffd workspace list --api <origin> [--limit <n>] [--cursor <cursor>]",
+        "ffd workspace get --api <origin> --workspace <id>",
+        "ffd workspace create --api <origin> --name <name> [--command-id <uuid>]",
+        "ffd project list --api <origin> --workspace <id> [--status active|archived] [--limit <n>] [--cursor <cursor>]",
+        "ffd project get --api <origin> --project <id>",
+        "ffd project create --api <origin> --workspace <id> --name <name> --key <key> [--description <text>] [--enable-cms] [--command-id <uuid>]",
+        "ffd project update --api <origin> --project <id> --expected-version <n> --name <name> [--description <text>|--clear-description]",
+        "ffd project archive --api <origin> --project <id> --expected-version <n> --confirm-key <key>",
+        "ffd project restore --api <origin> --project <id> --expected-version <n>",
+        "ffd project capabilities --api <origin> --project <id>",
+        "ffd project capability enable --api <origin> --project <id> --capability cms [--command-id <uuid>]",
+        "ffd studio registration get --api <origin> --project <id> --environment-id <id>",
+        "ffd studio registration set --api <origin> --project <id> --environment-id <id> --origin <origin> --path <path> [--expected-version <n>] [--command-id <uuid>]",
         "ffd link --api <origin> --project <id> --environment <key> [--output <path>] [--schema <path>]",
         "ffd schema pull",
         "ffd schema build [--check]",
@@ -350,7 +400,26 @@ export async function runAuthenticatedCli(rawArguments: ReadonlyArray<string>) {
         : undefined;
     const messageCode =
       value instanceof Error ? /^([A-Z0-9_]+)/.exec(value.message)?.[1] : undefined;
+    const rawControlPlaneHttpCode =
+      taggedCode === "ControlPlaneHttpError" &&
+      typeof value === "object" &&
+      value !== null &&
+      typeof Reflect.get(value, "code") === "string"
+        ? String(Reflect.get(value, "code"))
+        : undefined;
+    const requiresControlPlaneRelogin =
+      rawControlPlaneHttpCode === "CREDENTIAL_INVALID" &&
+      !process.env["FFD_MANAGEMENT_TOKEN"]?.length &&
+      (isControlPlaneCommand(arguments_.command.join(" ")) ||
+        arguments_.command.join(" ") === "link");
+    const controlPlaneHttpCode = requiresControlPlaneRelogin
+      ? "CLI_RELOGIN_REQUIRED"
+      : rawControlPlaneHttpCode;
     const stableTaggedCode: Readonly<Record<string, string>> = {
+      ControlPlaneResponseTooLargeError: "CONTROL_PLANE_RESPONSE_TOO_LARGE",
+      ControlPlaneTransportError: "CLI_CONTROL_PLANE_TRANSPORT",
+      CliRetryJournalConflictError: "CLI_RETRY_JOURNAL_CONFLICT",
+      CliRetryJournalError: "CLI_RETRY_JOURNAL_ERROR",
       CliSchemaBuildNotConfiguredError: "CLI_SCHEMA_BUILD_NOT_CONFIGURED",
       CliSchemaBuildOutputUnownedError: "CLI_SCHEMA_BUILD_OUTPUT_UNOWNED",
       CliSchemaBuildOutputModifiedError: "CLI_SCHEMA_BUILD_OUTPUT_MODIFIED",
@@ -360,6 +429,7 @@ export async function runAuthenticatedCli(rawArguments: ReadonlyArray<string>) {
     const response = {
       ok: false,
       code:
+        controlPlaneHttpCode ??
         (taggedCode === undefined ? undefined : stableTaggedCode[taggedCode]) ??
         taggedCode ??
         messageCode ??

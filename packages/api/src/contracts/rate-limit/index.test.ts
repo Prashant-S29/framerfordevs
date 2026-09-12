@@ -20,6 +20,27 @@ describe("rate-limit contracts", () => {
     expect(() => Schema.decodeUnknownSync(RateLimitPolicy)("caller.policy")).toThrow();
   });
 
+  it("keeps approved Control Plane budgets closed and source-controlled", () => {
+    expect(rateLimitPolicies["control-plane.global"]).toEqual({
+      policy: "control-plane.global",
+      limitPerInterval: 3_000,
+      intervalMs: 60_000,
+      capacity: 250,
+    });
+    expect(rateLimitPolicies["control-plane.user"]).toEqual({
+      policy: "control-plane.user",
+      limitPerInterval: 120,
+      intervalMs: 60_000,
+      capacity: 20,
+    });
+    expect(rateLimitPolicies["control-plane.credential"]).toEqual({
+      policy: "control-plane.credential",
+      limitPerInterval: 120,
+      intervalMs: 60_000,
+      capacity: 20,
+    });
+  });
+
   it("keeps approved Preview and webhook budgets closed and source-controlled", () => {
     expect(rateLimitPolicies["preview.global"]).toEqual({
       policy: "preview.global",
