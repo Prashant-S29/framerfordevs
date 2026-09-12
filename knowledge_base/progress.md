@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestones 0–13 and post-M13 repository/context normalization are developer-approved and committed. M14 implementation, automated readiness, and the delegated manual review are complete; explicit developer acceptance is pending. M15–M30 remain sequenced context only.
-**Next gate:** Explicit developer M14 acceptance; do not begin M15.
+**Overall status:** Milestones 0–14 and post-M13 repository/context normalization are developer-approved and committed. M15–M30 remain sequenced context only; no implementation milestone is active.
+**Next gate:** Developer authorization to design M15 governance automation parity.
 **Last updated:** 2026-09-10
 
 ## Status legend
@@ -33,8 +33,8 @@
 | 11  | Events, webhooks, invalidation          | `[A]`  |            868 | `fef7205` |
 | 12  | Developer portal and generated tooling  | `[A]`  |            962 | `4e87908` |
 | 13  | Code-first authoring and local editor   | `[A]`  |          1,184 | `9c68942` |
-| 14  | Control-plane bootstrap contracts       | `[R]`  |              — | —         |
-| 15  | Governance automation parity            | `[P]`  |              — | —         |
+| 14  | Control-plane bootstrap contracts       | `[A]`  |          1,259 | `6ba124a` |
+| 15  | Governance automation parity            | `[D]`  |              — | —         |
 | 16  | Operational administration and recovery | `[P]`  |              — | —         |
 | 17  | Hosted surface separation               | `[P]`  |              — | —         |
 | 18  | Studio mount and security runtime       | `[P]`  |              — | —         |
@@ -51,7 +51,7 @@
 | 29  | Visual publication and dependencies     | `[P]`  |              — | —         |
 | 30  | Renderer SDK and framework adapters     | `[P]`  |              — | —         |
 
-M14 is the sole active implementation milestone. M15–M30 preserve the developer-approved sequence and detailed context but are not designed or authorized for implementation.
+M14 is accepted at `6ba124a`. M15 is the next design target but is not yet authorized for design or implementation; M16–M30 preserve the developer-approved sequence and detailed context.
 
 ## Post-M13 repository/context normalization
 
@@ -161,9 +161,7 @@ M14 is the sole active implementation milestone. M15–M30 preserve the develope
 - Dashboard collection/field/layout/schema-publication mutation procedures are removed completely with no pre-release compatibility tombstones; content, editorial Presentation, Delivery, navigation, and read-only structure remain.
 - Developer generated/applied `0013_add_code_first_authoring_authorities` and `0014_normalize_authoring_actor_foreign_keys`; final readiness passed 1,184 tests; commit `9c68942`.
 
-## Planned milestone record
-
-These entries remain concise because `milestone.md` owns the detailed pending context. M14 has an approved decision record and active implementation; M15–M30 must not be designed or implemented ahead of their developer gate. The original pre-normalization M14–M16 scope is retained explicitly in M21–M23 and M27 rather than discarded.
+## Milestone 14 implementation and acceptance record
 
 ### Milestone 14 — Control-plane bootstrap contracts
 
@@ -177,7 +175,11 @@ These entries remain concise because `milestone.md` owns the detailed pending co
 - During final readiness, the independent worker was mistakenly restarted before a shared-database gate and claimed rows from one test run. Developer-approved read-only reconciliation identified exactly 10 test users, eight test workspaces, and eight test projects in the failed-run time/prefix scope. The first two guarded cleanup attempts rolled back unchanged on constraint guards; the corrected transaction deleted only the exact tenant graph and users, and read-only verification found zero matching users/workspaces/projects. Clean integration/readiness reruns passed with the worker stopped; the existing worker-isolation learning remains authoritative.
 - Canonical Control Plane artifact and baseline SHA-256 are `747cc0c897ed2738adb5bbc476aee6a284d0f10e89ca8208c3a813a59890a935`. The initial complete readiness gate passed 1,256 tests. Exact patched transitive overrides clear high/critical audit findings and the runtime `qs` advisories; four moderate findings remain only on the repository's Vitest 3 test-tool graph pending a separately reviewed Vitest 4 upgrade.
 - Completed all eight delegated manual-review scenarios with temporary local-only OAuth: native CLI login/whoami, workspace/project bootstrap, verified linking, schema export/plan/push, dashboard/CLI bidirectional projection, dropped-response replay with exactly one resource/receipt/audit, command conflict, tenant and principal-bound cursor isolation, read-only-role denial, exact management-credential permission and actor attribution, inert Studio registration, archive denial across Tooling/Authoring/Delivery/Preview, exact restore preservation, live artifact/docs parity, package-boundary inspection, and secret/content-redaction inspection. Manual review found and corrected two gaps: deterministic non-retryable Control Plane HTTP failures now clear their retry journal while ambiguous transport failures retain it, and the dashboard suppresses the global toast only for the component-owned missing-Studio empty state. Disposable users, credentials, workspaces, projects, content, receipts, audits, OAuth state, browser state, and private evidence were guardedly removed with the worker verified stopped; all target references are absent, temporary OAuth configuration is removed, and the normal PostgreSQL/Redis/server/web/worker stack is healthy.
-- Post-review `TURBO_FORCE=true pnpm run ready` passes 1,259 tests, coverage, contract drift, formatting, lint, structure, all type checks, and eight builds with zero Turbo cache hits and the independent worker stopped for shared-database gates. All 256 integration tests remain green. M14 now awaits only explicit developer acceptance; no commit, release, production OAuth/configuration, deployment, acceptance, or M15 work has occurred.
+- Post-review `TURBO_FORCE=true pnpm run ready` passed 1,259 tests, coverage, contract drift, formatting, lint, structure, all type checks, and eight builds with zero Turbo cache hits and the independent worker stopped for shared-database gates. All 256 integration tests remained green. The developer accepted and pushed M14 to `main` as `6ba124a`; no release, production OAuth/configuration, deployment, or M15 work occurred.
+
+## Planned milestone record
+
+These entries remain concise because `milestone.md` owns the detailed pending context. M15 is the next design target but remains unauthorized; M15–M30 must not be designed or implemented ahead of their developer gate. The original pre-normalization M14–M16 scope is retained explicitly in M21–M23 and M27 rather than discarded.
 
 ### Milestone 15 — Governance automation parity
 
@@ -250,7 +252,7 @@ These entries remain concise because `milestone.md` owns the detailed pending co
 - SDK/CLI boundary correction at `d63f215`: full `pnpm run ready` passed 1,190 tests, 15 type-check tasks, public-contract drift, formatting, lint, structure, coverage, and eight builds; CLI rose to 110 tests and SDK to 19. Packaged credential-blind extraction/build, schema/Presentation/content, and loopback-editor workflows passed.
 - Current pre-release dashboard route removal: full readiness passes 1,177 tests, including 721 API and 127 server tests, with the same 15 type-check, contract, formatting, lint, structure, coverage, and eight-build gates. The independent worker was stopped for shared-database gates and restored healthy.
 - Canonical Authoring OpenAPI SHA-256 is `d9500549cd95067857b87f494b77375e3d575c4832589478858e125ab3f31205`.
-- The live schema records migrations through `0014`; post-cleanup source/hash/actor/head/FK/receipt/webhook invariants and supported outbox projection were clean at acceptance.
+- The live schema records migrations through `0015`; post-cleanup source/hash/actor/head/FK/receipt/webhook invariants and supported outbox projection were clean at acceptance.
 - Schema, SDK, and CLI release Changesets/package metadata remain at version `0.0.0`; no package has been published. The committed SDK boundary removes schema push and Presentation mutation from public Authoring SDK methods/DTOs while preserving those workflows in the CLI.
 - Production OAuth rollout, production configuration, deployment, and Tier 2 production/default activation have not occurred.
 
@@ -275,8 +277,8 @@ Agents did not generate or apply these migrations. Developer-generated/applied a
 
 ## Roadmap and next gate
 
-- `knowledge_base/milestone.md` is authoritative for the approved M14–M30 sequence, detailed pending context, original M14–M16 preservation, boundaries, and selective reading pointers.
-- M14 design is approved and implementation is active after applied, read-only-verified migration `0015_add_control_plane_bootstrap_authorities`.
-- M15–M30 are contextualized pending milestones, not approved designs; work must continue one milestone at a time and later entries may be split during their own design.
+- `knowledge_base/milestone.md` is authoritative for the approved M15–M30 sequence, detailed pending context, original M14–M16 preservation, boundaries, and selective reading pointers.
+- M14 is developer-accepted and committed at `6ba124a` after applied, read-only-verified migration `0015_add_control_plane_bootstrap_authorities`.
+- M15 is the next design target; M15–M30 remain contextualized pending milestones rather than approved designs, and work must continue one milestone at a time.
 - Managed hosting, external backend/data adapters, billing, analytics, and plugins remain unsequenced long-term product directions until M30 is accepted.
 - Package publication/versioning, production OAuth, production domains/configuration, deployments, migrations, Tier 2 activation, and milestone acceptance remain developer-controlled.

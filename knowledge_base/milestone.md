@@ -45,30 +45,15 @@ Agents may edit an approved Drizzle schema but must never generate, edit, apply,
 | 11  | Add publication events, secure webhooks, invalidation, retries, replay, worker delivery, and operations UX.  | 868 tests; `fef7205`   |
 | 12  | Add Tooling v1, OAuth-capable CLI, SDK/generation, canonical public contracts, and developer portal.         | 962 tests; `4e87908`   |
 | 13  | Add secure code-first schema/content authoring, Authoring v1, SDK/CLI, local editor, and builder retirement. | 1,184 tests; `9c68942` |
+| 14  | Add portable Control Plane v1 bootstrap, complete CLI parity, hosted controls, and project recovery.         | 1,259 tests; `6ba124a` |
 
 Post-M13 repository/context normalization is developer-approved and committed at `cd31102`. Its owner-directory structure, direct-import policy, generalized pair/prefix checks, stable exports, and production entrypoints are the baseline for all pending work.
 
 ## Pending milestones
 
-### Milestone 14 — Control-plane bootstrap contracts
-
-**Status:** Design approved in `decisions/m14-control-plane-bootstrap-contracts-design.md`; implementation, automated readiness, and all eight delegated manual-review scenarios are complete after applied, read-only-verified migration `0015_add_control_plane_bootstrap_authorities`; explicit developer acceptance is pending.
-
-**Summary:** Establish the first portable Control Plane v1 slice so workspace/project bootstrap no longer depends on hosted-dashboard internals.
-
-- Define bounded create, discover/list, get, link, archive/recovery boundary, capability inspection, and initial Studio-registration primitives without absorbing governance or Studio runtime work.
-- Preserve one server authority across dashboard, HTTP, and CLI; every mutation needs tenant scope, honest actor attribution, idempotency or optimistic concurrency, audit behavior, and deterministic errors.
-- Add versioned HTTP/OpenAPI/public-contract ownership and stable noninteractive CLI JSON/exit-code behavior; Control Plane v1 is intentionally excluded from the content/runtime SDK.
-- Reconcile user sessions, OAuth CLI tokens, service credentials, exact grants, pagination, secret-safe output, and project/environment identity for each route.
-- Decide package/app ownership and compatibility without breaking existing Management/oRPC behavior, M12 public tooling, M13 Authoring, package exports, or generated artifacts.
-- Treat Studio registration as control-plane metadata only; do not implement the Studio SPA/BFF, governance breadth, credential/webhook administration, or hosted-surface migration.
-- Require success/failure/tenant-isolation/authorization/replay/concurrency/contract/package/load evidence and identify any schema change requiring a developer-generated migration.
-
-**Read before design:** `product.md` product surfaces; `prd/cms.md` §§6.1, 7, 14, 19, 21; M2, M3, M12, M13, and the public HTTP/CLI/SDK boundary decision; current platform operations, public-contract registry, CLI, and dashboard project flows.
-
 ### Milestone 15 — Governance automation parity
 
-**Status:** Planned; design not started.
+**Status:** Next design target; design and implementation are not authorized.
 
 **Depends on:** M14.
 
