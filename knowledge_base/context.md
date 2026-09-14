@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-09-10
-**Current phase:** M14 Control Plane v1 bootstrap is developer-accepted and committed at `6ba124a`; no implementation milestone is active
-**Next gate:** Developer authorization to design M15 governance automation parity
+**Last updated:** 2026-09-14
+**Current phase:** M15 governance automation parity design is proposed for developer review; no implementation milestone is active
+**Next gate:** Developer approval of `decisions/m15-governance-automation-parity-design.md` and explicit M15 implementation authorization
 
 ## Start here
 
@@ -20,7 +20,7 @@ Read relevant sections of `product.md` and `prd/cms.md` for behavioral work. Do 
 - Explicit current developer instruction, product/PRD, relevant rules/active criteria/approved decisions, then status documents govern intent in that order.
 - Committed source, tests, configuration, migrations, and generated artifacts describe executable truth; Git describes repository state.
 - Report drift instead of silently choosing an authority.
-- Work only on an approved active milestone or an explicitly authorized workstream. M15 is the next design target but remains unauthorized for design or implementation; M16+ remain sequenced context only.
+- Work only on an approved active milestone or an explicitly authorized workstream. M15 design was authorized and is now proposed for review; implementation remains unauthorized. M16+ remain sequenced context only.
 
 ## Product direction
 
@@ -124,4 +124,6 @@ The subsequent repository-normalization workstream also passed the complete read
 
 ## Current work and next gate
 
-The detailed M15–M30 roadmap is sequenced, with the original client-handover, production-hardening, and visual-readiness obligations explicitly mapped into M21–M23 and M27. M14 is accepted at `6ba124a`: it established the approved Control Plane contracts, shared domain authority, bearer-only HTTP transport, complete explicit-origin CLI, online linking, hosted controls, signed cursors, receipts, quotas, telemetry, canonical artifact/docs, and `sdkSupported: false`. Developer-generated/applied migration `0015_add_control_plane_bootstrap_authorities` was fully inspected and verified read-only. All eight delegated manual scenarios passed, the two review findings were corrected, and post-review readiness passed 1,259 tests plus coverage, contracts, formatting, lint, structure, types, and eight builds with zero Turbo cache hits. The Control Plane OpenAPI artifact/baseline digest is `747cc0c897ed2738adb5bbc476aee6a284d0f10e89ca8208c3a813a59890a935`. M15 governance automation parity is the next design target, but design and implementation require a new developer gate. Do not publish packages, activate production OAuth, deploy, create/apply further migrations, or begin M15 without explicit authorization.
+The detailed M15–M30 roadmap is sequenced, with the original client-handover, production-hardening, and visual-readiness obligations explicitly mapped into M21–M23 and M27. M14 is accepted at `6ba124a`: it established the approved Control Plane contracts, shared domain authority, bearer-only HTTP transport, complete explicit-origin CLI, online linking, hosted controls, signed cursors, receipts, quotas, telemetry, canonical artifact/docs, and `sdkSupported: false`. Developer-generated/applied migration `0015_add_control_plane_bootstrap_authorities` was fully inspected and verified read-only. All eight delegated manual scenarios passed, the two review findings were corrected, and post-review readiness passed 1,259 tests plus coverage, contracts, formatting, lint, structure, types, and eight builds with zero Turbo cache hits. The Control Plane OpenAPI artifact/baseline digest is `747cc0c897ed2738adb5bbc476aee6a284d0f10e89ca8208c3a813a59890a935`.
+
+M15 design is proposed in `decisions/m15-governance-automation-parity-design.md`. The developer resolved policy administration to the bounded fixed-role + locale-access model: invitations and member updates receive atomic role/locale policy, while custom persisted action/collection/field policy remains M21 scope. Design review confirmed the standalone role-only/locale-only mutations have no remaining production caller after the hosted UI migration, so M15 retires their contracts, operations, router entries, and repository methods instead of preserving the two-step widening path. It also replaces the user-visible partial permission mirror with one canonical policy-derived projector. The proposal otherwise adds HTTP/CLI/hosted parity, user-only member/invitation authority, exact management-credential locale authority, and reuse of M14 current-`main` inspection. Approval must explicitly accept non-replayable invitation creation and its list/revoke/reissue recovery. Implementation, schema edits, migration handoff, and rollout remain unauthorized pending review. Do not publish packages, activate production OAuth, deploy, create/apply further migrations, implement M15, or begin M16.

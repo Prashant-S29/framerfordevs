@@ -481,3 +481,11 @@
 **Incorrect assumption or decision:** Credential authorization loaded project, environment, and scope rows with `Promise.all` against one Drizzle transaction. PostgreSQL completed the focused scenario, but `pg` warned that a query was started while the same transaction client was already executing another query; pg 9 will reject that pattern.
 
 **Learning:** Independent reads are not safely concurrent when they share one transaction-bound client. Parallel query composition is appropriate only across independently acquired executors; work on one transaction must remain sequential unless the database adapter explicitly provides multiplexing. Prevention: Control Plane credential authorization now performs its three scoped reads sequentially, the management-credential integration scenario passes without the warning, and future transaction helpers must not use `Promise.all` over the same executor.
+
+---
+
+## 2026-09-14 — Permission projections must derive from canonical policy
+
+**Incorrect assumption or decision:** `CurrentProjectAccess.allowedActions` used a partial `isActionVisibleForLocaleAccess` mirror instead of the canonical policy rules. For selected/none developers it exposed schema write/publish, Delivery configuration, and webhook read/manage actions that `PolicyService` correctly denied, causing UI controls to overstate authority and requiring an ad hoc locale check on one webhook link.
+
+**Learning:** A UI capability projection is an authorization-derived contract even when repositories still enforce every mutation. Parallel permission heuristics drift and produce confusing or unsafe-looking controls. Prevention: M15 replaces the helper and compensating client checks with one pure projector derived from the canonical fixed-role and locale policy; tests distinguish base role grants, project-effective actions, configured locale grants, and exact enabled-locale actions, and manual review verifies the before/after restricted-developer surface.

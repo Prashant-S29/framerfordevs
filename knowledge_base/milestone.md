@@ -53,14 +53,15 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ### Milestone 15 — Governance automation parity
 
-**Status:** Next design target; design and implementation are not authorized.
+**Status:** Design proposed in `decisions/m15-governance-automation-parity-design.md`; awaiting developer review. Implementation is not authorized.
 
 **Depends on:** M14.
 
 **Summary:** Make project governance fully automatable through the same portable authority used by hosted administration.
 
-- Expose memberships, invitations, role assignment, policy administration, project locale administration, and current-`main` environment inspection through portable contracts.
-- Preserve last-owner protection, invitation lifecycle, collection/field/locale restrictions, exact action policy, project/environment scope, and permission-filtered responses.
+- Expose memberships, invitations, fixed-role assignment, locale-access-mode policy administration, project locale administration, and current-`main` environment inspection through portable contracts.
+- Treat policy administration in M15 as the bounded existing fixed-role + `all | selected | none` locale-access model: assign it atomically at invitation/acceptance and member update time. Retire the superseded standalone role-only/locale-only member mutations so no residual two-step widening path remains. Persisted custom action/collection/field policy remains M21 scope.
+- Preserve last-owner protection, invitation lifecycle, existing field-role and locale restrictions, exact action policy, project/environment scope, and permission-filtered responses.
 - Make direct HTTP, CLI, and hosted UI operations share the same repository/services and actor/audit/concurrency authority; do not add governance methods to the content/runtime SDK.
 - Keep browser and CLI grants least-privileged; distinguish user-session governance from noninteractive automation and never infer issuer authority for credential actors.
 - Provide bounded list/search/pagination and stable machine-readable failures so agents can reconcile governance state without scraping UI.

@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestones 0–14 and post-M13 repository/context normalization are developer-approved and committed. M15–M30 remain sequenced context only; no implementation milestone is active.
-**Next gate:** Developer authorization to design M15 governance automation parity.
-**Last updated:** 2026-09-10
+**Overall status:** Milestones 0–14 and post-M13 repository/context normalization are developer-approved and committed. M15 design is proposed for review; no implementation milestone is active.
+**Next gate:** Developer approval of the M15 design and explicit implementation authorization.
+**Last updated:** 2026-09-14
 
 ## Status legend
 
@@ -34,7 +34,7 @@
 | 12  | Developer portal and generated tooling  | `[A]`  |            962 | `4e87908` |
 | 13  | Code-first authoring and local editor   | `[A]`  |          1,184 | `9c68942` |
 | 14  | Control-plane bootstrap contracts       | `[A]`  |          1,259 | `6ba124a` |
-| 15  | Governance automation parity            | `[D]`  |              — | —         |
+| 15  | Governance automation parity            | `[R]`  |              — | —         |
 | 16  | Operational administration and recovery | `[P]`  |              — | —         |
 | 17  | Hosted surface separation               | `[P]`  |              — | —         |
 | 18  | Studio mount and security runtime       | `[P]`  |              — | —         |
@@ -51,7 +51,7 @@
 | 29  | Visual publication and dependencies     | `[P]`  |              — | —         |
 | 30  | Renderer SDK and framework adapters     | `[P]`  |              — | —         |
 
-M14 is accepted at `6ba124a`. M15 is the next design target but is not yet authorized for design or implementation; M16–M30 preserve the developer-approved sequence and detailed context.
+M14 is accepted at `6ba124a`. M15 design is proposed in `decisions/m15-governance-automation-parity-design.md` and awaits developer review; implementation is not authorized. M16–M30 preserve the developer-approved sequence and detailed context.
 
 ## Post-M13 repository/context normalization
 
@@ -179,11 +179,16 @@ M14 is accepted at `6ba124a`. M15 is the next design target but is not yet autho
 
 ## Planned milestone record
 
-These entries remain concise because `milestone.md` owns the detailed pending context. M15 is the next design target but remains unauthorized; M15–M30 must not be designed or implemented ahead of their developer gate. The original pre-normalization M14–M16 scope is retained explicitly in M21–M23 and M27 rather than discarded.
+These entries remain concise because `milestone.md` owns the detailed pending context. M15 design is awaiting review and implementation remains unauthorized; M16–M30 must not be designed or implemented ahead of their developer gate. The original pre-normalization M14–M16 scope is retained explicitly in M21–M23 and M27 rather than discarded.
 
 ### Milestone 15 — Governance automation parity
 
-- Sequence memberships, invitations, role/policy administration, locales, and current-environment inspection after M14 contracts establish the portable boundary.
+- Proposed `decisions/m15-governance-automation-parity-design.md` after inspecting M2–M4/M12/M14 authority, current contracts/repositories/transports/CLI/UI/tests, and the public HTTP/CLI/SDK boundary.
+- Developer clarified policy administration as the existing seven fixed roles plus `all | selected | none` locale access, assigned atomically at invitation/acceptance and member update time. M15 adds no persisted custom action/collection/field policy engine; M21 retains that authority.
+- Proposal adds stable Control Plane HTTP, complete CLI, and hosted shared-domain parity for governance and locales; preserves user-only member/invitation authority, exact management-credential locale authority, one-time token secrecy, last-owner/concurrency rules, signed bounded search/pagination, honest actor/audit attribution, current-`main` inspection, and SDK exclusion.
+- Design review found that standalone role-only and locale-only updates are called only by the current hosted component plus owning tests. Because that component migrates to atomic policy update and no CLI/SDK caller exists, the revised design retires both procedure shapes and the underlying redundant repository methods. It also records the user-visible partial permission-projection drift and requires a canonical policy-derived projector plus explicit before/after manual review.
+- Invitation creation remains intentionally non-receipt-replayable to preserve server-generated digest-only one-time tokens; design approval must explicitly accept list/search → revoke → reissue recovery after an ambiguous response.
+- No implementation, schema edit, migration generation/application, OAuth activation, publication, or deployment has begun.
 
 ### Milestone 16 — Operational administration and recovery
 
@@ -279,6 +284,6 @@ Agents did not generate or apply these migrations. Developer-generated/applied a
 
 - `knowledge_base/milestone.md` is authoritative for the approved M15–M30 sequence, detailed pending context, original M14–M16 preservation, boundaries, and selective reading pointers.
 - M14 is developer-accepted and committed at `6ba124a` after applied, read-only-verified migration `0015_add_control_plane_bootstrap_authorities`.
-- M15 is the next design target; M15–M30 remain contextualized pending milestones rather than approved designs, and work must continue one milestone at a time.
+- M15 design is proposed for developer review; M15 implementation and M16–M30 design/implementation remain unauthorized, and work must continue one milestone at a time.
 - Managed hosting, external backend/data adapters, billing, analytics, and plugins remain unsequenced long-term product directions until M30 is accepted.
 - Package publication/versioning, production OAuth, production domains/configuration, deployments, migrations, Tier 2 activation, and milestone acceptance remain developer-controlled.
