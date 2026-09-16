@@ -46,32 +46,15 @@ Agents may edit an approved Drizzle schema but must never generate, edit, apply,
 | 12  | Add Tooling v1, OAuth-capable CLI, SDK/generation, canonical public contracts, and developer portal.         | 962 tests; `4e87908`   |
 | 13  | Add secure code-first schema/content authoring, Authoring v1, SDK/CLI, local editor, and builder retirement. | 1,184 tests; `9c68942` |
 | 14  | Add portable Control Plane v1 bootstrap, complete CLI parity, hosted controls, and project recovery.         | 1,259 tests; `6ba124a` |
+| 15  | Add governance automation parity across HTTP, CLI, hosted controls, and shared policy authority.             | 1,270 tests; `5460c2b` |
 
 Post-M13 repository/context normalization is developer-approved and committed at `cd31102`. Its owner-directory structure, direct-import policy, generalized pair/prefix checks, stable exports, and production entrypoints are the baseline for all pending work.
 
 ## Pending milestones
 
-### Milestone 15 — Governance automation parity
-
-**Status:** Implementation, section-by-section checklist audit, automated readiness, and developer-delegated browser review are complete; awaiting explicit acceptance. Migration `0016` is applied and read-only verified.
-
-**Depends on:** M14.
-
-**Summary:** Make project governance fully automatable through the same portable authority used by hosted administration.
-
-- Expose memberships, invitations, fixed-role assignment, locale-access-mode policy administration, project locale administration, and current-`main` environment inspection through portable contracts.
-- Treat policy administration in M15 as the bounded existing fixed-role + `all | selected | none` locale-access model: assign it atomically at invitation/acceptance and member update time. Retire the superseded standalone role-only/locale-only member mutations so no residual two-step widening path remains. Persisted custom action/collection/field policy remains M21 scope.
-- Preserve last-owner protection, invitation lifecycle, existing field-role and locale restrictions, exact action policy, project/environment scope, and permission-filtered responses.
-- Make direct HTTP, CLI, and hosted UI operations share the same repository/services and actor/audit/concurrency authority; do not add governance methods to the content/runtime SDK.
-- Keep browser and CLI grants least-privileged; distinguish user-session governance from noninteractive automation and never infer issuer authority for credential actors.
-- Provide bounded list/search/pagination and stable machine-readable failures so agents can reconcile governance state without scraping UI.
-- Do not introduce multi-environment lifecycle, content Studio UX, credential/webhook administration, billing, or recovery operations assigned elsewhere.
-
-**Read before design:** M2–M4, M12, and the public HTTP/CLI/SDK boundary decision; platform/access/locale contracts, policy service, membership/invitation operations, dashboard access/locale UI, and CLI command conventions.
-
 ### Milestone 16 — Operational administration and recovery
 
-**Status:** Planned; design not started.
+**Status:** Next design target; design not started and implementation is not approved.
 
 **Depends on:** M14–M15.
 

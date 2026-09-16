@@ -1,8 +1,8 @@
 # Agent Session Context
 
 **Last updated:** 2026-09-16
-**Current phase:** M15 governance automation parity implementation, checklist audit, and Playwright review are complete; M15 awaits final developer review and is not accepted
-**Next gate:** Obtain explicit M15 acceptance and the developer-created commit; do not begin M16
+**Current phase:** M15 governance automation parity is developer-approved and committed at `5460c2b`; M16 operational administration and recovery is the next design target
+**Next gate:** Design M16 and obtain explicit developer approval before implementation
 
 ## Start here
 
@@ -20,7 +20,7 @@ Read relevant sections of `product.md` and `prd/cms.md` for behavioral work. Do 
 - Explicit current developer instruction, product/PRD, relevant rules/active criteria/approved decisions, then status documents govern intent in that order.
 - Committed source, tests, configuration, migrations, and generated artifacts describe executable truth; Git describes repository state.
 - Report drift instead of silently choosing an authority.
-- Work only on an approved active milestone or an explicitly authorized workstream. M15 implementation is active under the approved design; M16+ remain sequenced context only.
+- Work only on an approved active milestone or an explicitly authorized workstream. M16 is the next design target; implementation remains unauthorized until its design is explicitly approved, and M17+ remain sequenced context only.
 
 ## Product direction
 
@@ -33,7 +33,7 @@ The intended surfaces are:
 - Developer-configured project path such as `/studio`: framework-neutral, role-projected content/editorial/preview/future visual Studio.
 - Stable HTTP plus the CLI: complete machine-readable agent/developer automation. The public SDK is intentionally limited to content/runtime integration and never mirrors control-plane or secret administration.
 
-The approved execution sequence is: portable control-plane authority and automation parity; hosted surface separation; secure framework-neutral Studio; client handover/editorial safety; data durability and production hardening; advanced CMS operations; preserved visual-readiness contracts; visual composition/publication; and a renderer SDK baseline. `milestone.md` maps M14–M30 with detailed context and explicitly preserves every point from the original pre-normalization M14–M16. Managed hosting, external data, billing, analytics, and plugins remain unsequenced long-term directions in `product.md` until this baseline is accepted.
+The approved execution sequence is: portable control-plane authority and governance automation parity; operational administration and recovery; hosted surface separation; secure framework-neutral Studio; client handover/editorial safety; data durability and production hardening; advanced CMS operations; preserved visual-readiness contracts; visual composition/publication; and a renderer SDK baseline. `milestone.md` maps M14–M30 with detailed context and explicitly preserves every point from the original pre-normalization M14–M16. Managed hosting, external data, billing, analytics, and plugins remain unsequenced long-term directions in `product.md` until this baseline is accepted.
 
 ## Stack and workspace ownership
 
@@ -97,9 +97,9 @@ Packages never import application source. Cross-package imports use declared exp
 | M11        | Publication events, secure webhooks, invalidation, worker delivery                           |
 | M12        | Tooling v1, OAuth-capable CLI, SDK/generation, public contracts, docs portal                 |
 | M13        | Code-first schema/content Authoring v1, SDK/CLI, local editor, builder retirement            |
-| M14        | Portable Control Plane v1 bootstrap, complete CLI parity, hosted controls, and recovery      |
+| M14–M15    | Portable Control Plane bootstrap and governance automation parity                            |
 
-M0–M14 are developer-approved and committed; M13 commit is `9c68942` and M14 commit is `6ba124a`. Post-M13 repository/context normalization is committed at `cd31102`, roadmap sequencing at `2d0705a`, the public SDK/CLI boundary correction at `d63f215`, and retired dashboard schema-route removal at `5f6480d`. See `progress.md` for ordered outcomes, migrations, validation, roadmap status, and release state.
+M0–M15 are developer-approved and committed; M13 commit is `9c68942`, M14 commit is `6ba124a`, and M15 commit is `5460c2b`. Post-M13 repository/context normalization is committed at `cd31102`, roadmap sequencing at `2d0705a`, the public SDK/CLI boundary correction at `d63f215`, and retired dashboard schema-route removal at `5f6480d`. See `progress.md` for ordered outcomes, migrations, validation, roadmap status, and release state.
 
 ## Architecture landmarks
 
@@ -125,7 +125,7 @@ The subsequent repository-normalization workstream also passed the complete read
 ## Current work and next gate
 
 - **M14 `[A]` (`6ba124a`):** Control Plane v1 shipped 13 shared bearer HTTP/CLI/dashboard operations with signed cursors, receipts, quotas, telemetry, canonical docs/artifact, and `sdkSupported: false`; migration `0015` and eight manual scenarios passed, two review findings were fixed, and final readiness passed 1,259 tests. Artifact SHA-256: `747cc0c897ed2738adb5bbc476aee6a284d0f10e89ca8208c3a813a59890a935`.
-- **M15 `[R]` (`07bcad6` design):** seven fixed roles plus `all | selected | none` now flow atomically through invitations/member policy; 14 shared governance/member/invitation/locale operations expand Control Plane v1 to 27 while preserving OAuth-only account governance, exact current-`main` locale credentials, signed filter-bound cursors, stdin-only invitation proof, receipt-backed locale creation, honest actors, and SDK exclusion.
+- **M15 `[A]` (`5460c2b`):** seven fixed roles plus `all | selected | none` flow atomically through invitations/member policy; 14 shared governance/member/invitation/locale operations expand Control Plane v1 to 27 while preserving OAuth-only account governance, exact current-`main` locale credentials, signed filter-bound cursors, stdin-only invitation proof, receipt-backed locale creation, honest actors, and SDK exclusion.
 - Developer-generated/applied migration `0016` is catalog-verified at 17 journal rows/60 tables with clean policy, actor, English-locale, and tenant invariants. The checklist audit fixed documentation, filtering/recovery, token caching, and parallel-fixture defects; authorized cleanup removed 37 stale rows, and final forced readiness passes 1,270 tests, coverage, 16 type tasks, contracts/format/lint/structure, and eight builds. Artifact SHA-256: `2950b28d937ef48b9ce7db98cb4dd477396b4ee0b16ea9fb7dfdef672f670145`; audits have no high/critical and four existing moderate test-tool findings.
 - A two-session headed Playwright review passed invitation, policy, recovery, filtering, exact-locale, keyboard/focus, responsive, and reflow scenarios, then closed token-clean with guarded fixture cleanup and zero residue. Review fixes removed hydration/Button/favicon/locale-tab defects; the later project-owned `tools/browser-tests` suite adds four retry-free headless Chromium assertions, fixes and guards direct protected-link hydration, and reserves interactive sessions or visual artifacts for explicit developer requests. The handled optional missing-Studio lookup remains the sole expected console 404; all services including the worker are healthy.
-- **Next gate:** obtain explicit M15 acceptance and the developer-created commit. Do not edit/apply migrations, publish, activate production OAuth, deploy, accept M15, or begin M16 for the developer.
+- **Next gate:** design M16 operational administration and recovery, then stop for explicit developer design approval before implementation. Do not edit/apply migrations, publish, activate production OAuth, deploy, or begin M17.

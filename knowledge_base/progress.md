@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestones 0–14 and post-M13 repository/context normalization are developer-approved and committed. M15 implementation, checklist audit, and Playwright review are complete under approved design commit `07bcad6`; M15 awaits final developer review and is not accepted.
-**Next gate:** Obtain explicit M15 acceptance and the developer-created commit; do not begin M16.
+**Overall status:** Milestones 0–15 and post-M13 repository/context normalization are developer-approved and committed. M15 governance automation parity is accepted at `5460c2b`.
+**Next gate:** Design M16 operational administration and recovery, then obtain explicit developer approval before implementation.
 **Last updated:** 2026-09-16
 
 ## Status legend
@@ -34,8 +34,8 @@
 | 12  | Developer portal and generated tooling  | `[A]`  |            962 | `4e87908` |
 | 13  | Code-first authoring and local editor   | `[A]`  |          1,184 | `9c68942` |
 | 14  | Control-plane bootstrap contracts       | `[A]`  |          1,259 | `6ba124a` |
-| 15  | Governance automation parity            | `[R]`  |              — | —         |
-| 16  | Operational administration and recovery | `[P]`  |              — | —         |
+| 15  | Governance automation parity            | `[A]`  |          1,270 | `5460c2b` |
+| 16  | Operational administration and recovery | `[D]`  |              — | —         |
 | 17  | Hosted surface separation               | `[P]`  |              — | —         |
 | 18  | Studio mount and security runtime       | `[P]`  |              — | —         |
 | 19  | Studio content and localization         | `[P]`  |              — | —         |
@@ -51,7 +51,7 @@
 | 29  | Visual publication and dependencies     | `[P]`  |              — | —         |
 | 30  | Renderer SDK and framework adapters     | `[P]`  |              — | —         |
 
-M14 is accepted at `6ba124a`. M15 implementation under the developer-approved design at `07bcad6` is awaiting review and acceptance; M16–M30 preserve the developer-approved sequence and detailed context.
+M15 is accepted at `5460c2b`. M16 is the next design target; M17–M30 preserve the developer-approved sequence and detailed context.
 
 ## Post-M13 repository/context normalization
 
@@ -171,9 +171,9 @@ M14 is accepted at `6ba124a`. M15 implementation under the developer-approved de
 - All eight delegated manual scenarios passed OAuth/CLI/linking, dashboard projection, receipt replay/conflict, cursor isolation, role/credential authority, Studio metadata, archive/restore, artifact/package, and redaction checks. Review fixed deterministic journal clearing and component-owned missing-Studio toast handling; disposable state and temporary OAuth configuration were removed.
 - Final forced readiness passed 1,259 tests, coverage, contracts, format/lint/structure, 15 type tasks, and eight builds with zero cache hits; artifact SHA-256 is `747cc0c897ed2738adb5bbc476aee6a284d0f10e89ca8208c3a813a59890a935`, high/critical audits are clear, and four moderate Vitest findings remain pending separate upgrade review. Developer accepted/pushed `6ba124a`; no package release, production OAuth/configuration, or deployment occurred.
 
-## Active and planned milestone record
+## Recent and planned milestone record
 
-These entries remain concise because `milestone.md` owns the detailed pending context. M15 is awaiting review and is not accepted; M16–M30 must not be designed or implemented ahead of their developer gate. The original pre-normalization M14–M16 scope is retained explicitly in M21–M23 and M27 rather than discarded.
+These entries remain concise because `milestone.md` owns the detailed pending context. M15 is accepted; M16 is the next design target and must not be implemented before explicit design approval, while M17–M30 remain sequenced context only. The original pre-normalization M14–M16 scope is retained explicitly in M21–M23 and M27 rather than discarded.
 
 ### Milestone 15 — Governance automation parity
 
@@ -183,7 +183,7 @@ These entries remain concise because `milestone.md` owns the detailed pending co
 - Developer-generated/applied migration `0016_add_governance_automation_authorities` passed dependency correction, artifact/catalog inspection, 17-row journal/60-table verification, and policy/actor/tenant/English invariants. Audit fixes covered docs, hosted filters/recovery, token caching, OAuth/contention/response/accessibility evidence, and parallel-fixture uniqueness/validity; authorized cleanup removed 37 stale M2/M3/M6 rows, with zero scoped residue or invariant violations.
 - Final forced readiness passes 1,270 tests, coverage, contracts, format/lint/structure, 16 type tasks, and eight builds with zero cache hits; the worker was stopped for shared-database gates and restored healthy. The 27-operation artifact/baseline SHA-256 is `2950b28d937ef48b9ce7db98cb4dd477396b4ee0b16ea9fb7dfdef672f670145`; high/critical audits pass and four existing moderate test-tool findings remain.
 - A two-session headed Playwright review passed secure invitation acceptance, atomic member-policy changes, owner/stale/conflict/ambiguous-create recovery, filters, exact-locale denial, keyboard/focus, responsive 375 px, and 200% reflow checks. It fixed login hydration and rendered-link warnings, favicon failure, duplicate fixture locale text, and locale-tab vertical overflow; the handled optional missing-Studio lookup remains the sole expected console 404. Browser sessions closed with no retained token artifacts, and authorized guarded cleanup removed the exact two-user workspace/project fixture with zero residue before restoring the worker healthy.
-- Developer-authorized test-infrastructure R&D adds the project-owned `tools/browser-tests` workspace, pinned Playwright Test/CLI dependencies and Chromium setup, a loopback-only four-test shell/auth/invitation suite, project-local opt-in interactive skill, and mandatory no-interactive/no-visual-artifact default policy. The suite found the remaining direct protected-link React hydration mismatch; the authorized correction uses the existing request-aware session server function with data-only protected-route SSR, and the regression passes without browser errors. Explicit developer acceptance remains, and M16 has not started.
+- Developer-authorized test-infrastructure R&D adds the project-owned `tools/browser-tests` workspace, pinned Playwright Test/CLI dependencies and Chromium setup, a loopback-only four-test shell/auth/invitation suite, project-local opt-in interactive skill, and mandatory no-interactive/no-visual-artifact default policy. The suite found the remaining direct protected-link React hydration mismatch; the authorized correction uses the existing request-aware session server function with data-only protected-route SSR, and the regression passes without browser errors. Developer accepted and pushed M15 as `5460c2b`; M16 implementation has not started.
 
 ### Milestone 16 — Operational administration and recovery
 
@@ -247,7 +247,7 @@ These entries remain concise because `milestone.md` owns the detailed pending co
 
 ## Current validation and release state
 
-- The current M15 candidate passes forced readiness with 1,270 tests, coverage, contracts, format/lint/structure, 16 type tasks, and eight builds; shared-database residue/invariants are clean and the worker is healthy after restoration.
+- The accepted M15 baseline passes forced readiness with 1,270 tests, coverage, contracts, format/lint/structure, 16 type tasks, and eight builds; shared-database residue/invariants are clean and the worker is healthy after restoration.
 - Canonical OpenAPI SHA-256 values are Authoring `d9500549cd95067857b87f494b77375e3d575c4832589478858e125ab3f31205` and Control Plane `2950b28d937ef48b9ce7db98cb4dd477396b4ee0b16ea9fb7dfdef672f670145`.
 - The live schema records developer-applied migrations through `0016`; actor, tenant, locale, receipt, publication, outbox, and webhook invariants are clean.
 - Schema/SDK/CLI packages remain unpublished at `0.0.0`; schema push and Presentation mutation remain CLI-only, and production OAuth/configuration/deployment plus Tier 2 production/default activation have not occurred.
@@ -274,6 +274,6 @@ Agents did not generate or apply these migrations. Developer-generated/applied a
 
 ## Roadmap and next gate
 
-- `milestone.md` owns the approved M15–M30 sequence and preserved boundaries; M14 is accepted at `6ba124a`, while M15 under design `07bcad6` has completed Playwright review and awaits explicit acceptance.
-- M16–M30 remain unauthorized, and managed hosting, external data/backends, billing, analytics, and plugins remain unsequenced until the visual baseline is accepted.
+- `milestone.md` owns the approved sequence and preserved boundaries; M15 is accepted at `5460c2b`, and M16 operational administration and recovery is the next design target.
+- M16 implementation and M17–M30 design/implementation remain unauthorized until their developer gates; managed hosting, external data/backends, billing, analytics, and plugins remain unsequenced until the visual baseline is accepted.
 - Publication/versioning, production OAuth/domains/configuration, deployment, migrations, Tier 2 activation, milestone acceptance, and advancement remain developer-controlled.
