@@ -75,6 +75,7 @@ describe("locale operations", () => {
         yield* updateProjectLocaleDisplayName(
           actorId,
           yield* Schema.decodeUnknown(UpdateProjectLocaleDisplayNameInput)({
+            projectId,
             localeId,
             version: 1,
             displayName: "English",
@@ -92,6 +93,7 @@ describe("locale operations", () => {
         yield* updateProjectLocaleStatus(
           actorId,
           yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+            projectId,
             localeId,
             version: 1,
             status: "enabled",

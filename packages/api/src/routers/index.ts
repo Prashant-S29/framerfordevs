@@ -23,8 +23,7 @@ import {
   RevokeApiCredentialInputSchema,
   RevokeProjectInvitationInputSchema,
   RotateApiCredentialInputSchema,
-  UpdateProjectMemberLocaleAccessInputSchema,
-  UpdateProjectMemberRoleInputSchema,
+  UpdateProjectMemberPolicyInputSchema,
 } from "../contracts/access";
 import {
   DeliveryConfigurationOutputSchema,
@@ -148,8 +147,7 @@ import {
   listProjectMembers,
   removeProjectMember,
   revokeProjectInvitation,
-  updateProjectMemberLocaleAccess,
-  updateProjectMemberRole,
+  updateProjectMemberPolicy,
 } from "../operations/access";
 import { getDeliveryConfiguration, updateDeliveryConfiguration } from "../operations/delivery/api";
 import {
@@ -556,30 +554,15 @@ export const appRouter = {
               "Project members loaded.",
             ),
           ),
-        updateRole: protectedProcedure
-          .input(UpdateProjectMemberRoleInputSchema)
+        updatePolicy: protectedProcedure
+          .input(UpdateProjectMemberPolicyInputSchema)
           .output(ProjectMemberOutputSchema)
           .handler(({ context, input }) =>
             executeProcedure(
               context,
-              "api.access.member.role.update",
-              updateProjectMemberRole(context.session.user.id, input, context.request.requestId),
-              "Member role updated.",
-            ),
-          ),
-        updateLocaleAccess: protectedProcedure
-          .input(UpdateProjectMemberLocaleAccessInputSchema)
-          .output(ProjectMemberOutputSchema)
-          .handler(({ context, input }) =>
-            executeProcedure(
-              context,
-              "api.access.member.locale.update",
-              updateProjectMemberLocaleAccess(
-                context.session.user.id,
-                input,
-                context.request.requestId,
-              ),
-              "Member locale access updated.",
+              "api.access.member.policy.update",
+              updateProjectMemberPolicy(context.session.user.id, input, context.request.requestId),
+              "Member policy updated.",
             ),
           ),
         remove: protectedProcedure

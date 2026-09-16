@@ -16,6 +16,14 @@ Use a balanced test pyramid:
 
 Tests must be deterministic. Do not hide failures with retries unless the behavior being tested is explicitly retry-related.
 
+## Browser testing
+
+- Run committed real-browser specifications noninteractively through `pnpm test:browser`; keep them isolated, assertion-based, headless, retry-free, and free of screenshots, traces, video, and visual comparison by default.
+- Use browser coverage only for critical user-visible or browser-owned behavior that component/API tests cannot prove; do not duplicate lower-level policy and contract matrices.
+- Never launch or attach an interactive Playwright session, use headed/UI/debug mode, capture visual artifacts, or perform a manual browser tour unless the developer explicitly requests it in the current conversation.
+- Browser tests target validated loopback origins and must not retain credentials, invitation proofs, cookies, session state, or sensitive content in artifacts.
+- Follow `knowledge_base/decisions/repository-browser-test-workflow.md` for ownership, setup, and scope.
+
 ## Test placement
 
 Use test scope to determine placement:

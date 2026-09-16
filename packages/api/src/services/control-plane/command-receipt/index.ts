@@ -8,7 +8,6 @@ import type {
   ControlPlaneCommandId,
   ControlPlaneCommandOperation,
 } from "../../../contracts/control-plane";
-import type { EnvironmentId, ProjectId, WorkspaceId } from "../../../contracts/platform";
 import { controlPlaneActorReferences } from "../../../lib/control-plane/command-fingerprint";
 import type { ApplicationTransaction } from "../../project-access";
 
@@ -16,7 +15,8 @@ export type ControlPlaneReceiptResourceType =
   | "workspace"
   | "project"
   | "project_capability"
-  | "studio_registration";
+  | "studio_registration"
+  | "project_locale";
 export type ControlPlaneReceiptDisposition = "created" | "updated" | "no_op";
 
 export interface ControlPlaneCreateReceiptExpectation {
@@ -24,7 +24,7 @@ export interface ControlPlaneCreateReceiptExpectation {
   readonly operation: "workspace.create" | "project.create";
   readonly actor: Extract<ControlPlaneActor, { readonly kind: "user" }>;
   readonly fingerprint: string;
-  readonly workspaceId: WorkspaceId | null;
+  readonly workspaceId: string | null;
 }
 
 export interface ControlPlaneReceiptExpectation {
@@ -32,9 +32,9 @@ export interface ControlPlaneReceiptExpectation {
   readonly operation: ControlPlaneCommandOperation;
   readonly actor: ControlPlaneActor;
   readonly fingerprint: string;
-  readonly workspaceId: WorkspaceId;
-  readonly projectId: ProjectId | null;
-  readonly environmentId: EnvironmentId | null;
+  readonly workspaceId: string;
+  readonly projectId: string | null;
+  readonly environmentId: string | null;
 }
 
 export interface ControlPlaneReceiptResult {
@@ -69,7 +69,8 @@ function isReceiptResourceType(value: string): value is ControlPlaneReceiptResou
     value === "workspace" ||
     value === "project" ||
     value === "project_capability" ||
-    value === "studio_registration"
+    value === "studio_registration" ||
+    value === "project_locale"
   );
 }
 

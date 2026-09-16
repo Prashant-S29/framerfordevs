@@ -6,7 +6,6 @@ import type {
   ControlPlaneActor,
   ControlPlaneCommandOperation,
 } from "../../../contracts/control-plane";
-import type { EnvironmentId, ProjectId, WorkspaceId } from "../../../contracts/platform";
 
 export type ControlPlaneFingerprintValue =
   | null
@@ -17,9 +16,9 @@ export type ControlPlaneFingerprintValue =
   | { readonly [key: string]: ControlPlaneFingerprintValue };
 
 export interface ControlPlaneCommandScope {
-  readonly workspaceId: WorkspaceId | null;
-  readonly projectId: ProjectId | null;
-  readonly environmentId: EnvironmentId | null;
+  readonly workspaceId: string | null;
+  readonly projectId: string | null;
+  readonly environmentId: string | null;
 }
 
 export interface ControlPlaneCommandFingerprintInput {

@@ -22,21 +22,29 @@ const ControlPlaneCursorPayload = Schema.Struct({
   finalId: Schema.UUID,
   issuedAtEpochMs: EpochMillis,
   expiresAtEpochMs: EpochMillis,
+  asOfEpochMs: Schema.optionalWith(Schema.NullOr(EpochMillis), {
+    default: () => null,
+  }),
 });
 
-export type ControlPlaneCursorRoute = "workspaces" | "projects";
+export type ControlPlaneCursorRoute = "workspaces" | "projects" | "members" | "invitations";
 
 export interface ControlPlaneCursorAuthority {
   readonly route: ControlPlaneCursorRoute;
   readonly principalKey: string;
   readonly workspaceId: string | null;
+  readonly projectId?: string | null;
   readonly projectStatus: ControlPlaneProjectStatus | null;
+  readonly memberRole?: string | null;
+  readonly invitationStatus?: string | null;
+  readonly searchDigest?: string | null;
   readonly limit: number;
 }
 
 export interface ControlPlaneCursorPosition {
   readonly finalSortAtEpochMs: number;
   readonly finalId: string;
+  readonly asOfEpochMs?: number | null;
 }
 
 export interface ControlPlaneCursorSignerOptions {
@@ -88,19 +96,32 @@ function signatureMatches(expected: string, received: string): boolean {
   }
 }
 
+export function controlPlaneSearchDigest(search: string | null): string | null {
+  return search === null ? null : createHash("sha256").update(search, "utf8").digest("hex");
+}
+
 function authorityDigest(authority: ControlPlaneCursorAuthority): string {
-  return createHash("sha256")
-    .update(
-      JSON.stringify([
-        authority.route,
-        authority.principalKey,
-        authority.workspaceId,
-        authority.projectStatus,
-        authority.limit,
-      ]),
-      "utf8",
-    )
-    .digest("hex");
+  const values =
+    authority.route === "workspaces" || authority.route === "projects"
+      ? [
+          authority.route,
+          authority.principalKey,
+          authority.workspaceId,
+          authority.projectStatus,
+          authority.limit,
+        ]
+      : [
+          authority.route,
+          authority.principalKey,
+          authority.workspaceId,
+          authority.projectId ?? null,
+          authority.projectStatus,
+          authority.memberRole ?? null,
+          authority.invitationStatus ?? null,
+          authority.searchDigest ?? null,
+          authority.limit,
+        ];
+  return createHash("sha256").update(JSON.stringify(values), "utf8").digest("hex");
 }
 
 export function makeControlPlaneCursorSigner(
@@ -119,6 +140,7 @@ export function makeControlPlaneCursorSigner(
             finalId: position.finalId,
             issuedAtEpochMs: now,
             expiresAtEpochMs: now + cursorLifetimeMs,
+            asOfEpochMs: position.asOfEpochMs ?? null,
           }),
           "utf8",
         ).toString("base64url");
@@ -170,6 +192,7 @@ export function makeControlPlaneCursorSigner(
         return {
           finalSortAtEpochMs: payload.finalSortAtEpochMs,
           finalId: payload.finalId,
+          ...(payload.asOfEpochMs === null ? {} : { asOfEpochMs: payload.asOfEpochMs }),
         };
       }),
   };

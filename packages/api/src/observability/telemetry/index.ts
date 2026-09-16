@@ -80,9 +80,23 @@ export type ControlPlaneOperation =
   | "capability_list"
   | "capability_enable"
   | "studio_registration_get"
-  | "studio_registration_put";
+  | "studio_registration_put"
+  | "governance_get"
+  | "member_list"
+  | "member_policy_update"
+  | "member_remove"
+  | "invitation_list"
+  | "invitation_create"
+  | "invitation_revoke"
+  | "invitation_inspect"
+  | "invitation_accept"
+  | "locale_list"
+  | "locale_create"
+  | "locale_update"
+  | "locale_reorder"
+  | "locale_status_update";
 export type ControlPlaneSubject = "oauth_user" | "management_credential" | "unknown";
-export type ControlPlaneCostBucket = "1" | "3" | "5";
+export type ControlPlaneCostBucket = "1" | "2" | "3" | "5";
 
 export interface ControlPlaneRequestMetric {
   readonly operation: ControlPlaneOperation;

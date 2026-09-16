@@ -372,11 +372,11 @@
 
 ---
 
-## 2026-08-25 — Parallel database fixtures must publish valid aggregates atomically
+## 2026-08-25 — Parallel database fixtures must remain valid aggregates
 
-**Incorrect assumption or decision:** The worker fixture inserted an endpoint, destination, secret, subscription, and enabled pointer through separate committed statements. During the short interval before the subscription insert, the management fixture could list that endpoint and correctly reject its impossible zero-subscription aggregate.
+**Incorrect assumption or decision:** The worker fixture first published an endpoint, destination, secret, subscription, and enabled pointer through separate commits. After that was made atomic, it still left the enabled endpoint with only an already-closed subscription because the worker's historical dispatch assertion passed. Parallel management listing correctly rejected both forms of impossible zero-current-subscription aggregate.
 
-**Learning:** Stopping external consumers is necessary but not sufficient for shared-database isolation. A test fixture that represents one valid aggregate must become visible atomically, especially when parallel suites intentionally query broad tenant collections. Prevention: The worker fixture now inserts the endpoint, destination, secret, subscription, and enabled pointer in one database transaction. The two webhook integration files pass together in parallel, and complete 713-test normal/coverage API gates pass with zero scoped residue.
+**Learning:** Stopping external consumers is necessary but not sufficient for shared-database isolation. A shared fixture must become visible atomically and remain valid for its complete visible lifetime, especially when parallel suites query broad tenant collections. Prevention: The worker fixture publishes the aggregate in one transaction and retains an active subscription until teardown disables it; the two webhook integration files pass together repeatedly in parallel. Review temporal validity as well as insertion order whenever a fixture shares tenant scope.
 
 ---
 
@@ -489,3 +489,35 @@
 **Incorrect assumption or decision:** `CurrentProjectAccess.allowedActions` used a partial `isActionVisibleForLocaleAccess` mirror instead of the canonical policy rules. For selected/none developers it exposed schema write/publish, Delivery configuration, and webhook read/manage actions that `PolicyService` correctly denied, causing UI controls to overstate authority and requiring an ad hoc locale check on one webhook link.
 
 **Learning:** A UI capability projection is an authorization-derived contract even when repositories still enforce every mutation. Parallel permission heuristics drift and produce confusing or unsafe-looking controls. Prevention: M15 replaces the helper and compensating client checks with one pure projector derived from the canonical fixed-role and locale policy; tests distinguish base role grants, project-effective actions, configured locale grants, and exact enabled-locale actions, and manual review verifies the before/after restricted-developer surface.
+
+---
+
+## 2026-09-14 — Drizzle schema discovery includes root-level test modules
+
+**Incorrect assumption or decision:** A focused Vitest metadata test was placed directly under the directory configured as Drizzle Kit's schema path. Repository checks and Vitest passed, but `drizzle-kit generate` discovered the root module and attempted to load Vitest through its CommonJS transform, so generation stopped before producing artifacts.
+
+**Learning:** Test placement must respect both repository structure rules and tool-specific source discovery. With `schema: "./src/schema"`, root-level modules are migration-generator inputs even when they are named `*.test.ts`; nested schema tests remain reachable by Vitest without being imported by the production schema entrypoint. Prevention: Keep Drizzle metadata tests in dedicated nested owner directories, verify failed generation left migration SQL/snapshot/journal untouched, and retain production-only exports from `src/schema/index.ts`.
+
+---
+
+## 2026-09-16 — API parity and dialog state do not prove complete hosted or secret-handling parity
+
+**Incorrect assumption or decision:** Governance list/search filters existed in HTTP and CLI but were omitted from the hosted member/invitation surface, while resetting a TanStack mutation observer was treated as immediate removal of its one-time invitation result. Documentation examples also used drifted role names and an ambiguous token variable despite canonical closed vocabularies and a no-environment-token rule.
+
+**Learning:** Acceptance must reconcile every approved surface control independently and treat one-time client outputs as cache-ineligible. Prevention: Hosted governance now has bounded role/status/prefix filters whose query keys reset pagination; invitation creation calls the session client directly so its token never enters the mutation cache and clears local state on acknowledged close. Role examples use the canonical seven values, and stdin examples use an explicitly unexported shell-local value that is immediately unset.
+
+---
+
+## 2026-09-16 — Globally unique fixture fields cannot use shared placeholder values
+
+**Incorrect assumption or decision:** Two integration files independently used the same repeated-character credential digest, assuming tenant isolation made the placeholder local. Parallel coverage nondeterministically reached the database-wide unique digest constraint and canceled readiness.
+
+**Learning:** Every value constrained globally must derive from the fixture's unique namespace even when the tested operation never authenticates with it. Prevention: Credential digests now derive deterministically from each random credential ID, and the previously colliding platform/locale integration files pass together; post-run residue reconciliation remains mandatory after cancellation.
+
+---
+
+## 2026-09-16 — Client-only auth redirects can invalidate the server hydration fallback
+
+**Incorrect assumption or decision:** Disabling SSR for the protected route tree was treated as sufficient hydration safety while its client-only `beforeLoad` replaced the server fallback with the login route during initial hydration.
+
+**Learning:** Authentication state used by an initial route guard must be resolved consistently across the server/client boundary, not only hidden from server rendering. Prevention: The protected layout now uses the existing request-aware session server function with TanStack Start `data-only` SSR, while login remains client-rendered; a noninteractive Chromium regression opens a protected deep link and requires the bounded login redirect with zero page or console errors.

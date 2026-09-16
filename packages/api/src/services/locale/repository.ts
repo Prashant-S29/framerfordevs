@@ -5,8 +5,9 @@ import { projectLocale } from "@framerfordevs/db/schema/locale";
 import { auditEvent } from "@framerfordevs/db/schema/platform";
 import { Context, Effect, Layer, Schema } from "effect";
 
-import type { ProjectPermissionAction } from "../../contracts/access";
+import type { ProjectActor, ProjectPermissionAction } from "../../contracts/access";
 import {
+  ControlPlaneCommandConflictFailure,
   DatabaseFailure,
   ForbiddenFailure,
   InvalidStateTransitionFailure,
@@ -28,12 +29,18 @@ import {
   type UpdateProjectLocaleDisplayNameInput,
   type UpdateProjectLocaleStatusInput,
 } from "../../contracts/locale";
+import type { ControlPlaneCommandId } from "../../contracts/control-plane";
 import type { AuthUserId } from "../../contracts/platform";
+import { controlPlaneCommandFingerprint } from "../../lib/control-plane/command-fingerprint";
+import {
+  inspectControlPlaneReceipt,
+  persistControlPlaneReceipt,
+} from "../control-plane/command-receipt";
 import { decideLocaleTransition } from "./transition";
 import {
   type ApplicationDb,
   type ApplicationExecutor,
-  authorizeUserProject,
+  authorizeProjectActor,
   selectUserProjectAccess,
 } from "../project-access";
 import { isRoleAllowed } from "../policy";
@@ -106,10 +113,46 @@ function localeValue(row: typeof projectLocale.$inferSelect) {
   };
 }
 
+type LocaleActor = ProjectActor | AuthUserId;
+
+function projectActor(actor: LocaleActor): ProjectActor {
+  return typeof actor === "string" ? { kind: "user", id: actor } : actor;
+}
+
+function actorColumns(
+  actor: ProjectActor,
+  environmentId: string | null,
+  prefix: "created" | "changed",
+) {
+  return prefix === "created"
+    ? actor.kind === "user"
+      ? {
+          createdByUserId: actor.id,
+          createdByCredentialId: null,
+          createdByCredentialEnvironmentId: null,
+        }
+      : {
+          createdByUserId: null,
+          createdByCredentialId: actor.id,
+          createdByCredentialEnvironmentId: environmentId,
+        }
+    : actor.kind === "user"
+      ? {
+          changedByUserId: actor.id,
+          changedByCredentialId: null,
+          changedByCredentialEnvironmentId: null,
+        }
+      : {
+          changedByUserId: null,
+          changedByCredentialId: actor.id,
+          changedByCredentialEnvironmentId: environmentId,
+        };
+}
+
 function makeAuditValues(options: {
   readonly workspaceId: string;
   readonly projectId: string;
-  readonly actorId: AuthUserId;
+  readonly actor: ProjectActor;
   readonly action: string;
   readonly resourceId: string;
   readonly requestId: string;
@@ -117,8 +160,8 @@ function makeAuditValues(options: {
   return {
     workspaceId: options.workspaceId,
     projectId: options.projectId,
-    actorType: "user",
-    actorId: options.actorId,
+    actorType: options.actor.kind,
+    actorId: options.actor.id,
     action: options.action,
     resourceType: "project_locale",
     resourceId: options.resourceId,
@@ -126,8 +169,25 @@ function makeAuditValues(options: {
   };
 }
 
+async function authorizeLocaleActor(
+  executor: ApplicationExecutor,
+  actor: ProjectActor,
+  projectId: string,
+  action: "locale.read" | "locale.manage",
+) {
+  return authorizeProjectActor(executor, actor, projectId, action, null, {
+    requirePrimaryCredentialEnvironment: true,
+  });
+}
+
 async function lockProject(executor: ApplicationExecutor, projectId: string) {
   await executor.execute(sql`select id from project where id = ${projectId} for update`);
+}
+
+async function lockLocaleCredential(executor: ApplicationExecutor, actor: ProjectActor) {
+  if (actor.kind === "credential") {
+    await executor.execute(sql`select id from api_credential where id = ${actor.id} for update`);
+  }
 }
 
 async function selectLocaleById(executor: ApplicationExecutor, localeId: string) {
@@ -184,15 +244,16 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
 
   return {
     listLocales: Effect.fn("LocaleRepository.listLocales")(function* (
-      actorId: AuthUserId,
+      actorInput: LocaleActor,
       input: ListProjectLocalesInput,
     ) {
       const result = yield* Effect.tryPromise({
         try: async () => {
+          const actor = projectActor(actorInput);
           const action = input.view === "settings" ? "locale.manage" : "locale.read";
-          const authorization = await authorizeUserProject(
+          const authorization = await authorizeLocaleActor(
             database,
-            actorId,
+            actor,
             input.projectId,
             action,
           );
@@ -242,24 +303,64 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
     }),
 
     createLocale: Effect.fn("LocaleRepository.createLocale")(function* (
-      actorId: AuthUserId,
+      actorInput: LocaleActor,
       input: CreateProjectLocaleInput,
       now: Date,
       requestId: string,
+      commandId?: ControlPlaneCommandId,
     ) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
+            const actor = projectActor(actorInput);
             await lockProject(transaction, input.projectId);
-            const authorization = await authorizeUserProject(
+            await lockLocaleCredential(transaction, actor);
+            const authorization = await authorizeLocaleActor(
               transaction,
-              actorId,
+              actor,
               input.projectId,
               "locale.manage",
             );
             if (authorization.kind === "not_found") return outcome("not_found");
             if (authorization.kind === "forbidden") return outcome("forbidden");
             if (authorization.access.project.archivedAt) return outcome("invalid_state");
+            const environmentId = authorization.access.credentialAuthority?.environmentId ?? null;
+            const receiptExpectation = commandId
+              ? {
+                  commandId,
+                  operation: "project_locale.create" as const,
+                  actor,
+                  fingerprint: controlPlaneCommandFingerprint({
+                    operation: "project_locale.create",
+                    actor,
+                    scope: {
+                      workspaceId: authorization.access.project.workspaceId,
+                      projectId: input.projectId,
+                      environmentId,
+                    },
+                    input: { tag: input.tag, displayName: input.displayName },
+                  }),
+                  workspaceId: authorization.access.project.workspaceId,
+                  projectId: input.projectId,
+                  environmentId,
+                }
+              : null;
+            if (receiptExpectation) {
+              const receipt = await inspectControlPlaneReceipt(transaction, receiptExpectation);
+              if (receipt.kind === "conflict") return outcome("command_conflict");
+              if (receipt.kind === "replay") {
+                const replayed = await selectLocaleById(transaction, receipt.resourceId);
+                if (
+                  !replayed ||
+                  replayed.projectId !== input.projectId ||
+                  receipt.resourceType !== "project_locale" ||
+                  receipt.disposition !== "created"
+                ) {
+                  throw new Error("Locale receipt references inconsistent state.");
+                }
+                return outcomeWith("success", { row: replayed });
+              }
+            }
             const [summary] = await transaction
               .select({
                 count: sql<number>`count(*)::int`,
@@ -282,8 +383,16 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
                 displayName: input.displayName,
                 status: "enabled",
                 position: (summary?.maxPosition ?? -1) + 1,
-                createdByUserId: actorId,
-                changedByUserId: actorId,
+                ...actorColumns(
+                  actor,
+                  authorization.access.credentialAuthority?.environmentId ?? null,
+                  "created",
+                ),
+                ...actorColumns(
+                  actor,
+                  authorization.access.credentialAuthority?.environmentId ?? null,
+                  "changed",
+                ),
                 createdAt: now,
                 updatedAt: now,
               })
@@ -293,12 +402,24 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
               makeAuditValues({
                 workspaceId: row.workspaceId,
                 projectId: row.projectId,
-                actorId,
+                actor,
                 action: "project.locale.created",
                 resourceId: row.id,
                 requestId,
               }),
             );
+            if (receiptExpectation) {
+              await persistControlPlaneReceipt(
+                transaction,
+                receiptExpectation,
+                {
+                  resourceType: "project_locale",
+                  resourceId: row.id,
+                  disposition: "created",
+                },
+                now,
+              );
+            }
             return outcomeWith("success", { row });
           }),
         catch: (cause) =>
@@ -310,12 +431,15 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
       if (result.kind === "not_found") return yield* NotFoundFailure.make({ resource: "project" });
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
       if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
+      if (result.kind === "command_conflict") {
+        return yield* ControlPlaneCommandConflictFailure.make();
+      }
       if (result.kind === "locale_conflict") return yield* LocaleConflictFailure.make();
       return yield* decodeDatabaseValue("locale.create", ProjectLocale, localeValue(result.row));
     }),
 
     updateDisplayName: Effect.fn("LocaleRepository.updateDisplayName")(function* (
-      actorId: AuthUserId,
+      actorInput: LocaleActor,
       input: UpdateProjectLocaleDisplayNameInput,
       now: Date,
       requestId: string,
@@ -323,19 +447,23 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const initial = await selectLocaleById(transaction, input.localeId);
-            if (!initial) return outcome("not_found");
-            await lockProject(transaction, initial.projectId);
-            const authorization = await authorizeUserProject(
+            const actor = projectActor(actorInput);
+            await lockProject(transaction, input.projectId);
+            await lockLocaleCredential(transaction, actor);
+            const authorization = await authorizeLocaleActor(
               transaction,
-              actorId,
-              initial.projectId,
+              actor,
+              input.projectId,
               "locale.manage",
             );
             if (authorization.kind === "not_found") return outcome("not_found");
             if (authorization.kind === "forbidden") return outcome("forbidden");
             const current = await selectLocaleById(transaction, input.localeId);
-            if (!current || current.workspaceId !== authorization.access.project.workspaceId) {
+            if (
+              !current ||
+              current.workspaceId !== authorization.access.project.workspaceId ||
+              current.projectId !== input.projectId
+            ) {
               return outcome("not_found");
             }
             if (authorization.access.project.archivedAt) return outcome("invalid_state");
@@ -347,7 +475,11 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
               .update(projectLocale)
               .set({
                 displayName: input.displayName,
-                changedByUserId: actorId,
+                ...actorColumns(
+                  actor,
+                  authorization.access.credentialAuthority?.environmentId ?? null,
+                  "changed",
+                ),
                 version: sql`${projectLocale.version} + 1`,
                 updatedAt: now,
               })
@@ -360,7 +492,7 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
               makeAuditValues({
                 workspaceId: row.workspaceId,
                 projectId: row.projectId,
-                actorId,
+                actor,
                 action: "project.locale.display_name.updated",
                 resourceId: row.id,
                 requestId,
@@ -382,7 +514,7 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
     }),
 
     reorderLocales: Effect.fn("LocaleRepository.reorderLocales")(function* (
-      actorId: AuthUserId,
+      actorInput: LocaleActor,
       input: ReorderProjectLocalesInput,
       now: Date,
       requestId: string,
@@ -390,10 +522,12 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
+            const actor = projectActor(actorInput);
             await lockProject(transaction, input.projectId);
-            const authorization = await authorizeUserProject(
+            await lockLocaleCredential(transaction, actor);
+            const authorization = await authorizeLocaleActor(
               transaction,
-              actorId,
+              actor,
               input.projectId,
               "locale.manage",
             );
@@ -459,7 +593,11 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
               .update(projectLocale)
               .set({
                 position: sql`case ${sql.join(positionCases, sql.raw(" "))} else ${projectLocale.position} end`,
-                changedByUserId: actorId,
+                ...actorColumns(
+                  actor,
+                  authorization.access.credentialAuthority?.environmentId ?? null,
+                  "changed",
+                ),
                 version: sql`${projectLocale.version} + 1`,
                 updatedAt: now,
               })
@@ -468,7 +606,7 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
               makeAuditValues({
                 workspaceId: authorization.access.project.workspaceId,
                 projectId: input.projectId,
-                actorId,
+                actor,
                 action: "project.locale.reordered",
                 resourceId: input.projectId,
                 requestId,
@@ -500,7 +638,7 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
     }),
 
     updateStatus: Effect.fn("LocaleRepository.updateStatus")(function* (
-      actorId: AuthUserId,
+      actorInput: LocaleActor,
       input: UpdateProjectLocaleStatusInput,
       now: Date,
       requestId: string,
@@ -508,19 +646,23 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const initial = await selectLocaleById(transaction, input.localeId);
-            if (!initial) return outcome("not_found");
-            await lockProject(transaction, initial.projectId);
-            const authorization = await authorizeUserProject(
+            const actor = projectActor(actorInput);
+            await lockProject(transaction, input.projectId);
+            await lockLocaleCredential(transaction, actor);
+            const authorization = await authorizeLocaleActor(
               transaction,
-              actorId,
-              initial.projectId,
+              actor,
+              input.projectId,
               "locale.manage",
             );
             if (authorization.kind === "not_found") return outcome("not_found");
             if (authorization.kind === "forbidden") return outcome("forbidden");
             const current = await selectLocaleById(transaction, input.localeId);
-            if (!current || current.workspaceId !== authorization.access.project.workspaceId) {
+            if (
+              !current ||
+              current.workspaceId !== authorization.access.project.workspaceId ||
+              current.projectId !== input.projectId
+            ) {
               return outcome("not_found");
             }
             if (authorization.access.project.archivedAt) return outcome("invalid_state");
@@ -563,7 +705,11 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
               .set({
                 status: input.status,
                 position: nextPosition,
-                changedByUserId: actorId,
+                ...actorColumns(
+                  actor,
+                  authorization.access.credentialAuthority?.environmentId ?? null,
+                  "changed",
+                ),
                 version: sql`${projectLocale.version} + 1`,
                 updatedAt: now,
               })
@@ -584,7 +730,7 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
               makeAuditValues({
                 workspaceId: row.workspaceId,
                 projectId: row.projectId,
-                actorId,
+                actor,
                 action,
                 resourceId: row.id,
                 requestId,

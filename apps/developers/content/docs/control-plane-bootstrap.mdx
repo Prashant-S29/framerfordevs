@@ -1,11 +1,11 @@
 ---
-title: Bootstrap a Project with the CLI
-description: Create or select a workspace and project, enable CMS, and link a local codebase through verified Control Plane authority.
+title: Bootstrap and Govern a Project with the CLI
+description: Create or select a project, manage fixed-role and locale policy, and link a local codebase through verified Control Plane authority.
 ---
 
 {/* Documents agent-safe bootstrap commands without exposing bearer material or SDK administration. */}
 
-Use the Control Plane commands when you need to bootstrap a project without navigating the hosted dashboard. Every command is noninteractive, supports `--json`, and requires an explicit API origin.
+Use the Control Plane commands when you need to bootstrap or govern a project without navigating the hosted dashboard. Every command is noninteractive, supports `--json`, and requires an explicit API origin.
 
 Control Plane administration is intentionally not part of `@framerfordevs/sdk`. Use the CLI for developer and agent automation.
 
@@ -15,7 +15,7 @@ Control Plane administration is intentionally not part of `@framerfordevs/sdk`. 
 ffd login --api https://api.example.com --open
 ```
 
-Login requests the read, write, and project-lifecycle grants used by the commands below. Existing credentials do not silently gain new grants; log in again if the CLI reports a scope denial.
+Login requests the read, write, project-lifecycle, governance-read, and governance-write grants used by the commands below. Existing credentials do not silently gain new grants; log in again if the CLI reports a scope denial.
 
 ## 2. Create or Select a Workspace
 
@@ -95,6 +95,69 @@ ffd schema push --acknowledge CHANGE_ID
 ```
 
 Continue with [Publish a code-first schema](/docs/authoring/code-first-schema) for stable source identities, planning, acknowledgement, and publication behavior.
+
+## Govern Locales and Access
+
+Inspect your canonical fixed-role and locale projection, including the current primary `main` environment:
+
+```bash
+ffd governance inspect --api https://api.example.com --project PROJECT_ID --json
+```
+
+Locale creation is receipt-backed, so an exact retry after an uncertain response reuses the same command authority:
+
+```bash
+ffd locale create \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --tag fr \
+  --display-name "French" \
+  --json
+```
+
+Invite a member with the complete role and locale policy in one operation. Fixed roles are `owner`, `developer`, `content_admin`, `editor`, `reviewer`, `client_editor`, and `read_only`. Locale access is `all`, `selected`, or `none`; repeat `--locale` only with `selected`.
+
+```bash
+ffd invitation create \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --email editor@example.com \
+  --role content_admin \
+  --locale-access selected \
+  --locale LOCALE_ID \
+  --json
+```
+
+Invitation creation intentionally cannot replay a one-time token. After an ambiguous response, search the exact email, explicitly revoke the pending invitation when appropriate, and then reissue it. The CLI never retries or revokes an invitation automatically.
+
+The recipient inspects and accepts the token through stdin only:
+
+```bash
+IFS= read -r -s invitation_token
+export -n invitation_token
+printf '\n'
+printf '%s\n' "$invitation_token" | \
+  ffd invitation inspect --api https://api.example.com --token-stdin --json
+printf '%s\n' "$invitation_token" | \
+  ffd invitation accept --api https://api.example.com --token-stdin --json
+unset invitation_token
+```
+
+This keeps the token in an unexported shell-local variable only long enough for the two stdin writes, then clears it. The token is never accepted in CLI arguments, queries, environment variables, retry journals, or configuration. Existing member policy changes are also atomic and require the current membership version:
+
+```bash
+ffd member policy set \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --member MEMBERSHIP_ID \
+  --expected-version 2 \
+  --role client_editor \
+  --locale-access selected \
+  --locale LOCALE_ID \
+  --json
+```
+
+Control Plane member and invitation operations require OAuth user authority. A primary-environment management credential can administer locales only with exact locale scope; it cannot manage governance, members, or invitations. Governance remains absent from the public SDK.
 
 ## Lifecycle Safety
 

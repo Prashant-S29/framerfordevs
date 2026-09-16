@@ -2,12 +2,16 @@ import { db } from "@framerfordevs/db";
 import { and, eq, inArray, isNull, lt, or, sql } from "@framerfordevs/db/query";
 import { projectInvitation, projectMembership } from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
-import { projectLocale, projectMembershipLocaleAccess } from "@framerfordevs/db/schema/locale";
+import {
+  projectInvitationLocaleAccess,
+  projectLocale,
+  projectMembershipLocaleAccess,
+} from "@framerfordevs/db/schema/locale";
 import { auditEvent, project, workspaceMembership } from "@framerfordevs/db/schema/platform";
 import { Context, Effect, Layer, Schema } from "effect";
 
 import {
-  type CanonicalEmail,
+  CanonicalEmail,
   type CreateProjectInvitationInput,
   CurrentProjectAccess,
   type GetCurrentProjectAccessInput,
@@ -17,14 +21,15 @@ import {
   ProjectInvitation,
   ProjectInvitationId,
   ProjectInvitationPage,
+  ProjectLocaleAccess,
   ProjectMember,
   ProjectMemberPage,
   ProjectMembershipId,
-  projectPermissionActionValues,
+  ProjectRole,
+  type ProjectLocaleAccess as ProjectLocaleAccessType,
   type RemoveProjectMemberInput,
   type RevokeProjectInvitationInput,
-  type UpdateProjectMemberLocaleAccessInput,
-  type UpdateProjectMemberRoleInput,
+  type UpdateProjectMemberPolicyInput,
 } from "../contracts/access";
 import {
   decodeProjectInvitationCursor,
@@ -43,13 +48,14 @@ import {
   NotFoundFailure,
   VersionConflictFailure,
 } from "../contracts/response/errors";
+import { ProjectLocaleId } from "../contracts/locale";
 import type { AuthUserId } from "../contracts/platform";
 import {
   type ApplicationDb,
   type ApplicationExecutor,
   authorizeUserProject,
 } from "./project-access";
-import { isRoleAllowed } from "./policy";
+import { projectPolicyProjection } from "./policy";
 
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
@@ -97,13 +103,18 @@ function canonicalEmail(value: string): string {
   return value.trim().normalize("NFC").toLowerCase();
 }
 
-function invitationValue(row: typeof projectInvitation.$inferSelect, now: Date) {
+function invitationValue(
+  row: typeof projectInvitation.$inferSelect,
+  now: Date,
+  localeIds: ReadonlyArray<string> = [],
+) {
   const status = row.status === "pending" && row.expiresAt <= now ? "expired" : row.status;
   return {
     id: row.id,
     projectId: row.projectId,
     email: row.email,
     role: row.role,
+    localeAccess: localeAccessValue(row.localeAccessMode, localeIds),
     status,
     version: row.version,
     expiresAt: toIso(row.expiresAt),
@@ -124,25 +135,67 @@ function localeAccessValue(mode: string, localeIds: ReadonlyArray<string>) {
   return mode === "selected" ? { mode, localeIds } : { mode };
 }
 
-function isActionVisibleForLocaleAccess(
-  action: (typeof projectPermissionActionValues)[number],
-  role: string,
-  mode: string,
+function requestedLocaleIds(access: ProjectLocaleAccessType) {
+  return access.mode === "selected" ? [...access.localeIds].sort() : [];
+}
+
+async function selectedLocalesAreEnabled(
+  executor: ApplicationExecutor,
+  workspaceId: string,
+  projectId: string,
   localeIds: ReadonlyArray<string>,
-): boolean {
-  if (!isRoleAllowed(role, action)) return false;
-  if (
-    mode !== "all" &&
-    (action === "locale.manage" ||
-      action === "project.credential.issue" ||
-      action === "project.credential.rotate")
-  ) {
-    return false;
+) {
+  if (localeIds.length === 0) return true;
+  const rows = await executor
+    .select({ id: projectLocale.id })
+    .from(projectLocale)
+    .where(
+      and(
+        eq(projectLocale.workspaceId, workspaceId),
+        eq(projectLocale.projectId, projectId),
+        eq(projectLocale.status, "enabled"),
+        inArray(projectLocale.id, localeIds),
+      ),
+    );
+  return rows.length === localeIds.length;
+}
+
+async function invitationLocaleIds(executor: ApplicationExecutor, invitationId: string) {
+  return (
+    await executor
+      .select({ localeId: projectInvitationLocaleAccess.localeId })
+      .from(projectInvitationLocaleAccess)
+      .where(eq(projectInvitationLocaleAccess.invitationId, invitationId))
+  ).map((row) => row.localeId);
+}
+
+async function attachInvitationLocaleAccess(
+  executor: ApplicationExecutor,
+  rows: ReadonlyArray<typeof projectInvitation.$inferSelect>,
+) {
+  const selectedIds = rows
+    .filter((row) => row.localeAccessMode === "selected")
+    .map((row) => row.id);
+  const accessRows =
+    selectedIds.length === 0
+      ? []
+      : await executor
+          .select({
+            invitationId: projectInvitationLocaleAccess.invitationId,
+            localeId: projectInvitationLocaleAccess.localeId,
+          })
+          .from(projectInvitationLocaleAccess)
+          .where(inArray(projectInvitationLocaleAccess.invitationId, selectedIds));
+  const localeIdsByInvitation = new Map<string, Array<string>>();
+  for (const access of accessRows) {
+    const localeIds = localeIdsByInvitation.get(access.invitationId) ?? [];
+    localeIds.push(access.localeId);
+    localeIdsByInvitation.set(access.invitationId, localeIds);
   }
-  if (action.startsWith("content.")) {
-    return mode === "all" || (mode === "selected" && localeIds.length > 0);
-  }
-  return true;
+  return rows.map((row) => ({
+    row,
+    localeIds: localeIdsByInvitation.get(row.id) ?? [],
+  }));
 }
 
 function memberValue(row: MemberRecord) {
@@ -185,12 +238,18 @@ function makeAuditValues(options: {
 async function selectMemberById(
   executor: ApplicationExecutor,
   membershipId: string,
+  projectId?: string,
 ): Promise<MemberRecord | undefined> {
   const [row] = await executor
     .select({ membership: projectMembership, member: user })
     .from(projectMembership)
     .innerJoin(user, eq(user.id, projectMembership.userId))
-    .where(eq(projectMembership.id, membershipId))
+    .where(
+      and(
+        eq(projectMembership.id, membershipId),
+        projectId === undefined ? undefined : eq(projectMembership.projectId, projectId),
+      ),
+    )
     .limit(1);
   if (!row) return undefined;
   const localeIds =
@@ -259,6 +318,17 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
   const database = options.database ?? db;
 
   return {
+    getActorEmail: Effect.fn("AccessRepository.getActorEmail")(function* (actorId: AuthUserId) {
+      const result = yield* Effect.tryPromise({
+        try: () =>
+          database.select({ email: user.email }).from(user).where(eq(user.id, actorId)).limit(1),
+        catch: (cause) => databaseFailure("access.actor.email", cause),
+      });
+      const row = result[0];
+      if (!row) return yield* InvitationInvalidFailure.make();
+      return yield* decodeDatabaseValue("access.actor.email", CanonicalEmail, row.email);
+    }),
+
     createInvitation: Effect.fn("AccessRepository.createInvitation")(function* (
       actorId: AuthUserId,
       input: CreateProjectInvitationInput,
@@ -270,6 +340,9 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
+            await transaction.execute(
+              sql`select id from project where id = ${input.projectId} for update`,
+            );
             const authorization = await authorizeUserProject(
               transaction,
               actorId,
@@ -277,6 +350,31 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
               "project.member.invite",
             );
             if (authorization.kind !== "allowed") return outcome(authorization.kind);
+
+            const localeIds = requestedLocaleIds(input.localeAccess);
+            if (
+              !(await selectedLocalesAreEnabled(
+                transaction,
+                authorization.access.project.workspaceId,
+                input.projectId,
+                localeIds,
+              ))
+            ) {
+              return outcome("locale_unavailable");
+            }
+            const [activeMember] = await transaction
+              .select({ id: projectMembership.id })
+              .from(projectMembership)
+              .innerJoin(user, eq(user.id, projectMembership.userId))
+              .where(
+                and(
+                  eq(projectMembership.projectId, input.projectId),
+                  isNull(projectMembership.removedAt),
+                  sql`lower(${user.email}) = ${input.email}`,
+                ),
+              )
+              .limit(1);
+            if (activeMember) return outcome("invitation_conflict");
 
             await transaction
               .update(projectInvitation)
@@ -301,12 +399,23 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                 projectId: input.projectId,
                 email: input.email,
                 role: input.role,
+                localeAccessMode: input.localeAccess.mode,
                 tokenDigest,
                 invitedByUserId: actorId,
                 expiresAt,
               })
               .returning();
             if (!row) throw new Error("Invitation insert returned no row.");
+            if (localeIds.length > 0) {
+              await transaction.insert(projectInvitationLocaleAccess).values(
+                localeIds.map((localeId) => ({
+                  invitationId: row.id,
+                  workspaceId: row.workspaceId,
+                  projectId: row.projectId,
+                  localeId,
+                })),
+              );
+            }
 
             await transaction.insert(auditEvent).values(
               makeAuditValues({
@@ -319,7 +428,7 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                 requestId,
               }),
             );
-            return outcomeWith("success", { row });
+            return outcomeWith("success", { row, localeIds });
           }),
         catch: (cause) =>
           hasConstraint(cause, "project_invitation_project_pending_email_unique")
@@ -332,11 +441,15 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
           return yield* NotFoundFailure.make({ resource: "project" });
         case "forbidden":
           return yield* ForbiddenFailure.make();
+        case "invitation_conflict":
+          return yield* InvitationConflictFailure.make();
+        case "locale_unavailable":
+          return yield* LocaleUnavailableFailure.make();
         case "success":
           return yield* decodeDatabaseValue(
             "access.invitation.create",
             ProjectInvitation,
-            invitationValue(result.row, now),
+            invitationValue(result.row, now, result.localeIds),
           );
       }
     }),
@@ -349,6 +462,7 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
       const cursor = input.cursor
         ? yield* decodeProjectInvitationCursor(input.cursor, input.projectId)
         : null;
+      const asOf = now;
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
@@ -370,16 +484,45 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                   ),
                 )
               : undefined;
+            const statusCondition =
+              input.status === "all"
+                ? undefined
+                : input.status === "pending"
+                  ? and(
+                      eq(projectInvitation.status, "pending"),
+                      sql`${projectInvitation.expiresAt} > ${asOf}`,
+                    )
+                  : input.status === "expired"
+                    ? or(
+                        eq(projectInvitation.status, "expired"),
+                        and(
+                          eq(projectInvitation.status, "pending"),
+                          sql`${projectInvitation.expiresAt} <= ${asOf}`,
+                        ),
+                      )
+                    : eq(projectInvitation.status, input.status);
+            const searchCondition = input.search
+              ? sql`left(lower(${projectInvitation.email}), char_length(${input.search})) = lower(${input.search})`
+              : undefined;
             const rows = await transaction
               .select()
               .from(projectInvitation)
-              .where(and(eq(projectInvitation.projectId, input.projectId), cursorCondition))
+              .where(
+                and(
+                  eq(projectInvitation.projectId, input.projectId),
+                  statusCondition,
+                  searchCondition,
+                  cursorCondition,
+                ),
+              )
               .orderBy(
                 sql`${projectInvitation.createdAt} desc nulls last`,
                 sql`${projectInvitation.id} desc nulls last`,
               )
               .limit(input.limit + 1);
-            return outcomeWith("success", { rows });
+            return outcomeWith("success", {
+              rows: await attachInvitationLocaleAccess(transaction, rows),
+            });
           }),
         catch: (cause) => databaseFailure("access.invitation.list", cause),
       });
@@ -389,10 +532,14 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
 
       const hasNextPage = result.rows.length > input.limit;
       const visible = result.rows.slice(0, input.limit);
-      const items = yield* Effect.forEach(visible, (row) =>
-        decodeDatabaseValue("access.invitation.list", ProjectInvitation, invitationValue(row, now)),
+      const items = yield* Effect.forEach(visible, ({ row, localeIds }) =>
+        decodeDatabaseValue(
+          "access.invitation.list",
+          ProjectInvitation,
+          invitationValue(row, asOf, localeIds),
+        ),
       );
-      const last = visible.at(-1);
+      const last = visible.at(-1)?.row;
       const nextCursor =
         hasNextPage && last
           ? yield* encodeProjectInvitationCursor({
@@ -449,7 +596,10 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                 );
               return outcome("invalid");
             }
-            return outcomeWith("success", { row });
+            return outcomeWith("success", {
+              row,
+              localeIds: await invitationLocaleIds(transaction, row.invitation.id),
+            });
           }),
         catch: (cause) => databaseFailure("access.invitation.inspect", cause),
       });
@@ -458,6 +608,7 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
         projectId: result.row.invitation.projectId,
         projectName: result.row.projectName,
         role: result.row.invitation.role,
+        localeAccess: localeAccessValue(result.row.invitation.localeAccessMode, result.localeIds),
         inviterName: result.row.inviterName,
         expiresAt: toIso(result.row.invitation.expiresAt),
       });
@@ -473,10 +624,7 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            await transaction.execute(
-              sql`select id from project_invitation where token_digest = ${tokenDigest} for update`,
-            );
-            const [invitation] = await transaction
+            const [initialInvitation] = await transaction
               .select()
               .from(projectInvitation)
               .where(
@@ -486,7 +634,46 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                 ),
               )
               .limit(1);
-            if (!invitation || invitation.status !== "pending") return outcome("invalid");
+            if (!initialInvitation) return outcome("invalid");
+            await transaction.execute(
+              sql`select id from project where id = ${initialInvitation.projectId} for update`,
+            );
+            await transaction.execute(
+              sql`select id from project_invitation where id = ${initialInvitation.id} for update`,
+            );
+            const [invitation] = await transaction
+              .select()
+              .from(projectInvitation)
+              .where(
+                and(
+                  eq(projectInvitation.id, initialInvitation.id),
+                  eq(projectInvitation.tokenDigest, tokenDigest),
+                  eq(projectInvitation.email, actorEmail),
+                ),
+              )
+              .limit(1);
+            if (!invitation) return outcome("invalid");
+            if (invitation.status === "accepted" && invitation.acceptedByUserId === actorId) {
+              const replayMember = await transaction
+                .select({ id: projectMembership.id })
+                .from(projectMembership)
+                .where(
+                  and(
+                    eq(projectMembership.projectId, invitation.projectId),
+                    eq(projectMembership.userId, actorId),
+                    isNull(projectMembership.removedAt),
+                  ),
+                )
+                .limit(1);
+              if (!replayMember[0]) return outcome("invalid");
+              const member = await selectMemberById(
+                transaction,
+                replayMember[0].id,
+                invitation.projectId,
+              );
+              return member ? outcomeWith("success", { member }) : outcome("invalid");
+            }
+            if (invitation.status !== "pending") return outcome("invalid");
             if (invitation.expiresAt <= now) {
               await transaction
                 .update(projectInvitation)
@@ -498,6 +685,19 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                 .where(eq(projectInvitation.id, invitation.id));
               return outcome("invalid");
             }
+
+            const localeIds = await invitationLocaleIds(transaction, invitation.id);
+            const [existingMembership] = await transaction
+              .select()
+              .from(projectMembership)
+              .where(
+                and(
+                  eq(projectMembership.projectId, invitation.projectId),
+                  eq(projectMembership.userId, actorId),
+                ),
+              )
+              .limit(1);
+            if (existingMembership && !existingMembership.removedAt) return outcome("invalid");
 
             await transaction.execute(sql`select id from "user" where id = ${actorId} for update`);
             let workspaceMembershipAudit:
@@ -548,16 +748,6 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
               | "project.membership.reactivated"
               | undefined;
             let membershipId: string;
-            const [existingMembership] = await transaction
-              .select()
-              .from(projectMembership)
-              .where(
-                and(
-                  eq(projectMembership.projectId, invitation.projectId),
-                  eq(projectMembership.userId, actorId),
-                ),
-              )
-              .limit(1);
             if (!existingMembership) {
               const [created] = await transaction
                 .insert(projectMembership)
@@ -566,6 +756,7 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                   projectId: invitation.projectId,
                   userId: actorId,
                   role: invitation.role,
+                  localeAccessMode: invitation.localeAccessMode,
                   createdByUserId: invitation.invitedByUserId,
                 })
                 .returning({ id: projectMembership.id });
@@ -579,18 +770,29 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                   .update(projectMembership)
                   .set({
                     role: invitation.role,
-                    localeAccessMode: "all",
+                    localeAccessMode: invitation.localeAccessMode,
                     removedAt: null,
                     removedByUserId: null,
                     version: sql`${projectMembership.version} + 1`,
                     updatedAt: now,
                   })
                   .where(eq(projectMembership.id, existingMembership.id));
-                await transaction
-                  .delete(projectMembershipLocaleAccess)
-                  .where(eq(projectMembershipLocaleAccess.membershipId, existingMembership.id));
                 membershipAction = "project.membership.reactivated";
               }
+            }
+
+            await transaction
+              .delete(projectMembershipLocaleAccess)
+              .where(eq(projectMembershipLocaleAccess.membershipId, membershipId));
+            if (localeIds.length > 0) {
+              await transaction.insert(projectMembershipLocaleAccess).values(
+                localeIds.map((localeId) => ({
+                  membershipId,
+                  workspaceId: invitation.workspaceId,
+                  projectId: invitation.projectId,
+                  localeId,
+                })),
+              );
             }
 
             const [accepted] = await transaction
@@ -672,21 +874,29 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
         try: () =>
           database.transaction(async (transaction) => {
             await transaction.execute(
-              sql`select id from project_invitation where id = ${input.invitationId} for update`,
+              sql`select id from project where id = ${input.projectId} for update`,
+            );
+            const authorization = await authorizeUserProject(
+              transaction,
+              actorId,
+              input.projectId,
+              "project.member.invite",
+            );
+            if (authorization.kind !== "allowed") return outcome(authorization.kind);
+            await transaction.execute(
+              sql`select id from project_invitation where id = ${input.invitationId} and project_id = ${input.projectId} for update`,
             );
             const [invitation] = await transaction
               .select()
               .from(projectInvitation)
-              .where(eq(projectInvitation.id, input.invitationId))
+              .where(
+                and(
+                  eq(projectInvitation.id, input.invitationId),
+                  eq(projectInvitation.projectId, input.projectId),
+                ),
+              )
               .limit(1);
             if (!invitation) return outcome("not_found");
-            const authorization = await authorizeUserProject(
-              transaction,
-              actorId,
-              invitation.projectId,
-              "project.member.invite",
-            );
-            if (authorization.kind !== "allowed") return outcome(authorization.kind);
             if (invitation.version !== input.version) return outcome("version_conflict");
             if (invitation.status !== "pending" || invitation.expiresAt <= now) {
               if (invitation.status === "pending") {
@@ -730,7 +940,10 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                 requestId,
               }),
             );
-            return outcomeWith("success", { row: updated });
+            return outcomeWith("success", {
+              row: updated,
+              localeIds: await invitationLocaleIds(transaction, invitation.id),
+            });
           }),
         catch: (cause) => databaseFailure("access.invitation.revoke", cause),
       });
@@ -747,7 +960,7 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
           return yield* decodeDatabaseValue(
             "access.invitation.revoke",
             ProjectInvitation,
-            invitationValue(result.row, now),
+            invitationValue(result.row, now, result.localeIds),
           );
       }
     }),
@@ -764,21 +977,46 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
         return yield* NotFoundFailure.make({ resource: "project" });
       }
       if (authorization.kind === "forbidden") return yield* ForbiddenFailure.make();
-      return yield* decodeDatabaseValue("access.current.get", CurrentProjectAccess, {
-        projectId: input.projectId,
-        role: authorization.access.role,
-        localeAccess: localeAccessValue(
+      const role = yield* decodeDatabaseValue(
+        "access.current.get",
+        ProjectRole,
+        authorization.access.role,
+      );
+      const localeAccess = yield* decodeDatabaseValue(
+        "access.current.get",
+        ProjectLocaleAccess,
+        localeAccessValue(
           authorization.access.localeAccessMode,
           authorization.access.allowedLocaleIds,
         ),
-        allowedActions: projectPermissionActionValues.filter((action) =>
-          isActionVisibleForLocaleAccess(
-            action,
-            authorization.access.role,
-            authorization.access.localeAccessMode,
-            authorization.access.allowedLocaleIds,
-          ),
-        ),
+      );
+      const enabledRows = yield* Effect.tryPromise({
+        try: () =>
+          database
+            .select({ id: projectLocale.id })
+            .from(projectLocale)
+            .where(
+              and(
+                eq(projectLocale.workspaceId, authorization.access.project.workspaceId),
+                eq(projectLocale.projectId, authorization.access.project.id),
+                eq(projectLocale.status, "enabled"),
+              ),
+            )
+            .orderBy(projectLocale.position, projectLocale.id),
+        catch: (cause) => databaseFailure("access.current.get", cause),
+      });
+      const enabledLocaleIds = yield* Effect.forEach(enabledRows, (row) =>
+        decodeDatabaseValue("access.current.get", ProjectLocaleId, row.id),
+      );
+      const projection = projectPolicyProjection({ role, localeAccess, enabledLocaleIds });
+      return yield* decodeDatabaseValue("access.current.get", CurrentProjectAccess, {
+        projectId: input.projectId,
+        role,
+        localeAccess,
+        baseRoleActions: projection.baseRoleActions,
+        effectiveProjectActions: projection.effectiveProjectActions,
+        effectiveLocaleIds: projection.effectiveLocaleIds,
+        effectiveLocaleActions: projection.effectiveLocaleActions,
       });
     }),
 
@@ -810,6 +1048,13 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                   ),
                 )
               : undefined;
+            const roleCondition = input.role ? eq(projectMembership.role, input.role) : undefined;
+            const searchCondition = input.search
+              ? or(
+                  sql`left(lower(${user.name}), char_length(${input.search})) = lower(${input.search})`,
+                  sql`left(lower(${user.email}), char_length(${input.search})) = lower(${input.search})`,
+                )
+              : undefined;
             const rows = await transaction
               .select({ membership: projectMembership, member: user })
               .from(projectMembership)
@@ -818,6 +1063,8 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                 and(
                   eq(projectMembership.projectId, input.projectId),
                   isNull(projectMembership.removedAt),
+                  roleCondition,
+                  searchCondition,
                   cursorCondition,
                 ),
               )
@@ -856,163 +1103,84 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
       return ProjectMemberPage.make({ items, nextCursor });
     }),
 
-    updateMemberRole: Effect.fn("AccessRepository.updateMemberRole")(function* (
+    updateMemberPolicy: Effect.fn("AccessRepository.updateMemberPolicy")(function* (
       actorId: AuthUserId,
-      input: UpdateProjectMemberRoleInput,
+      input: UpdateProjectMemberPolicyInput,
       now: Date,
       requestId: string,
     ) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const initial = await selectMemberById(transaction, input.membershipId);
-            if (!initial) return outcome("not_found");
             await transaction.execute(
-              sql`select id from project where id = ${initial.membership.projectId} for update`,
+              sql`select id from project where id = ${input.projectId} for update`,
             );
-            const authorization = await authorizeUserProject(
+            const roleAuthorization = await authorizeUserProject(
               transaction,
               actorId,
-              initial.membership.projectId,
+              input.projectId,
               "project.member.role.update",
             );
-            if (authorization.kind !== "allowed") return outcome(authorization.kind);
-            const current = await selectMemberById(transaction, input.membershipId);
+            if (roleAuthorization.kind !== "allowed") return outcome(roleAuthorization.kind);
+            const localeAuthorization = await authorizeUserProject(
+              transaction,
+              actorId,
+              input.projectId,
+              "project.member.locale.update",
+            );
+            if (localeAuthorization.kind !== "allowed") return outcome(localeAuthorization.kind);
+
+            const current = await selectMemberById(
+              transaction,
+              input.membershipId,
+              input.projectId,
+            );
             if (!current || current.membership.removedAt) return outcome("not_found");
             if (current.membership.version !== input.version) return outcome("version_conflict");
-            if (current.membership.role === input.role) {
+            if (input.role === "owner" && input.localeAccess.mode !== "all") {
+              return outcome("invalid_state");
+            }
+
+            const localeIds = requestedLocaleIds(input.localeAccess);
+            if (
+              !(await selectedLocalesAreEnabled(
+                transaction,
+                current.membership.workspaceId,
+                current.membership.projectId,
+                localeIds,
+              ))
+            ) {
+              return outcome("locale_unavailable");
+            }
+            const currentLocaleIds = [...current.localeIds].sort();
+            if (
+              current.membership.role === input.role &&
+              current.membership.localeAccessMode === input.localeAccess.mode &&
+              currentLocaleIds.length === localeIds.length &&
+              currentLocaleIds.every((localeId, index) => localeId === localeIds[index])
+            ) {
               return outcomeWith("success", { member: current });
             }
             if (
               current.membership.role === "owner" &&
               input.role !== "owner" &&
-              (await activeOwnerCount(transaction, current.membership.projectId)) <= 1
+              (await activeOwnerCount(transaction, input.projectId)) <= 1
             ) {
               return outcome("last_owner");
             }
+
             const [updated] = await transaction
               .update(projectMembership)
               .set({
                 role: input.role,
-                ...(input.role === "owner" ? { localeAccessMode: "all" } : {}),
+                localeAccessMode: input.localeAccess.mode,
                 version: sql`${projectMembership.version} + 1`,
                 updatedAt: now,
               })
               .where(
                 and(
                   eq(projectMembership.id, input.membershipId),
-                  eq(projectMembership.version, input.version),
-                  isNull(projectMembership.removedAt),
-                ),
-              )
-              .returning({ id: projectMembership.id });
-            if (!updated) return outcome("version_conflict");
-            if (input.role === "owner") {
-              await transaction
-                .delete(projectMembershipLocaleAccess)
-                .where(eq(projectMembershipLocaleAccess.membershipId, input.membershipId));
-            }
-            await transaction.insert(auditEvent).values(
-              makeAuditValues({
-                workspaceId: current.membership.workspaceId,
-                projectId: current.membership.projectId,
-                actorId,
-                action: "project.membership.role.updated",
-                resourceType: "project_membership",
-                resourceId: current.membership.id,
-                requestId,
-              }),
-            );
-            const member = await selectMemberById(transaction, input.membershipId);
-            if (!member) throw new Error("Updated membership could not be loaded.");
-            return outcomeWith("success", { member });
-          }),
-        catch: (cause) => databaseFailure("access.member.role.update", cause),
-      });
-      switch (result.kind) {
-        case "not_found":
-          return yield* NotFoundFailure.make({ resource: "membership" });
-        case "forbidden":
-          return yield* ForbiddenFailure.make();
-        case "version_conflict":
-          return yield* VersionConflictFailure.make();
-        case "last_owner":
-          return yield* LastOwnerRequiredFailure.make();
-        case "success":
-          return yield* decodeDatabaseValue(
-            "access.member.role.update",
-            ProjectMember,
-            memberValue(result.member),
-          );
-      }
-    }),
-
-    updateMemberLocaleAccess: Effect.fn("AccessRepository.updateMemberLocaleAccess")(function* (
-      actorId: AuthUserId,
-      input: UpdateProjectMemberLocaleAccessInput,
-      now: Date,
-      requestId: string,
-    ) {
-      const result = yield* Effect.tryPromise({
-        try: () =>
-          database.transaction(async (transaction) => {
-            const initial = await selectMemberById(transaction, input.membershipId);
-            if (!initial) return outcome("not_found");
-            await transaction.execute(
-              sql`select id from project where id = ${initial.membership.projectId} for update`,
-            );
-            const authorization = await authorizeUserProject(
-              transaction,
-              actorId,
-              initial.membership.projectId,
-              "project.member.locale.update",
-            );
-            if (authorization.kind !== "allowed") return outcome(authorization.kind);
-            const current = await selectMemberById(transaction, input.membershipId);
-            if (!current || current.membership.removedAt) return outcome("not_found");
-            if (current.membership.version !== input.version) return outcome("version_conflict");
-            if (current.membership.role === "owner" && input.access.mode !== "all") {
-              return outcome("invalid_state");
-            }
-
-            const requestedLocaleIds =
-              input.access.mode === "selected" ? [...input.access.localeIds].sort() : [];
-            if (input.access.mode === "selected") {
-              const localeRows = await transaction
-                .select({ id: projectLocale.id })
-                .from(projectLocale)
-                .where(
-                  and(
-                    eq(projectLocale.workspaceId, current.membership.workspaceId),
-                    eq(projectLocale.projectId, current.membership.projectId),
-                    eq(projectLocale.status, "enabled"),
-                    inArray(projectLocale.id, requestedLocaleIds),
-                  ),
-                );
-              if (localeRows.length !== requestedLocaleIds.length) {
-                return outcome("locale_unavailable");
-              }
-            }
-
-            const currentLocaleIds = [...current.localeIds].sort();
-            if (
-              current.membership.localeAccessMode === input.access.mode &&
-              currentLocaleIds.length === requestedLocaleIds.length &&
-              currentLocaleIds.every((localeId, index) => localeId === requestedLocaleIds[index])
-            ) {
-              return outcomeWith("success", { member: current });
-            }
-
-            const [updated] = await transaction
-              .update(projectMembership)
-              .set({
-                localeAccessMode: input.access.mode,
-                version: sql`${projectMembership.version} + 1`,
-                updatedAt: now,
-              })
-              .where(
-                and(
-                  eq(projectMembership.id, input.membershipId),
+                  eq(projectMembership.projectId, input.projectId),
                   eq(projectMembership.version, input.version),
                   isNull(projectMembership.removedAt),
                 ),
@@ -1022,10 +1190,15 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
 
             await transaction
               .delete(projectMembershipLocaleAccess)
-              .where(eq(projectMembershipLocaleAccess.membershipId, input.membershipId));
-            if (input.access.mode === "selected") {
+              .where(
+                and(
+                  eq(projectMembershipLocaleAccess.membershipId, input.membershipId),
+                  eq(projectMembershipLocaleAccess.projectId, input.projectId),
+                ),
+              );
+            if (localeIds.length > 0) {
               await transaction.insert(projectMembershipLocaleAccess).values(
-                requestedLocaleIds.map((localeId) => ({
+                localeIds.map((localeId) => ({
                   membershipId: input.membershipId,
                   workspaceId: current.membership.workspaceId,
                   projectId: current.membership.projectId,
@@ -1038,17 +1211,17 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                 workspaceId: current.membership.workspaceId,
                 projectId: current.membership.projectId,
                 actorId,
-                action: "project.membership.locale_access.updated",
+                action: "project.membership.policy.updated",
                 resourceType: "project_membership",
                 resourceId: current.membership.id,
                 requestId,
               }),
             );
-            const member = await selectMemberById(transaction, input.membershipId);
+            const member = await selectMemberById(transaction, input.membershipId, input.projectId);
             if (!member) throw new Error("Updated membership could not be loaded.");
             return outcomeWith("success", { member });
           }),
-        catch: (cause) => databaseFailure("access.member.locale.update", cause),
+        catch: (cause) => databaseFailure("access.member.policy.update", cause),
       });
       switch (result.kind) {
         case "not_found":
@@ -1061,9 +1234,11 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
           return yield* InvalidStateTransitionFailure.make();
         case "locale_unavailable":
           return yield* LocaleUnavailableFailure.make();
+        case "last_owner":
+          return yield* LastOwnerRequiredFailure.make();
         case "success":
           return yield* decodeDatabaseValue(
-            "access.member.locale.update",
+            "access.member.policy.update",
             ProjectMember,
             memberValue(result.member),
           );
@@ -1079,19 +1254,21 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const initial = await selectMemberById(transaction, input.membershipId);
-            if (!initial) return outcome("not_found");
             await transaction.execute(
-              sql`select id from project where id = ${initial.membership.projectId} for update`,
+              sql`select id from project where id = ${input.projectId} for update`,
             );
             const authorization = await authorizeUserProject(
               transaction,
               actorId,
-              initial.membership.projectId,
+              input.projectId,
               "project.member.remove",
             );
             if (authorization.kind !== "allowed") return outcome(authorization.kind);
-            const current = await selectMemberById(transaction, input.membershipId);
+            const current = await selectMemberById(
+              transaction,
+              input.membershipId,
+              input.projectId,
+            );
             if (!current || current.membership.removedAt) return outcome("not_found");
             if (current.membership.version !== input.version) return outcome("version_conflict");
             if (
@@ -1114,6 +1291,7 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
               .where(
                 and(
                   eq(projectMembership.id, input.membershipId),
+                  eq(projectMembership.projectId, input.projectId),
                   eq(projectMembership.version, input.version),
                   isNull(projectMembership.removedAt),
                 ),
@@ -1160,7 +1338,7 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
                 requestId,
               }),
             );
-            const member = await selectMemberById(transaction, input.membershipId);
+            const member = await selectMemberById(transaction, input.membershipId, input.projectId);
             if (!member) throw new Error("Removed membership could not be loaded.");
             return outcomeWith("success", { member });
           }),

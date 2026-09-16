@@ -3,7 +3,7 @@
 import { Effect, Schema } from "effect";
 
 import { canonicalJsonBytes, sha256, toJsonValue } from "../canonical";
-import { booleanFlag, stringFlag, type ParsedArguments } from "../command-arguments";
+import { booleanFlag, stringFlag, stringFlags, type ParsedArguments } from "../command-arguments";
 import { makeControlPlaneHttpClient } from "../control-plane-http-client";
 import { ControlPlaneHttpError } from "../errors";
 import { acquireControlPlaneCommand, clearControlPlaneCommand } from "../retry-journal";
@@ -23,6 +23,21 @@ const controlPlaneCommands = new Set([
   "project capability enable",
   "studio registration get",
   "studio registration set",
+  "governance inspect",
+  "member list",
+  "member policy set",
+  "member remove",
+  "invitation list",
+  "invitation create",
+  "invitation inspect",
+  "invitation accept",
+  "invitation revoke",
+  "locale list",
+  "locale create",
+  "locale update",
+  "locale reorder",
+  "locale status set",
+  "project environment get",
 ]);
 
 export function isControlPlaneCommand(command: string): boolean {
@@ -115,7 +130,8 @@ function receiptMutation<A, E, R>(options: {
     | "workspace.create"
     | "project.create"
     | "project.capability.enable"
-    | "studio_registration.put";
+    | "studio_registration.put"
+    | "project_locale.create";
   readonly suppliedCommandId: string | undefined;
   readonly input: unknown;
   readonly execute: (commandId: string) => Effect.Effect<A, E, R>;
@@ -141,11 +157,86 @@ function receiptMutation<A, E, R>(options: {
   });
 }
 
+const projectRoles = new Set([
+  "owner",
+  "developer",
+  "content_admin",
+  "editor",
+  "reviewer",
+  "client_editor",
+  "read_only",
+]);
+
+function projectRoleFlag(arguments_: ParsedArguments) {
+  return Effect.flatMap(requiredFlag(arguments_, "role"), (role) =>
+    projectRoles.has(role) ? Effect.succeed(role) : Effect.fail(new Error("CLI_ROLE_INVALID")),
+  );
+}
+
+function localeAccessFlag(arguments_: ParsedArguments) {
+  return Effect.gen(function* () {
+    const mode = yield* requiredFlag(arguments_, "locale-access");
+    const localeIds = stringFlags(arguments_, "locale");
+    if (new Set(localeIds).size !== localeIds.length) {
+      return yield* Effect.fail(new Error("CLI_LOCALE_DUPLICATE"));
+    }
+    if (mode === "selected" && localeIds.length > 0) {
+      return { mode, localeIds } as const;
+    }
+    if ((mode === "all" || mode === "none") && localeIds.length === 0) {
+      return { mode } as const;
+    }
+    return yield* Effect.fail(new Error("CLI_LOCALE_ACCESS_INVALID"));
+  });
+}
+
+function reorderItems(arguments_: ParsedArguments) {
+  const values = stringFlags(arguments_, "item");
+  if (values.length === 0) return Effect.fail(new Error("CLI_ITEM_REQUIRED"));
+  const items: Array<{ readonly localeId: string; readonly expectedVersion: number }> = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const separator = value.lastIndexOf(":");
+    const localeId = separator < 0 ? "" : value.slice(0, separator);
+    const version = separator < 0 ? "" : value.slice(separator + 1);
+    if (
+      localeId.length === 0 ||
+      !positiveIntegerPattern.test(version) ||
+      seen.has(localeId) ||
+      !Number.isSafeInteger(Number(version))
+    ) {
+      return Effect.fail(new Error("CLI_ITEM_INVALID"));
+    }
+    seen.add(localeId);
+    items.push({ localeId, expectedVersion: Number(version) });
+  }
+  return Effect.succeed(items);
+}
+
+function readBoundedInvitationToken() {
+  return Effect.tryPromise({
+    try: async () => {
+      if (process.stdin.isTTY) throw new Error("CLI_TOKEN_STDIN_REQUIRED");
+      process.stdin.setEncoding("utf8");
+      let value = "";
+      for await (const chunk of process.stdin) {
+        value += chunk;
+        if (Buffer.byteLength(value, "utf8") > 128) throw new Error("CLI_TOKEN_STDIN_INVALID");
+      }
+      const token = value.replace(/\r?\n$/u, "");
+      if (!/^[A-Za-z0-9_-]{43}$/u.test(token)) throw new Error("CLI_TOKEN_STDIN_INVALID");
+      return token;
+    },
+    catch: (cause) => (cause instanceof Error ? cause : new Error("CLI_TOKEN_STDIN_INVALID")),
+  });
+}
+
 export function executeControlPlaneCommand(options: {
   readonly arguments: ParsedArguments;
   readonly apiOrigin: string;
   readonly token: string;
   readonly root: string;
+  readonly readInvitationToken?: () => Effect.Effect<string, Error>;
 }) {
   const arguments_ = options.arguments;
   const command = arguments_.command.join(" ");
@@ -278,6 +369,169 @@ export function executeControlPlaneCommand(options: {
         execute: (commandId) => client.enableCmsCapability(projectId, { commandId }),
       });
       return { command, ...result };
+    }
+    if (command === "governance inspect") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      return { command, governance: yield* client.getGovernance(projectId) };
+    }
+    if (command === "member list") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const role = stringFlag(arguments_, "role") ?? null;
+      if (role !== null && !projectRoles.has(role)) {
+        return yield* Effect.fail(new Error("CLI_ROLE_INVALID"));
+      }
+      const limit = yield* positiveIntegerFlag(arguments_, "limit", 20);
+      return {
+        command,
+        ...(yield* client.listMembers(
+          projectId,
+          role,
+          stringFlag(arguments_, "search") ?? null,
+          stringFlag(arguments_, "cursor") ?? null,
+          limit,
+        )),
+      };
+    }
+    if (command === "member policy set") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const memberId = yield* requiredFlag(arguments_, "member");
+      const expectedVersion = yield* positiveIntegerFlag(arguments_, "expected-version");
+      const role = yield* projectRoleFlag(arguments_);
+      const localeAccess = yield* localeAccessFlag(arguments_);
+      return {
+        command,
+        member: yield* client.updateMemberPolicy(projectId, memberId, {
+          expectedVersion,
+          role,
+          localeAccess,
+        }),
+      };
+    }
+    if (command === "member remove") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const memberId = yield* requiredFlag(arguments_, "member");
+      const expectedVersion = yield* positiveIntegerFlag(arguments_, "expected-version");
+      return {
+        command,
+        member: yield* client.removeMember(projectId, memberId, { expectedVersion }),
+      };
+    }
+    if (command === "invitation list") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const status = stringFlag(arguments_, "status") ?? "all";
+      if (!["all", "pending", "accepted", "revoked", "expired"].includes(status)) {
+        return yield* Effect.fail(new Error("CLI_STATUS_INVALID"));
+      }
+      const limit = yield* positiveIntegerFlag(arguments_, "limit", 20);
+      return {
+        command,
+        ...(yield* client.listInvitations(
+          projectId,
+          status,
+          stringFlag(arguments_, "search") ?? null,
+          stringFlag(arguments_, "cursor") ?? null,
+          limit,
+        )),
+      };
+    }
+    if (command === "invitation create") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const email = yield* requiredFlag(arguments_, "email");
+      const role = yield* projectRoleFlag(arguments_);
+      const localeAccess = yield* localeAccessFlag(arguments_);
+      return {
+        command,
+        ...(yield* client.createInvitation(projectId, { email, role, localeAccess })),
+      };
+    }
+    if (command === "invitation inspect" || command === "invitation accept") {
+      if (!booleanFlag(arguments_, "token-stdin")) {
+        return yield* Effect.fail(new Error("CLI_TOKEN_STDIN_REQUIRED"));
+      }
+      const token = yield* options.readInvitationToken?.() ?? readBoundedInvitationToken();
+      return command === "invitation inspect"
+        ? { command, invitation: yield* client.inspectInvitation(token) }
+        : { command, member: yield* client.acceptInvitation(token) };
+    }
+    if (command === "invitation revoke") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const invitationId = yield* requiredFlag(arguments_, "invitation");
+      const expectedVersion = yield* positiveIntegerFlag(arguments_, "expected-version");
+      return {
+        command,
+        invitation: yield* client.revokeInvitation(projectId, invitationId, {
+          expectedVersion,
+        }),
+      };
+    }
+    if (command === "locale list") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const view = stringFlag(arguments_, "view") ?? "effective";
+      if (view !== "effective" && view !== "settings") {
+        return yield* Effect.fail(new Error("CLI_VIEW_INVALID"));
+      }
+      return {
+        command,
+        ...(yield* client.listLocales(projectId, view, booleanFlag(arguments_, "include-removed"))),
+      };
+    }
+    if (command === "locale create") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const tag = yield* requiredFlag(arguments_, "tag");
+      const displayName = yield* requiredFlag(arguments_, "display-name");
+      const suppliedCommandId = yield* optionalCommandId(arguments_);
+      const result = yield* receiptMutation({
+        root: options.root,
+        operation: "project_locale.create",
+        suppliedCommandId,
+        input: { projectId, tag, displayName },
+        execute: (commandId) => client.createLocale(projectId, { commandId, tag, displayName }),
+      });
+      return { command, locale: result };
+    }
+    if (command === "locale update") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const localeId = yield* requiredFlag(arguments_, "locale");
+      const expectedVersion = yield* positiveIntegerFlag(arguments_, "expected-version");
+      const displayName = yield* requiredFlag(arguments_, "display-name");
+      return {
+        command,
+        locale: yield* client.updateLocale(projectId, localeId, {
+          expectedVersion,
+          displayName,
+        }),
+      };
+    }
+    if (command === "locale reorder") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      return {
+        command,
+        ...(yield* client.reorderLocales(projectId, {
+          locales: yield* reorderItems(arguments_),
+        })),
+      };
+    }
+    if (command === "locale status set") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const localeId = yield* requiredFlag(arguments_, "locale");
+      const expectedVersion = yield* positiveIntegerFlag(arguments_, "expected-version");
+      const status = yield* requiredFlag(arguments_, "status");
+      if (status !== "enabled" && status !== "disabled" && status !== "removed") {
+        return yield* Effect.fail(new Error("CLI_STATUS_INVALID"));
+      }
+      return {
+        command,
+        locale: yield* client.updateLocaleStatus(projectId, localeId, {
+          expectedVersion,
+          status,
+          confirmDraftImpact: booleanFlag(arguments_, "confirm-draft-impact"),
+        }),
+      };
+    }
+    if (command === "project environment get") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const project = yield* client.getProject(projectId);
+      return { command, environment: project.primaryEnvironment };
     }
     if (command === "studio registration get") {
       const projectId = yield* requiredFlag(arguments_, "project");

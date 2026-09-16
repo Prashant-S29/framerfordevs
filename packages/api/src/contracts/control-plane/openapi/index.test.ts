@@ -19,6 +19,18 @@ describe("Control Plane OpenAPI", () => {
       "/projects/{projectId}/restore",
       "/projects/{projectId}/capabilities",
       "/projects/{projectId}/capabilities/cms",
+      "/projects/{projectId}/governance",
+      "/projects/{projectId}/members",
+      "/projects/{projectId}/members/{membershipId}/policy",
+      "/projects/{projectId}/members/{membershipId}/remove",
+      "/projects/{projectId}/invitations",
+      "/projects/{projectId}/invitations/{invitationId}/revoke",
+      "/invitations/inspect",
+      "/invitations/accept",
+      "/projects/{projectId}/locales",
+      "/projects/{projectId}/locales/{localeId}",
+      "/projects/{projectId}/locales/order",
+      "/projects/{projectId}/locales/{localeId}/status",
       "/projects/{projectId}/environments/{environmentId}/studio-registration",
     ]);
 
@@ -27,7 +39,7 @@ describe("Control Plane OpenAPI", () => {
         .filter(([method]) => dataMethods.has(method))
         .map(([, operation]) => operation.operationId),
     );
-    assert.strictEqual(operationIds.length, 13);
+    assert.strictEqual(operationIds.length, 27);
     assert.strictEqual(new Set(operationIds).size, operationIds.length);
   });
 
@@ -83,10 +95,9 @@ describe("Control Plane OpenAPI", () => {
     assert.notInclude(serialized, "#/$defs/");
     assert.notInclude(serialized, "cookie");
     assert.notInclude(serialized, "clientSecret");
-    assert.notInclude(serialized, "credential.issue");
-    assert.notInclude(serialized, "webhook.manage");
-    assert.notInclude(serialized, "/members");
-    assert.notInclude(serialized, "/invitations");
+    assert.notInclude(serialized, '"/credentials');
+    assert.notInclude(serialized, "customPolicy");
+    assert.notInclude(serialized, "rawTokenDigest");
     assert.strictEqual(controlPlaneOpenApiDocument["x-sdk-supported"], false);
     assert.strictEqual(controlPlaneOpenApiDocument["x-control-plane-limits"].maximumPageSize, 50);
     assert.strictEqual(controlPlaneOpenApiDocument["x-control-plane-limits"].requestBytes, 65_536);

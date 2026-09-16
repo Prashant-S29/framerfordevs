@@ -106,6 +106,7 @@ export const projectInvitation = pgTable(
     projectId: uuid("project_id").notNull(),
     email: varchar("email", { length: 320 }).notNull(),
     role: varchar("role", { length: 32 }).notNull(),
+    localeAccessMode: varchar("locale_access_mode", { length: 16 }).default("all").notNull(),
     tokenDigest: char("token_digest", { length: 64 }).notNull(),
     status: varchar("status", { length: 16 }).default("pending").notNull(),
     version: integer("version").default(1).notNull(),
@@ -131,6 +132,11 @@ export const projectInvitation = pgTable(
       foreignColumns: [project.id, project.workspaceId],
     }).onDelete("restrict"),
     unique("project_invitation_token_digest_unique").on(table.tokenDigest),
+    unique("project_invitation_id_project_workspace_unique").on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
     uniqueIndex("project_invitation_project_pending_email_unique")
       .on(table.projectId, table.email)
       .where(sql`${table.status} = 'pending'`),
@@ -139,6 +145,14 @@ export const projectInvitation = pgTable(
       sql`char_length(${table.email}) between 3 and 320 and ${table.email} = lower(btrim(${table.email})) and ${table.email} !~ '[[:cntrl:]]'`,
     ),
     check("project_invitation_role_valid", sql`${table.role} in ${projectRoleSql}`),
+    check(
+      "project_invitation_locale_access_mode_valid",
+      sql`${table.localeAccessMode} in ('all', 'selected', 'none')`,
+    ),
+    check(
+      "project_invitation_owner_locale_access_all",
+      sql`${table.role} <> 'owner' or ${table.localeAccessMode} = 'all'`,
+    ),
     check("project_invitation_token_digest_valid", sql`${table.tokenDigest} ~ '^[0-9a-f]{64}$'`),
     check(
       "project_invitation_status_valid",

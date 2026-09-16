@@ -53,7 +53,7 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ### Milestone 15 — Governance automation parity
 
-**Status:** Design proposed in `decisions/m15-governance-automation-parity-design.md`; awaiting developer review. Implementation is not authorized.
+**Status:** Implementation, section-by-section checklist audit, automated readiness, and developer-delegated browser review are complete; awaiting explicit acceptance. Migration `0016` is applied and read-only verified.
 
 **Depends on:** M14.
 

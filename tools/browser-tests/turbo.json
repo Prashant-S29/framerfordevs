@@ -1,0 +1,17 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "cache": false,
+      "env": ["FFD_BROWSER_TEST_BASE_URL"]
+    },
+    "test:browser": {
+      "cache": false,
+      "env": ["FFD_BROWSER_TEST_BASE_URL"]
+    },
+    "test:integration": {
+      "cache": false,
+      "env": ["FFD_BROWSER_TEST_BASE_URL"]
+    }
+  }
+}

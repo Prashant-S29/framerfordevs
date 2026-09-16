@@ -17,8 +17,7 @@ import {
   ProjectMemberPage,
   RemoveProjectMemberInput,
   RevokeProjectInvitationInput,
-  UpdateProjectMemberLocaleAccessInput,
-  UpdateProjectMemberRoleInput,
+  UpdateProjectMemberPolicyInput,
 } from "../../contracts/access";
 import { AccessRepository, makeAccessRepository } from "../../services/access-repository";
 import { SecretGenerator, makeSecretGenerator } from "../../services/secret-generator";
@@ -31,8 +30,7 @@ import {
   listProjectMembers,
   removeProjectMember,
   revokeProjectInvitation,
-  updateProjectMemberLocaleAccess,
-  updateProjectMemberRole,
+  updateProjectMemberPolicy,
 } from "./index";
 
 const projectId = "019fae8b-1234-7000-8000-000000000001";
@@ -58,6 +56,7 @@ const invitation = Schema.decodeUnknownSync(ProjectInvitation)({
   projectId,
   email: "member@example.test",
   role: "editor",
+  localeAccess: { mode: "all" },
   status: "pending",
   version: 1,
   expiresAt: "2026-08-06T12:00:00.000Z",
@@ -70,6 +69,7 @@ const inspected = Schema.decodeUnknownSync(InspectedProjectInvitation)({
   projectId,
   projectName: "Test Project",
   role: "editor",
+  localeAccess: { mode: "all" },
   inviterName: "Test Owner",
   expiresAt: invitation.expiresAt,
 });
@@ -77,7 +77,10 @@ const currentAccess = Schema.decodeUnknownSync(CurrentProjectAccess)({
   projectId,
   role: "owner",
   localeAccess: { mode: "all" },
-  allowedActions: ["project.read", "project.member.invite"],
+  baseRoleActions: ["project.read", "project.member.invite"],
+  effectiveProjectActions: ["project.read", "project.member.invite"],
+  effectiveLocaleIds: [],
+  effectiveLocaleActions: [],
 });
 const memberPage = ProjectMemberPage.make({ items: [member], nextCursor: null });
 const invitationPage = ProjectInvitationPage.make({ items: [invitation], nextCursor: null });
@@ -92,9 +95,7 @@ const AccessRepositoryTest = Layer.succeed(AccessRepository, {
   acceptInvitation: () => Effect.sync(() => (calls.push("acceptInvitation"), member)),
   revokeInvitation: () => Effect.sync(() => (calls.push("revokeInvitation"), invitation)),
   listMembers: () => Effect.sync(() => (calls.push("listMembers"), memberPage)),
-  updateMemberRole: () => Effect.sync(() => (calls.push("updateMemberRole"), member)),
-  updateMemberLocaleAccess: () =>
-    Effect.sync(() => (calls.push("updateMemberLocaleAccess"), member)),
+  updateMemberPolicy: () => Effect.sync(() => (calls.push("updateMemberPolicy"), member)),
   removeMember: () => Effect.sync(() => (calls.push("removeMember"), member)),
 });
 
@@ -124,6 +125,7 @@ describe("access operations", () => {
               projectId,
               email,
               role: "editor",
+              localeAccess: { mode: "all" },
             }),
             requestId,
           );
@@ -153,6 +155,7 @@ describe("access operations", () => {
           yield* revokeProjectInvitation(
             actor,
             yield* Schema.decodeUnknown(RevokeProjectInvitationInput)({
+              projectId,
               invitationId,
               version: 1,
             }),
@@ -166,27 +169,21 @@ describe("access operations", () => {
               limit: 20,
             }),
           );
-          yield* updateProjectMemberRole(
+          yield* updateProjectMemberPolicy(
             actor,
-            yield* Schema.decodeUnknown(UpdateProjectMemberRoleInput)({
+            yield* Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+              projectId,
               membershipId,
               version: 1,
               role: "developer",
-            }),
-            requestId,
-          );
-          yield* updateProjectMemberLocaleAccess(
-            actor,
-            yield* Schema.decodeUnknown(UpdateProjectMemberLocaleAccessInput)({
-              membershipId,
-              version: 1,
-              access: { mode: "none" },
+              localeAccess: { mode: "none" },
             }),
             requestId,
           );
           yield* removeProjectMember(
             actor,
             yield* Schema.decodeUnknown(RemoveProjectMemberInput)({
+              projectId,
               membershipId,
               version: 1,
             }),
@@ -201,8 +198,7 @@ describe("access operations", () => {
             "acceptInvitation",
             "revokeInvitation",
             "listMembers",
-            "updateMemberRole",
-            "updateMemberLocaleAccess",
+            "updateMemberPolicy",
             "removeMember",
           ]);
         }),

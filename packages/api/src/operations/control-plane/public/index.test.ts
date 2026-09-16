@@ -8,6 +8,9 @@ import {
   controlPlanePrincipalKey,
   controlPlaneRequestCosts,
   decodeControlPlaneCreateWorkspaceRequest,
+  decodeControlPlaneInvitationListInput,
+  decodeControlPlaneLocaleListInput,
+  decodeControlPlaneMemberListInput,
   decodeControlPlaneListProjectsInput,
   decodeControlPlaneListWorkspacesQuery,
 } from "./index";
@@ -33,6 +36,7 @@ describe("Control Plane public principal boundary", () => {
   it("uses the developer-approved weighted operation costs", () => {
     assert.deepEqual(controlPlaneRequestCosts, {
       read: 1,
+      list: 2,
       create: 5,
       update: 3,
       lifecycle: 5,
@@ -82,6 +86,21 @@ describe("Control Plane public principal boundary", () => {
     assert.deepEqual(controlPlaneBearerRequirements.putStudioRegistration.managementScopes, [
       "project.update",
     ]);
+    assert.deepEqual(controlPlaneBearerRequirements.listLocales.managementScopes, ["locale.read"]);
+    assert.deepEqual(controlPlaneBearerRequirements.listLocaleSettings.managementScopes, [
+      "locale.manage",
+    ]);
+    assert.deepEqual(controlPlaneBearerRequirements.manageLocales.managementScopes, [
+      "locale.manage",
+    ]);
+    assert.strictEqual(
+      controlPlaneBearerRequirements.listLocaleSettings.oauthScope,
+      "control-plane:governance:read",
+    );
+    assert.strictEqual(
+      controlPlaneBearerRequirements.manageLocales.oauthScope,
+      "control-plane:governance:write",
+    );
   });
 
   it.effect("decodes bounded page defaults and rejects ambiguous query authority", () =>
@@ -103,6 +122,35 @@ describe("Control Plane public principal boundary", () => {
       assert.strictEqual(duplicate._tag, "ValidationFailure");
       const unknown = yield* Effect.flip(decodeControlPlaneListWorkspacesQuery("token=secret"));
       assert.strictEqual(unknown._tag, "ValidationFailure");
+    }),
+  );
+
+  it.effect("normalizes closed governance list and locale projections", () =>
+    Effect.gen(function* () {
+      const projectId = "019fae8b-1234-7000-8000-000000000003";
+      const members = yield* decodeControlPlaneMemberListInput(
+        projectId,
+        "role=editor&search=%20CLIENT%20&limit=10",
+      );
+      const invitations = yield* decodeControlPlaneInvitationListInput(
+        projectId,
+        "status=pending&search=Invitee%40Example.test",
+      );
+      const locales = yield* decodeControlPlaneLocaleListInput(
+        projectId,
+        "view=settings&includeRemoved=true",
+      );
+      const invalidEffectiveRemoved = yield* Effect.exit(
+        decodeControlPlaneLocaleListInput(projectId, "includeRemoved=true"),
+      );
+
+      assert.strictEqual(members.search, "client");
+      assert.strictEqual(members.role, "editor");
+      assert.strictEqual(invitations.search, "invitee@example.test");
+      assert.strictEqual(invitations.status, "pending");
+      assert.strictEqual(locales.view, "settings");
+      assert.isTrue(locales.includeRemoved);
+      assert.strictEqual(invalidEffectiveRemoved._tag, "Failure");
     }),
   );
 

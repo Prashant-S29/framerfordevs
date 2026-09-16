@@ -77,6 +77,14 @@ describe("Control Plane HTTP boundary", () => {
         "/projects/project-id/environments/environment-id/studio-registration",
       ),
     ).toEqual({ operation: "studio_registration_put", costBucket: "5" });
+    expect(classifyControlPlaneRequest("GET", "/projects/project-id/members")).toEqual({
+      operation: "member_list",
+      costBucket: "2",
+    });
+    expect(classifyControlPlaneRequest("POST", "/invitations/accept")).toEqual({
+      operation: "invitation_accept",
+      costBucket: "5",
+    });
     expect(classifyControlPlaneRequest("DELETE", "/projects/project-id")).toBeNull();
   });
 

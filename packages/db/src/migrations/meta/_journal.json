@@ -113,6 +113,13 @@
       "when": 1788112052784,
       "tag": "0015_add_control_plane_bootstrap_authorities",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1789396462214,
+      "tag": "0016_add_governance_automation_authorities",
+      "breakpoints": true
     }
   ]
 }

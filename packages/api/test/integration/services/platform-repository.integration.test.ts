@@ -810,7 +810,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
             family: "management",
             name: "M14 Studio manager",
             keyPrefix: `ffd_mgmt_${studioCredentialId}`,
-            keyDigest: "c".repeat(64),
+            keyDigest: studioCredentialId.replaceAll("-", "").repeat(2),
             createdByUserId: firstUserId,
           });
           await transaction.insert(apiCredentialScope).values([

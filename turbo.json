@@ -28,6 +28,9 @@
     "test:accessibility": {
       "dependsOn": ["^test:accessibility"]
     },
+    "test:browser": {
+      "dependsOn": ["^test:browser"]
+    },
     "test:coverage": {
       "dependsOn": ["^test:coverage"],
       "outputs": ["coverage/**"]

@@ -14,6 +14,22 @@ import {
 import type { RateLimitDecision } from "@framerfordevs/api/contracts/rate-limit/index";
 import { selectCanonicalNetworkSource } from "@framerfordevs/api/lib/network-source/index";
 import {
+  acceptInvitation as acceptControlPlaneInvitation,
+  createInvitation as createControlPlaneInvitation,
+  createLocale as createControlPlaneLocale,
+  getGovernance as getControlPlaneGovernance,
+  inspectInvitation as inspectControlPlaneInvitation,
+  listInvitations as listControlPlaneInvitations,
+  listLocales as listControlPlaneLocales,
+  listMembers as listControlPlaneMembers,
+  removeMember as removeControlPlaneMember,
+  reorderLocales as reorderControlPlaneLocales,
+  revokeInvitation as revokeControlPlaneInvitation,
+  updateLocale as updateControlPlaneLocale,
+  updateLocaleStatus as updateControlPlaneLocaleStatus,
+  updateMemberPolicy as updateControlPlaneMemberPolicy,
+} from "@framerfordevs/api/operations/control-plane/governance/index";
+import {
   archiveProject as archiveControlPlaneProject,
   createProject as createControlPlaneProject,
   createWorkspace as createControlPlaneWorkspace,
@@ -34,15 +50,27 @@ import {
   controlPlanePrincipalActor,
   controlPlanePrincipalKey,
   controlPlaneRequestCosts,
+  decodeControlPlaneCreateInvitationInput,
+  decodeControlPlaneCreateLocaleInput,
   decodeControlPlaneCreateProjectInput,
   decodeControlPlaneCreateWorkspaceRequest,
   decodeControlPlaneEnableCapabilityInput,
+  decodeControlPlaneInvitationListInput,
+  decodeControlPlaneInvitationTokenInput,
+  decodeControlPlaneLocaleListInput,
+  decodeControlPlaneLocaleOrderInput,
+  decodeControlPlaneLocaleStatusInput,
+  decodeControlPlaneMemberListInput,
+  decodeControlPlaneMemberPolicyInput,
   decodeControlPlaneListProjectsInput,
   decodeControlPlaneListWorkspacesQuery,
   decodeControlPlaneProjectLifecycleInput,
   decodeControlPlaneProjectScope,
   decodeControlPlanePutStudioRegistrationInput,
+  decodeControlPlaneRemoveMemberInput,
+  decodeControlPlaneRevokeInvitationInput,
   decodeControlPlaneStudioRegistrationScope,
+  decodeControlPlaneUpdateLocaleInput,
   decodeControlPlaneUpdateProjectInput,
   decodeControlPlaneWorkspaceScope,
   evaluateControlPlaneGlobalRateLimit,
@@ -132,6 +160,48 @@ export function classifyControlPlaneRequest(
   }
   if (/^\/projects\/[^/]+\/capabilities\/cms$/u.test(path) && method === "PUT") {
     return { operation: "capability_enable", costBucket: "5" };
+  }
+  if (/^\/projects\/[^/]+\/governance$/u.test(path) && method === "GET") {
+    return { operation: "governance_get", costBucket: "1" };
+  }
+  if (/^\/projects\/[^/]+\/members$/u.test(path) && method === "GET") {
+    return { operation: "member_list", costBucket: "2" };
+  }
+  if (/^\/projects\/[^/]+\/members\/[^/]+\/policy$/u.test(path) && method === "PUT") {
+    return { operation: "member_policy_update", costBucket: "3" };
+  }
+  if (/^\/projects\/[^/]+\/members\/[^/]+\/remove$/u.test(path) && method === "POST") {
+    return { operation: "member_remove", costBucket: "5" };
+  }
+  if (/^\/projects\/[^/]+\/invitations$/u.test(path) && method === "GET") {
+    return { operation: "invitation_list", costBucket: "2" };
+  }
+  if (/^\/projects\/[^/]+\/invitations$/u.test(path) && method === "POST") {
+    return { operation: "invitation_create", costBucket: "5" };
+  }
+  if (/^\/projects\/[^/]+\/invitations\/[^/]+\/revoke$/u.test(path) && method === "POST") {
+    return { operation: "invitation_revoke", costBucket: "5" };
+  }
+  if (path === "/invitations/inspect" && method === "POST") {
+    return { operation: "invitation_inspect", costBucket: "1" };
+  }
+  if (path === "/invitations/accept" && method === "POST") {
+    return { operation: "invitation_accept", costBucket: "5" };
+  }
+  if (/^\/projects\/[^/]+\/locales$/u.test(path) && method === "GET") {
+    return { operation: "locale_list", costBucket: "1" };
+  }
+  if (/^\/projects\/[^/]+\/locales$/u.test(path) && method === "POST") {
+    return { operation: "locale_create", costBucket: "5" };
+  }
+  if (/^\/projects\/[^/]+\/locales\/order$/u.test(path) && method === "PUT") {
+    return { operation: "locale_reorder", costBucket: "3" };
+  }
+  if (/^\/projects\/[^/]+\/locales\/[^/]+$/u.test(path) && method === "PATCH") {
+    return { operation: "locale_update", costBucket: "3" };
+  }
+  if (/^\/projects\/[^/]+\/locales\/[^/]+\/status$/u.test(path) && method === "PUT") {
+    return { operation: "locale_status_update", costBucket: "3" };
   }
   if (
     /^\/projects\/[^/]+\/environments\/[^/]+\/studio-registration$/u.test(path) &&
@@ -269,6 +339,17 @@ function controlPlaneAllowedMethods(path: string): ReadonlyArray<string> | null 
   if (/^\/projects\/[^/]+\/(?:archive|restore)$/u.test(path)) return ["POST"];
   if (/^\/projects\/[^/]+\/capabilities$/u.test(path)) return ["GET"];
   if (/^\/projects\/[^/]+\/capabilities\/cms$/u.test(path)) return ["PUT"];
+  if (/^\/projects\/[^/]+\/governance$/u.test(path)) return ["GET"];
+  if (/^\/projects\/[^/]+\/members$/u.test(path)) return ["GET"];
+  if (/^\/projects\/[^/]+\/members\/[^/]+\/policy$/u.test(path)) return ["PUT"];
+  if (/^\/projects\/[^/]+\/members\/[^/]+\/remove$/u.test(path)) return ["POST"];
+  if (/^\/projects\/[^/]+\/invitations$/u.test(path)) return ["GET", "POST"];
+  if (/^\/projects\/[^/]+\/invitations\/[^/]+\/revoke$/u.test(path)) return ["POST"];
+  if (/^\/invitations\/(?:inspect|accept)$/u.test(path)) return ["POST"];
+  if (/^\/projects\/[^/]+\/locales$/u.test(path)) return ["GET", "POST"];
+  if (/^\/projects\/[^/]+\/locales\/order$/u.test(path)) return ["PUT"];
+  if (/^\/projects\/[^/]+\/locales\/[^/]+$/u.test(path)) return ["PATCH"];
+  if (/^\/projects\/[^/]+\/locales\/[^/]+\/status$/u.test(path)) return ["PUT"];
   if (/^\/projects\/[^/]+\/environments\/[^/]+\/studio-registration$/u.test(path)) {
     return ["GET", "PUT"];
   }
@@ -389,7 +470,9 @@ export function createControlPlaneRouter(
     }
     const listQuery =
       req.method === "GET" &&
-      (req.path === "/workspaces" || /^\/workspaces\/[^/]+\/projects$/u.test(req.path));
+      (req.path === "/workspaces" ||
+        /^\/workspaces\/[^/]+\/projects$/u.test(req.path) ||
+        /^\/projects\/[^/]+\/(?:members|invitations|locales)$/u.test(req.path));
     if (rawQuery !== "" && !listQuery) {
       sendControlPlaneResponse(
         req,
@@ -763,6 +846,431 @@ export function createControlPlaneRouter(
         context.request.requestId,
       ),
       "Control Plane capability enabled.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.get("/projects/:projectId/governance", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.getGovernance,
+      controlPlaneRequestCosts.read,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.governance.get.path",
+      decodeControlPlaneProjectScope(routeParameter(req, "projectId")),
+      "Control Plane governance path decoded.",
+    );
+    const input = controlPlaneStepData(req, res, decoded);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.governance.get",
+      getControlPlaneGovernance(controlPlanePrincipalActor(principal), input),
+      "Control Plane governance loaded.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.get("/projects/:projectId/members", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.listMembers,
+      controlPlaneRequestCosts.list,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.member.list.input",
+      decodeControlPlaneMemberListInput(
+        routeParameter(req, "projectId"),
+        req.originalUrl.split("?", 2)[1] ?? "",
+      ),
+      "Control Plane member list input decoded.",
+    );
+    const input = controlPlaneStepData(req, res, decoded);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.member.list",
+      listControlPlaneMembers(
+        controlPlanePrincipalActor(principal),
+        controlPlanePrincipalKey(principal),
+        input,
+      ),
+      "Control Plane members loaded.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.put("/projects/:projectId/members/:membershipId/policy", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.updateMemberPolicy,
+      controlPlaneRequestCosts.update,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.member.policy.input",
+      decodeControlPlaneMemberPolicyInput(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "membershipId"),
+        req.body,
+      ),
+      "Control Plane member policy input decoded.",
+    );
+    const input = controlPlaneStepData(req, res, decoded);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.member.policy.update",
+      updateControlPlaneMemberPolicy(
+        controlPlanePrincipalActor(principal),
+        input,
+        context.request.requestId,
+      ),
+      "Control Plane member policy updated.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.post("/projects/:projectId/members/:membershipId/remove", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.removeMember,
+      controlPlaneRequestCosts.lifecycle,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.member.remove.input",
+      decodeControlPlaneRemoveMemberInput(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "membershipId"),
+        req.body,
+      ),
+      "Control Plane member removal input decoded.",
+    );
+    const input = controlPlaneStepData(req, res, decoded);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.member.remove",
+      removeControlPlaneMember(
+        controlPlanePrincipalActor(principal),
+        input,
+        context.request.requestId,
+      ),
+      "Control Plane member removed.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.get("/projects/:projectId/invitations", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.listInvitations,
+      controlPlaneRequestCosts.list,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.invitation.list.input",
+      decodeControlPlaneInvitationListInput(
+        routeParameter(req, "projectId"),
+        req.originalUrl.split("?", 2)[1] ?? "",
+      ),
+      "Control Plane invitation list input decoded.",
+    );
+    const input = controlPlaneStepData(req, res, decoded);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.invitation.list",
+      listControlPlaneInvitations(
+        controlPlanePrincipalActor(principal),
+        controlPlanePrincipalKey(principal),
+        input,
+      ),
+      "Control Plane invitations loaded.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.post("/projects/:projectId/invitations", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.createInvitation,
+      controlPlaneRequestCosts.create,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.invitation.create.input",
+      decodeControlPlaneCreateInvitationInput(routeParameter(req, "projectId"), req.body),
+      "Control Plane invitation create input decoded.",
+    );
+    const input = controlPlaneStepData(req, res, decoded);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.invitation.create",
+      createControlPlaneInvitation(
+        controlPlanePrincipalActor(principal),
+        input,
+        context.request.requestId,
+      ),
+      "Control Plane invitation created.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.post("/projects/:projectId/invitations/:invitationId/revoke", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.revokeInvitation,
+      controlPlaneRequestCosts.lifecycle,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.invitation.revoke.input",
+      decodeControlPlaneRevokeInvitationInput(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "invitationId"),
+        req.body,
+      ),
+      "Control Plane invitation revoke input decoded.",
+    );
+    const input = controlPlaneStepData(req, res, decoded);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.invitation.revoke",
+      revokeControlPlaneInvitation(
+        controlPlanePrincipalActor(principal),
+        input,
+        context.request.requestId,
+      ),
+      "Control Plane invitation revoked.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.post("/invitations/inspect", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.inspectInvitation,
+      controlPlaneRequestCosts.read,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.invitation.inspect.input",
+      decodeControlPlaneInvitationTokenInput(req.body),
+      "Control Plane invitation inspect input decoded.",
+    );
+    const input = controlPlaneStepData(req, res, decoded);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.invitation.inspect",
+      inspectControlPlaneInvitation(controlPlanePrincipalActor(principal), input),
+      "Control Plane invitation inspected.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.post("/invitations/accept", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.acceptInvitation,
+      controlPlaneRequestCosts.create,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.invitation.accept.input",
+      decodeControlPlaneInvitationTokenInput(req.body),
+      "Control Plane invitation accept input decoded.",
+    );
+    const input = controlPlaneStepData(req, res, decoded);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.invitation.accept",
+      acceptControlPlaneInvitation(
+        controlPlanePrincipalActor(principal),
+        input,
+        context.request.requestId,
+      ),
+      "Control Plane invitation accepted.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.get("/projects/:projectId/locales", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const rawQuery = req.originalUrl.split("?", 2)[1] ?? "";
+    const settingsView = new URLSearchParams(rawQuery).get("view") === "settings";
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      settingsView
+        ? controlPlaneBearerRequirements.listLocaleSettings
+        : controlPlaneBearerRequirements.listLocales,
+      controlPlaneRequestCosts.read,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.locale.list.input",
+      decodeControlPlaneLocaleListInput(routeParameter(req, "projectId"), rawQuery),
+      "Control Plane locale list input decoded.",
+    );
+    const input = controlPlaneStepData(req, res, decoded);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.locale.list",
+      listControlPlaneLocales(controlPlanePrincipalActor(principal), input),
+      "Control Plane locales loaded.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.post("/projects/:projectId/locales", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.manageLocales,
+      controlPlaneRequestCosts.create,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.locale.create.input",
+      decodeControlPlaneCreateLocaleInput(routeParameter(req, "projectId"), req.body),
+      "Control Plane locale create input decoded.",
+    );
+    const data = controlPlaneStepData(req, res, decoded);
+    if (data === null) return;
+    const result = await context.execute(
+      "api.control-plane.locale.create",
+      createControlPlaneLocale(
+        controlPlanePrincipalActor(principal),
+        data.input,
+        data.commandId,
+        context.request.requestId,
+      ),
+      "Control Plane locale created.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.patch("/projects/:projectId/locales/:localeId", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.manageLocales,
+      controlPlaneRequestCosts.update,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.locale.update.input",
+      decodeControlPlaneUpdateLocaleInput(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "localeId"),
+        req.body,
+      ),
+      "Control Plane locale update input decoded.",
+    );
+    const input = controlPlaneStepData(req, res, decoded);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.locale.update",
+      updateControlPlaneLocale(
+        controlPlanePrincipalActor(principal),
+        input,
+        context.request.requestId,
+      ),
+      "Control Plane locale updated.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.put("/projects/:projectId/locales/order", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.manageLocales,
+      controlPlaneRequestCosts.update,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.locale.reorder.input",
+      decodeControlPlaneLocaleOrderInput(routeParameter(req, "projectId"), req.body),
+      "Control Plane locale order input decoded.",
+    );
+    const input = controlPlaneStepData(req, res, decoded);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.locale.reorder",
+      reorderControlPlaneLocales(
+        controlPlanePrincipalActor(principal),
+        input,
+        context.request.requestId,
+      ),
+      "Control Plane locales reordered.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.put("/projects/:projectId/locales/:localeId/status", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.manageLocales,
+      controlPlaneRequestCosts.update,
+    );
+    if (principal === undefined) return;
+    const decoded = await context.execute(
+      "api.control-plane.locale.status.input",
+      decodeControlPlaneLocaleStatusInput(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "localeId"),
+        req.body,
+      ),
+      "Control Plane locale status input decoded.",
+    );
+    const input = controlPlaneStepData(req, res, decoded);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.locale.status.update",
+      updateControlPlaneLocaleStatus(
+        controlPlanePrincipalActor(principal),
+        input,
+        context.request.requestId,
+      ),
+      "Control Plane locale status updated.",
     );
     sendControlPlaneResponse(req, res, result.status, result.response);
   });

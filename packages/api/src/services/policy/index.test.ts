@@ -1,18 +1,28 @@
-import { assert, describe, layer } from "@effect/vitest";
-import { Effect } from "effect";
+import { assert, describe, it, layer } from "@effect/vitest";
+import { Effect, Schema } from "effect";
 
 import {
   credentialScopeValues,
   projectPermissionActionValues,
   projectRoleValues,
 } from "../../contracts/access";
-import { PolicyService, PolicyServiceLive } from "./index";
+import { ProjectLocaleId } from "../../contracts/locale";
+import {
+  PolicyService,
+  PolicyServiceLive,
+  fixedProjectRolePolicies,
+  projectPolicyProjection,
+} from "./index";
 
 const workspaceId = "019fae8b-1234-7000-8000-000000000001";
 const projectId = "019fae8b-1234-7000-8000-000000000002";
 const environmentId = "019fae8b-1234-7000-8000-000000000003";
 const localeId = "019fae8b-1234-7000-8000-000000000004";
 const otherLocaleId = "019fae8b-1234-7000-8000-000000000005";
+const disabledLocaleId = "019fae8b-1234-7000-8000-000000000006";
+const projectLocaleId = Schema.decodeUnknownSync(ProjectLocaleId)(localeId);
+const otherProjectLocaleId = Schema.decodeUnknownSync(ProjectLocaleId)(otherLocaleId);
+const disabledProjectLocaleId = Schema.decodeUnknownSync(ProjectLocaleId)(disabledLocaleId);
 
 const expectedAllowedActions = {
   owner: new Set(projectPermissionActionValues),
@@ -377,5 +387,90 @@ describe("PolicyService", () => {
         }
       }),
     );
+  });
+
+  it("keeps canonical role order and base actions in the fixed registry", () => {
+    assert.deepEqual(
+      fixedProjectRolePolicies.map((policy) => policy.role),
+      [...projectRoleValues],
+    );
+    for (const policy of fixedProjectRolePolicies) {
+      assert.deepEqual(new Set(policy.baseRoleActions), expectedAllowedActions[policy.role]);
+      assert.strictEqual(policy.requiresAllLocaleAccess, policy.role === "owner");
+    }
+  });
+
+  it("derives restricted developer projection from the canonical policy kernel", () => {
+    const projection = projectPolicyProjection({
+      role: "developer",
+      localeAccess: {
+        mode: "selected",
+        localeIds: [projectLocaleId, disabledProjectLocaleId],
+      },
+      enabledLocaleIds: [projectLocaleId, otherProjectLocaleId],
+    });
+
+    assert.includeMembers(projection.baseRoleActions, [
+      "schema.write",
+      "schema.publish",
+      "delivery.configure",
+      "webhook.read",
+      "webhook.manage",
+      "content.write",
+      "project.credential.revoke",
+    ]);
+    assert.notIncludeMembers(projection.effectiveProjectActions, [
+      "schema.write",
+      "schema.publish",
+      "delivery.configure",
+      "webhook.read",
+      "webhook.manage",
+      "content.read",
+      "content.write",
+      "content.review",
+      "content.publish",
+    ]);
+    assert.includeMembers(projection.effectiveProjectActions, [
+      "project.read",
+      "locale.read",
+      "project.credential.revoke",
+    ]);
+    assert.deepEqual(projection.configuredLocaleIds, [projectLocaleId, disabledProjectLocaleId]);
+    assert.deepEqual(projection.effectiveLocaleIds, [projectLocaleId]);
+    assert.deepEqual(projection.effectiveLocaleActions, [
+      "content.read",
+      "content.write",
+      "content.review",
+      "content.publish",
+    ]);
+  });
+
+  it("keeps configured grants while suspending unavailable or denied locale authority", () => {
+    const selectedUnavailable = projectPolicyProjection({
+      role: "editor",
+      localeAccess: { mode: "selected", localeIds: [disabledProjectLocaleId] },
+      enabledLocaleIds: [projectLocaleId],
+    });
+    const none = projectPolicyProjection({
+      role: "developer",
+      localeAccess: { mode: "none" },
+      enabledLocaleIds: [projectLocaleId],
+    });
+    const all = projectPolicyProjection({
+      role: "editor",
+      localeAccess: { mode: "all" },
+      enabledLocaleIds: [projectLocaleId, otherProjectLocaleId, projectLocaleId],
+    });
+
+    assert.deepEqual(selectedUnavailable.configuredLocaleIds, [disabledProjectLocaleId]);
+    assert.deepEqual(selectedUnavailable.effectiveLocaleIds, []);
+    assert.deepEqual(selectedUnavailable.effectiveLocaleActions, []);
+    assert.deepEqual(none.configuredLocaleIds, []);
+    assert.deepEqual(none.effectiveLocaleIds, []);
+    assert.deepEqual(none.effectiveLocaleActions, []);
+    assert.deepEqual(all.effectiveLocaleIds, [projectLocaleId, otherProjectLocaleId]);
+    assert.deepEqual(all.effectiveLocaleActions, ["content.read", "content.write"]);
+    assert.notInclude(all.effectiveProjectActions, "content.read");
+    assert.notInclude(all.effectiveProjectActions, "content.write");
   });
 });

@@ -211,7 +211,10 @@ export function EntryEditor({
               locale={localeTag}
               definition={definition.data.data}
               draft={draftData}
-              canPublish={access.data.data.allowedActions.includes("content.publish")}
+              canPublish={
+                access.data.data.effectiveLocaleIds.includes(selectedLocale.id) &&
+                access.data.data.effectiveLocaleActions.includes("content.publish")
+              }
               onDirtyChange={setHasUnsavedChanges}
               onAuthoritativeReload={async () => {
                 await draft.refetch();

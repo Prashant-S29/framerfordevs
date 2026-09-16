@@ -1,6 +1,8 @@
 import { assert, describe, it } from "@effect/vitest";
 import {
   CLI_API_OAUTH_SCOPES,
+  CONTROL_PLANE_GOVERNANCE_READ_SCOPE,
+  CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE,
   CONTROL_PLANE_PROJECT_LIFECYCLE_SCOPE,
   CONTROL_PLANE_READ_SCOPE,
   CONTROL_PLANE_WRITE_SCOPE,
@@ -10,10 +12,16 @@ import { Effect, Exit, Schema } from "effect";
 import { CredentialScope } from "../access";
 
 describe("Control Plane OAuth grants", () => {
-  it("registers the three narrow grants on the fixed CLI OAuth authority", () => {
+  it("registers the five narrow grants on the fixed CLI OAuth authority", () => {
     assert.includeMembers(
       [...CLI_API_OAUTH_SCOPES],
-      [CONTROL_PLANE_READ_SCOPE, CONTROL_PLANE_WRITE_SCOPE, CONTROL_PLANE_PROJECT_LIFECYCLE_SCOPE],
+      [
+        CONTROL_PLANE_READ_SCOPE,
+        CONTROL_PLANE_WRITE_SCOPE,
+        CONTROL_PLANE_PROJECT_LIFECYCLE_SCOPE,
+        CONTROL_PLANE_GOVERNANCE_READ_SCOPE,
+        CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE,
+      ],
     );
     assert.strictEqual(new Set(CLI_API_OAUTH_SCOPES).size, CLI_API_OAUTH_SCOPES.length);
   });

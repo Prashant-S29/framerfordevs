@@ -8,8 +8,7 @@ import {
 import { projectMembershipLocaleAccess } from "@framerfordevs/db/schema/locale";
 import { environment, project, workspaceMembership } from "@framerfordevs/db/schema/platform";
 
-import type { ProjectPermissionAction } from "../contracts/access";
-import type { CmsActor } from "../contracts/authoring";
+import type { ProjectActor, ProjectPermissionAction } from "../contracts/access";
 import type { AuthUserId } from "../contracts/platform";
 import { decideCredentialPolicy, decideUserPolicy } from "./policy";
 
@@ -125,7 +124,7 @@ export interface ActorProjectAuthorizationOptions {
 /** Authorizes the shared user/credential actor while preserving exact credential environment scope. */
 export async function authorizeProjectActor(
   executor: ApplicationExecutor,
-  actor: CmsActor,
+  actor: ProjectActor,
   projectId: string,
   action: ProjectPermissionAction,
   requestedLocaleId: string | null = null,
@@ -240,7 +239,7 @@ export async function authorizeProjectActor(
 
 export function authorizeCmsActorProject(
   executor: ApplicationExecutor,
-  actor: CmsActor,
+  actor: ProjectActor,
   projectId: string,
   environmentId: string,
   action: ProjectPermissionAction,

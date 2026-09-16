@@ -58,18 +58,18 @@ function ProjectDetail() {
 
   const project = projectQuery.data.data;
   const access = accessQuery.data.data;
-  const allowedActions = new Set(access.allowedActions);
+  const effectiveProjectActions = new Set(access.effectiveProjectActions);
   const cms = project.capabilities.find((capability) => capability.key === "cms");
   const isArchived = project.archivedAt !== null;
-  const canUpdate = allowedActions.has("project.update");
-  const canArchive = allowedActions.has("project.archive");
-  const canRestore = allowedActions.has("project.restore");
-  const canManageCapability = allowedActions.has("project.capability.manage");
-  const canReadLocales = allowedActions.has("locale.read");
-  const canManageLocales = allowedActions.has("locale.manage");
-  const canReadSchemas = allowedActions.has("schema.read");
-  const canWriteSchemas = allowedActions.has("schema.write");
-  const canReadWebhooks = allowedActions.has("webhook.read") && access.localeAccess.mode === "all";
+  const canUpdate = effectiveProjectActions.has("project.update");
+  const canArchive = effectiveProjectActions.has("project.archive");
+  const canRestore = effectiveProjectActions.has("project.restore");
+  const canManageCapability = effectiveProjectActions.has("project.capability.manage");
+  const canReadLocales = effectiveProjectActions.has("locale.read");
+  const canManageLocales = effectiveProjectActions.has("locale.manage");
+  const canReadSchemas = effectiveProjectActions.has("schema.read");
+  const canWriteSchemas = effectiveProjectActions.has("schema.write");
+  const canReadWebhooks = effectiveProjectActions.has("webhook.read");
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">
@@ -222,7 +222,7 @@ function ProjectDetail() {
         environmentId={project.environment.id}
         role={access.role}
         localeAccessMode={access.localeAccess.mode}
-        allowedActions={access.allowedActions}
+        effectiveProjectActions={access.effectiveProjectActions}
       />
 
       <Card>

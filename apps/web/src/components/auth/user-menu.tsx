@@ -23,7 +23,11 @@ export default function UserMenu() {
 
   if (!session) {
     return (
-      <Button variant="outline" render={<Link to="/login" search={{ returnTo: undefined }} />}>
+      <Button
+        variant="outline"
+        nativeButton={false}
+        render={<Link to="/login" search={{ returnTo: undefined }} />}
+      >
         Sign in
       </Button>
     );

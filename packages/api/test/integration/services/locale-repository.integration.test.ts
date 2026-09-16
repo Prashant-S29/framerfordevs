@@ -2,9 +2,14 @@ import { randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, it } from "@effect/vitest";
 import { db } from "@framerfordevs/db";
-import { eq, or, sql } from "@framerfordevs/db/query";
-import { projectMembership } from "@framerfordevs/db/schema/access";
+import { and, eq, or, sql } from "@framerfordevs/db/query";
+import {
+  apiCredential,
+  apiCredentialScope,
+  projectMembership,
+} from "@framerfordevs/db/schema/access";
 import { user } from "@framerfordevs/db/schema/auth";
+import { controlPlaneCommandReceipt } from "@framerfordevs/db/schema/control-plane";
 import { projectLocale, projectMembershipLocaleAccess } from "@framerfordevs/db/schema/locale";
 import {
   auditEvent,
@@ -17,9 +22,11 @@ import { Cause, Effect, Exit, Option, Schema } from "effect";
 
 import {
   ListProjectMembersInput,
-  UpdateProjectMemberLocaleAccessInput,
+  ProjectActor,
+  UpdateProjectMemberPolicyInput,
   type ProjectMember,
 } from "../../../src/contracts/access";
+import { ControlPlaneCommandId } from "../../../src/contracts/control-plane";
 import {
   CreateProjectLocaleInput,
   ListProjectLocalesInput,
@@ -43,9 +50,21 @@ const suffix = randomUUID();
 const ownerId = `m4-locale-owner-${suffix}`;
 const developerId = `m4-locale-developer-${suffix}`;
 const foreignId = `m4-locale-foreign-${suffix}`;
+const credentialId = randomUUID();
+const secondaryEnvironmentId = randomUUID();
+const wrongEnvironmentCredentialId = randomUUID();
 const ownerActor = Schema.decodeUnknownSync(AuthUserId)(ownerId);
 const developerActor = Schema.decodeUnknownSync(AuthUserId)(developerId);
 const foreignActor = Schema.decodeUnknownSync(AuthUserId)(foreignId);
+const credentialActor = Schema.decodeUnknownSync(ProjectActor)({
+  kind: "credential",
+  id: credentialId,
+});
+const wrongEnvironmentCredentialActor = Schema.decodeUnknownSync(ProjectActor)({
+  kind: "credential",
+  id: wrongEnvironmentCredentialId,
+});
+const localeCreateCommandId = Schema.decodeUnknownSync(ControlPlaneCommandId)(randomUUID());
 const platform = makePlatformRepository();
 const locales = makeLocaleRepository();
 const access = makeAccessRepository();
@@ -148,6 +167,68 @@ beforeAll(async () => {
     })
     .returning();
   if (!membership) throw new Error("Developer membership was not created.");
+  const currentProject = required(projectModel, "project");
+  await db.insert(apiCredential).values({
+    id: credentialId,
+    workspaceId: currentProject.workspaceId,
+    projectId: currentProject.id,
+    environmentId: currentProject.environment.id,
+    family: "management",
+    name: "M15 locale credential",
+    keyPrefix: `ffd_mgmt_${credentialId}`,
+    keyDigest: credentialId.replaceAll("-", "").repeat(2),
+    createdByUserId: ownerId,
+  });
+  await db.insert(environment).values({
+    id: secondaryEnvironmentId,
+    workspaceId: currentProject.workspaceId,
+    projectId: currentProject.id,
+    key: "secondary",
+    name: "Secondary",
+    isPrimary: false,
+    createdByUserId: ownerId,
+  });
+  await db.insert(apiCredential).values({
+    id: wrongEnvironmentCredentialId,
+    workspaceId: currentProject.workspaceId,
+    projectId: currentProject.id,
+    environmentId: secondaryEnvironmentId,
+    family: "management",
+    name: "Wrong environment locale credential",
+    keyPrefix: `ffd_mgmt_${wrongEnvironmentCredentialId}`,
+    keyDigest: wrongEnvironmentCredentialId.replaceAll("-", "").repeat(2),
+    createdByUserId: ownerId,
+  });
+  await db.insert(apiCredentialScope).values([
+    {
+      credentialId,
+      workspaceId: currentProject.workspaceId,
+      projectId: currentProject.id,
+      environmentId: currentProject.environment.id,
+      scope: "locale.read",
+    },
+    {
+      credentialId,
+      workspaceId: currentProject.workspaceId,
+      projectId: currentProject.id,
+      environmentId: currentProject.environment.id,
+      scope: "locale.manage",
+    },
+    {
+      credentialId: wrongEnvironmentCredentialId,
+      workspaceId: currentProject.workspaceId,
+      projectId: currentProject.id,
+      environmentId: secondaryEnvironmentId,
+      scope: "locale.read",
+    },
+    {
+      credentialId: wrongEnvironmentCredentialId,
+      workspaceId: currentProject.workspaceId,
+      projectId: currentProject.id,
+      environmentId: secondaryEnvironmentId,
+      scope: "locale.manage",
+    },
+  ]);
   developerMember = await Effect.runPromise(
     access.listMembers(
       ownerActor,
@@ -164,7 +245,15 @@ afterAll(async () => {
   const actorIds = [ownerId, developerId, foreignId];
   await db
     .delete(auditEvent)
-    .where(or(...actorIds.map((actorId) => eq(auditEvent.actorId, actorId))));
+    .where(
+      or(
+        ...actorIds.map((actorId) => eq(auditEvent.actorId, actorId)),
+        eq(auditEvent.actorId, credentialId),
+      ),
+    );
+  await db
+    .delete(controlPlaneCommandReceipt)
+    .where(eq(controlPlaneCommandReceipt.actorId, credentialId));
   const membershipRows = await db
     .select({ id: projectMembership.id })
     .from(projectMembership)
@@ -178,7 +267,25 @@ afterAll(async () => {
   }
   await db
     .delete(projectLocale)
-    .where(or(...actorIds.map((actorId) => eq(projectLocale.createdByUserId, actorId))));
+    .where(
+      or(
+        ...actorIds.map((actorId) => eq(projectLocale.createdByUserId, actorId)),
+        eq(projectLocale.createdByCredentialId, credentialId),
+      ),
+    );
+  await db
+    .delete(apiCredentialScope)
+    .where(
+      or(
+        eq(apiCredentialScope.credentialId, credentialId),
+        eq(apiCredentialScope.credentialId, wrongEnvironmentCredentialId),
+      ),
+    );
+  await db
+    .delete(apiCredential)
+    .where(
+      or(eq(apiCredential.id, credentialId), eq(apiCredential.id, wrongEnvironmentCredentialId)),
+    );
   await db
     .delete(environment)
     .where(or(...actorIds.map((actorId) => eq(environment.createdByUserId, actorId))));
@@ -257,10 +364,12 @@ describe.sequential("locale repository PostgreSQL integration", () => {
 
   it.effect("updates display names optimistically without no-op audit noise", () =>
     Effect.gen(function* () {
+      const currentProject = required(projectModel, "project");
       const currentHindi = required(hindi, "Hindi locale");
       const updated = yield* locales.updateDisplayName(
         ownerActor,
         yield* Schema.decodeUnknown(UpdateProjectLocaleDisplayNameInput)({
+          projectId: currentProject.id,
           localeId: currentHindi.id,
           version: currentHindi.version,
           displayName: "हिन्दी",
@@ -271,6 +380,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       const noOp = yield* locales.updateDisplayName(
         ownerActor,
         yield* Schema.decodeUnknown(UpdateProjectLocaleDisplayNameInput)({
+          projectId: currentProject.id,
           localeId: updated.id,
           version: updated.version,
           displayName: updated.displayName,
@@ -282,6 +392,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
         locales.updateDisplayName(
           ownerActor,
           yield* Schema.decodeUnknown(UpdateProjectLocaleDisplayNameInput)({
+            projectId: currentProject.id,
             localeId: updated.id,
             version: currentHindi.version,
             displayName: "Stale",
@@ -380,6 +491,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
           locales.updateStatus(
             ownerActor,
             yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+              projectId: currentProject.id,
               localeId: required(english, "English locale").id,
               version: required(english, "English locale").version,
               status: "disabled",
@@ -395,6 +507,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
         const removed = yield* locales.updateStatus(
           ownerActor,
           yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+            projectId: currentProject.id,
             localeId: currentGujarati.id,
             version: currentGujarati.version,
             status: "removed",
@@ -406,6 +519,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
         const restored = yield* locales.updateStatus(
           ownerActor,
           yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+            projectId: currentProject.id,
             localeId: removed.id,
             version: removed.version,
             status: "enabled",
@@ -432,12 +546,14 @@ describe.sequential("locale repository PostgreSQL integration", () => {
         const currentProject = required(projectModel, "project");
         const currentMember = required(developerMember, "developer member");
         const currentHindi = required(hindi, "Hindi locale");
-        developerMember = yield* access.updateMemberLocaleAccess(
+        developerMember = yield* access.updateMemberPolicy(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateProjectMemberLocaleAccessInput)({
+          yield* Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+            projectId: currentProject.id,
             membershipId: currentMember.id,
             version: currentMember.version,
-            access: { mode: "selected", localeIds: [currentHindi.id] },
+            role: currentMember.role,
+            localeAccess: { mode: "selected", localeIds: [currentHindi.id] },
           }),
           new Date(),
           "request-m4-member-hi",
@@ -480,6 +596,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
         const disabled = yield* locales.updateStatus(
           ownerActor,
           yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+            projectId: currentProject.id,
             localeId: currentHindi.id,
             version: currentHindi.version,
             status: "disabled",
@@ -513,6 +630,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
         hindi = yield* locales.updateStatus(
           ownerActor,
           yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+            projectId: currentProject.id,
             localeId: disabled.id,
             version: disabled.version,
             status: "enabled",
@@ -617,6 +735,122 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       );
       assert.include(plans, "project_locale_project_active_position_id_idx");
       assert.include(plans, "project_locale_project_tag_ci_unique");
+    }),
+  );
+
+  it.effect("denies management credentials outside the current primary environment", () =>
+    Effect.gen(function* () {
+      const currentProject = required(projectModel, "project");
+      const list = yield* Effect.exit(
+        locales.listLocales(
+          wrongEnvironmentCredentialActor,
+          yield* Schema.decodeUnknown(ListProjectLocalesInput)({
+            projectId: currentProject.id,
+            view: "settings",
+            includeRemoved: true,
+          }),
+        ),
+      );
+      const create = yield* Effect.exit(
+        locales.createLocale(
+          wrongEnvironmentCredentialActor,
+          yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+            projectId: currentProject.id,
+            tag: "de",
+            displayName: "German",
+          }),
+          new Date(),
+          "request-m15-wrong-environment",
+        ),
+      );
+
+      assert.strictEqual(failureTag(list), "NotFoundFailure");
+      assert.strictEqual(failureTag(create), "NotFoundFailure");
+    }),
+  );
+
+  it.effect("attributes management-credential locale mutations to the exact credential", () =>
+    Effect.gen(function* () {
+      const currentProject = required(projectModel, "project");
+      const createInput = yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+        projectId: currentProject.id,
+        tag: "es",
+        displayName: "Spanish",
+      });
+      const [created, replayed] = yield* Effect.all(
+        [
+          locales.createLocale(
+            credentialActor,
+            createInput,
+            new Date(),
+            "request-m15-credential-create",
+            localeCreateCommandId,
+          ),
+          locales.createLocale(
+            credentialActor,
+            createInput,
+            new Date(),
+            "request-m15-credential-create-replay",
+            localeCreateCommandId,
+          ),
+        ],
+        { concurrency: 2 },
+      );
+      const conflict = yield* Effect.exit(
+        locales.createLocale(
+          credentialActor,
+          yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+            projectId: currentProject.id,
+            tag: "es-MX",
+            displayName: "Spanish (Mexico)",
+          }),
+          new Date(),
+          "request-m15-credential-create-conflict",
+          localeCreateCommandId,
+        ),
+      );
+      const updated = yield* locales.updateDisplayName(
+        credentialActor,
+        yield* Schema.decodeUnknown(UpdateProjectLocaleDisplayNameInput)({
+          projectId: currentProject.id,
+          localeId: created.id,
+          version: created.version,
+          displayName: "Spanish (Spain)",
+        }),
+        new Date(),
+        "request-m15-credential-update",
+      );
+      const [row] = yield* Effect.promise(() =>
+        db.select().from(projectLocale).where(eq(projectLocale.id, created.id)).limit(1),
+      );
+      const audits = yield* Effect.promise(() =>
+        db
+          .select()
+          .from(auditEvent)
+          .where(
+            and(
+              eq(auditEvent.resourceId, created.id),
+              or(
+                eq(auditEvent.action, "project.locale.created"),
+                eq(auditEvent.action, "project.locale.display_name.updated"),
+              ),
+            ),
+          ),
+      );
+
+      assert.strictEqual(replayed.id, created.id);
+      assert.strictEqual(failureTag(conflict), "ControlPlaneCommandConflictFailure");
+      assert.strictEqual(updated.displayName, "Spanish (Spain)");
+      assert.isNull(row?.createdByUserId ?? null);
+      assert.strictEqual(row?.createdByCredentialId, credentialId);
+      assert.strictEqual(row?.createdByCredentialEnvironmentId, currentProject.environment.id);
+      assert.isNull(row?.changedByUserId ?? null);
+      assert.strictEqual(row?.changedByCredentialId, credentialId);
+      assert.strictEqual(row?.changedByCredentialEnvironmentId, currentProject.environment.id);
+      assert.strictEqual(audits.length, 2);
+      assert.isTrue(
+        audits.every((audit) => audit.actorType === "credential" && audit.actorId === credentialId),
+      );
     }),
   );
 

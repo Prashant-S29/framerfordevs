@@ -14,7 +14,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { projectMembership } from "./access";
+import { apiCredential, projectInvitation, projectMembership } from "./access";
 import { user } from "./auth";
 import { project } from "./platform";
 
@@ -35,12 +35,16 @@ export const projectLocale = pgTable(
     status: varchar("status", { length: 16 }).default("enabled").notNull(),
     position: integer("position"),
     version: integer("version").default(1).notNull(),
-    createdByUserId: text("created_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
-    changedByUserId: text("changed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    createdByCredentialId: uuid("created_by_credential_id"),
+    createdByCredentialEnvironmentId: uuid("created_by_credential_environment_id"),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
+    changedByCredentialEnvironmentId: uuid("changed_by_credential_environment_id"),
     createdAt: localeTimestamp("created_at").defaultNow().notNull(),
     updatedAt: localeTimestamp("updated_at").defaultNow().notNull(),
   },
@@ -49,6 +53,36 @@ export const projectLocale = pgTable(
       name: "project_locale_project_workspace_fk",
       columns: [table.projectId, table.workspaceId],
       foreignColumns: [project.id, project.workspaceId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "project_locale_created_credential_tenant_fk",
+      columns: [
+        table.createdByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.createdByCredentialEnvironmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "project_locale_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.changedByCredentialEnvironmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
     }).onDelete("restrict"),
     unique("project_locale_id_project_workspace_unique").on(
       table.id,
@@ -62,6 +96,14 @@ export const projectLocale = pgTable(
     uniqueIndex("project_locale_project_position_unique")
       .on(table.projectId, table.position)
       .where(sql`${table.position} is not null`),
+    check(
+      "project_locale_created_actor_exactly_one",
+      sql`(${table.createdByUserId} is not null and ${table.createdByCredentialId} is null and ${table.createdByCredentialEnvironmentId} is null) or (${table.createdByUserId} is null and ${table.createdByCredentialId} is not null and ${table.createdByCredentialEnvironmentId} is not null)`,
+    ),
+    check(
+      "project_locale_changed_actor_exactly_one",
+      sql`(${table.changedByUserId} is not null and ${table.changedByCredentialId} is null and ${table.changedByCredentialEnvironmentId} is null) or (${table.changedByUserId} is null and ${table.changedByCredentialId} is not null and ${table.changedByCredentialEnvironmentId} is not null)`,
+    ),
     check(
       "project_locale_tag_valid",
       sql`char_length(${table.tag}) between 1 and 64 and ${table.tag} = btrim(${table.tag}) and ${table.tag} ~ '^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$'`,
@@ -86,8 +128,18 @@ export const projectLocale = pgTable(
     index("project_locale_project_active_position_id_idx")
       .on(table.projectId, table.position, table.id)
       .where(sql`${table.status} <> 'removed'`),
-    index("project_locale_created_by_user_idx").on(table.createdByUserId),
-    index("project_locale_changed_by_user_idx").on(table.changedByUserId),
+    index("project_locale_created_by_user_idx")
+      .on(table.createdByUserId)
+      .where(sql`${table.createdByUserId} is not null`),
+    index("project_locale_changed_by_user_idx")
+      .on(table.changedByUserId)
+      .where(sql`${table.changedByUserId} is not null`),
+    index("project_locale_created_by_credential_idx")
+      .on(table.createdByCredentialId, table.createdByCredentialEnvironmentId)
+      .where(sql`${table.createdByCredentialId} is not null`),
+    index("project_locale_changed_by_credential_idx")
+      .on(table.changedByCredentialId, table.changedByCredentialEnvironmentId)
+      .where(sql`${table.changedByCredentialId} is not null`),
   ],
 );
 
@@ -123,6 +175,38 @@ export const projectMembershipLocaleAccess = pgTable(
   ],
 );
 
+export const projectInvitationLocaleAccess = pgTable(
+  "project_invitation_locale_access",
+  {
+    invitationId: uuid("invitation_id").notNull(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    localeId: uuid("locale_id").notNull(),
+    createdAt: localeTimestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "project_invitation_locale_access_invitation_locale_pk",
+      columns: [table.invitationId, table.localeId],
+    }),
+    foreignKey({
+      name: "project_invitation_locale_access_invitation_tenant_fk",
+      columns: [table.invitationId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        projectInvitation.id,
+        projectInvitation.projectId,
+        projectInvitation.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "project_invitation_locale_access_locale_tenant_fk",
+      columns: [table.localeId, table.projectId, table.workspaceId],
+      foreignColumns: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }).onDelete("restrict"),
+    index("project_invitation_locale_access_locale_idx").on(table.localeId),
+  ],
+);
+
 export const projectLocaleRelations = relations(projectLocale, ({ one, many }) => ({
   project: one(project, {
     fields: [projectLocale.projectId, projectLocale.workspaceId],
@@ -133,12 +217,43 @@ export const projectLocaleRelations = relations(projectLocale, ({ one, many }) =
     fields: [projectLocale.createdByUserId],
     references: [user.id],
   }),
+  createdByCredential: one(apiCredential, {
+    relationName: "projectLocaleCredentialCreator",
+    fields: [
+      projectLocale.createdByCredentialId,
+      projectLocale.workspaceId,
+      projectLocale.projectId,
+      projectLocale.createdByCredentialEnvironmentId,
+    ],
+    references: [
+      apiCredential.id,
+      apiCredential.workspaceId,
+      apiCredential.projectId,
+      apiCredential.environmentId,
+    ],
+  }),
   changedBy: one(user, {
     relationName: "projectLocaleChanger",
     fields: [projectLocale.changedByUserId],
     references: [user.id],
   }),
+  changedByCredential: one(apiCredential, {
+    relationName: "projectLocaleCredentialChanger",
+    fields: [
+      projectLocale.changedByCredentialId,
+      projectLocale.workspaceId,
+      projectLocale.projectId,
+      projectLocale.changedByCredentialEnvironmentId,
+    ],
+    references: [
+      apiCredential.id,
+      apiCredential.workspaceId,
+      apiCredential.projectId,
+      apiCredential.environmentId,
+    ],
+  }),
   membershipAccess: many(projectMembershipLocaleAccess),
+  invitationAccess: many(projectInvitationLocaleAccess),
 }));
 
 export const projectMembershipLocaleAccessRelations = relations(
@@ -161,6 +276,32 @@ export const projectMembershipLocaleAccessRelations = relations(
         projectMembershipLocaleAccess.localeId,
         projectMembershipLocaleAccess.projectId,
         projectMembershipLocaleAccess.workspaceId,
+      ],
+      references: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
+    }),
+  }),
+);
+
+export const projectInvitationLocaleAccessRelations = relations(
+  projectInvitationLocaleAccess,
+  ({ one }) => ({
+    invitation: one(projectInvitation, {
+      fields: [
+        projectInvitationLocaleAccess.invitationId,
+        projectInvitationLocaleAccess.projectId,
+        projectInvitationLocaleAccess.workspaceId,
+      ],
+      references: [
+        projectInvitation.id,
+        projectInvitation.projectId,
+        projectInvitation.workspaceId,
+      ],
+    }),
+    locale: one(projectLocale, {
+      fields: [
+        projectInvitationLocaleAccess.localeId,
+        projectInvitationLocaleAccess.projectId,
+        projectInvitationLocaleAccess.workspaceId,
       ],
       references: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
     }),

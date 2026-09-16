@@ -374,6 +374,7 @@ export const ControlPlaneMutationOperation = Schema.Literal(
   "project.create",
   "project.capability.enable",
   "studio_registration.put",
+  "project_locale.create",
 );
 export type ControlPlaneMutationOperation = typeof ControlPlaneMutationOperation.Type;
 

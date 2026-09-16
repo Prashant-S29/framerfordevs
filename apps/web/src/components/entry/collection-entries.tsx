@@ -66,7 +66,8 @@ export function CollectionEntries({
   );
   const environmentId = project.data?.data.environment.id ?? "";
   const localeItems = useMemo(() => locales.data?.data.items ?? [], [locales.data]);
-  const locale = localeItems[0]?.tag ?? "";
+  const firstLocale = localeItems[0];
+  const locale = firstLocale?.tag ?? "";
   const collection = useQuery({
     ...orpc.platform.projects.collections.get.queryOptions({
       input: { projectId, environmentId, collectionId },
@@ -130,7 +131,10 @@ export function CollectionEntries({
   }
   if (!project.data || !access.data || !locales.data || !collection.data) return null;
 
-  const canWrite = access.data.data.allowedActions.includes("content.write");
+  const canWrite =
+    firstLocale !== undefined &&
+    access.data.data.effectiveLocaleIds.includes(firstLocale.id) &&
+    access.data.data.effectiveLocaleActions.includes("content.write");
   const firstPage = pageQuery.data?.data;
   const items = [...(firstPage?.items ?? []), ...additionalItems];
   const nextCursor = loadedNextCursor === undefined ? firstPage?.nextCursor : loadedNextCursor;

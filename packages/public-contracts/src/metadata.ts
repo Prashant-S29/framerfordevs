@@ -60,7 +60,7 @@ export const publicContractMetadata = {
     portalRoute: "/api-reference/control-plane/v1",
     sdkSupported: false,
     baselinePath: "baselines/control-plane/v1/openapi.json",
-    baselineDigest: "747cc0c897ed2738adb5bbc476aee6a284d0f10e89ca8208c3a813a59890a935",
+    baselineDigest: "2950b28d937ef48b9ce7db98cb4dd477396b4ee0b16ea9fb7dfdef672f670145",
     deprecatedAt: null,
     sunsetAt: null,
   },

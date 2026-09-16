@@ -400,6 +400,56 @@ describe.sequential("Tooling OAuth HTTP readiness", () => {
     expect(head.headers["cache-control"]).toBe("private, no-cache");
   });
 
+  it("uses a freshly issued official CLI grant for canonical governance reads", async () => {
+    const [governance, members, locales] = await Promise.all([
+      api.get(`/api/control-plane/v1/projects/${projectId}/governance`).set(bearer(accessToken)),
+      api
+        .get(`/api/control-plane/v1/projects/${projectId}/members?limit=20`)
+        .set(bearer(accessToken)),
+      api
+        .get(`/api/control-plane/v1/projects/${projectId}/locales?view=settings`)
+        .set(bearer(accessToken)),
+    ]);
+
+    const governanceData = successData(governance);
+    expect(governanceData).toEqual(
+      expect.objectContaining({
+        projectId,
+        role: "owner",
+        localeAccess: { mode: "all" },
+        canReadMembers: true,
+        canInviteMembers: true,
+        canUpdateMemberPolicy: true,
+        canRemoveMembers: true,
+        primaryEnvironment: expect.objectContaining({ id: environmentId, key: "main" }),
+      }),
+    );
+    expect(
+      (governanceData.fixedRolePolicies as Array<{ role: string }>).map(({ role }) => role),
+    ).toEqual([
+      "owner",
+      "developer",
+      "content_admin",
+      "editor",
+      "reviewer",
+      "client_editor",
+      "read_only",
+    ]);
+
+    const memberData = successData(members);
+    expect(memberData).toEqual(
+      expect.objectContaining({
+        items: [expect.objectContaining({ projectId, userId: ownerId, role: "owner" })],
+        nextCursor: null,
+      }),
+    );
+
+    const localeData = successData(locales);
+    expect(localeData.items).toEqual([
+      expect.objectContaining({ projectId, tag: "en", status: "enabled" }),
+    ]);
+  });
+
   it("paginates a non-empty manifest and serves immutable revision cache semantics", async () => {
     const manifestPath = `/api/tooling/v1/projects/${projectId}/environments/main/schema/manifest`;
     const first = await api.get(`${manifestPath}?limit=1`).set(bearer(accessToken));

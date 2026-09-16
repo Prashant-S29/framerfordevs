@@ -13,6 +13,15 @@ import {
   ControlPlaneCreateWorkspaceResult,
   ControlPlaneEnableCapabilityResult,
   ControlPlaneFailureResponse,
+  ControlPlaneGovernance,
+  ControlPlaneInspectedInvitation,
+  ControlPlaneInvitation,
+  ControlPlaneInvitationPage,
+  ControlPlaneIssuedInvitation,
+  ControlPlaneLocale,
+  ControlPlaneLocaleList,
+  ControlPlaneMember,
+  ControlPlaneMemberPage,
   ControlPlaneProject,
   ControlPlaneProjectPage,
   ControlPlanePutStudioRegistrationResult,
@@ -63,6 +72,29 @@ export interface ProjectLifecycleRequest {
 
 export interface EnableCapabilityRequest {
   readonly commandId: string;
+}
+
+export type LocaleAccessRequest =
+  | { readonly mode: "all" }
+  | { readonly mode: "selected"; readonly localeIds: ReadonlyArray<string> }
+  | { readonly mode: "none" };
+
+export interface MemberPolicyRequest {
+  readonly expectedVersion: number;
+  readonly role: string;
+  readonly localeAccess: LocaleAccessRequest;
+}
+
+export interface CreateInvitationRequest {
+  readonly email: string;
+  readonly role: string;
+  readonly localeAccess: LocaleAccessRequest;
+}
+
+export interface CreateLocaleRequest {
+  readonly commandId: string;
+  readonly tag: string;
+  readonly displayName: string;
 }
 
 export interface PutStudioRegistrationRequest {
@@ -318,6 +350,196 @@ export function makeControlPlaneHttpClient(options: ControlPlaneHttpClientOption
         "PUT",
         `/api/control-plane/v1/projects/${segment(projectId)}/capabilities/cms`,
         ControlPlaneEnableCapabilityResult,
+        body,
+        requestOptions,
+      ),
+    getGovernance: (projectId: string, requestOptions?: ControlPlaneRequestOptions) =>
+      request(
+        "GET",
+        `/api/control-plane/v1/projects/${segment(projectId)}/governance`,
+        ControlPlaneGovernance,
+        null,
+        requestOptions,
+      ),
+    listMembers: (
+      projectId: string,
+      role: string | null,
+      search: string | null,
+      cursor: string | null,
+      limit: number,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "GET",
+        pagePath(`/api/control-plane/v1/projects/${segment(projectId)}/members`, {
+          role,
+          search,
+          cursor,
+          limit,
+        }),
+        ControlPlaneMemberPage,
+        null,
+        requestOptions,
+      ),
+    updateMemberPolicy: (
+      projectId: string,
+      memberId: string,
+      body: MemberPolicyRequest,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "PUT",
+        `/api/control-plane/v1/projects/${segment(projectId)}/members/${segment(memberId)}/policy`,
+        ControlPlaneMember,
+        body,
+        requestOptions,
+      ),
+    removeMember: (
+      projectId: string,
+      memberId: string,
+      body: ProjectLifecycleRequest,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/members/${segment(memberId)}/remove`,
+        ControlPlaneMember,
+        body,
+        requestOptions,
+      ),
+    listInvitations: (
+      projectId: string,
+      status: string,
+      search: string | null,
+      cursor: string | null,
+      limit: number,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "GET",
+        pagePath(`/api/control-plane/v1/projects/${segment(projectId)}/invitations`, {
+          status,
+          search,
+          cursor,
+          limit,
+        }),
+        ControlPlaneInvitationPage,
+        null,
+        requestOptions,
+      ),
+    createInvitation: (
+      projectId: string,
+      body: CreateInvitationRequest,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/invitations`,
+        ControlPlaneIssuedInvitation,
+        body,
+        requestOptions,
+      ),
+    revokeInvitation: (
+      projectId: string,
+      invitationId: string,
+      body: ProjectLifecycleRequest,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/invitations/${segment(invitationId)}/revoke`,
+        ControlPlaneInvitation,
+        body,
+        requestOptions,
+      ),
+    inspectInvitation: (token: string, requestOptions?: ControlPlaneRequestOptions) =>
+      request(
+        "POST",
+        "/api/control-plane/v1/invitations/inspect",
+        ControlPlaneInspectedInvitation,
+        { token },
+        requestOptions,
+      ),
+    acceptInvitation: (token: string, requestOptions?: ControlPlaneRequestOptions) =>
+      request(
+        "POST",
+        "/api/control-plane/v1/invitations/accept",
+        ControlPlaneMember,
+        { token },
+        requestOptions,
+      ),
+    listLocales: (
+      projectId: string,
+      view: "effective" | "settings",
+      includeRemoved: boolean,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "GET",
+        pagePath(`/api/control-plane/v1/projects/${segment(projectId)}/locales`, {
+          view,
+          includeRemoved: String(includeRemoved),
+        }),
+        ControlPlaneLocaleList,
+        null,
+        requestOptions,
+      ),
+    createLocale: (
+      projectId: string,
+      body: CreateLocaleRequest,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/locales`,
+        ControlPlaneLocale,
+        body,
+        requestOptions,
+      ),
+    updateLocale: (
+      projectId: string,
+      localeId: string,
+      body: { readonly expectedVersion: number; readonly displayName: string },
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "PATCH",
+        `/api/control-plane/v1/projects/${segment(projectId)}/locales/${segment(localeId)}`,
+        ControlPlaneLocale,
+        body,
+        requestOptions,
+      ),
+    reorderLocales: (
+      projectId: string,
+      body: {
+        readonly locales: ReadonlyArray<{
+          readonly localeId: string;
+          readonly expectedVersion: number;
+        }>;
+      },
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "PUT",
+        `/api/control-plane/v1/projects/${segment(projectId)}/locales/order`,
+        ControlPlaneLocaleList,
+        body,
+        requestOptions,
+      ),
+    updateLocaleStatus: (
+      projectId: string,
+      localeId: string,
+      body: {
+        readonly expectedVersion: number;
+        readonly status: "enabled" | "disabled" | "removed";
+        readonly confirmDraftImpact: boolean;
+      },
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "PUT",
+        `/api/control-plane/v1/projects/${segment(projectId)}/locales/${segment(localeId)}/status`,
+        ControlPlaneLocale,
         body,
         requestOptions,
       ),

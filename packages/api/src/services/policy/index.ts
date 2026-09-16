@@ -6,13 +6,16 @@ import {
   LocaleAccessMode,
   type CredentialFamily as CredentialFamilyType,
   type CredentialScope as CredentialScopeType,
+  type ProjectLocaleAccess as ProjectLocaleAccessType,
   type ProjectPermissionAction as ProjectPermissionActionType,
   type ProjectRole as ProjectRoleType,
   ProjectPermissionAction,
   ProjectRole,
   credentialScopeValues,
   projectPermissionActionValues,
+  projectRoleValues,
 } from "../../contracts/access";
+import type { ProjectLocaleId } from "../../contracts/locale";
 
 export type PolicyDecisionReason =
   | "allowed"
@@ -57,6 +60,12 @@ export interface CredentialPolicyRequest {
   readonly environmentId: string | null;
   readonly isActive: boolean;
   readonly hasExplicitDeny?: boolean;
+}
+
+export interface ProjectPolicyProjectionRequest {
+  readonly role: ProjectRoleType;
+  readonly localeAccess: ProjectLocaleAccessType;
+  readonly enabledLocaleIds: ReadonlyArray<ProjectLocaleId>;
 }
 
 const allActions = new Set<ProjectPermissionActionType>(projectPermissionActionValues);
@@ -179,24 +188,13 @@ export function areScopesAllowedForFamily(family: string, scopes: ReadonlyArray<
   );
 }
 
-export function decideUserPolicy(request: UserPolicyRequest): PolicyDecision {
-  if (request.hasExplicitDeny) return deny("explicit_deny");
-  if (!request.isActive) return deny("inactive_subject");
-  if (
-    request.workspaceId === null ||
-    request.projectId === null ||
-    request.subjectWorkspaceId === null ||
-    request.subjectProjectId === null ||
-    request.role === null
-  ) {
-    return deny("missing_context");
-  }
-  if (
-    request.workspaceId !== request.subjectWorkspaceId ||
-    request.projectId !== request.subjectProjectId
-  ) {
-    return deny("scope_mismatch");
-  }
+function decideRoleLocalePolicy(request: {
+  readonly action: string;
+  readonly role: string;
+  readonly localeAccessMode: string | null;
+  readonly allowedLocaleIds: ReadonlyArray<string>;
+  readonly requestedLocaleId: string | null;
+}): PolicyDecision {
   const action = decodeOption(ProjectPermissionAction, request.action);
   if (action === undefined) return deny("unknown_action");
   const role = decodeOption(ProjectRole, request.role);
@@ -220,6 +218,84 @@ export function decideUserPolicy(request: UserPolicyRequest): PolicyDecision {
   }
   return deny("locale_denied");
 }
+
+export function decideUserPolicy(request: UserPolicyRequest): PolicyDecision {
+  if (request.hasExplicitDeny) return deny("explicit_deny");
+  if (!request.isActive) return deny("inactive_subject");
+  const role = request.role;
+  if (
+    request.workspaceId === null ||
+    request.projectId === null ||
+    request.subjectWorkspaceId === null ||
+    request.subjectProjectId === null ||
+    role === null
+  ) {
+    return deny("missing_context");
+  }
+  if (
+    request.workspaceId !== request.subjectWorkspaceId ||
+    request.projectId !== request.subjectProjectId
+  ) {
+    return deny("scope_mismatch");
+  }
+  return decideRoleLocalePolicy({ ...request, role });
+}
+
+export function projectPolicyProjection(request: ProjectPolicyProjectionRequest) {
+  const configuredLocaleIds =
+    request.localeAccess.mode === "selected" ? [...request.localeAccess.localeIds] : [];
+  const configuredLocaleIdSet = new Set(configuredLocaleIds);
+  const effectiveLocaleIds = [...new Set(request.enabledLocaleIds)].filter(
+    (localeId) =>
+      request.localeAccess.mode === "all" ||
+      (request.localeAccess.mode === "selected" && configuredLocaleIdSet.has(localeId)),
+  );
+  const baseRoleActions = projectPermissionActionValues.filter((action) =>
+    projectRolePermissions[request.role].has(action),
+  );
+  const effectiveProjectActions = projectPermissionActionValues.filter(
+    (action) =>
+      decideRoleLocalePolicy({
+        action,
+        role: request.role,
+        localeAccessMode: request.localeAccess.mode,
+        allowedLocaleIds: configuredLocaleIds,
+        requestedLocaleId: null,
+      }).allowed,
+  );
+  const effectiveLocaleActions =
+    effectiveLocaleIds.length === 0
+      ? []
+      : projectPermissionActionValues.filter(
+          (action) =>
+            localeScopedContentActions.has(action) &&
+            decideRoleLocalePolicy({
+              action,
+              role: request.role,
+              localeAccessMode: request.localeAccess.mode,
+              allowedLocaleIds: configuredLocaleIds,
+              requestedLocaleId: effectiveLocaleIds[0] ?? null,
+            }).allowed,
+        );
+
+  return {
+    role: request.role,
+    localeAccess: request.localeAccess,
+    baseRoleActions,
+    effectiveProjectActions,
+    configuredLocaleIds,
+    effectiveLocaleIds,
+    effectiveLocaleActions,
+  };
+}
+
+export const fixedProjectRolePolicies = projectRoleValues.map((role) => ({
+  role,
+  baseRoleActions: projectPermissionActionValues.filter((action) =>
+    projectRolePermissions[role].has(action),
+  ),
+  requiresAllLocaleAccess: role === "owner",
+}));
 
 export function decideCredentialPolicy(request: CredentialPolicyRequest): PolicyDecision {
   if (request.hasExplicitDeny) return deny("explicit_deny");

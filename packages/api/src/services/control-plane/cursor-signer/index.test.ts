@@ -48,6 +48,37 @@ describe("Control Plane cursor signer", () => {
     }),
   );
 
+  it.effect("binds governance filters, search digest, project, and invitation as-of", () =>
+    Effect.gen(function* () {
+      const governanceAuthority = {
+        route: "invitations" as const,
+        principalKey: "oauth:framerfordevs-cli:user-1",
+        workspaceId: null,
+        projectId: "019fae8b-1234-7000-8000-000000000010",
+        projectStatus: null,
+        memberRole: null,
+        invitationStatus: "pending",
+        searchDigest: "a".repeat(64),
+        limit: 20,
+      };
+      const governancePosition = { ...position, asOfEpochMs: 1_800_000_100_000 };
+      const cursor = yield* signer.sign(governanceAuthority, governancePosition);
+
+      assert.deepEqual(yield* signer.verify(cursor, governanceAuthority), governancePosition);
+      const substitutions = [
+        { ...governanceAuthority, projectId: "019fae8b-1234-7000-8000-000000000011" },
+        { ...governanceAuthority, invitationStatus: "expired" },
+        { ...governanceAuthority, searchDigest: "b".repeat(64) },
+      ];
+      const failures = yield* Effect.all(
+        substitutions.map((substitution) => Effect.flip(signer.verify(cursor, substitution))),
+      );
+      assert.isTrue(
+        failures.every((failure) => failure._tag === "ControlPlaneCursorInvalidFailure"),
+      );
+    }),
+  );
+
   it.effect("rejects expired, oversized, and malformed cursors", () =>
     Effect.gen(function* () {
       const cursor = yield* signer.sign(authority, position);

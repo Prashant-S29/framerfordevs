@@ -102,6 +102,7 @@ export class CreateProjectLocaleInput extends Schema.Class<CreateProjectLocaleIn
 export class UpdateProjectLocaleDisplayNameInput extends Schema.Class<UpdateProjectLocaleDisplayNameInput>(
   "UpdateProjectLocaleDisplayNameInput",
 )({
+  projectId: ProjectId,
   localeId: ProjectLocaleId,
   version: ResourceVersion,
   displayName: LocaleDisplayName,
@@ -133,6 +134,7 @@ export class ReorderProjectLocalesInput extends Schema.Class<ReorderProjectLocal
 export class UpdateProjectLocaleStatusInput extends Schema.Class<UpdateProjectLocaleStatusInput>(
   "UpdateProjectLocaleStatusInput",
 )({
+  projectId: ProjectId,
   localeId: ProjectLocaleId,
   version: ResourceVersion,
   status: ProjectLocaleStatus,

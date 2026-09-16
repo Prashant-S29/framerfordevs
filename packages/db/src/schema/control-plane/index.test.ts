@@ -64,6 +64,15 @@ describe("M14 Control Plane persistence authority", () => {
       "control_plane_command_receipt_tenant_result_idx",
       "control_plane_command_receipt_created_at_idx",
     ]);
+    expect(
+      checkSql(controlPlaneCommandReceipt, "control_plane_command_receipt_operation_valid"),
+    ).toContain("'project_locale.create'");
+    expect(
+      checkSql(controlPlaneCommandReceipt, "control_plane_command_receipt_result_type_valid"),
+    ).toContain("'project_locale'");
+    expect(
+      checkSql(controlPlaneCommandReceipt, "control_plane_command_receipt_scope_result_valid"),
+    ).toContain("'project_locale.create'");
   });
 
   it("stores one versioned metadata-only Studio registration per environment", () => {

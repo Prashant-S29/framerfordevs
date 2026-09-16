@@ -374,9 +374,9 @@ describe("Webhook worker repository PostgreSQL integration", () => {
         environmentId: current.environmentId,
         eventType: "cms.schema.published",
         activeFrom: new Date(now.getTime() - 1_000),
-        activeUntil: new Date(now.getTime() + 1_000),
+        activeUntil: null,
         createdByUserId: actorId,
-        closedByUserId: actorId,
+        closedByUserId: null,
         createdAt: new Date(now.getTime() - 1_000),
       });
       await transaction

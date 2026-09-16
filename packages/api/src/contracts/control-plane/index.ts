@@ -2,9 +2,28 @@
 
 import { Schema } from "effect";
 
-import { ApiCredentialId } from "../access";
 import {
-  AuthUserId,
+  CanonicalEmail,
+  InspectedProjectInvitation,
+  InvitationToken,
+  IssuedProjectInvitation,
+  ProjectActor,
+  ProjectInvitation,
+  ProjectInvitationListStatus,
+  ProjectLocaleAccess,
+  ProjectMember,
+  ProjectPermissionActions,
+  ProjectRole,
+  projectRoleValues,
+} from "../access";
+import {
+  LocaleDisplayName,
+  LocaleTag,
+  ProjectLocale,
+  ProjectLocaleId,
+  ProjectLocaleStatus,
+} from "../locale";
+import {
   Capability,
   EnvironmentId,
   IsoDateTime,
@@ -104,6 +123,7 @@ export const ControlPlaneCommandOperation = Schema.Literal(
   "project.create",
   "project.capability.enable",
   "studio_registration.put",
+  "project_locale.create",
 );
 export type ControlPlaneCommandOperation = typeof ControlPlaneCommandOperation.Type;
 
@@ -146,10 +166,7 @@ export const StudioMountPath = Schema.String.pipe(
 );
 export type StudioMountPath = typeof StudioMountPath.Type;
 
-export const ControlPlaneActor = Schema.Union(
-  Schema.Struct({ kind: Schema.Literal("user"), id: AuthUserId }),
-  Schema.Struct({ kind: Schema.Literal("credential"), id: ApiCredentialId }),
-).annotations({ identifier: "ControlPlaneActor", parseOptions: { onExcessProperty: "error" } });
+export const ControlPlaneActor = ProjectActor.annotations({ identifier: "ControlPlaneActor" });
 export type ControlPlaneActor = typeof ControlPlaneActor.Type;
 
 export const ControlPlaneProjectStatus = Schema.Literal("active", "archived");
@@ -409,6 +426,169 @@ export class ControlPlanePutStudioRegistrationInput extends Schema.Class<Control
   mountPath: StudioMountPath,
 }) {}
 
+export const ControlPlaneMemberListQuery = Schema.Struct({
+  role: Schema.NullOr(ProjectRole),
+  search: Schema.NullOr(
+    Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100), Schema.brand("MemberSearch")),
+  ),
+  cursor: Schema.NullOr(ControlPlaneCursorInput),
+  limit: ControlPlanePageLimit,
+}).annotations({
+  identifier: "ControlPlaneMemberListQuery",
+  parseOptions: { onExcessProperty: "error" },
+});
+export type ControlPlaneMemberListQuery = typeof ControlPlaneMemberListQuery.Type;
+
+export const ControlPlaneInvitationListQuery = Schema.Struct({
+  status: ProjectInvitationListStatus,
+  search: Schema.NullOr(
+    Schema.String.pipe(
+      Schema.minLength(1),
+      Schema.maxLength(100),
+      Schema.brand("InvitationSearch"),
+    ),
+  ),
+  cursor: Schema.NullOr(ControlPlaneCursorInput),
+  limit: ControlPlanePageLimit,
+}).annotations({
+  identifier: "ControlPlaneInvitationListQuery",
+  parseOptions: { onExcessProperty: "error" },
+});
+export type ControlPlaneInvitationListQuery = typeof ControlPlaneInvitationListQuery.Type;
+
+export const ControlPlaneMemberPolicyRequest = Schema.Struct({
+  expectedVersion: ResourceVersion,
+  role: ProjectRole,
+  localeAccess: ProjectLocaleAccess,
+}).annotations({
+  identifier: "ControlPlaneMemberPolicyRequest",
+  parseOptions: { onExcessProperty: "error" },
+});
+export type ControlPlaneMemberPolicyRequest = typeof ControlPlaneMemberPolicyRequest.Type;
+
+export const ControlPlaneVersionRequest = Schema.Struct({
+  expectedVersion: ResourceVersion,
+}).annotations({
+  identifier: "ControlPlaneVersionRequest",
+  parseOptions: { onExcessProperty: "error" },
+});
+export type ControlPlaneVersionRequest = typeof ControlPlaneVersionRequest.Type;
+
+export const ControlPlaneCreateInvitationRequest = Schema.Struct({
+  email: CanonicalEmail,
+  role: ProjectRole,
+  localeAccess: ProjectLocaleAccess,
+}).annotations({
+  identifier: "ControlPlaneCreateInvitationRequest",
+  parseOptions: { onExcessProperty: "error" },
+});
+export type ControlPlaneCreateInvitationRequest = typeof ControlPlaneCreateInvitationRequest.Type;
+
+export const ControlPlaneInvitationTokenRequest = Schema.Struct({
+  token: InvitationToken,
+}).annotations({
+  identifier: "ControlPlaneInvitationTokenRequest",
+  parseOptions: { onExcessProperty: "error" },
+});
+export type ControlPlaneInvitationTokenRequest = typeof ControlPlaneInvitationTokenRequest.Type;
+
+export const ControlPlaneLocaleListQuery = Schema.Struct({
+  view: Schema.Literal("effective", "settings"),
+  includeRemoved: Schema.Boolean,
+}).annotations({
+  identifier: "ControlPlaneLocaleListQuery",
+  parseOptions: { onExcessProperty: "error" },
+});
+export type ControlPlaneLocaleListQuery = typeof ControlPlaneLocaleListQuery.Type;
+
+export const ControlPlaneCreateLocaleRequest = Schema.Struct({
+  commandId: ControlPlaneCommandId,
+  tag: LocaleTag,
+  displayName: LocaleDisplayName,
+}).annotations({
+  identifier: "ControlPlaneCreateLocaleRequest",
+  parseOptions: { onExcessProperty: "error" },
+});
+export type ControlPlaneCreateLocaleRequest = typeof ControlPlaneCreateLocaleRequest.Type;
+
+export const ControlPlaneUpdateLocaleRequest = Schema.Struct({
+  expectedVersion: ResourceVersion,
+  displayName: LocaleDisplayName,
+}).annotations({
+  identifier: "ControlPlaneUpdateLocaleRequest",
+  parseOptions: { onExcessProperty: "error" },
+});
+export type ControlPlaneUpdateLocaleRequest = typeof ControlPlaneUpdateLocaleRequest.Type;
+
+export const ControlPlaneLocaleStatusRequest = Schema.Struct({
+  expectedVersion: ResourceVersion,
+  status: ProjectLocaleStatus,
+  confirmDraftImpact: Schema.Boolean,
+}).annotations({
+  identifier: "ControlPlaneLocaleStatusRequest",
+  parseOptions: { onExcessProperty: "error" },
+});
+export type ControlPlaneLocaleStatusRequest = typeof ControlPlaneLocaleStatusRequest.Type;
+
+export const ControlPlaneLocaleOrderRequest = Schema.Struct({
+  locales: Schema.Array(
+    Schema.Struct({ localeId: ProjectLocaleId, expectedVersion: ResourceVersion }),
+  ).pipe(Schema.minItems(1), Schema.maxItems(100)),
+}).annotations({
+  identifier: "ControlPlaneLocaleOrderRequest",
+  parseOptions: { onExcessProperty: "error" },
+});
+export type ControlPlaneLocaleOrderRequest = typeof ControlPlaneLocaleOrderRequest.Type;
+
+export class ControlPlaneProjectRolePolicy extends Schema.Class<ControlPlaneProjectRolePolicy>(
+  "ControlPlaneProjectRolePolicy",
+)({
+  role: ProjectRole,
+  baseRoleActions: ProjectPermissionActions,
+  requiresAllLocales: Schema.Boolean,
+}) {}
+
+export class ControlPlaneGovernance extends Schema.Class<ControlPlaneGovernance>(
+  "ControlPlaneGovernance",
+)({
+  projectId: ProjectId,
+  primaryEnvironment: ControlPlanePrimaryEnvironment,
+  role: ProjectRole,
+  localeAccess: ProjectLocaleAccess,
+  baseRoleActions: ProjectPermissionActions,
+  effectiveProjectActions: ProjectPermissionActions,
+  effectiveLocaleIds: Schema.Array(ProjectLocaleId).pipe(Schema.maxItems(100)),
+  effectiveLocaleActions: ProjectPermissionActions,
+  fixedRolePolicies: Schema.Array(ControlPlaneProjectRolePolicy).pipe(
+    Schema.minItems(projectRoleValues.length),
+    Schema.maxItems(projectRoleValues.length),
+  ),
+  canReadMembers: Schema.Boolean,
+  canInviteMembers: Schema.Boolean,
+  canUpdateMemberPolicy: Schema.Boolean,
+  canRemoveMembers: Schema.Boolean,
+}) {}
+
+export class ControlPlaneMemberPage extends Schema.Class<ControlPlaneMemberPage>(
+  "ControlPlaneMemberPage",
+)({
+  items: Schema.Array(ProjectMember).pipe(Schema.maxItems(controlPlaneLimits.maximumPageSize)),
+  nextCursor: Schema.NullOr(ControlPlaneCursor),
+}) {}
+
+export class ControlPlaneInvitationPage extends Schema.Class<ControlPlaneInvitationPage>(
+  "ControlPlaneInvitationPage",
+)({
+  items: Schema.Array(ProjectInvitation).pipe(Schema.maxItems(controlPlaneLimits.maximumPageSize)),
+  nextCursor: Schema.NullOr(ControlPlaneCursor),
+}) {}
+
+export class ControlPlaneLocaleList extends Schema.Class<ControlPlaneLocaleList>(
+  "ControlPlaneLocaleList",
+)({
+  items: Schema.Array(ProjectLocale).pipe(Schema.maxItems(100)),
+}) {}
+
 export class ControlPlaneCreateWorkspaceResult extends Schema.Class<ControlPlaneCreateWorkspaceResult>(
   "ControlPlaneCreateWorkspaceResult",
 )({
@@ -449,6 +629,12 @@ export const ControlPlaneApiErrorCode = Schema.Literal(
   "INVALID_STATE_TRANSITION",
   "COMMAND_CONFLICT",
   "CMS_CAPABILITY_REQUIRED",
+  "INVITATION_CONFLICT",
+  "INVITATION_INVALID",
+  "LAST_OWNER_REQUIRED",
+  "LOCALE_CONFLICT",
+  "LOCALE_DEPENDENCIES_EXIST",
+  "LOCALE_UNAVAILABLE",
   "CONTROL_PLANE_CURSOR_INVALID",
   "CONTROL_PLANE_REQUEST_TOO_LARGE",
   "CONTROL_PLANE_RESPONSE_TOO_LARGE",
@@ -500,6 +686,16 @@ export const StudioRegistrationResponse = ApiSuccessSchema(StudioRegistration);
 export const ControlPlanePutStudioRegistrationResponse = ApiSuccessSchema(
   ControlPlanePutStudioRegistrationResult,
 );
+export const ControlPlaneGovernanceResponse = ApiSuccessSchema(ControlPlaneGovernance);
+export const ControlPlaneMemberResponse = ApiSuccessSchema(ProjectMember);
+export const ControlPlaneMemberPageResponse = ApiSuccessSchema(ControlPlaneMemberPage);
+export const ControlPlaneInvitationResponse = ApiSuccessSchema(ProjectInvitation);
+export const ControlPlaneIssuedInvitationResponse = ApiSuccessSchema(IssuedProjectInvitation);
+export const ControlPlaneInspectedInvitationResponse = ApiSuccessSchema(InspectedProjectInvitation);
+export const ControlPlaneInvitationPageResponse = ApiSuccessSchema(ControlPlaneInvitationPage);
+export const ControlPlaneLocaleResponse = ApiSuccessSchema(ProjectLocale);
+export const ControlPlaneCreateLocaleResponse = ApiSuccessSchema(ProjectLocale);
+export const ControlPlaneLocaleListResponse = ApiSuccessSchema(ControlPlaneLocaleList);
 
 export const ControlPlaneWorkspaceScopeSchema = Schema.standardSchemaV1(ControlPlaneWorkspaceScope);
 export const ControlPlaneProjectScopeSchema = Schema.standardSchemaV1(ControlPlaneProjectScope);

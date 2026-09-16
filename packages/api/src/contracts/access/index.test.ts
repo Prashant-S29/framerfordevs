@@ -10,17 +10,24 @@ import {
   CredentialSecret,
   InvitationToken,
   IssueApiCredentialInput,
+  ListProjectInvitationsInput,
+  ListProjectMembersInput,
   LocaleAccessMode,
+  ProjectAccessSearch,
+  ProjectActor,
+  ProjectInvitationPolicy,
   ProjectInvitationStatus,
   ProjectLocaleAccess,
+  ProjectMemberPolicy,
   ProjectPermissionAction,
   ProjectRole,
-  UpdateProjectMemberLocaleAccessInput,
+  UpdateProjectMemberPolicyInput,
 } from "./index";
 
 const credentialId = "019fae8b-1234-7000-8000-000000000001";
 const secret = "A".repeat(43);
 const membershipId = "019fae8b-1234-7000-8000-000000000002";
+const projectId = "019fae8b-1234-7000-8000-000000000004";
 const localeId = "019fae8b-1234-7000-8000-000000000003";
 
 describe("access contracts", () => {
@@ -29,6 +36,28 @@ describe("access contracts", () => {
       const email = yield* Schema.decodeUnknown(CanonicalEmail)("  Client@Example.COM  ");
 
       assert.strictEqual(email, "client@example.com");
+    }),
+  );
+
+  it.effect("canonicalizes bounded governance search and list defaults", () =>
+    Effect.gen(function* () {
+      const search = yield* Schema.decodeUnknown(ProjectAccessSearch)("  ClIeNt  ");
+      const members = yield* Schema.decodeUnknown(ListProjectMembersInput)({
+        projectId,
+        cursor: null,
+        limit: 20,
+      });
+      const invitations = yield* Schema.decodeUnknown(ListProjectInvitationsInput)({
+        projectId,
+        cursor: null,
+        limit: 20,
+      });
+
+      assert.strictEqual(search, "client");
+      assert.isNull(members.role);
+      assert.isNull(members.search);
+      assert.strictEqual(invitations.status, "all");
+      assert.isNull(invitations.search);
     }),
   );
 
@@ -96,17 +125,81 @@ describe("access contracts", () => {
         Schema.decodeUnknown(ProjectLocaleAccess)({ mode: "all" }),
         Schema.decodeUnknown(ProjectLocaleAccess)({ mode: "none" }),
         Schema.decodeUnknown(ProjectLocaleAccess)({ mode: "selected", localeIds: [localeId] }),
-        Schema.decodeUnknown(UpdateProjectMemberLocaleAccessInput)({
-          membershipId,
-          version: 1,
-          access: { mode: "selected", localeIds: [localeId] },
-        }),
       ]);
 
       assert.deepEqual(
-        values.map((value) => ("access" in value ? value.access.mode : value.mode)),
-        ["all", "none", "selected", "selected"],
+        values.map((value) => value.mode),
+        ["all", "none", "selected"],
       );
+    }),
+  );
+
+  it.effect("enforces complete member and invitation policy including owner locale authority", () =>
+    Effect.gen(function* () {
+      const valid = yield* Effect.all([
+        Schema.decodeUnknown(ProjectMemberPolicy)({
+          role: "owner",
+          localeAccess: { mode: "all" },
+        }),
+        Schema.decodeUnknown(ProjectInvitationPolicy)({
+          role: "client_editor",
+          localeAccess: { mode: "selected", localeIds: [localeId] },
+        }),
+        Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+          projectId,
+          membershipId,
+          version: 2,
+          role: "read_only",
+          localeAccess: { mode: "none" },
+        }),
+      ]);
+      const invalid = yield* Effect.all([
+        Effect.exit(
+          Schema.decodeUnknown(ProjectMemberPolicy)({
+            role: "owner",
+            localeAccess: { mode: "selected", localeIds: [localeId] },
+          }),
+        ),
+        Effect.exit(
+          Schema.decodeUnknown(ProjectInvitationPolicy)({
+            role: "owner",
+            localeAccess: { mode: "none" },
+          }),
+        ),
+        Effect.exit(
+          Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+            projectId,
+            membershipId,
+            version: 2,
+            role: "owner",
+            localeAccess: { mode: "none" },
+          }),
+        ),
+      ]);
+
+      assert.deepEqual(
+        valid.map((policy) => policy.localeAccess.mode),
+        ["all", "selected", "none"],
+      );
+      assert.isTrue(invalid.every(Exit.isFailure));
+    }),
+  );
+
+  it.effect("uses one strict user-or-credential project actor shape", () =>
+    Effect.gen(function* () {
+      const actors = yield* Effect.all([
+        Schema.decodeUnknown(ProjectActor)({ kind: "user", id: "user-1" }),
+        Schema.decodeUnknown(ProjectActor)({ kind: "credential", id: credentialId }),
+      ]);
+      const excess = yield* Effect.exit(
+        Schema.decodeUnknown(ProjectActor)({ kind: "user", id: "user-1", issuerId: "user-2" }),
+      );
+
+      assert.deepEqual(
+        actors.map((actor) => actor.kind),
+        ["user", "credential"],
+      );
+      assert.isTrue(Exit.isFailure(excess));
     }),
   );
 

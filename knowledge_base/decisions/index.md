@@ -21,6 +21,7 @@ Decision records preserve load-bearing rationale; they are not a chronological r
 | [`m15-governance-automation-parity-design.md`](m15-governance-automation-parity-design.md)                                 | Portable members/invitations, fixed-role + locale policy, locale administration, governance CLI/HTTP | M2–M4, M12, M14                     |
 | [`public-http-cli-and-sdk-surface-boundary.md`](public-http-cli-and-sdk-surface-boundary.md)                               | Choosing stable HTTP, full agent/operator CLI, or scoped content/runtime SDK exposure                | M12 onward as actually consumed     |
 | [`repository-test-structure.md`](repository-test-structure.md)                                                             | Test placement, package ownership, test/build boundaries, test-directory refactors                   | None                                |
+| [`repository-browser-test-workflow.md`](repository-browser-test-workflow.md)                                               | Automated browser coverage, Playwright ownership, or interactive browser permission                  | Repository test structure           |
 
 ## Selection rules
 

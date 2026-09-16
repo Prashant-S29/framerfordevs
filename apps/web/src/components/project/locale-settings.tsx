@@ -309,7 +309,7 @@ function LocaleManager({
                 >
                   <ArrowDownIcon aria-hidden="true" />
                 </Button>
-                <EditLocaleDialog locale={locale} />
+                <EditLocaleDialog projectId={projectId} locale={locale} />
                 {locale.tag !== "en" ? (
                   <>
                     {locale.status === "enabled" ? (
@@ -333,6 +333,7 @@ function LocaleManager({
                         disabled={updateStatus.isPending}
                         onClick={() =>
                           updateStatus.mutate({
+                            projectId,
                             localeId: locale.id,
                             version: locale.version,
                             status: "enabled",
@@ -393,6 +394,7 @@ function LocaleManager({
                   disabled={updateStatus.isPending}
                   onClick={() =>
                     updateStatus.mutate({
+                      projectId,
                       localeId: locale.id,
                       version: locale.version,
                       status: "enabled",
@@ -435,6 +437,7 @@ function LocaleManager({
                 event.preventDefault();
                 if (!pendingTransition) return;
                 updateStatus.mutate({
+                  projectId,
                   localeId: pendingTransition.locale.id,
                   version: pendingTransition.locale.version,
                   status: pendingTransition.status,
@@ -578,7 +581,13 @@ export function AddLocaleDialog({ projectId }: { readonly projectId: string }) {
   );
 }
 
-function EditLocaleDialog({ locale }: { readonly locale: ProjectLocale }) {
+function EditLocaleDialog({
+  projectId,
+  locale,
+}: {
+  readonly projectId: string;
+  readonly locale: ProjectLocale;
+}) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [displayName, setDisplayName] = useState<string>(locale.displayName);
@@ -623,6 +632,7 @@ function EditLocaleDialog({ locale }: { readonly locale: ProjectLocale }) {
             }
             setValidationError(undefined);
             update.mutate({
+              projectId,
               localeId: locale.id,
               version: locale.version,
               displayName: result.data.displayName,

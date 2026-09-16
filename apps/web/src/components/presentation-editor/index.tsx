@@ -1333,7 +1333,7 @@ export function PresentationEditor({
   }
   if (!project.data || !access.data || !presentation.data || !published.data || !environmentId)
     return null;
-  const allowed = new Set(access.data.data.allowedActions);
+  const allowed = new Set(access.data.data.effectiveProjectActions);
   const canPublish =
     allowed.has("schema.read") &&
     allowed.has("schema.write") &&

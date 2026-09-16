@@ -3,6 +3,8 @@ export interface ParsedArguments {
   readonly flags: ReadonlyMap<string, string | true | ReadonlyArray<string>>;
 }
 
+const repeatableFlags = new Set(["acknowledge", "locale", "item"]);
+
 export function parseArguments(arguments_: ReadonlyArray<string>): ParsedArguments {
   const command: Array<string> = [];
   const flags = new Map<string, string | true | ReadonlyArray<string>>();
@@ -22,13 +24,13 @@ export function parseArguments(arguments_: ReadonlyArray<string>): ParsedArgumen
     if (existing === undefined) {
       flags.set(name, parsedValue);
     } else if (
-      name === "acknowledge" &&
+      repeatableFlags.has(name) &&
       typeof existing === "string" &&
       typeof parsedValue === "string"
     ) {
       flags.set(name, [existing, parsedValue]);
     } else if (
-      name === "acknowledge" &&
+      repeatableFlags.has(name) &&
       Array.isArray(existing) &&
       typeof parsedValue === "string"
     ) {
@@ -138,6 +140,99 @@ export function validateFlags(arguments_: ParsedArguments): void {
       "command-id": "string",
       json: "boolean",
     },
+    "governance inspect": { api: "string", project: "string", json: "boolean" },
+    "member list": {
+      api: "string",
+      project: "string",
+      role: "string",
+      search: "string",
+      limit: "string",
+      cursor: "string",
+      json: "boolean",
+    },
+    "member policy set": {
+      api: "string",
+      project: "string",
+      member: "string",
+      "expected-version": "string",
+      role: "string",
+      "locale-access": "string",
+      locale: "strings",
+      json: "boolean",
+    },
+    "member remove": {
+      api: "string",
+      project: "string",
+      member: "string",
+      "expected-version": "string",
+      json: "boolean",
+    },
+    "invitation list": {
+      api: "string",
+      project: "string",
+      status: "string",
+      search: "string",
+      limit: "string",
+      cursor: "string",
+      json: "boolean",
+    },
+    "invitation create": {
+      api: "string",
+      project: "string",
+      email: "string",
+      role: "string",
+      "locale-access": "string",
+      locale: "strings",
+      json: "boolean",
+    },
+    "invitation inspect": { api: "string", "token-stdin": "boolean", json: "boolean" },
+    "invitation accept": { api: "string", "token-stdin": "boolean", json: "boolean" },
+    "invitation revoke": {
+      api: "string",
+      project: "string",
+      invitation: "string",
+      "expected-version": "string",
+      json: "boolean",
+    },
+    "locale list": {
+      api: "string",
+      project: "string",
+      view: "string",
+      "include-removed": "boolean",
+      json: "boolean",
+    },
+    "locale create": {
+      api: "string",
+      project: "string",
+      tag: "string",
+      "display-name": "string",
+      "command-id": "string",
+      json: "boolean",
+    },
+    "locale update": {
+      api: "string",
+      project: "string",
+      locale: "string",
+      "expected-version": "string",
+      "display-name": "string",
+      json: "boolean",
+    },
+    "locale reorder": {
+      api: "string",
+      project: "string",
+      item: "strings",
+      json: "boolean",
+    },
+    "locale status set": {
+      api: "string",
+      project: "string",
+      locale: "string",
+      "expected-version": "string",
+      status: "string",
+      "confirm-draft-impact": "boolean",
+      json: "boolean",
+    },
+    "project environment get": { api: "string", project: "string", json: "boolean" },
     link: {
       api: "string",
       project: "string",

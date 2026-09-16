@@ -20,6 +20,8 @@ export const AUTHORING_SCHEMA_PUSH_SCOPE = "authoring:schema:push";
 export const CONTROL_PLANE_READ_SCOPE = "control-plane:read";
 export const CONTROL_PLANE_WRITE_SCOPE = "control-plane:write";
 export const CONTROL_PLANE_PROJECT_LIFECYCLE_SCOPE = "control-plane:project:lifecycle";
+export const CONTROL_PLANE_GOVERNANCE_READ_SCOPE = "control-plane:governance:read";
+export const CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE = "control-plane:governance:write";
 export const CLI_API_OAUTH_SCOPES = [
   TOOLING_READ_SCOPE,
   AUTHORING_READ_SCOPE,
@@ -29,6 +31,8 @@ export const CLI_API_OAUTH_SCOPES = [
   CONTROL_PLANE_READ_SCOPE,
   CONTROL_PLANE_WRITE_SCOPE,
   CONTROL_PLANE_PROJECT_LIFECYCLE_SCOPE,
+  CONTROL_PLANE_GOVERNANCE_READ_SCOPE,
+  CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE,
 ] as const;
 export type CliApiOAuthScope = (typeof CLI_API_OAUTH_SCOPES)[number];
 export const CLI_OAUTH_SCOPES = [

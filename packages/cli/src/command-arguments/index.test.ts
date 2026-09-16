@@ -119,6 +119,29 @@ describe("CLI command arguments", () => {
     expect(booleanFlag(create, "enable-cms")).toBe(true);
     expect(stringFlag(create, "api")).toBe("https://api.example.com");
 
+    const policy = parseArguments([
+      "member",
+      "policy",
+      "set",
+      "--locale",
+      "locale-1",
+      "--locale",
+      "locale-2",
+    ]);
+    const reorder = parseArguments([
+      "locale",
+      "reorder",
+      "--item",
+      "locale-1:1",
+      "--item",
+      "locale-2:2",
+    ]);
+    validateFlags(policy);
+    validateFlags(reorder);
+    validateFlags(parseArguments(["invitation", "inspect", "--token-stdin"]));
+    expect(stringFlags(policy, "locale")).toEqual(["locale-1", "locale-2"]);
+    expect(stringFlags(reorder, "item")).toEqual(["locale-1:1", "locale-2:2"]);
+
     expect(() => validateFlags(parseArguments(["project", "restore", "--force"]))).toThrowError(
       "CLI_FLAG_INVALID",
     );

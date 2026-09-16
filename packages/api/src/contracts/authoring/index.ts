@@ -2,9 +2,9 @@
 
 import { Schema } from "effect";
 
-import { ApiCredentialId } from "../access";
+import { ProjectActor } from "../access";
 import { ApiErrorDetail, RequestIdSchema } from "../response/api";
-import { AuthUserId, EnvironmentId, ProjectId } from "../platform";
+import { EnvironmentId, ProjectId } from "../platform";
 import {
   CollectionApiKey,
   CollectionFieldApiKey,
@@ -89,10 +89,7 @@ export const SchemaApplyFingerprint = Schema.String.pipe(
 );
 export type SchemaApplyFingerprint = typeof SchemaApplyFingerprint.Type;
 
-export const CmsActor = Schema.Union(
-  Schema.Struct({ kind: Schema.Literal("user"), id: AuthUserId }),
-  Schema.Struct({ kind: Schema.Literal("credential"), id: ApiCredentialId }),
-).annotations({ identifier: "CmsActor", parseOptions: { onExcessProperty: "error" } });
+export const CmsActor = ProjectActor.annotations({ identifier: "CmsActor" });
 export type CmsActor = typeof CmsActor.Type;
 
 export class CollectionSourceIdentity extends Schema.Class<CollectionSourceIdentity>(

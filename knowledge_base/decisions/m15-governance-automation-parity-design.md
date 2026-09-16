@@ -1,6 +1,6 @@
 # Milestone 15 governance automation parity design
 
-**Status:** Proposed; awaiting developer approval
+**Status:** Developer-approved for implementation on 2026-09-14; design committed as `07bcad6`
 
 **Date:** 2026-09-14
 
@@ -739,11 +739,11 @@ Actual actors, stable scope, closed operation/outcome labels, and transactional 
 
 The design extends existing access/locale repositories, Control Plane transport, CLI, and dashboard adapters. It creates no second policy engine, environment model, SDK namespace, or app-owned business authority, leaving M21 a clean place to add requirements-driven custom restrictions.
 
-## Approval gate
+## Approval and implementation gate
 
-This record is a proposal only. Developer approval is required before implementation. Approval must explicitly acknowledge the intentional invitation-create exception: it is unique/conflict-safe but not receipt-replayable because replay would require recoverable storage of a one-time server-generated token. After an ambiguous response, automation must list/search, explicitly revoke if appropriate, and issue a replacement; it never self-heals by hidden retry.
+The developer approved this design and explicitly authorized implementation on 2026-09-14 by committing and pushing `07bcad6`, including the intentional invitation-create exception: it is unique/conflict-safe but not receipt-replayable because replay would require recoverable storage of a one-time server-generated token. After an ambiguous response, automation must list/search, explicitly revoke if appropriate, and issue a replacement; it never self-heals by hidden retry.
 
-After approval, implementation should proceed in bounded gates:
+Implementation proceeds in bounded gates:
 
 1. Contracts, role/policy kernel, actor shape, and focused pure tests
 2. Approved Drizzle schema edits and stop for developer migration generation/application

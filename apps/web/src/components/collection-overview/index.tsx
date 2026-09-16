@@ -73,7 +73,7 @@ export function CollectionOverview({
 
   const projectModel = project.data.data;
   const draftModel = draft.data.data;
-  const allowed = new Set(access.data.data.allowedActions);
+  const allowed = new Set(access.data.data.effectiveProjectActions);
   const canConfigureDelivery =
     allowed.has("delivery.configure") && projectModel.archivedAt === null;
 

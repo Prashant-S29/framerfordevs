@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth/invitation-link";
 
 export const Route = createFileRoute("/login")({
+  ssr: false,
   validateSearch: (search: Record<string, unknown>) => ({
     returnTo: getSafeAuthenticatedReturnTo(search.returnTo) ?? undefined,
   }),

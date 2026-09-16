@@ -42,6 +42,7 @@ Do not preload all historical decisions, milestone journals, learnings, or rules
 ## Tests, documentation, and handoff
 
 - Add deterministic success/failure/authorization/boundary/regression tests with behavior changes. Follow `knowledge_base/decisions/repository-test-structure.md` for placement.
+- Run committed browser specifications noninteractively with `pnpm test:browser` when relevant. Never launch or attach an interactive Playwright session, use headed/UI/debug mode, capture screenshots/traces/video, or perform a manual browser/visual tour unless the developer explicitly requests that activity.
 - Run applicable format, lint, structure, contracts, types, tests, coverage, audit, and builds. Never hide failures or claim unrun evidence.
 - `knowledge_base/context.md` stays a concise zero-context map. `progress.md` stays ordered and factual. `learnings.md` uses only `Incorrect assumption or decision`, `Learning`, and optional unresolved `Status`.
 - Decision records are domain references, not chronological required reading. Update `knowledge_base/decisions/index.md` when adding or superseding one.

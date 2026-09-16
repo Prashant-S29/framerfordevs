@@ -42,19 +42,33 @@ FFD_MANAGEMENT_TOKEN="$CI_SECRET" ffd schema check --json
 
 Do not run interactive login in CI. The token is read only from the process environment and is never written to project configuration or schema locks.
 
-## Control Plane bootstrap
+## Control Plane automation
 
-Control Plane commands provide complete noninteractive workspace/project bootstrap, capability, lifecycle, and inert Studio-registration automation. Every command requires an explicit `--api <origin>` and supports stable `--json` output. List commands return one bounded page; they never silently enumerate an account.
+Control Plane commands provide complete noninteractive workspace/project bootstrap, fixed-role governance, invitation/member policy, locale, capability, lifecycle, and inert Studio-registration automation. Every command requires an explicit `--api <origin>` and supports stable `--json` output. List commands return one bounded page; they never silently enumerate an account.
 
 ```sh
 ffd workspace list --api https://api.example.com --limit 20 --json
 ffd workspace create --api https://api.example.com --name "Workspace" --json
 ffd project create --api https://api.example.com --workspace WORKSPACE_ID --name "Project" --key project --enable-cms --json
 ffd project capabilities --api https://api.example.com --project PROJECT_ID --json
+ffd project environment get --api https://api.example.com --project PROJECT_ID --json
+ffd governance inspect --api https://api.example.com --project PROJECT_ID --json
+ffd member list --api https://api.example.com --project PROJECT_ID --role editor --json
+ffd member policy set --api https://api.example.com --project PROJECT_ID --member MEMBER_ID --expected-version 2 --role editor --locale-access selected --locale LOCALE_ID --json
+ffd invitation create --api https://api.example.com --project PROJECT_ID --email editor@example.com --role editor --locale-access all --json
+IFS= read -r -s invitation_token
+export -n invitation_token
+printf '\n'
+printf '%s\n' "$invitation_token" | ffd invitation inspect --api https://api.example.com --token-stdin --json
+printf '%s\n' "$invitation_token" | ffd invitation accept --api https://api.example.com --token-stdin --json
+unset invitation_token
+ffd locale create --api https://api.example.com --project PROJECT_ID --tag fr --display-name French --json
 ffd studio registration set --api https://api.example.com --project PROJECT_ID --environment-id ENVIRONMENT_ID --origin https://app.example.com --path /studio --json
 ```
 
-Receipt-backed mutations persist only a command UUID and canonical fingerprint until a confirmed response. An uncertain response retains that authority for exact replay, while changed command intent fails closed. Archive requires current version plus exact project-key confirmation; no lifecycle command has a force mode.
+Receipt-backed mutations persist only a command UUID and canonical fingerprint until a confirmed response. An uncertain response retains that authority for exact replay, while changed command intent fails closed. Locale create is receipt-backed; invitation create intentionally is not because its raw token is returned only once and is never recoverably stored. After an ambiguous invitation-create response, list/search the exact email, explicitly revoke the pending invitation when appropriate, then reissue it. The CLI never retries or revokes invitations automatically.
+
+Invitation inspect and accept require `--token-stdin`; the example keeps the token in an unexported shell-local variable only long enough for those two stdin writes, then unsets it. The token is never accepted in a CLI argument, query, environment variable, retry journal, or configuration file. Selected locale policy requires one or more unique `--locale` values, while `all` and `none` reject locale flags. Governance reads/writes require the `control-plane:governance:read`/`control-plane:governance:write` OAuth grants; existing refresh tokens cannot gain them, so scope denial requires a fresh login. Archive requires current version plus exact project-key confirmation; no lifecycle command has a force mode.
 
 Control Plane administration is intentionally absent from `@framerfordevs/sdk`.
 

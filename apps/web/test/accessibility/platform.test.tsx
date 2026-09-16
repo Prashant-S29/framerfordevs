@@ -2,7 +2,12 @@
 
 // Verifies accessible semantics across platform management controls without owning component behavior.
 
-import { ApiCredential, ProjectMember } from "@framerfordevs/api/contracts/access/index";
+import {
+  ApiCredential,
+  IssuedProjectInvitation,
+  ProjectInvitation,
+  ProjectMember,
+} from "@framerfordevs/api/contracts/access/index";
 import { StudioRegistration } from "@framerfordevs/api/contracts/control-plane/index";
 import { ProjectLocale } from "@framerfordevs/api/contracts/locale/index";
 import { Project } from "@framerfordevs/api/contracts/platform/index";
@@ -34,6 +39,8 @@ import {
   InviteMemberDialog,
   IssueCredentialDialog,
   LocaleAccessDialog,
+  ProjectAccessSettings,
+  governanceErrorMessage,
 } from "@/components/project/access-settings";
 import { AddLocaleDialog } from "@/components/project/locale-settings";
 import { CreateEntryDialog } from "@/components/entry/collection-entries";
@@ -79,6 +86,21 @@ const member = Schema.decodeUnknownSync(ProjectMember)({
   removedAt: null,
   createdAt: "2026-07-29T00:00:00.000Z",
   updatedAt: "2026-07-29T00:00:00.000Z",
+});
+
+const acceptedInvitation = Schema.decodeUnknownSync(ProjectInvitation)({
+  id: "019fae8b-1234-7000-8000-000000000007",
+  projectId: "019fae8b-1234-7000-8000-000000000001",
+  email: "accepted@example.test",
+  role: "reviewer",
+  localeAccess: { mode: "all" },
+  status: "accepted",
+  version: 2,
+  expiresAt: "2026-09-23T00:00:00.000Z",
+  acceptedAt: "2026-09-16T00:00:00.000Z",
+  revokedAt: null,
+  createdAt: "2026-09-15T00:00:00.000Z",
+  updatedAt: "2026-09-16T00:00:00.000Z",
 });
 
 const project = Schema.decodeUnknownSync(Project)({
@@ -257,9 +279,253 @@ describe("platform management accessibility", () => {
     expect((await axe.run(container)).violations).toEqual([]);
   });
 
+  it("keeps bounded member and invitation filters accessible", async () => {
+    const queryClient = new QueryClient();
+    const memberOptions = orpc.platform.projects.members.list.infiniteOptions({
+      input: (cursor: string | null) => ({
+        projectId: project.id,
+        role: null,
+        search: null,
+        cursor,
+        limit: 20,
+      }),
+      initialPageParam: null,
+      getNextPageParam: (lastPage) => lastPage.data.nextCursor ?? undefined,
+      maxPages: 10,
+    });
+    const filteredMemberOptions = orpc.platform.projects.members.list.infiniteOptions({
+      input: (cursor: string | null) => ({
+        projectId: project.id,
+        role: "reviewer" as const,
+        search: null,
+        cursor,
+        limit: 20,
+      }),
+      initialPageParam: null,
+      getNextPageParam: (lastPage) => lastPage.data.nextCursor ?? undefined,
+      maxPages: 10,
+    });
+    const invitationOptions = orpc.platform.projects.invitations.list.infiniteOptions({
+      input: (cursor: string | null) => ({
+        projectId: project.id,
+        status: "all" as const,
+        search: null,
+        cursor,
+        limit: 20,
+      }),
+      initialPageParam: null,
+      getNextPageParam: (lastPage) => lastPage.data.nextCursor ?? undefined,
+      maxPages: 10,
+    });
+    const filteredInvitationOptions = orpc.platform.projects.invitations.list.infiniteOptions({
+      input: (cursor: string | null) => ({
+        projectId: project.id,
+        status: "pending" as const,
+        search: null,
+        cursor,
+        limit: 20,
+      }),
+      initialPageParam: null,
+      getNextPageParam: (lastPage) => lastPage.data.nextCursor ?? undefined,
+      maxPages: 10,
+    });
+    const localeOptions = orpc.platform.projects.locales.list.queryOptions({
+      input: { projectId: project.id, view: "settings", includeRemoved: true },
+    });
+    queryClient.setQueryData(memberOptions.queryKey, {
+      pages: [
+        {
+          ok: true,
+          data: { items: [member], nextCursor: null },
+          error: null,
+          message: "Members loaded.",
+        },
+      ],
+      pageParams: [null],
+    });
+    queryClient.setQueryData(filteredMemberOptions.queryKey, {
+      pages: [
+        {
+          ok: true,
+          data: { items: [], nextCursor: null },
+          error: null,
+          message: "Members loaded.",
+        },
+      ],
+      pageParams: [null],
+    });
+    queryClient.setQueryData(invitationOptions.queryKey, {
+      pages: [
+        {
+          ok: true,
+          data: { items: [acceptedInvitation], nextCursor: null },
+          error: null,
+          message: "Invitations loaded.",
+        },
+      ],
+      pageParams: [null],
+    });
+    queryClient.setQueryData(filteredInvitationOptions.queryKey, {
+      pages: [
+        {
+          ok: true,
+          data: { items: [], nextCursor: null },
+          error: null,
+          message: "Invitations loaded.",
+        },
+      ],
+      pageParams: [null],
+    });
+    queryClient.setQueryData(localeOptions.queryKey, {
+      ok: true,
+      data: { items: [locale, hindiLocale] },
+      error: null,
+      message: "Locales loaded.",
+    });
+
+    const { container } = renderWithQueryClient(
+      <ProjectAccessSettings
+        projectId={project.id}
+        environmentId={project.environment.id}
+        role="owner"
+        localeAccessMode="all"
+        effectiveProjectActions={[
+          "project.member.read",
+          "project.member.invite",
+          "project.member.role.update",
+          "project.member.locale.update",
+          "project.member.remove",
+        ]}
+      />,
+      queryClient,
+    );
+
+    const user = userEvent.setup();
+    const memberSearch = await screen.findByLabelText("Member name or email prefix");
+    const memberRole = screen.getByLabelText("Role", { selector: "select#member-role-filter" });
+    const invitationSearch = screen.getByLabelText("Invitation email prefix");
+    const invitationStatus = screen.getByLabelText("Status");
+    expect(memberSearch.getAttribute("maxlength")).toBe("100");
+    expect(invitationSearch.getAttribute("maxlength")).toBe("100");
+    expect(Array.from((memberRole as HTMLSelectElement).options)).toHaveLength(8);
+    expect(
+      Array.from((invitationStatus as HTMLSelectElement).options, ({ value }) => value),
+    ).toEqual(["all", "pending", "accepted", "revoked", "expired"]);
+    expect(screen.getByText("member@example.test")).toBeTruthy();
+    expect(screen.getByText("accepted@example.test")).toBeTruthy();
+
+    await user.selectOptions(memberRole, "reviewer");
+    expect(await screen.findByText("No matching project members")).toBeTruthy();
+    await user.selectOptions(invitationStatus, "pending");
+    expect(await screen.findByText("No invitations match the current filters.")).toBeTruthy();
+    expect((await axe.run(container)).violations).toEqual([]);
+  });
+
+  it("provides actionable governance recovery messages", () => {
+    expect(governanceErrorMessage({ data: { code: "LAST_OWNER_REQUIRED" } })).toMatch(
+      /another owner/i,
+    );
+    expect(governanceErrorMessage({ error: { code: "VERSION_CONFLICT" } })).toMatch(
+      /latest version/i,
+    );
+    expect(governanceErrorMessage({ code: "LOCALE_UNAVAILABLE" })).toMatch(/enabled locales/i);
+    expect(governanceErrorMessage({ code: "INVITATION_CONFLICT" })).toMatch(
+      /revoke the pending invitation/i,
+    );
+    expect(governanceErrorMessage(new Error("Network closed."), true)).toMatch(
+      /instead of retrying blindly/i,
+    );
+  });
+
   it("has accessible invitation creation semantics", async () => {
-    renderWithQueryClient(<InviteMemberDialog projectId={project.id} />);
+    renderWithQueryClient(
+      <InviteMemberDialog projectId={project.id} projectLocales={[locale, hindiLocale]} />,
+    );
     await expectOpenDialogToHaveNoViolations(/invite member/i);
+  });
+
+  it("requires a complete invitation role and locale policy", async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(
+      <InviteMemberDialog projectId={project.id} projectLocales={[locale, hindiLocale]} />,
+    );
+    await user.click(screen.getByRole("button", { name: /invite member/i }));
+    await user.type(screen.getByLabelText("Email"), "invitee@example.test");
+
+    const role = screen.getByLabelText("Role");
+    expect(Array.from((role as HTMLSelectElement).options, (option) => option.value)).toEqual([
+      "owner",
+      "developer",
+      "content_admin",
+      "editor",
+      "reviewer",
+      "client_editor",
+      "read_only",
+    ]);
+    const localeAccess = screen.getByLabelText("Locale access");
+    const create = screen.getByRole("button", { name: /create invitation/i });
+    await user.selectOptions(localeAccess, "selected");
+    expect(create.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText(/select at least one enabled locale/i)).toBeTruthy();
+
+    await user.click(screen.getByRole("checkbox", { name: /Hindi \(hi\)/i }));
+    expect(create.hasAttribute("disabled")).toBe(false);
+
+    await user.selectOptions(role, "owner");
+    expect((localeAccess as HTMLSelectElement).value).toBe("all");
+    expect((localeAccess as HTMLSelectElement).disabled).toBe(true);
+    expect(screen.getByText(/owners always receive all-locale access/i)).toBeTruthy();
+  });
+
+  it("keeps one-time invitation tokens out of the mutation cache and clears the dialog copy", async () => {
+    const token = "t".repeat(43);
+    const issued = Schema.decodeUnknownSync(IssuedProjectInvitation)({
+      invitation: {
+        id: "019fae8b-1234-7000-8000-000000000099",
+        projectId: project.id,
+        email: "invitee@example.test",
+        role: "client_editor",
+        localeAccess: { mode: "all" },
+        status: "pending",
+        version: 1,
+        expiresAt: "2026-09-23T00:00:00.000Z",
+        acceptedAt: null,
+        revokedAt: null,
+        createdAt: "2026-09-16T00:00:00.000Z",
+        updatedAt: "2026-09-16T00:00:00.000Z",
+      },
+      token,
+    });
+    const createInvitation = vi.fn(async () => ({
+      ok: true as const,
+      data: issued,
+      error: null,
+      message: "Invitation created.",
+    }));
+    const queryClient = new QueryClient();
+    const user = userEvent.setup();
+
+    renderWithQueryClient(
+      <InviteMemberDialog
+        projectId={project.id}
+        projectLocales={[locale, hindiLocale]}
+        createInvitation={createInvitation}
+      />,
+      queryClient,
+    );
+    await user.click(screen.getByRole("button", { name: /invite member/i }));
+    await user.type(screen.getByLabelText("Email"), "invitee@example.test");
+    await user.click(screen.getByRole("button", { name: /create invitation/i }));
+
+    const link = await screen.findByLabelText("One-time invitation link");
+    expect((link as HTMLInputElement).value).toContain(token);
+    expect(createInvitation).toHaveBeenCalledOnce();
+    expect(queryClient.getMutationCache().getAll()).toHaveLength(0);
+
+    await user.click(screen.getByRole("checkbox", { name: /I saved the invitation link/i }));
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByLabelText("One-time invitation link")).toBeNull();
+    expect(JSON.stringify(queryClient.getMutationCache().getAll())).not.toContain(token);
   });
 
   it("has accessible credential issuance semantics", async () => {
@@ -501,7 +767,11 @@ describe("platform management accessibility", () => {
 
   it("has accessible membership locale-access semantics", async () => {
     renderWithQueryClient(
-      <LocaleAccessDialog member={member} projectLocales={[locale, hindiLocale]} />,
+      <LocaleAccessDialog
+        projectId={project.id}
+        member={member}
+        projectLocales={[locale, hindiLocale]}
+      />,
     );
     await expectOpenDialogToHaveNoViolations(/locale access/i);
   });
@@ -509,7 +779,11 @@ describe("platform management accessibility", () => {
   it("requires confirmation before reducing member locale access", async () => {
     const user = userEvent.setup();
     renderWithQueryClient(
-      <LocaleAccessDialog member={member} projectLocales={[locale, hindiLocale]} />,
+      <LocaleAccessDialog
+        projectId={project.id}
+        member={member}
+        projectLocales={[locale, hindiLocale]}
+      />,
     );
     await user.click(screen.getByRole("button", { name: /locale access/i }));
     await user.selectOptions(screen.getByLabelText(/access mode/i), "none");

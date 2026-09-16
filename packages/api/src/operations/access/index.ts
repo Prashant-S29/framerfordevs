@@ -11,8 +11,7 @@ import {
   type ListProjectMembersInput,
   type RemoveProjectMemberInput,
   type RevokeProjectInvitationInput,
-  type UpdateProjectMemberLocaleAccessInput,
-  type UpdateProjectMemberRoleInput,
+  type UpdateProjectMemberPolicyInput,
 } from "../../contracts/access";
 import { UnauthorizedFailure } from "../../contracts/response/errors";
 import { AuthUserId } from "../../contracts/platform";
@@ -101,7 +100,10 @@ export const revokeProjectInvitation = Effect.fn("access.invitation.revoke")(fun
   requestId: string,
 ) {
   const actorId = yield* decodeActorId(actorUserId);
-  yield* Effect.annotateCurrentSpan({ invitationId: input.invitationId });
+  yield* Effect.annotateCurrentSpan({
+    projectId: input.projectId,
+    invitationId: input.invitationId,
+  });
   const repository = yield* AccessRepository;
   return yield* repository.revokeInvitation(actorId, input, yield* currentDate, requestId);
 });
@@ -126,29 +128,20 @@ export const listProjectMembers = Effect.fn("access.member.list")(function* (
   return yield* repository.listMembers(actorId, input);
 });
 
-export const updateProjectMemberRole = Effect.fn("access.member.role.update")(function* (
+export const updateProjectMemberPolicy = Effect.fn("access.member.policy.update")(function* (
   actorUserId: string,
-  input: UpdateProjectMemberRoleInput,
-  requestId: string,
-) {
-  const actorId = yield* decodeActorId(actorUserId);
-  yield* Effect.annotateCurrentSpan({ membershipId: input.membershipId, role: input.role });
-  const repository = yield* AccessRepository;
-  return yield* repository.updateMemberRole(actorId, input, yield* currentDate, requestId);
-});
-
-export const updateProjectMemberLocaleAccess = Effect.fn("access.member.locale.update")(function* (
-  actorUserId: string,
-  input: UpdateProjectMemberLocaleAccessInput,
+  input: UpdateProjectMemberPolicyInput,
   requestId: string,
 ) {
   const actorId = yield* decodeActorId(actorUserId);
   yield* Effect.annotateCurrentSpan({
+    projectId: input.projectId,
     membershipId: input.membershipId,
-    localeAccessMode: input.access.mode,
+    role: input.role,
+    localeAccessMode: input.localeAccess.mode,
   });
   const repository = yield* AccessRepository;
-  return yield* repository.updateMemberLocaleAccess(actorId, input, yield* currentDate, requestId);
+  return yield* repository.updateMemberPolicy(actorId, input, yield* currentDate, requestId);
 });
 
 export const removeProjectMember = Effect.fn("access.member.remove")(function* (
@@ -157,7 +150,10 @@ export const removeProjectMember = Effect.fn("access.member.remove")(function* (
   requestId: string,
 ) {
   const actorId = yield* decodeActorId(actorUserId);
-  yield* Effect.annotateCurrentSpan({ membershipId: input.membershipId });
+  yield* Effect.annotateCurrentSpan({
+    projectId: input.projectId,
+    membershipId: input.membershipId,
+  });
   const repository = yield* AccessRepository;
   return yield* repository.removeMember(actorId, input, yield* currentDate, requestId);
 });

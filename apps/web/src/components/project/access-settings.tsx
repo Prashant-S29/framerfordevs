@@ -6,6 +6,8 @@ import type {
   CredentialScope,
   LocaleAccessMode,
   ProjectInvitation,
+  ProjectInvitationListStatus,
+  ProjectLocaleAccess,
   ProjectMember,
   ProjectPermissionAction,
   ProjectRole,
@@ -76,7 +78,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { buildInvitationLink } from "@/lib/auth/invitation-link";
-import { orpc } from "@/utils/orpc";
+import { client, orpc } from "@/utils/orpc";
 
 const projectRoles: ReadonlyArray<ProjectRole> = [
   "owner",
@@ -105,6 +107,33 @@ function parseProjectRole(value: string): ProjectRole | undefined {
 function parseCredentialFamily(value: string): CredentialFamily | undefined {
   if (value === "management" || value === "delivery" || value === "preview") return value;
   return undefined;
+}
+
+function applicationErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  if ("code" in error && typeof error.code === "string") return error.code;
+  if ("data" in error) return applicationErrorCode(error.data);
+  if ("error" in error) return applicationErrorCode(error.error);
+  return undefined;
+}
+
+export function governanceErrorMessage(error: unknown, ambiguousInvitation = false): string {
+  const code = applicationErrorCode(error);
+  switch (code) {
+    case "LAST_OWNER_REQUIRED":
+      return "Add or promote another owner, refresh members, and then retry.";
+    case "VERSION_CONFLICT":
+      return "This record changed. Refresh the list and retry with its latest version.";
+    case "LOCALE_UNAVAILABLE":
+      return "A selected locale is unavailable. Refresh locales and choose only enabled locales.";
+    case "INVITATION_CONFLICT":
+      return "This email is already a member or has a pending invitation. Search and revoke the pending invitation before reissuing.";
+    default:
+      if (ambiguousInvitation && (code === undefined || code === "INTERNAL_SERVER_ERROR")) {
+        return "The invitation result is uncertain. Search this email, revoke any pending invitation, and then reissue instead of retrying blindly.";
+      }
+      return error instanceof Error ? error.message : "The governance operation failed.";
+  }
 }
 
 const roleDescriptions: Readonly<Record<ProjectRole, string>> = {
@@ -139,12 +168,22 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
   timeStyle: "short",
 });
 
+function localeAccessLabel(
+  access: ProjectLocaleAccess,
+  projectLocales: ReadonlyArray<ProjectLocale>,
+): string {
+  if (access.mode === "all") return "All locales";
+  if (access.mode === "none") return "No locales";
+  const labels = new Map(projectLocales.map((locale) => [locale.id, locale.displayName]));
+  return access.localeIds.map((localeId) => labels.get(localeId) ?? localeId).join(", ");
+}
+
 interface ProjectAccessSettingsProps {
   readonly projectId: string;
   readonly environmentId: string;
   readonly role: ProjectRole;
   readonly localeAccessMode: LocaleAccessMode;
-  readonly allowedActions: ReadonlyArray<ProjectPermissionAction>;
+  readonly effectiveProjectActions: ReadonlyArray<ProjectPermissionAction>;
 }
 
 export function ProjectAccessSettings({
@@ -152,9 +191,9 @@ export function ProjectAccessSettings({
   environmentId,
   role,
   localeAccessMode,
-  allowedActions,
+  effectiveProjectActions,
 }: ProjectAccessSettingsProps) {
-  const actions = new Set(allowedActions);
+  const actions = new Set(effectiveProjectActions);
   const canReadMembers = actions.has("project.member.read");
   const canInvite = actions.has("project.member.invite");
   const canMutateMembers =
@@ -162,9 +201,8 @@ export function ProjectAccessSettings({
   const canUpdateLocaleAccess = actions.has("project.member.locale.update");
   const canReadCredentials = actions.has("project.credential.read");
   const hasRestrictedLocaleAccess = localeAccessMode !== "all";
-  const canIssueCredentials = actions.has("project.credential.issue") && !hasRestrictedLocaleAccess;
-  const canRotateCredentials =
-    actions.has("project.credential.rotate") && !hasRestrictedLocaleAccess;
+  const canIssueCredentials = actions.has("project.credential.issue");
+  const canRotateCredentials = actions.has("project.credential.rotate");
   const canRevokeCredentials = actions.has("project.credential.revoke");
 
   return (
@@ -237,9 +275,21 @@ function MembersPanel({
   readonly canMutate: boolean;
   readonly canUpdateLocaleAccess: boolean;
 }) {
+  const [memberRole, setMemberRole] = useState<"all" | ProjectRole>("all");
+  const [memberSearchDraft, setMemberSearchDraft] = useState("");
+  const [memberSearch, setMemberSearch] = useState("");
+  const [invitationStatus, setInvitationStatus] = useState<ProjectInvitationListStatus>("all");
+  const [invitationSearchDraft, setInvitationSearchDraft] = useState("");
+  const [invitationSearch, setInvitationSearch] = useState("");
   const members = useInfiniteQuery(
     orpc.platform.projects.members.list.infiniteOptions({
-      input: (cursor: string | null) => ({ projectId, cursor, limit: 20 }),
+      input: (cursor: string | null) => ({
+        projectId,
+        role: memberRole === "all" ? null : memberRole,
+        search: memberSearch === "" ? null : memberSearch,
+        cursor,
+        limit: 20,
+      }),
       initialPageParam: null,
       getNextPageParam: (lastPage) => lastPage.data.nextCursor ?? undefined,
       maxPages: 10,
@@ -247,7 +297,13 @@ function MembersPanel({
   );
   const invitations = useInfiniteQuery(
     orpc.platform.projects.invitations.list.infiniteOptions({
-      input: (cursor: string | null) => ({ projectId, cursor, limit: 20 }),
+      input: (cursor: string | null) => ({
+        projectId,
+        status: invitationStatus,
+        search: invitationSearch === "" ? null : invitationSearch,
+        cursor,
+        limit: 20,
+      }),
       initialPageParam: null,
       getNextPageParam: (lastPage) => lastPage.data.nextCursor ?? undefined,
       maxPages: 10,
@@ -277,6 +333,8 @@ function MembersPanel({
   }
 
   const canRenderLocaleAccess = canUpdateLocaleAccess && !localeQuery.isError;
+  const memberFiltersActive = memberRole !== "all" || memberSearch !== "";
+  const invitationFiltersActive = invitationStatus !== "all" || invitationSearch !== "";
 
   return (
     <div className="flex flex-col gap-6">
@@ -298,8 +356,68 @@ function MembersPanel({
             Membership changes take effect immediately and preserve audit history.
           </p>
         </div>
-        {canInvite ? <InviteMemberDialog projectId={projectId} /> : null}
+        {canInvite ? (
+          <InviteMemberDialog projectId={projectId} projectLocales={projectLocales} />
+        ) : null}
       </div>
+
+      <form
+        className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto] sm:items-end"
+        aria-label="Filter project members"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setMemberSearch(memberSearchDraft.trim());
+        }}
+      >
+        <Field>
+          <FieldLabel htmlFor="member-search">Member name or email prefix</FieldLabel>
+          <Input
+            id="member-search"
+            type="search"
+            maxLength={100}
+            value={memberSearchDraft}
+            onChange={(event) => setMemberSearchDraft(event.target.value)}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="member-role-filter">Role</FieldLabel>
+          <NativeSelect
+            id="member-role-filter"
+            value={memberRole}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (value === "all") setMemberRole("all");
+              else {
+                const role = parseProjectRole(value);
+                if (role) setMemberRole(role);
+              }
+            }}
+          >
+            <NativeSelectOption value="all">All roles</NativeSelectOption>
+            {projectRoles.map((value) => (
+              <NativeSelectOption key={value} value={value}>
+                {roleLabels[value]}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
+        <div className="flex gap-2">
+          <Button type="submit" variant="outline">
+            Search
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setMemberRole("all");
+              setMemberSearchDraft("");
+              setMemberSearch("");
+            }}
+          >
+            Clear
+          </Button>
+        </div>
+      </form>
 
       {memberItems.length === 0 ? (
         <Empty>
@@ -307,8 +425,14 @@ function MembersPanel({
             <EmptyMedia variant="icon">
               <UsersIcon aria-hidden="true" />
             </EmptyMedia>
-            <EmptyTitle>No project members</EmptyTitle>
-            <EmptyDescription>Invite a collaborator to establish project access.</EmptyDescription>
+            <EmptyTitle>
+              {memberFiltersActive ? "No matching project members" : "No project members"}
+            </EmptyTitle>
+            <EmptyDescription>
+              {memberFiltersActive
+                ? "Clear or change the member filters to continue."
+                : "Invite a collaborator to establish project access."}
+            </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
@@ -316,6 +440,7 @@ function MembersPanel({
           {memberItems.map((member) => (
             <MemberRow
               key={member.id}
+              projectId={projectId}
               member={member}
               canMutate={canMutate}
               canUpdateLocaleAccess={canRenderLocaleAccess}
@@ -338,11 +463,80 @@ function MembersPanel({
 
       <div className="flex flex-col gap-3">
         <h3 className="text-sm font-medium">Invitations</h3>
+        <form
+          className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto] sm:items-end"
+          aria-label="Filter project invitations"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setInvitationSearch(invitationSearchDraft.trim());
+          }}
+        >
+          <Field>
+            <FieldLabel htmlFor="invitation-search">Invitation email prefix</FieldLabel>
+            <Input
+              id="invitation-search"
+              type="search"
+              maxLength={100}
+              value={invitationSearchDraft}
+              onChange={(event) => setInvitationSearchDraft(event.target.value)}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="invitation-status-filter">Status</FieldLabel>
+            <NativeSelect
+              id="invitation-status-filter"
+              value={invitationStatus}
+              onChange={(event) => {
+                const status = event.target.value;
+                if (
+                  status === "all" ||
+                  status === "pending" ||
+                  status === "accepted" ||
+                  status === "revoked" ||
+                  status === "expired"
+                ) {
+                  setInvitationStatus(status);
+                }
+              }}
+            >
+              <NativeSelectOption value="all">All statuses</NativeSelectOption>
+              <NativeSelectOption value="pending">Pending</NativeSelectOption>
+              <NativeSelectOption value="accepted">Accepted</NativeSelectOption>
+              <NativeSelectOption value="revoked">Revoked</NativeSelectOption>
+              <NativeSelectOption value="expired">Expired</NativeSelectOption>
+            </NativeSelect>
+          </Field>
+          <div className="flex gap-2">
+            <Button type="submit" variant="outline">
+              Search
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setInvitationStatus("all");
+                setInvitationSearchDraft("");
+                setInvitationSearch("");
+              }}
+            >
+              Clear
+            </Button>
+          </div>
+        </form>
         {invitationItems.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No invitations have been created.</p>
+          <p className="text-muted-foreground text-sm">
+            {invitationFiltersActive
+              ? "No invitations match the current filters."
+              : "No invitations have been created."}
+          </p>
         ) : (
           invitationItems.map((invitation) => (
-            <InvitationRow key={invitation.id} invitation={invitation} canRevoke={canInvite} />
+            <InvitationRow
+              key={invitation.id}
+              invitation={invitation}
+              projectLocales={projectLocales}
+              canRevoke={canInvite}
+            />
           ))
         )}
         {invitations.hasNextPage ? (
@@ -362,11 +556,13 @@ function MembersPanel({
 }
 
 function MemberRow({
+  projectId,
   member,
   canMutate,
   canUpdateLocaleAccess,
   projectLocales,
 }: {
+  readonly projectId: string;
   readonly member: ProjectMember;
   readonly canMutate: boolean;
   readonly canUpdateLocaleAccess: boolean;
@@ -382,6 +578,7 @@ function MemberRow({
         <Badge variant="secondary">{roleLabels[member.role]}</Badge>
         {canMutate || canUpdateLocaleAccess ? (
           <MemberActions
+            projectId={projectId}
             member={member}
             canMutate={canMutate}
             canUpdateLocaleAccess={canUpdateLocaleAccess}
@@ -394,36 +591,19 @@ function MemberRow({
 }
 
 function MemberActions({
+  projectId,
   member,
   canMutate,
   canUpdateLocaleAccess,
   projectLocales,
 }: {
+  readonly projectId: string;
   readonly member: ProjectMember;
   readonly canMutate: boolean;
   readonly canUpdateLocaleAccess: boolean;
   readonly projectLocales: ReadonlyArray<ProjectLocale>;
 }) {
   const queryClient = useQueryClient();
-  const [role, setRole] = useState<ProjectRole>(member.role);
-  const [confirmDemotion, setConfirmDemotion] = useState(false);
-  const updateRole = useMutation(
-    orpc.platform.projects.members.updateRole.mutationOptions({
-      onSuccess: async (response) => {
-        setConfirmDemotion(false);
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: orpc.platform.projects.members.key(),
-          }),
-          queryClient.invalidateQueries({
-            queryKey: orpc.platform.projects.access.key(),
-          }),
-        ]);
-        toast.success(response.message);
-      },
-      onError: (error) => toast.error(error.message),
-    }),
-  );
   const remove = useMutation(
     orpc.platform.projects.members.remove.mutationOptions({
       onSuccess: async (response) => {
@@ -437,53 +617,24 @@ function MemberActions({
         ]);
         toast.success(response.message);
       },
-      onError: (error) => toast.error(error.message),
+      onError: async (error) => {
+        await queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.members.key(),
+        });
+        toast.error(governanceErrorMessage(error));
+      },
     }),
   );
 
-  function saveRole() {
-    if (member.role === "owner" && role !== "owner") {
-      setConfirmDemotion(true);
-      return;
-    }
-    updateRole.mutate({
-      membershipId: member.id,
-      version: member.version,
-      role,
-    });
-  }
-
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {canMutate ? (
-        <>
-          <NativeSelect
-            aria-label={`Role for ${member.name}`}
-            value={role}
-            onChange={(event) => {
-              const nextRole = parseProjectRole(event.target.value);
-              if (nextRole) setRole(nextRole);
-            }}
-          >
-            {projectRoles.map((value) => (
-              <NativeSelectOption key={value} value={value}>
-                {roleLabels[value]}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={role === member.role || updateRole.isPending}
-            onClick={saveRole}
-          >
-            {updateRole.isPending ? <Spinner data-icon="inline-start" /> : null}
-            Save role
-          </Button>
-        </>
-      ) : null}
       {canUpdateLocaleAccess ? (
-        <LocaleAccessDialog member={member} projectLocales={projectLocales} />
+        <LocaleAccessDialog
+          projectId={projectId}
+          member={member}
+          projectLocales={projectLocales}
+          canUpdateRole={canMutate}
+        />
       ) : null}
       {canMutate ? (
         <AlertDialog>
@@ -505,6 +656,7 @@ function MemberActions({
                 disabled={remove.isPending}
                 onClick={() =>
                   remove.mutate({
+                    projectId: member.projectId,
                     membershipId: member.id,
                     version: member.version,
                   })
@@ -517,57 +669,32 @@ function MemberActions({
           </AlertDialogContent>
         </AlertDialog>
       ) : null}
-      <AlertDialog open={confirmDemotion} onOpenChange={setConfirmDemotion}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Demote {member.name} to {roleLabels[role]}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Owner-only authority will be removed, but this member will retain access to all
-              locales. Use the separate locale access control afterward if narrower access is
-              intended.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={updateRole.isPending}
-              onClick={() =>
-                updateRole.mutate({
-                  membershipId: member.id,
-                  version: member.version,
-                  role,
-                })
-              }
-            >
-              {updateRole.isPending ? <Spinner data-icon="inline-start" /> : null}
-              Demote and retain all locales
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
 
 export function LocaleAccessDialog({
+  projectId,
   member,
   projectLocales,
+  canUpdateRole = false,
 }: {
+  readonly projectId: string;
   readonly member: ProjectMember;
   readonly projectLocales: ReadonlyArray<ProjectLocale>;
+  readonly canUpdateRole?: boolean;
 }) {
   const queryClient = useQueryClient();
   const configuredLocaleIds =
     member.localeAccess.mode === "selected" ? member.localeAccess.localeIds : [];
   const [open, setOpen] = useState(false);
+  const [role, setRole] = useState<ProjectRole>(member.role);
   const [mode, setMode] = useState<LocaleAccessMode>(member.localeAccess.mode);
   const [localeIds, setLocaleIds] =
     useState<ReadonlyArray<ProjectLocale["id"]>>(configuredLocaleIds);
   const [acknowledged, setAcknowledged] = useState(false);
   const update = useMutation(
-    orpc.platform.projects.members.updateLocaleAccess.mutationOptions({
+    orpc.platform.projects.members.updatePolicy.mutationOptions({
       onSuccess: async (response) => {
         setOpen(false);
         setAcknowledged(false);
@@ -581,24 +708,36 @@ export function LocaleAccessDialog({
         ]);
         toast.success(response.message);
       },
-      onError: (error) => toast.error(error.message),
+      onError: async (error) => {
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: orpc.platform.projects.members.key(),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: orpc.platform.projects.locales.key(),
+          }),
+        ]);
+        toast.error(governanceErrorMessage(error));
+      },
     }),
   );
   const reducingAccess =
+    (member.role === "owner" && role !== "owner") ||
     (member.localeAccess.mode === "all" && mode !== "all") ||
     (member.localeAccess.mode === "selected" &&
       (mode === "none" ||
         (mode === "selected" &&
           configuredLocaleIds.some((localeId) => !localeIds.includes(localeId)))));
   const accessChanged =
+    role !== member.role ||
     mode !== member.localeAccess.mode ||
     (mode === "selected" &&
       member.localeAccess.mode === "selected" &&
       (localeIds.length !== configuredLocaleIds.length ||
         localeIds.some((localeId) => !configuredLocaleIds.includes(localeId))));
   const canSubmit =
-    member.role !== "owner" &&
     accessChanged &&
+    (role !== "owner" || mode === "all") &&
     (mode !== "selected" || localeIds.length > 0) &&
     (!reducingAccess || acknowledged);
 
@@ -610,6 +749,7 @@ export function LocaleAccessDialog({
 
   function changeOpen(nextOpen: boolean) {
     if (nextOpen) {
+      setRole(member.role);
       setMode(member.localeAccess.mode);
       setLocaleIds(configuredLocaleIds);
       setAcknowledged(false);
@@ -620,26 +760,61 @@ export function LocaleAccessDialog({
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger
-        render={<Button size="sm" variant="outline" disabled={member.role === "owner"} />}
+        render={
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={member.role === "owner" && !canUpdateRole}
+          />
+        }
       >
-        Locale access
+        {canUpdateRole ? "Member policy" : "Locale access"}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Locale access for {member.name}</DialogTitle>
+          <DialogTitle>
+            {canUpdateRole
+              ? `Member policy for ${member.name}`
+              : `Locale access for ${member.name}`}
+          </DialogTitle>
           <DialogDescription>
-            Restrictions are enforced server-side for content, locale configuration, and credential
-            escalation. Owners always retain all locales.
+            Role and locale access are saved together as one optimistic policy update. Restrictions
+            are enforced server-side, and owners always retain all locales.
           </DialogDescription>
         </DialogHeader>
         <FieldGroup>
+          {canUpdateRole ? (
+            <Field>
+              <FieldLabel htmlFor={`member-policy-role-${member.id}`}>Role</FieldLabel>
+              <NativeSelect
+                id={`member-policy-role-${member.id}`}
+                className="w-full"
+                value={role}
+                onChange={(event) => {
+                  const nextRole = parseProjectRole(event.target.value);
+                  if (nextRole) {
+                    setRole(nextRole);
+                    if (nextRole === "owner") setMode("all");
+                    setAcknowledged(false);
+                  }
+                }}
+              >
+                {projectRoles.map((value) => (
+                  <NativeSelectOption key={value} value={value}>
+                    {roleLabels[value]}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              <FieldDescription>{roleDescriptions[role]}</FieldDescription>
+            </Field>
+          ) : null}
           <Field>
             <FieldLabel htmlFor={`locale-access-mode-${member.id}`}>Access mode</FieldLabel>
             <NativeSelect
               id={`locale-access-mode-${member.id}`}
               className="w-full"
               value={mode}
-              disabled={member.role === "owner"}
+              disabled={role === "owner"}
               onChange={(event) => {
                 const value = event.target.value;
                 if (value === "all" || value === "selected" || value === "none") {
@@ -696,9 +871,11 @@ export function LocaleAccessDialog({
             disabled={!canSubmit || update.isPending}
             onClick={() =>
               update.mutate({
+                projectId,
                 membershipId: member.id,
                 version: member.version,
-                access:
+                role,
+                localeAccess:
                   mode === "selected"
                     ? { mode, localeIds }
                     : mode === "all"
@@ -708,7 +885,7 @@ export function LocaleAccessDialog({
             }
           >
             {update.isPending ? <Spinner data-icon="inline-start" /> : null}
-            Save locale access
+            {canUpdateRole ? "Save member policy" : "Save locale access"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -718,9 +895,11 @@ export function LocaleAccessDialog({
 
 function InvitationRow({
   invitation,
+  projectLocales,
   canRevoke,
 }: {
   readonly invitation: ProjectInvitation;
+  readonly projectLocales: ReadonlyArray<ProjectLocale>;
   readonly canRevoke: boolean;
 }) {
   const queryClient = useQueryClient();
@@ -732,7 +911,12 @@ function InvitationRow({
         });
         toast.success(response.message);
       },
-      onError: (error) => toast.error(error.message),
+      onError: async (error) => {
+        await queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.invitations.key(),
+        });
+        toast.error(governanceErrorMessage(error));
+      },
     }),
   );
 
@@ -741,7 +925,9 @@ function InvitationRow({
       <div className="min-w-0">
         <p className="truncate text-sm font-medium">{invitation.email}</p>
         <p className="text-muted-foreground text-sm">
-          {roleLabels[invitation.role]} · Expires{" "}
+          {roleLabels[invitation.role]} ·{" "}
+          {localeAccessLabel(invitation.localeAccess, projectLocales)}
+          {" · Expires "}
           {dateFormatter.format(new Date(invitation.expiresAt))}
         </p>
       </div>
@@ -756,6 +942,7 @@ function InvitationRow({
             disabled={revoke.isPending}
             onClick={() =>
               revoke.mutate({
+                projectId: invitation.projectId,
                 invitationId: invitation.id,
                 version: invitation.version,
               })
@@ -769,32 +956,62 @@ function InvitationRow({
   );
 }
 
-export function InviteMemberDialog({ projectId }: { readonly projectId: string }) {
+export function InviteMemberDialog({
+  projectId,
+  projectLocales,
+  createInvitation = (input) => client.platform.projects.invitations.create(input),
+}: {
+  readonly projectId: string;
+  readonly projectLocales: ReadonlyArray<ProjectLocale>;
+  readonly createInvitation?: typeof client.platform.projects.invitations.create;
+}) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<ProjectRole>("client_editor");
+  const [localeAccessMode, setLocaleAccessMode] = useState<LocaleAccessMode>("all");
+  const [localeIds, setLocaleIds] = useState<ReadonlyArray<ProjectLocale["id"]>>([]);
   const [invitationLink, setInvitationLink] = useState<string | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
-  const createInvitation = useMutation(
-    orpc.platform.projects.invitations.create.mutationOptions({
-      onSuccess: async (response) => {
-        const link = buildInvitationLink(window.location.origin, response.data.token);
-        setInvitationLink(link);
-        await queryClient.invalidateQueries({
-          queryKey: orpc.platform.projects.invitations.key(),
-        });
-      },
-      onError: (error) => toast.error(error.message),
-    }),
-  );
+  const [isCreating, setIsCreating] = useState(false);
+
+  async function submitInvitation() {
+    if (isCreating) return;
+    setIsCreating(true);
+    try {
+      const response = await createInvitation({
+        projectId,
+        email,
+        role,
+        localeAccess:
+          localeAccessMode === "selected"
+            ? { mode: "selected", localeIds }
+            : localeAccessMode === "all"
+              ? { mode: "all" }
+              : { mode: "none" },
+      });
+      const link = buildInvitationLink(window.location.origin, response.data.token);
+      setInvitationLink(link);
+      void queryClient.invalidateQueries({
+        queryKey: orpc.platform.projects.invitations.key(),
+      });
+    } catch (error) {
+      await queryClient.invalidateQueries({
+        queryKey: orpc.platform.projects.invitations.key(),
+      });
+      toast.error(governanceErrorMessage(error, true));
+    } finally {
+      setIsCreating(false);
+    }
+  }
 
   function reset() {
     setEmail("");
     setRole("client_editor");
+    setLocaleAccessMode("all");
+    setLocaleIds([]);
     setInvitationLink(null);
     setAcknowledged(false);
-    createInvitation.reset();
   }
 
   function changeOpen(nextOpen: boolean) {
@@ -808,6 +1025,17 @@ export function InviteMemberDialog({ projectId }: { readonly projectId: string }
     await navigator.clipboard.writeText(invitationLink);
     toast.success("Invitation link copied.");
   }
+
+  function toggleLocale(localeId: ProjectLocale["id"], checked: boolean) {
+    setLocaleIds((current) =>
+      checked ? [...current, localeId] : current.filter((value) => value !== localeId),
+    );
+  }
+
+  const canCreate =
+    email.trim() !== "" &&
+    (localeAccessMode !== "selected" || localeIds.length > 0) &&
+    (role !== "owner" || localeAccessMode === "all");
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
@@ -858,7 +1086,7 @@ export function InviteMemberDialog({ projectId }: { readonly projectId: string }
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              createInvitation.mutate({ projectId, email, role });
+              void submitInvitation();
             }}
           >
             <FieldGroup>
@@ -884,7 +1112,10 @@ export function InviteMemberDialog({ projectId }: { readonly projectId: string }
                   value={role}
                   onChange={(event) => {
                     const nextRole = parseProjectRole(event.target.value);
-                    if (nextRole) setRole(nextRole);
+                    if (nextRole) {
+                      setRole(nextRole);
+                      if (nextRole === "owner") setLocaleAccessMode("all");
+                    }
                   }}
                 >
                   {projectRoles.map((value) => (
@@ -895,12 +1126,60 @@ export function InviteMemberDialog({ projectId }: { readonly projectId: string }
                 </NativeSelect>
                 <FieldDescription>{roleDescriptions[role]}</FieldDescription>
               </Field>
+              <Field>
+                <FieldLabel htmlFor="invitation-locale-access">Locale access</FieldLabel>
+                <NativeSelect
+                  id="invitation-locale-access"
+                  className="w-full"
+                  value={localeAccessMode}
+                  disabled={role === "owner"}
+                  onChange={(event) => {
+                    const mode = event.target.value;
+                    if (mode === "all" || mode === "selected" || mode === "none") {
+                      setLocaleAccessMode(mode);
+                    }
+                  }}
+                >
+                  <NativeSelectOption value="all">All enabled locales</NativeSelectOption>
+                  <NativeSelectOption value="selected">Selected enabled locales</NativeSelectOption>
+                  <NativeSelectOption value="none">
+                    No locale-scoped content access
+                  </NativeSelectOption>
+                </NativeSelect>
+                {role === "owner" ? (
+                  <FieldDescription>Owners always receive all-locale access.</FieldDescription>
+                ) : null}
+              </Field>
+              {localeAccessMode === "selected" ? (
+                <FieldSet>
+                  <FieldLegend>Enabled project locales</FieldLegend>
+                  <div data-slot="checkbox-group" className="grid gap-3 sm:grid-cols-2">
+                    {projectLocales.map((locale) => (
+                      <Field key={locale.id} orientation="horizontal">
+                        <Checkbox
+                          id={`invitation-locale-${locale.id}`}
+                          checked={localeIds.includes(locale.id)}
+                          disabled={locale.status !== "enabled"}
+                          onCheckedChange={(checked) => toggleLocale(locale.id, checked)}
+                        />
+                        <FieldLabel htmlFor={`invitation-locale-${locale.id}`}>
+                          {locale.displayName} ({locale.tag})
+                          {locale.status === "enabled" ? "" : ` · ${locale.status}`}
+                        </FieldLabel>
+                      </Field>
+                    ))}
+                  </div>
+                  {localeIds.length === 0 ? (
+                    <FieldError>Select at least one enabled locale.</FieldError>
+                  ) : null}
+                </FieldSet>
+              ) : null}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => changeOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createInvitation.isPending || email.trim() === ""}>
-                  {createInvitation.isPending ? <Spinner data-icon="inline-start" /> : null}
+                <Button type="submit" disabled={isCreating || !canCreate}>
+                  {isCreating ? <Spinner data-icon="inline-start" /> : null}
                   Create invitation
                 </Button>
               </DialogFooter>

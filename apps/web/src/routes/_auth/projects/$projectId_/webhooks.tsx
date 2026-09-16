@@ -359,7 +359,7 @@ function WebhookWorkspace() {
   const mappingItems = mappings.data?.pages.flatMap((page) => page.data.items) ?? [];
   const deliveryItems = deliveries.data?.pages.flatMap((page) => page.data.items) ?? [];
   const selectedDelivery = deliveryItems.find((delivery) => delivery.id === selectedDeliveryId);
-  const canManage = access.data?.data.allowedActions.includes("webhook.manage") === true;
+  const canManage = access.data?.data.effectiveProjectActions.includes("webhook.manage") === true;
 
   function updateSearch(patch: Partial<WebhookSearch>) {
     void navigate({

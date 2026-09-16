@@ -5,19 +5,37 @@ import { JSONSchema, Schema } from "effect";
 import {
   ControlPlaneApiFailure,
   ControlPlaneCapabilityListResponse,
+  ControlPlaneCreateInvitationRequest,
+  ControlPlaneCreateLocaleRequest,
+  ControlPlaneCreateLocaleResponse,
   ControlPlaneCreateProjectRequest,
   ControlPlaneCreateProjectResponse,
   ControlPlaneCreateWorkspaceRequest,
   ControlPlaneCreateWorkspaceResponse,
   ControlPlaneEnableCapabilityRequest,
   ControlPlaneEnableCapabilityResponse,
+  ControlPlaneGovernanceResponse,
+  ControlPlaneInspectedInvitationResponse,
+  ControlPlaneInvitationPageResponse,
+  ControlPlaneInvitationResponse,
+  ControlPlaneInvitationTokenRequest,
+  ControlPlaneIssuedInvitationResponse,
+  ControlPlaneLocaleListResponse,
+  ControlPlaneLocaleOrderRequest,
+  ControlPlaneLocaleResponse,
+  ControlPlaneLocaleStatusRequest,
   controlPlaneLimits,
+  ControlPlaneMemberPageResponse,
+  ControlPlaneMemberPolicyRequest,
+  ControlPlaneMemberResponse,
   ControlPlaneProjectLifecycleRequest,
   ControlPlaneProjectPageResponse,
   ControlPlaneProjectResponse,
   ControlPlanePutStudioRegistrationRequest,
   ControlPlanePutStudioRegistrationResponse,
+  ControlPlaneUpdateLocaleRequest,
   ControlPlaneUpdateProjectRequest,
+  ControlPlaneVersionRequest,
   ControlPlaneWorkspacePageResponse,
   ControlPlaneWorkspaceResponse,
   StudioRegistrationResponse,
@@ -82,6 +100,24 @@ function schemaComponents() {
     ["StudioRegistrationResponse", StudioRegistrationResponse],
     ["ControlPlanePutStudioRegistrationRequest", ControlPlanePutStudioRegistrationRequest],
     ["ControlPlanePutStudioRegistrationResponse", ControlPlanePutStudioRegistrationResponse],
+    ["ControlPlaneGovernanceResponse", ControlPlaneGovernanceResponse],
+    ["ControlPlaneMemberPageResponse", ControlPlaneMemberPageResponse],
+    ["ControlPlaneMemberResponse", ControlPlaneMemberResponse],
+    ["ControlPlaneMemberPolicyRequest", ControlPlaneMemberPolicyRequest],
+    ["ControlPlaneVersionRequest", ControlPlaneVersionRequest],
+    ["ControlPlaneInvitationPageResponse", ControlPlaneInvitationPageResponse],
+    ["ControlPlaneInvitationResponse", ControlPlaneInvitationResponse],
+    ["ControlPlaneCreateInvitationRequest", ControlPlaneCreateInvitationRequest],
+    ["ControlPlaneIssuedInvitationResponse", ControlPlaneIssuedInvitationResponse],
+    ["ControlPlaneInvitationTokenRequest", ControlPlaneInvitationTokenRequest],
+    ["ControlPlaneInspectedInvitationResponse", ControlPlaneInspectedInvitationResponse],
+    ["ControlPlaneLocaleListResponse", ControlPlaneLocaleListResponse],
+    ["ControlPlaneCreateLocaleRequest", ControlPlaneCreateLocaleRequest],
+    ["ControlPlaneCreateLocaleResponse", ControlPlaneCreateLocaleResponse],
+    ["ControlPlaneUpdateLocaleRequest", ControlPlaneUpdateLocaleRequest],
+    ["ControlPlaneLocaleResponse", ControlPlaneLocaleResponse],
+    ["ControlPlaneLocaleOrderRequest", ControlPlaneLocaleOrderRequest],
+    ["ControlPlaneLocaleStatusRequest", ControlPlaneLocaleStatusRequest],
   ] as const;
   for (const [name, schema] of schemas) addEffectSchema(components, name, schema);
   return components;
@@ -141,6 +177,24 @@ const projectParameter = {
   required: true,
   schema: { type: "string", format: "uuid" },
 } as const;
+const membershipParameter = {
+  name: "membershipId",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+} as const;
+const invitationParameter = {
+  name: "invitationId",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+} as const;
+const localeParameter = {
+  name: "localeId",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+} as const;
 const environmentParameter = {
   name: "environmentId",
   in: "path",
@@ -174,6 +228,16 @@ const paginationParameters = [
 const oauthRead = [{ ControlPlaneOAuthRead: [] }] as const;
 const oauthWrite = [{ ControlPlaneOAuthWrite: [] }] as const;
 const oauthLifecycle = [{ ControlPlaneOAuthLifecycle: [] }] as const;
+const oauthGovernanceRead = [{ ControlPlaneOAuthGovernanceRead: [] }] as const;
+const oauthGovernanceWrite = [{ ControlPlaneOAuthGovernanceWrite: [] }] as const;
+const exactGovernanceRead = [
+  { ControlPlaneOAuthGovernanceRead: [] },
+  { ControlPlaneManagementCredential: [] },
+] as const;
+const exactGovernanceWrite = [
+  { ControlPlaneOAuthGovernanceWrite: [] },
+  { ControlPlaneManagementCredential: [] },
+] as const;
 const exactRead = [
   { ControlPlaneOAuthRead: [] },
   { ControlPlaneManagementCredential: [] },
@@ -201,10 +265,10 @@ export const controlPlaneOpenApiDocument = {
     title: "Framer for Developers Control Plane API",
     version: "1.0.0",
     description:
-      "Originless bearer-only workspace/project bootstrap, lifecycle recovery, capability, and inert Studio-registration authority for the official CLI and exact management credentials.",
+      "Originless bearer-only workspace/project bootstrap, fixed governance, locale administration, lifecycle recovery, capability, and inert Studio-registration authority for the official CLI and exact management credentials.",
   },
   servers: [{ url: "/api/control-plane/v1" }],
-  tags: [{ name: "Control Plane", description: "Bootstrap control-plane resources" }],
+  tags: [{ name: "Control Plane", description: "Portable control-plane resources" }],
   paths: {
     "/workspaces": {
       get: {
@@ -354,6 +418,257 @@ export const controlPlaneOpenApiDocument = {
       },
       options: denyPreflight("denyControlPlaneCmsCapabilityPreflight"),
     },
+    "/projects/{projectId}/governance": {
+      get: {
+        operationId: "getControlPlaneGovernance",
+        summary: "Inspect current fixed governance policy",
+        security: oauthGovernanceRead,
+        parameters: [projectParameter],
+        responses: {
+          "200": successResponse("ControlPlaneGovernanceResponse", "Governance projection."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneGovernancePreflight"),
+    },
+    "/projects/{projectId}/members": {
+      get: {
+        operationId: "listControlPlaneMembers",
+        summary: "List or search active project members",
+        security: oauthGovernanceRead,
+        parameters: [
+          projectParameter,
+          {
+            name: "role",
+            in: "query",
+            required: false,
+            schema: {
+              type: "string",
+              enum: [
+                "owner",
+                "developer",
+                "content_admin",
+                "editor",
+                "reviewer",
+                "client_editor",
+                "read_only",
+              ],
+            },
+          },
+          {
+            name: "search",
+            in: "query",
+            required: false,
+            schema: { type: "string", minLength: 1, maxLength: 100 },
+          },
+          ...paginationParameters,
+        ],
+        responses: {
+          "200": successResponse("ControlPlaneMemberPageResponse", "Member page."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneMembersPreflight"),
+    },
+    "/projects/{projectId}/members/{membershipId}/policy": {
+      put: {
+        operationId: "updateControlPlaneMemberPolicy",
+        summary: "Atomically update complete member role and locale policy",
+        security: oauthGovernanceWrite,
+        parameters: [projectParameter, membershipParameter],
+        requestBody: jsonBody("ControlPlaneMemberPolicyRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneMemberResponse", "Updated member."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneMemberPolicyPreflight"),
+    },
+    "/projects/{projectId}/members/{membershipId}/remove": {
+      post: {
+        operationId: "removeControlPlaneMember",
+        summary: "Remove a project member optimistically",
+        security: oauthGovernanceWrite,
+        parameters: [projectParameter, membershipParameter],
+        requestBody: jsonBody("ControlPlaneVersionRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneMemberResponse", "Removed member."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneMemberRemovePreflight"),
+    },
+    "/projects/{projectId}/invitations": {
+      get: {
+        operationId: "listControlPlaneInvitations",
+        summary: "List or search project invitations",
+        security: oauthGovernanceRead,
+        parameters: [
+          projectParameter,
+          {
+            name: "status",
+            in: "query",
+            required: false,
+            schema: {
+              type: "string",
+              enum: ["all", "pending", "accepted", "revoked", "expired"],
+              default: "all",
+            },
+          },
+          {
+            name: "search",
+            in: "query",
+            required: false,
+            schema: { type: "string", minLength: 1, maxLength: 100 },
+          },
+          ...paginationParameters,
+        ],
+        responses: {
+          "200": successResponse("ControlPlaneInvitationPageResponse", "Invitation page."),
+          ...commonFailures,
+        },
+      },
+      post: {
+        operationId: "createControlPlaneInvitation",
+        summary: "Create an invitation with complete fixed policy",
+        description:
+          "Returns the raw token once. Ambiguous-response recovery is list/search, explicit revoke, then reissue; invitation creation is intentionally not command-receipt replayable.",
+        security: oauthGovernanceWrite,
+        parameters: [projectParameter],
+        requestBody: jsonBody("ControlPlaneCreateInvitationRequest"),
+        responses: {
+          "200": successResponse(
+            "ControlPlaneIssuedInvitationResponse",
+            "Invitation and one-time token.",
+          ),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneInvitationsPreflight"),
+    },
+    "/projects/{projectId}/invitations/{invitationId}/revoke": {
+      post: {
+        operationId: "revokeControlPlaneInvitation",
+        summary: "Revoke a pending invitation optimistically",
+        security: oauthGovernanceWrite,
+        parameters: [projectParameter, invitationParameter],
+        requestBody: jsonBody("ControlPlaneVersionRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneInvitationResponse", "Revoked invitation."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneInvitationRevokePreflight"),
+    },
+    "/invitations/inspect": {
+      post: {
+        operationId: "inspectControlPlaneInvitation",
+        summary: "Inspect an invitation using bounded token proof",
+        security: oauthGovernanceRead,
+        requestBody: jsonBody("ControlPlaneInvitationTokenRequest"),
+        responses: {
+          "200": successResponse(
+            "ControlPlaneInspectedInvitationResponse",
+            "Safe invitation projection.",
+          ),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneInvitationInspectPreflight"),
+    },
+    "/invitations/accept": {
+      post: {
+        operationId: "acceptControlPlaneInvitation",
+        summary: "Accept an invitation atomically",
+        security: oauthGovernanceWrite,
+        requestBody: jsonBody("ControlPlaneInvitationTokenRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneMemberResponse", "Accepted member policy."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneInvitationAcceptPreflight"),
+    },
+    "/projects/{projectId}/locales": {
+      get: {
+        operationId: "listControlPlaneLocales",
+        summary: "List effective or settings locale projections",
+        security: exactGovernanceRead,
+        parameters: [
+          projectParameter,
+          {
+            name: "view",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["effective", "settings"], default: "effective" },
+          },
+          {
+            name: "includeRemoved",
+            in: "query",
+            required: false,
+            schema: { type: "boolean", default: false },
+          },
+        ],
+        responses: {
+          "200": successResponse("ControlPlaneLocaleListResponse", "Locale list."),
+          ...commonFailures,
+        },
+      },
+      post: {
+        operationId: "createControlPlaneLocale",
+        summary: "Create a locale idempotently",
+        security: exactGovernanceWrite,
+        parameters: [projectParameter],
+        requestBody: jsonBody("ControlPlaneCreateLocaleRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneCreateLocaleResponse", "Created or replayed locale."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneLocalesPreflight"),
+    },
+    "/projects/{projectId}/locales/{localeId}": {
+      patch: {
+        operationId: "updateControlPlaneLocale",
+        summary: "Update a locale display name optimistically",
+        security: exactGovernanceWrite,
+        parameters: [projectParameter, localeParameter],
+        requestBody: jsonBody("ControlPlaneUpdateLocaleRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneLocaleResponse", "Updated locale."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneLocalePreflight"),
+    },
+    "/projects/{projectId}/locales/order": {
+      put: {
+        operationId: "reorderControlPlaneLocales",
+        summary: "Replace the complete active locale order optimistically",
+        security: exactGovernanceWrite,
+        parameters: [projectParameter],
+        requestBody: jsonBody("ControlPlaneLocaleOrderRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneLocaleListResponse", "Reordered locales."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneLocaleOrderPreflight"),
+    },
+    "/projects/{projectId}/locales/{localeId}/status": {
+      put: {
+        operationId: "updateControlPlaneLocaleStatus",
+        summary: "Update locale lifecycle status optimistically",
+        security: exactGovernanceWrite,
+        parameters: [projectParameter, localeParameter],
+        requestBody: jsonBody("ControlPlaneLocaleStatusRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneLocaleResponse", "Updated locale."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneLocaleStatusPreflight"),
+    },
     "/projects/{projectId}/environments/{environmentId}/studio-registration": {
       get: {
         operationId: "getControlPlaneStudioRegistration",
@@ -404,6 +719,20 @@ export const controlPlaneOpenApiDocument = {
         bearerFormat: "JWT",
         description: "Official CLI OAuth access token for archive and restore.",
         "x-required-scope": "control-plane:project:lifecycle",
+      },
+      ControlPlaneOAuthGovernanceRead: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Official CLI OAuth access token for governance inspection.",
+        "x-required-scope": "control-plane:governance:read",
+      },
+      ControlPlaneOAuthGovernanceWrite: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Official CLI OAuth access token for governance mutations.",
+        "x-required-scope": "control-plane:governance:write",
       },
       ControlPlaneManagementCredential: {
         type: "http",

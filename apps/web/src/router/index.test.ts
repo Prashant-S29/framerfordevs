@@ -5,6 +5,8 @@ import { getRouter } from "./index";
 describe("route structure", () => {
   it("keeps schema, entry, Preview, and Webhooks workspaces outside the project detail tree", () => {
     const router = getRouter();
+    const loginRoute = router.routesById["/login"];
+    const authenticatedRoute = router.routesById["/_auth"];
     const schemaRoute = router.routesById["/_auth/projects/$projectId_/collections/$collectionId"];
     const presentationRoute =
       router.routesById["/_auth/projects/$projectId_/collections/$collectionId_/presentation"];
@@ -18,6 +20,8 @@ describe("route structure", () => {
       ];
     const webhooksRoute = router.routesById["/_auth/projects/$projectId_/webhooks"];
 
+    expect(loginRoute.options.ssr).toBe(false);
+    expect(authenticatedRoute.options.ssr).toBe("data-only");
     expect(schemaRoute.fullPath).toBe("/projects/$projectId/collections/$collectionId");
     expect(presentationRoute.fullPath).toBe(
       "/projects/$projectId/collections/$collectionId/presentation",

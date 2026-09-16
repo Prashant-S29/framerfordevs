@@ -203,3 +203,278 @@ it.live("reuses a journaled Control Plane command after an ambiguous response", 
       }).pipe(Effect.zipRight(Effect.promise(() => rm(root, { recursive: true, force: true })))),
   ),
 );
+
+it.live(
+  "executes the complete governance and locale command matrix without secret-bearing arguments",
+  () =>
+    Effect.acquireUseRelease(
+      Effect.map(
+        Effect.promise(() => mkdtemp(join(tmpdir(), "ffd-governance-command-"))),
+        (root) => ({ root, originalFetch: globalThis.fetch }),
+      ),
+      ({ root }) =>
+        Effect.gen(function* () {
+          const project = {
+            id: "019fae8b-1234-7000-8000-000000000010",
+            workspaceId: workspace.id,
+            name: "Project",
+            key: "project",
+            description: null,
+            version: 1,
+            status: "active",
+            archivedAt: null,
+            createdAt: workspace.createdAt,
+            updatedAt: workspace.updatedAt,
+            primaryEnvironment: {
+              id: "019fae8b-1234-7000-8000-000000000011",
+              key: "main",
+              name: "main",
+              isPrimary: true,
+              createdAt: workspace.createdAt,
+            },
+            capabilities: [],
+            effectiveActions: ["project.read"],
+          };
+          const locale = {
+            id: "019fae8b-1234-7000-8000-000000000012",
+            workspaceId: workspace.id,
+            projectId: project.id,
+            tag: "en",
+            displayName: "English",
+            status: "enabled",
+            position: 0,
+            version: 1,
+            createdAt: workspace.createdAt,
+            updatedAt: workspace.updatedAt,
+          };
+          const member = {
+            id: "019fae8b-1234-7000-8000-000000000013",
+            projectId: project.id,
+            userId: "user-1",
+            name: "Owner",
+            email: "owner@example.test",
+            role: "owner",
+            localeAccess: { mode: "all" },
+            version: 1,
+            removedAt: null,
+            createdAt: workspace.createdAt,
+            updatedAt: workspace.updatedAt,
+          };
+          const invitation = {
+            id: "019fae8b-1234-7000-8000-000000000014",
+            projectId: project.id,
+            email: "invitee@example.test",
+            role: "editor",
+            localeAccess: { mode: "selected", localeIds: [locale.id] },
+            status: "pending",
+            version: 1,
+            expiresAt: "2026-08-21T00:00:00.000Z",
+            acceptedAt: null,
+            revokedAt: null,
+            createdAt: workspace.createdAt,
+            updatedAt: workspace.updatedAt,
+          };
+          const roleNames = [
+            "owner",
+            "developer",
+            "content_admin",
+            "editor",
+            "reviewer",
+            "client_editor",
+            "read_only",
+          ];
+          const governance = {
+            projectId: project.id,
+            primaryEnvironment: project.primaryEnvironment,
+            role: "owner",
+            localeAccess: { mode: "all" },
+            baseRoleActions: ["project.read"],
+            effectiveProjectActions: ["project.read"],
+            effectiveLocaleIds: [locale.id],
+            effectiveLocaleActions: ["content.read"],
+            fixedRolePolicies: roleNames.map((role) => ({
+              role,
+              baseRoleActions: ["project.read"],
+              requiresAllLocales: role === "owner",
+            })),
+            canReadMembers: true,
+            canInviteMembers: true,
+            canUpdateMemberPolicy: true,
+            canRemoveMembers: true,
+          };
+          const observed: Array<{
+            readonly method: string;
+            readonly path: string;
+            readonly body: string;
+          }> = [];
+          globalThis.fetch = (input, init) => {
+            const url = new URL(String(input));
+            observed.push({
+              method: init?.method ?? "GET",
+              path: url.pathname,
+              body: String(init?.body ?? ""),
+            });
+            if (url.pathname.endsWith("/governance")) return Promise.resolve(success(governance));
+            if (url.pathname.endsWith("/members"))
+              return Promise.resolve(success({ items: [member], nextCursor: null }));
+            if (url.pathname.includes("/members/")) return Promise.resolve(success(member));
+            if (url.pathname.endsWith("/invitations")) {
+              return Promise.resolve(
+                success(
+                  init?.method === "POST"
+                    ? { invitation, token: "a".repeat(43) }
+                    : { items: [invitation], nextCursor: null },
+                ),
+              );
+            }
+            if (url.pathname.endsWith("/invitations/inspect")) {
+              return Promise.resolve(
+                success({
+                  projectId: project.id,
+                  projectName: project.name,
+                  role: invitation.role,
+                  localeAccess: invitation.localeAccess,
+                  inviterName: member.name,
+                  expiresAt: invitation.expiresAt,
+                }),
+              );
+            }
+            if (url.pathname.endsWith("/invitations/accept"))
+              return Promise.resolve(success(member));
+            if (url.pathname.includes("/invitations/")) return Promise.resolve(success(invitation));
+            if (url.pathname.endsWith("/locales")) {
+              return Promise.resolve(
+                success(init?.method === "POST" ? locale : { items: [locale] }),
+              );
+            }
+            if (url.pathname.includes("/locales/order"))
+              return Promise.resolve(success({ items: [locale] }));
+            if (url.pathname.includes("/locales/")) return Promise.resolve(success(locale));
+            if (url.pathname.endsWith(`/projects/${project.id}`))
+              return Promise.resolve(success(project));
+            return Promise.reject(new Error(`Unexpected path: ${url.pathname}`));
+          };
+
+          const common = { apiOrigin: "https://api.example.test", token: "oauth-token", root };
+          const commands: ReadonlyArray<ReadonlyArray<string>> = [
+            ["governance", "inspect", "--project", project.id],
+            ["member", "list", "--project", project.id, "--role", "owner", "--search", "own"],
+            [
+              "member",
+              "policy",
+              "set",
+              "--project",
+              project.id,
+              "--member",
+              member.id,
+              "--expected-version",
+              "1",
+              "--role",
+              "editor",
+              "--locale-access",
+              "selected",
+              "--locale",
+              locale.id,
+            ],
+            [
+              "member",
+              "remove",
+              "--project",
+              project.id,
+              "--member",
+              member.id,
+              "--expected-version",
+              "1",
+            ],
+            ["invitation", "list", "--project", project.id, "--status", "pending"],
+            [
+              "invitation",
+              "create",
+              "--project",
+              project.id,
+              "--email",
+              invitation.email,
+              "--role",
+              "editor",
+              "--locale-access",
+              "selected",
+              "--locale",
+              locale.id,
+            ],
+            ["invitation", "inspect", "--token-stdin"],
+            ["invitation", "accept", "--token-stdin"],
+            [
+              "invitation",
+              "revoke",
+              "--project",
+              project.id,
+              "--invitation",
+              invitation.id,
+              "--expected-version",
+              "1",
+            ],
+            ["locale", "list", "--project", project.id, "--view", "settings", "--include-removed"],
+            [
+              "locale",
+              "create",
+              "--project",
+              project.id,
+              "--tag",
+              "en",
+              "--display-name",
+              "English",
+            ],
+            [
+              "locale",
+              "update",
+              "--project",
+              project.id,
+              "--locale",
+              locale.id,
+              "--expected-version",
+              "1",
+              "--display-name",
+              "English",
+            ],
+            ["locale", "reorder", "--project", project.id, "--item", `${locale.id}:1`],
+            [
+              "locale",
+              "status",
+              "set",
+              "--project",
+              project.id,
+              "--locale",
+              locale.id,
+              "--expected-version",
+              "1",
+              "--status",
+              "enabled",
+            ],
+            ["project", "environment", "get", "--project", project.id],
+          ];
+          for (const command of commands) {
+            yield* executeControlPlaneCommand({
+              ...common,
+              arguments: parseArguments([...command, "--api", common.apiOrigin]),
+              readInvitationToken: () => Effect.succeed("a".repeat(43)),
+            });
+          }
+
+          assert.lengthOf(observed, commands.length);
+          assert.isTrue(observed.every((request) => !request.path.includes("a".repeat(43))));
+          assert.isTrue(
+            observed
+              .filter(
+                (request) =>
+                  request.path.endsWith("/invitations/inspect") ||
+                  request.path.endsWith("/invitations/accept"),
+              )
+              .every((request) => request.body === JSON.stringify({ token: "a".repeat(43) })),
+          );
+        }),
+      ({ root, originalFetch }) =>
+        Effect.sync(() => {
+          globalThis.fetch = originalFetch;
+        }).pipe(Effect.zipRight(Effect.promise(() => rm(root, { recursive: true, force: true })))),
+    ),
+);

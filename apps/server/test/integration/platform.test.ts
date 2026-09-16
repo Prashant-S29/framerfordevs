@@ -228,24 +228,22 @@ describe.sequential("platform API contracts", () => {
       { projectId: "019fae8b-1234-7000-8000-000000000001", cursor: null, limit: 20 },
     ],
     [
-      "platform/projects/members/updateRole",
+      "platform/projects/members/updatePolicy",
       {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
         membershipId: "019fae8b-1234-7000-8000-000000000001",
         version: 1,
         role: "editor",
-      },
-    ],
-    [
-      "platform/projects/members/updateLocaleAccess",
-      {
-        membershipId: "019fae8b-1234-7000-8000-000000000001",
-        version: 1,
-        access: { mode: "none" },
+        localeAccess: { mode: "none" },
       },
     ],
     [
       "platform/projects/members/remove",
-      { membershipId: "019fae8b-1234-7000-8000-000000000001", version: 1 },
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        membershipId: "019fae8b-1234-7000-8000-000000000001",
+        version: 1,
+      },
     ],
     [
       "platform/projects/locales/list",
@@ -598,6 +596,7 @@ describe.sequential("platform API contracts", () => {
         projectId: "019fae8b-1234-7000-8000-000000000001",
         email: "anonymous@example.test",
         role: "editor",
+        localeAccess: { mode: "all" },
       },
     ],
     [
@@ -608,7 +607,11 @@ describe.sequential("platform API contracts", () => {
     ["platform/projects/invitations/accept", { token: "A".repeat(43) }],
     [
       "platform/projects/invitations/revoke",
-      { invitationId: "019fae8b-1234-7000-8000-000000000001", version: 1 },
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        invitationId: "019fae8b-1234-7000-8000-000000000001",
+        version: 1,
+      },
     ],
     [
       "platform/projects/credentials/issue",
@@ -729,7 +732,7 @@ describe.sequential("platform API contracts", () => {
     const access = await rpc(firstAgent, "platform/projects/access", { projectId });
     expect(access.body.json.data.role).toBe("owner");
     expect(access.body.json.data.localeAccess).toEqual({ mode: "all" });
-    expect(access.body.json.data.allowedActions).toContain("project.member.invite");
+    expect(access.body.json.data.effectiveProjectActions).toContain("project.member.invite");
   });
 
   it("returns a typed same-workspace key conflict", async () => {
@@ -843,6 +846,7 @@ describe.sequential("platform API contracts", () => {
       (locale: { tag: string }) => locale.tag === "en",
     );
     const englishDenied = await rpc(firstAgent, "platform/projects/locales/updateStatus", {
+      projectId,
       localeId: englishAfterReorder.id,
       version: englishAfterReorder.version,
       status: "disabled",
@@ -852,12 +856,14 @@ describe.sequential("platform API contracts", () => {
       (locale: { tag: string }) => locale.tag === "hi",
     );
     const disabled = await rpc(firstAgent, "platform/projects/locales/updateStatus", {
+      projectId,
       localeId: hindiAfterReorder.id,
       version: hindiAfterReorder.version,
       status: "disabled",
       confirmDraftImpact: false,
     });
     const enabled = await rpc(firstAgent, "platform/projects/locales/updateStatus", {
+      projectId,
       localeId: disabled.body.json.data.id,
       version: disabled.body.json.data.version,
       status: "enabled",
@@ -888,6 +894,7 @@ describe.sequential("platform API contracts", () => {
       projectId,
       email: secondEmail,
       role: "editor",
+      localeAccess: { mode: "all" },
     });
     const token = issued.body.json.data.token;
     const invitationId = issued.body.json.data.invitation.id;
@@ -911,8 +918,9 @@ describe.sequential("platform API contracts", () => {
       role: "editor",
       localeAccess: { mode: "all" },
     });
-    expect(reused.status).toBe(404);
-    expect(reused.body.json.data.error.code).toBe("INVITATION_INVALID");
+    expect(reused.status).toBe(200);
+    expect(reused.body.json.data.id).toBe(memberId);
+    expect(reused.body.json.data.version).toBe(accepted.body.json.data.version);
 
     const memberRead = await rpc(secondAgent, "platform/projects/get", { projectId });
     const memberUpdate = await rpc(secondAgent, "platform/projects/update", {
@@ -940,10 +948,12 @@ describe.sequential("platform API contracts", () => {
       memberId,
     );
 
-    const scopedMember = await rpc(firstAgent, "platform/projects/members/updateLocaleAccess", {
+    const scopedMember = await rpc(firstAgent, "platform/projects/members/updatePolicy", {
+      projectId,
       membershipId: memberId,
       version: accepted.body.json.data.version,
-      access: { mode: "selected", localeIds: [hindiLocaleId] },
+      role: accepted.body.json.data.role,
+      localeAccess: { mode: "selected", localeIds: [hindiLocaleId] },
     });
     const selectedLocales = await rpc(secondAgent, "platform/projects/locales/list", {
       projectId,
@@ -960,6 +970,7 @@ describe.sequential("platform API contracts", () => {
     );
 
     const removed = await rpc(firstAgent, "platform/projects/members/remove", {
+      projectId,
       membershipId: memberId,
       version: scopedMember.body.json.data.version,
     });
@@ -969,6 +980,7 @@ describe.sequential("platform API contracts", () => {
     expect(accessAfterRemoval.status).toBe(404);
 
     const staleRevoke = await rpc(firstAgent, "platform/projects/invitations/revoke", {
+      projectId,
       invitationId,
       version: invitationVersion,
     });

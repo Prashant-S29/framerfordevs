@@ -66,7 +66,10 @@ export function LocaleTabs({
   return (
     <>
       <Tabs value={selectedLocaleId} onValueChange={requestSelection}>
-        <TabsList aria-label="Content locales" className="max-w-full justify-start overflow-x-auto">
+        <TabsList
+          aria-label="Content locales"
+          className="max-w-full justify-start overflow-x-auto overflow-y-hidden"
+        >
           {locales.map((locale) => (
             <TabsTrigger key={locale.id} value={locale.id}>
               <span>{locale.displayName}</span>

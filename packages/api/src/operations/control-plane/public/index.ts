@@ -1,6 +1,8 @@
 // Defines Control Plane bearer grants and principal adaptation without introducing cookie authority.
 
 import {
+  CONTROL_PLANE_GOVERNANCE_READ_SCOPE,
+  CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE,
   CONTROL_PLANE_PROJECT_LIFECYCLE_SCOPE,
   CONTROL_PLANE_READ_SCOPE,
   CONTROL_PLANE_WRITE_SCOPE,
@@ -8,14 +10,32 @@ import {
 } from "@framerfordevs/auth";
 import { Effect, Schema } from "effect";
 
-import type { CredentialScope } from "../../../contracts/access";
+import {
+  AcceptProjectInvitationInput,
+  type CredentialScope,
+  CreateProjectInvitationInput,
+  ListProjectInvitationsInput,
+  ListProjectMembersInput,
+  RemoveProjectMemberInput,
+  RevokeProjectInvitationInput,
+  UpdateProjectMemberPolicyInput,
+} from "../../../contracts/access";
 import {
   type ControlPlaneActor,
+  ControlPlaneCreateInvitationRequest,
+  ControlPlaneCreateLocaleRequest,
   ControlPlaneCreateProjectInput,
   ControlPlaneCreateProjectRequest,
   ControlPlaneCreateWorkspaceRequest,
   ControlPlaneEnableCapabilityInput,
   ControlPlaneEnableCapabilityRequest,
+  ControlPlaneInvitationListQuery,
+  ControlPlaneInvitationTokenRequest,
+  ControlPlaneLocaleListQuery,
+  ControlPlaneLocaleOrderRequest,
+  ControlPlaneLocaleStatusRequest,
+  ControlPlaneMemberListQuery,
+  ControlPlaneMemberPolicyRequest,
   ControlPlaneListProjectsInput,
   ControlPlaneListProjectsQuery,
   ControlPlaneListWorkspacesQuery,
@@ -25,10 +45,19 @@ import {
   ControlPlanePutStudioRegistrationInput,
   ControlPlaneStudioRegistrationScope,
   ControlPlanePutStudioRegistrationRequest,
+  ControlPlaneUpdateLocaleRequest,
   ControlPlaneUpdateProjectInput,
   ControlPlaneUpdateProjectRequest,
+  ControlPlaneVersionRequest,
   ControlPlaneWorkspaceScope,
 } from "../../../contracts/control-plane";
+import {
+  CreateProjectLocaleInput,
+  ListProjectLocalesInput,
+  ReorderProjectLocalesInput,
+  UpdateProjectLocaleDisplayNameInput,
+  UpdateProjectLocaleStatusInput,
+} from "../../../contracts/locale";
 import { AuthUserId } from "../../../contracts/platform";
 import { RateLimitCost } from "../../../contracts/rate-limit";
 import { ApiErrorDetail } from "../../../contracts/response/api";
@@ -78,6 +107,226 @@ function parsePageQuery(raw: string, includeStatus: boolean) {
     limit: limitValue === null ? 20 : Number(limitValue),
     ...(includeStatus ? { status: parameters.get("status") ?? "active" } : {}),
   });
+}
+
+function parseBoundedQuery(
+  raw: string,
+  allowedKeys: ReadonlyArray<string>,
+): Effect.Effect<URLSearchParams, ValidationFailure> {
+  const parameters = new URLSearchParams(raw);
+  const allowed = new Set(allowedKeys);
+  for (const key of parameters.keys()) {
+    if (!allowed.has(key) || parameters.getAll(key).length !== 1) {
+      return Effect.fail(validationFailure("query"));
+    }
+  }
+  return Effect.succeed(parameters);
+}
+
+export function decodeControlPlaneMemberListInput(projectId: string, raw: string) {
+  return Effect.flatMap(parseBoundedQuery(raw, ["role", "search", "cursor", "limit"]), (query) => {
+    const limit = query.get("limit");
+    if (limit !== null && !positiveIntegerPattern.test(limit)) {
+      return Effect.fail(validationFailure("query.limit"));
+    }
+    return Effect.flatMap(
+      decodeInput(
+        ControlPlaneMemberListQuery,
+        {
+          role: query.get("role"),
+          search: query.get("search")?.trim().normalize("NFC") ?? null,
+          cursor: query.get("cursor"),
+          limit: limit === null ? 20 : Number(limit),
+        },
+        "query",
+      ),
+      (decoded) => decodeInput(ListProjectMembersInput, { projectId, ...decoded }, "path"),
+    );
+  });
+}
+
+export function decodeControlPlaneInvitationListInput(projectId: string, raw: string) {
+  return Effect.flatMap(
+    parseBoundedQuery(raw, ["status", "search", "cursor", "limit"]),
+    (query) => {
+      const limit = query.get("limit");
+      if (limit !== null && !positiveIntegerPattern.test(limit)) {
+        return Effect.fail(validationFailure("query.limit"));
+      }
+      return Effect.flatMap(
+        decodeInput(
+          ControlPlaneInvitationListQuery,
+          {
+            status: query.get("status") ?? "all",
+            search: query.get("search")?.trim().normalize("NFC") ?? null,
+            cursor: query.get("cursor"),
+            limit: limit === null ? 20 : Number(limit),
+          },
+          "query",
+        ),
+        (decoded) => decodeInput(ListProjectInvitationsInput, { projectId, ...decoded }, "path"),
+      );
+    },
+  );
+}
+
+export function decodeControlPlaneMemberPolicyInput(
+  projectId: string,
+  membershipId: string,
+  body: unknown,
+) {
+  return Effect.flatMap(decodeInput(ControlPlaneMemberPolicyRequest, body, "body"), (decoded) =>
+    decodeInput(
+      UpdateProjectMemberPolicyInput,
+      {
+        projectId,
+        membershipId,
+        version: decoded.expectedVersion,
+        role: decoded.role,
+        localeAccess: decoded.localeAccess,
+      },
+      "path",
+    ),
+  );
+}
+
+export function decodeControlPlaneRemoveMemberInput(
+  projectId: string,
+  membershipId: string,
+  body: unknown,
+) {
+  return Effect.flatMap(decodeInput(ControlPlaneVersionRequest, body, "body"), (decoded) =>
+    decodeInput(
+      RemoveProjectMemberInput,
+      { projectId, membershipId, version: decoded.expectedVersion },
+      "path",
+    ),
+  );
+}
+
+export function decodeControlPlaneCreateInvitationInput(projectId: string, body: unknown) {
+  return Effect.flatMap(decodeInput(ControlPlaneCreateInvitationRequest, body, "body"), (decoded) =>
+    decodeInput(CreateProjectInvitationInput, { projectId, ...decoded }, "path"),
+  );
+}
+
+export function decodeControlPlaneRevokeInvitationInput(
+  projectId: string,
+  invitationId: string,
+  body: unknown,
+) {
+  return Effect.flatMap(decodeInput(ControlPlaneVersionRequest, body, "body"), (decoded) =>
+    decodeInput(
+      RevokeProjectInvitationInput,
+      { projectId, invitationId, version: decoded.expectedVersion },
+      "path",
+    ),
+  );
+}
+
+export function decodeControlPlaneInvitationTokenInput(body: unknown) {
+  return Effect.flatMap(decodeInput(ControlPlaneInvitationTokenRequest, body, "body"), (decoded) =>
+    decodeInput(AcceptProjectInvitationInput, decoded, "body"),
+  );
+}
+
+export function decodeControlPlaneLocaleListInput(projectId: string, raw: string) {
+  return Effect.flatMap(parseBoundedQuery(raw, ["view", "includeRemoved"]), (query) => {
+    const includeRemoved = query.get("includeRemoved");
+    if (includeRemoved !== null && includeRemoved !== "true" && includeRemoved !== "false") {
+      return Effect.fail(validationFailure("query.includeRemoved"));
+    }
+    return Effect.flatMap(
+      decodeInput(
+        ControlPlaneLocaleListQuery,
+        {
+          view: query.get("view") ?? "effective",
+          includeRemoved: includeRemoved === "true",
+        },
+        "query",
+      ),
+      (decoded) =>
+        decoded.view === "effective" && decoded.includeRemoved
+          ? Effect.fail(validationFailure("query.includeRemoved"))
+          : decodeInput(
+              ListProjectLocalesInput,
+              {
+                projectId,
+                view: decoded.view === "effective" ? "enabled" : "settings",
+                includeRemoved: decoded.includeRemoved,
+              },
+              "path",
+            ),
+    );
+  });
+}
+
+export function decodeControlPlaneCreateLocaleInput(projectId: string, body: unknown) {
+  return Effect.flatMap(decodeInput(ControlPlaneCreateLocaleRequest, body, "body"), (decoded) =>
+    Effect.all({
+      input: decodeInput(
+        CreateProjectLocaleInput,
+        { projectId, tag: decoded.tag, displayName: decoded.displayName },
+        "path",
+      ),
+      commandId: Effect.succeed(decoded.commandId),
+    }),
+  );
+}
+
+export function decodeControlPlaneUpdateLocaleInput(
+  projectId: string,
+  localeId: string,
+  body: unknown,
+) {
+  return Effect.flatMap(decodeInput(ControlPlaneUpdateLocaleRequest, body, "body"), (decoded) =>
+    decodeInput(
+      UpdateProjectLocaleDisplayNameInput,
+      {
+        projectId,
+        localeId,
+        version: decoded.expectedVersion,
+        displayName: decoded.displayName,
+      },
+      "path",
+    ),
+  );
+}
+
+export function decodeControlPlaneLocaleStatusInput(
+  projectId: string,
+  localeId: string,
+  body: unknown,
+) {
+  return Effect.flatMap(decodeInput(ControlPlaneLocaleStatusRequest, body, "body"), (decoded) =>
+    decodeInput(
+      UpdateProjectLocaleStatusInput,
+      {
+        projectId,
+        localeId,
+        version: decoded.expectedVersion,
+        status: decoded.status,
+        confirmDraftImpact: decoded.confirmDraftImpact,
+      },
+      "path",
+    ),
+  );
+}
+
+export function decodeControlPlaneLocaleOrderInput(projectId: string, body: unknown) {
+  return Effect.flatMap(decodeInput(ControlPlaneLocaleOrderRequest, body, "body"), (decoded) =>
+    decodeInput(
+      ReorderProjectLocalesInput,
+      {
+        projectId,
+        locales: decoded.locales.map((locale) => ({
+          localeId: locale.localeId,
+          version: locale.expectedVersion,
+        })),
+      },
+      "path",
+    ),
+  );
 }
 
 export function decodeControlPlaneListWorkspacesQuery(raw: string) {
@@ -187,6 +436,18 @@ export const controlPlaneBearerRequirements = {
   enableCapability: projectAuthority(CONTROL_PLANE_WRITE_SCOPE, ["project.capability.manage"]),
   getStudioRegistration: projectAuthority(CONTROL_PLANE_READ_SCOPE, ["project.read"]),
   putStudioRegistration: projectAuthority(CONTROL_PLANE_WRITE_SCOPE, ["project.update"]),
+  getGovernance: oauthOnly(CONTROL_PLANE_GOVERNANCE_READ_SCOPE),
+  listMembers: oauthOnly(CONTROL_PLANE_GOVERNANCE_READ_SCOPE),
+  updateMemberPolicy: oauthOnly(CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE),
+  removeMember: oauthOnly(CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE),
+  listInvitations: oauthOnly(CONTROL_PLANE_GOVERNANCE_READ_SCOPE),
+  createInvitation: oauthOnly(CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE),
+  revokeInvitation: oauthOnly(CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE),
+  inspectInvitation: oauthOnly(CONTROL_PLANE_GOVERNANCE_READ_SCOPE),
+  acceptInvitation: oauthOnly(CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE),
+  listLocales: projectAuthority(CONTROL_PLANE_GOVERNANCE_READ_SCOPE, ["locale.read"]),
+  listLocaleSettings: projectAuthority(CONTROL_PLANE_GOVERNANCE_READ_SCOPE, ["locale.manage"]),
+  manageLocales: projectAuthority(CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE, ["locale.manage"]),
 } as const satisfies Readonly<Record<string, ControlPlaneBearerRequirement>>;
 
 export const authenticateControlPlaneRequest = Effect.fn("control-plane.public.authenticate")(
@@ -216,6 +477,7 @@ export const authenticateControlPlaneRequest = Effect.fn("control-plane.public.a
 
 export const controlPlaneRequestCosts = {
   read: 1,
+  list: 2,
   create: 5,
   update: 3,
   lifecycle: 5,
