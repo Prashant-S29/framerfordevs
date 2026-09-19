@@ -47,33 +47,15 @@ Agents may edit an approved Drizzle schema but must never generate, edit, apply,
 | 13  | Add secure code-first schema/content authoring, Authoring v1, SDK/CLI, local editor, and builder retirement. | 1,184 tests; `9c68942` |
 | 14  | Add portable Control Plane v1 bootstrap, complete CLI parity, hosted controls, and project recovery.         | 1,259 tests; `6ba124a` |
 | 15  | Add governance automation parity across HTTP, CLI, hosted controls, and shared policy authority.             | 1,270 tests; `5460c2b` |
+| 16  | Add operational credential, webhook, audit, delivery, and archive recovery across HTTP, CLI, and hosted UI.  | 1,311 tests; `c3f9430` |
 
 Post-M13 repository/context normalization is developer-approved and committed at `cd31102`. Its owner-directory structure, direct-import policy, generalized pair/prefix checks, stable exports, and production entrypoints are the baseline for all pending work.
 
 ## Pending milestones
 
-### Milestone 16 — Operational administration and recovery
-
-**Status:** Implementation and automated readiness complete; awaiting developer review and explicit acceptance. Migrations `0017` and `0018` are developer-applied/catalog-verified and the worker remains stopped.
-
-**Proposal:** [`decisions/m16-operational-administration-and-recovery-design.md`](decisions/m16-operational-administration-and-recovery-design.md)
-
-**Depends on:** M14–M15.
-
-**Summary:** Provide safe automation and hosted recovery for credentials, webhooks, audits, and sensitive project operations.
-
-- Add portable credential issue/list/rotate/revoke administration with one-time secret handling, exact family/scope/environment grants, actor attribution, and secret-safe CLI output.
-- Add webhook destination/subscription/mapping/attempt/replay administration without weakening encryption, SSRF, signing, retry, lease, or worker-only-delivery boundaries.
-- Provide bounded audit/security visibility and recovery-safe project operations appropriate to owners/developers while filtering resources and sensitive fields by policy.
-- Keep sensitive recovery and management routes server-side and hosted-control-plane-owned; Studio browser code must never receive management/refresh credentials.
-- Add stable HTTP and complete CLI parity, dry-run/confirmation gates where destructive, optimistic/idempotent authority, deterministic pagination, and complete audits; secret and recovery administration never enters the application SDK.
-- Exclude production topology hardening, Studio implementation, multi-environment lifecycle, and commercial administration.
-
-**Read before design:** M3, M11–M13 decisions; credential services, webhook services/worker, audit schema/operations, CLI credential-store/OAuth patterns, security and API rules.
-
 ### Milestone 17 — Hosted surface separation
 
-**Status:** Planned; design not started.
+**Status:** Next design target; design not started.
 
 **Depends on:** M14–M16.
 

@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestones 0–15 and post-M13 repository/context normalization are developer-approved and committed. M16 operational administration and recovery is implemented and awaiting developer review; it is not accepted or committed.
-**Next gate:** Developer review and explicit M16 acceptance; do not begin M17.
-**Last updated:** 2026-09-19
+**Overall status:** Milestones 0–16 and post-M13 repository/context normalization are developer-approved, committed, and pushed. M17 hosted surface separation is the next design target.
+**Next gate:** Propose and obtain approval for the M17 design before implementation.
+**Last updated:** 2026-09-20
 
 ## Status legend
 
@@ -35,8 +35,8 @@
 | 13  | Code-first authoring and local editor   | `[A]`  |          1,184 | `9c68942` |
 | 14  | Control-plane bootstrap contracts       | `[A]`  |          1,259 | `6ba124a` |
 | 15  | Governance automation parity            | `[A]`  |          1,270 | `5460c2b` |
-| 16  | Operational administration and recovery | `[R]`  |          1,311 | —         |
-| 17  | Hosted surface separation               | `[P]`  |              — | —         |
+| 16  | Operational administration and recovery | `[A]`  |          1,311 | `c3f9430` |
+| 17  | Hosted surface separation               | `[D]`  |              — | —         |
 | 18  | Studio mount and security runtime       | `[P]`  |              — | —         |
 | 19  | Studio content and localization         | `[P]`  |              — | —         |
 | 20  | Studio editorial lifecycle              | `[P]`  |              — | —         |
@@ -51,7 +51,7 @@
 | 29  | Visual publication and dependencies     | `[P]`  |              — | —         |
 | 30  | Renderer SDK and framework adapters     | `[P]`  |              — | —         |
 
-M15 is accepted at `5460c2b`. Corrected M16 migration `0017` and follow-up invariant migration `0018` are developer-applied and catalog-verified; implementation and automated readiness are complete, the independent worker remains stopped, and M16 awaits developer review. M17–M30 preserve the developer-approved sequence and detailed context.
+M16 is accepted at `c3f9430`; migrations `0017` and `0018` are developer-applied/catalog-verified and the independent worker remains stopped. M17 is the next design target; M18–M30 retain the approved sequence.
 
 ## Post-M13 repository/context normalization
 
@@ -173,7 +173,7 @@ M15 is accepted at `5460c2b`. Corrected M16 migration `0017` and follow-up invar
 
 ## Recent and planned milestone record
 
-These entries stay concise because `milestone.md` owns detailed pending context. M15 is accepted, M16 awaits explicit developer acceptance, and M17–M30 remain sequenced context. Earlier scope remains represented in M21–M23 and M27.
+These entries stay concise because `milestone.md` owns detailed pending context. M15–M16 are accepted, M17 is the next design target, and M18–M30 remain sequenced context. Earlier scope remains represented in M21–M23 and M27.
 
 ### Milestone 15 — Governance automation parity
 
@@ -190,7 +190,7 @@ These entries stay concise because `milestone.md` owns detailed pending context.
 - Control Plane v1 now has 52 strict bearer operations with separate OAuth grants, exact management-credential webhook authority, canonical HTTP policy/costs/OpenAPI, and additive artifact/baseline SHA-256 `0be7c1bc603cdf17e2c775509c58dc9f716eeced59d0ebab9a8e13cfad39d90c`. CLI parity includes `--secret-stdout`, stdin-only destinations, exact confirmations, no credential/audit management fallback, and content-free conflict-safe journals. Hosted controls/docs cover credential recovery, webhook/delivery/mapping administration, archived recovery-only rendering, bounded audit, and secret-safe operations.
 - Authorized headed Chromium review passed credential/webhook disclosure containment and staged lifecycle, consequence gates, exact filters, unique fixed-snapshot pagination, archive allowlists/restore-no-replay, keyboard/focus, 375 px, and 200% reflow. It corrected millisecond-truncated audit bounds, falsely local-only “URL-backed” filters, missing SSR oRPC cookie forwarding, and focus loss from programmatic/replaced dialogs. The expected missing-Studio 404 is unchanged; exact guarded cleanup removed both disposable fixtures, sessions, secrets, and browser artifacts with zero residue.
 - Final `pnpm run ready` passes 1,311 tests, coverage, contract drift, format/lint/structure, 16 type tasks, four noninteractive Chromium specifications, and eight builds. High/critical audit is clear with four existing moderate test-tool findings; complete credential redaction and read-only reconciliation report zero scoped residue, orphans, invalid outcomes, archived claimable work, or non-idle test clients. The worker remains stopped.
-- **M16 `[R]`:** implementation and automated/interactive evidence are ready for explicit developer acceptance. The isolated sustained two-worker profile and production rollout/baseline checks remain environment gates; no commit, acceptance, publication, deployment, production OAuth/configuration change, worker restart, or M17 work has occurred.
+- **M16 `[A]`:** developer accepted, committed, and pushed `c3f9430`. The isolated sustained two-worker profile and production rollout/baseline checks remain environment gates; no publication, deployment, production OAuth/configuration change, worker restart, or M17 implementation occurred.
 
 ### Milestone 17 — Hosted surface separation
 
@@ -279,6 +279,6 @@ Agents did not generate or apply these migrations. Developer-generated/applied a
 
 ## Roadmap and next gate
 
-- `milestone.md` owns the approved sequence and preserved boundaries; M15 is accepted at `5460c2b`, and M16 is awaiting developer review with both migrations applied and the worker stopped.
-- M17–M30 design/implementation remain unauthorized until their developer gates; managed hosting, external data/backends, billing, analytics, and plugins remain unsequenced until the visual baseline is accepted.
+- `milestone.md` owns the approved sequence and preserved boundaries; M16 is accepted at `c3f9430`, both migrations are applied, and the worker remains stopped.
+- M17 design is next but requires proposal approval before implementation; M18–M30 remain gated. Managed hosting, external data/backends, billing, analytics, and plugins remain unsequenced until the visual baseline is accepted.
 - Publication/versioning, production OAuth/domains/configuration, deployment, migrations, Tier 2 activation, milestone acceptance, and advancement remain developer-controlled.

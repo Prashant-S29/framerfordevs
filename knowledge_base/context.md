@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-09-19
-**Current phase:** M16 operational administration and recovery implementation and automated readiness are complete; developer review is pending and the worker remains stopped
-**Next gate:** Developer review and explicit M16 acceptance; do not begin M17
+**Last updated:** 2026-09-20
+**Current phase:** M16 operational administration and recovery is accepted, committed, and pushed at `c3f9430`; the worker remains stopped
+**Next gate:** Propose and obtain approval for the M17 hosted-surface-separation design before implementation
 
 ## Start here
 
@@ -20,7 +20,7 @@ Read relevant sections of `product.md` and `prd/cms.md` for behavioral work. Do 
 - Explicit current developer instruction, product/PRD, relevant rules/active criteria/approved decisions, then status documents govern intent in that order.
 - Committed source, tests, configuration, migrations, and generated artifacts describe executable truth; Git describes repository state.
 - Report drift instead of silently choosing an authority.
-- Work only on an approved active milestone or an explicitly authorized workstream. M16 implementation is active; M17+ remain sequenced context only.
+- Work only on an approved active milestone or explicitly authorized workstream. M17 design is next; implementation is not authorized before design approval, and M18+ remain sequenced context only.
 
 ## Product direction
 
@@ -98,9 +98,9 @@ Packages never import application source. Cross-package imports use declared exp
 | M12        | Tooling v1, OAuth-capable CLI, SDK/generation, public contracts, docs portal                   |
 | M13        | Code-first schema/content Authoring v1, SDK/CLI, local editor, builder retirement              |
 | M14–M15    | Portable Control Plane bootstrap and governance automation parity                              |
-| M16 review | Operational credentials/webhooks/audits/archive recovery across HTTP, CLI, and hosted controls |
+| M16        | Operational credentials/webhooks/audits/archive recovery across HTTP, CLI, and hosted controls |
 
-M0–M15 are developer-approved and committed; M13 commit is `9c68942`, M14 commit is `6ba124a`, and M15 commit is `5460c2b`. Post-M13 repository/context normalization is committed at `cd31102`, roadmap sequencing at `2d0705a`, the public SDK/CLI boundary correction at `d63f215`, and retired dashboard schema-route removal at `5f6480d`. See `progress.md` for ordered outcomes, migrations, validation, roadmap status, and release state.
+M0–M16 are developer-approved and committed; M13 is `9c68942`, M14 `6ba124a`, M15 `5460c2b`, and M16 `c3f9430`. Post-M13 repository/context normalization is `cd31102`, roadmap sequencing `2d0705a`, the public SDK/CLI boundary correction `d63f215`, and retired dashboard schema-route removal `5f6480d`. See `progress.md` for ordered outcomes, migrations, validation, roadmap status, and release state.
 
 ## Architecture landmarks
 
@@ -125,5 +125,5 @@ The subsequent repository-normalization workstream also passed the complete read
 
 ## Current work and next gate
 
-- **Current — M16 `[R]`:** operational administration/recovery is implemented across HTTP, CLI, and hosted controls; migrations `0017`/`0018` are developer-applied and catalog-verified. Automated and headed-browser review passes, including 1,311 tests, four Chromium specifications, eight builds, clean high/critical audit and database reconciliation, archive/worker recovery, secret containment, accessibility, and authenticated SSR. The worker remains stopped; changes are uncommitted and M16 is not accepted.
-- **Next:** developer reviews and explicitly accepts M16, then commits manually. The isolated sustained two-worker profile and production baseline/smoke checks remain environment gates; do not restart the worker, deploy, publish, activate production configuration, or begin M17 without authorization.
+- **Current — M16 `[A]`:** operational administration/recovery is accepted, committed, and pushed at `c3f9430`; migrations `0017`/`0018` and the 1,311-test automated/interactive evidence are recorded. The worker remains stopped, and no publication, deployment, or production configuration changed.
+- **Next — M17 `[D]`:** design hosted surface separation between public discovery/authentication and resilient dashboard administration, preserving shared backend authority, session/origin boundaries, recovery availability, and temporary editorial UI. Obtain explicit design approval before implementation; M18+ remain out of scope.

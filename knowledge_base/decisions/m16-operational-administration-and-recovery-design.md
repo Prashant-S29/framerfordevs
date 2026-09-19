@@ -1,6 +1,6 @@
 # Milestone 16 operational administration and recovery design
 
-**Status:** Developer-approved on 2026-09-16; corrected migration `0017` developer-applied/catalog-verified; implementation and automated readiness await developer review
+**Status:** Developer-approved on 2026-09-16; implemented, accepted, committed, and pushed as `c3f9430`; migrations `0017` and `0018` developer-applied/catalog-verified
 
 **Date:** 2026-09-16
 
