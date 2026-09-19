@@ -1,5 +1,6 @@
 // Owns the bearer-only, originless Control Plane v1 Express transport boundary.
 
+import { listProjectAuditEvents } from "@framerfordevs/api/operations/audit/index";
 import {
   type ApplicationEffectTransform,
   createContext,
@@ -45,33 +46,82 @@ import {
   updateProject as updateControlPlaneProject,
 } from "@framerfordevs/api/operations/control-plane/index";
 import {
+  changeControlPlaneCredentialRotation,
+  issueControlPlaneCredential,
+  listControlPlaneCredentials,
+  revokeControlPlaneCredential,
+  startControlPlaneCredentialRotation,
+} from "@framerfordevs/api/operations/control-plane/operational/index";
+import {
+  changeControlPlaneWebhookSecretRotation,
+  createControlPlaneInvalidationMapping,
+  createControlPlaneWebhookEndpoint,
+  getControlPlaneWebhookDelivery,
+  listControlPlaneInvalidationMappings,
+  listControlPlaneWebhookAttempts,
+  listControlPlaneWebhookDeliveries,
+  listControlPlaneWebhookEndpoints,
+  replayControlPlaneWebhook,
+  replaceControlPlaneWebhookSubscriptions,
+  setControlPlaneInvalidationMappingState,
+  setControlPlaneWebhookEndpointState,
+  startControlPlaneWebhookSecretRotation,
+  updateControlPlaneInvalidationMapping,
+  updateControlPlaneWebhookEndpoint,
+} from "@framerfordevs/api/operations/control-plane/operational/webhook";
+import {
   authenticateControlPlaneRequest,
   controlPlaneBearerRequirements,
   controlPlanePrincipalActor,
   controlPlanePrincipalKey,
   controlPlaneRequestCosts,
   decodeControlPlaneCreateInvitationInput,
+  decodeControlPlaneCreateInvalidationMappingRequest,
   decodeControlPlaneCreateLocaleInput,
+  decodeControlPlaneCreateWebhookEndpointRequest,
   decodeControlPlaneCreateProjectInput,
   decodeControlPlaneCreateWorkspaceRequest,
+  decodeControlPlaneCredentialListQuery,
+  decodeControlPlaneCredentialRotationTransitionRequest,
   decodeControlPlaneEnableCapabilityInput,
+  decodeControlPlaneInvalidationMappingListQuery,
+  decodeControlPlaneInvalidationMappingStateRequest,
   decodeControlPlaneInvitationListInput,
   decodeControlPlaneInvitationTokenInput,
+  decodeControlPlaneIssueCredentialRequest,
   decodeControlPlaneLocaleListInput,
   decodeControlPlaneLocaleOrderInput,
   decodeControlPlaneLocaleStatusInput,
   decodeControlPlaneMemberListInput,
+  decodeControlPlaneOperationalCredentialScope,
+  decodeControlPlaneOperationalDeliveryScope,
+  decodeControlPlaneOperationalEnvironmentScope,
+  decodeControlPlaneOperationalMappingScope,
+  decodeControlPlaneOperationalRotationScope,
+  decodeControlPlaneOperationalWebhookScope,
   decodeControlPlaneMemberPolicyInput,
   decodeControlPlaneListProjectsInput,
   decodeControlPlaneListWorkspacesQuery,
+  decodeControlPlaneProjectAuditInput,
   decodeControlPlaneProjectLifecycleInput,
   decodeControlPlaneProjectScope,
   decodeControlPlanePutStudioRegistrationInput,
+  decodeControlPlaneReplaceWebhookSubscriptionsRequest,
+  decodeControlPlaneReplayWebhookRequest,
+  decodeControlPlaneRevokeCredentialRequest,
   decodeControlPlaneRemoveMemberInput,
   decodeControlPlaneRevokeInvitationInput,
+  decodeControlPlaneStartCredentialRotationRequest,
+  decodeControlPlaneStartWebhookSecretRotationRequest,
   decodeControlPlaneStudioRegistrationScope,
   decodeControlPlaneUpdateLocaleInput,
+  decodeControlPlaneUpdateInvalidationMappingRequest,
   decodeControlPlaneUpdateProjectInput,
+  decodeControlPlaneUpdateWebhookEndpointRequest,
+  decodeControlPlaneWebhookDeliveryListQuery,
+  decodeControlPlaneWebhookEndpointListQuery,
+  decodeControlPlaneWebhookEndpointStateRequest,
+  decodeControlPlaneWebhookSecretTransitionRequest,
   decodeControlPlaneWorkspaceScope,
   evaluateControlPlaneGlobalRateLimit,
   evaluateControlPlanePrincipalRateLimit,
@@ -202,6 +252,125 @@ export function classifyControlPlaneRequest(
   }
   if (/^\/projects\/[^/]+\/locales\/[^/]+\/status$/u.test(path) && method === "PUT") {
     return { operation: "locale_status_update", costBucket: "3" };
+  }
+  if (/^\/projects\/[^/]+\/environments\/[^/]+\/webhooks$/u.test(path)) {
+    if (method === "GET") return { operation: "webhook_endpoint_list", costBucket: "2" };
+    if (method === "POST") return { operation: "webhook_endpoint_create", costBucket: "5" };
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/webhooks\/[^/]+$/u.test(path) &&
+    method === "PATCH"
+  ) {
+    return { operation: "webhook_endpoint_update", costBucket: "3" };
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/webhooks\/[^/]+\/state$/u.test(path) &&
+    method === "PUT"
+  ) {
+    return { operation: "webhook_endpoint_state", costBucket: "3" };
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/webhooks\/[^/]+\/subscriptions$/u.test(path) &&
+    method === "PUT"
+  ) {
+    return { operation: "webhook_subscription_replace", costBucket: "3" };
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/webhooks\/[^/]+\/secret-rotations$/u.test(path) &&
+    method === "POST"
+  ) {
+    return { operation: "webhook_secret_rotation_start", costBucket: "5" };
+  }
+  const secretTransition =
+    /^\/projects\/[^/]+\/environments\/[^/]+\/webhooks\/[^/]+\/secret-rotations\/(activate|cancel|complete)$/u.exec(
+      path,
+    );
+  if (secretTransition !== null && method === "POST") {
+    const action = secretTransition[1];
+    return {
+      operation:
+        action === "activate"
+          ? "webhook_secret_rotation_activate"
+          : action === "cancel"
+            ? "webhook_secret_rotation_cancel"
+            : "webhook_secret_rotation_complete",
+      costBucket: "5",
+    };
+  }
+  if (/^\/projects\/[^/]+\/environments\/[^/]+\/invalidation-mappings$/u.test(path)) {
+    if (method === "GET") return { operation: "invalidation_mapping_list", costBucket: "2" };
+    if (method === "POST") return { operation: "invalidation_mapping_create", costBucket: "5" };
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/invalidation-mappings\/[^/]+$/u.test(path) &&
+    method === "PUT"
+  ) {
+    return { operation: "invalidation_mapping_update", costBucket: "3" };
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/invalidation-mappings\/[^/]+\/state$/u.test(path) &&
+    method === "PUT"
+  ) {
+    return { operation: "invalidation_mapping_state", costBucket: "3" };
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/webhook-deliveries$/u.test(path) &&
+    method === "GET"
+  ) {
+    return { operation: "webhook_delivery_list", costBucket: "2" };
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/webhook-deliveries\/[^/]+$/u.test(path) &&
+    method === "GET"
+  ) {
+    return { operation: "webhook_delivery_get", costBucket: "1" };
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/webhook-deliveries\/[^/]+\/attempts$/u.test(path) &&
+    method === "GET"
+  ) {
+    return { operation: "webhook_attempt_list", costBucket: "1" };
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/webhook-replays$/u.test(path) &&
+    method === "POST"
+  ) {
+    return { operation: "webhook_replay", costBucket: "5" };
+  }
+  if (/^\/projects\/[^/]+\/environments\/[^/]+\/credentials$/u.test(path)) {
+    if (method === "GET") return { operation: "credential_list", costBucket: "2" };
+    if (method === "POST") return { operation: "credential_issue", costBucket: "5" };
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/credentials\/[^/]+\/rotations$/u.test(path) &&
+    method === "POST"
+  ) {
+    return { operation: "credential_rotation_start", costBucket: "5" };
+  }
+  const rotationTransition =
+    /^\/projects\/[^/]+\/environments\/[^/]+\/credential-rotations\/[^/]+\/(activate|cancel|complete)$/u.exec(
+      path,
+    );
+  if (rotationTransition !== null && method === "POST") {
+    const action = rotationTransition[1];
+    return {
+      operation:
+        action === "activate"
+          ? "credential_rotation_activate"
+          : action === "cancel"
+            ? "credential_rotation_cancel"
+            : "credential_rotation_complete",
+      costBucket: "5",
+    };
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/credentials\/[^/]+\/revoke$/u.test(path) &&
+    method === "POST"
+  ) {
+    return { operation: "credential_revoke", costBucket: "5" };
+  }
+  if (/^\/projects\/[^/]+\/audit-events$/u.test(path) && method === "GET") {
+    return { operation: "audit_list", costBucket: "2" };
   }
   if (
     /^\/projects\/[^/]+\/environments\/[^/]+\/studio-registration$/u.test(path) &&
@@ -350,6 +519,58 @@ function controlPlaneAllowedMethods(path: string): ReadonlyArray<string> | null 
   if (/^\/projects\/[^/]+\/locales\/order$/u.test(path)) return ["PUT"];
   if (/^\/projects\/[^/]+\/locales\/[^/]+$/u.test(path)) return ["PATCH"];
   if (/^\/projects\/[^/]+\/locales\/[^/]+\/status$/u.test(path)) return ["PUT"];
+  if (/^\/projects\/[^/]+\/audit-events$/u.test(path)) return ["GET"];
+  if (/^\/projects\/[^/]+\/environments\/[^/]+\/webhooks$/u.test(path)) {
+    return ["GET", "POST"];
+  }
+  if (/^\/projects\/[^/]+\/environments\/[^/]+\/webhooks\/[^/]+$/u.test(path)) {
+    return ["PATCH"];
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/webhooks\/[^/]+\/(?:state|subscriptions)$/u.test(path)
+  ) {
+    return ["PUT"];
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/webhooks\/[^/]+\/secret-rotations(?:\/(?:activate|cancel|complete))?$/u.test(
+      path,
+    )
+  ) {
+    return ["POST"];
+  }
+  if (/^\/projects\/[^/]+\/environments\/[^/]+\/invalidation-mappings$/u.test(path)) {
+    return ["GET", "POST"];
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/invalidation-mappings\/[^/]+(?:\/state)?$/u.test(path)
+  ) {
+    return ["PUT"];
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/webhook-deliveries(?:\/[^/]+(?:\/attempts)?)?$/u.test(
+      path,
+    )
+  ) {
+    return ["GET"];
+  }
+  if (/^\/projects\/[^/]+\/environments\/[^/]+\/webhook-replays$/u.test(path)) {
+    return ["POST"];
+  }
+  if (/^\/projects\/[^/]+\/environments\/[^/]+\/credentials$/u.test(path)) {
+    return ["GET", "POST"];
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/credentials\/[^/]+\/(?:rotations|revoke)$/u.test(path)
+  ) {
+    return ["POST"];
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/credential-rotations\/[^/]+\/(?:activate|cancel|complete)$/u.test(
+      path,
+    )
+  ) {
+    return ["POST"];
+  }
   if (/^\/projects\/[^/]+\/environments\/[^/]+\/studio-registration$/u.test(path)) {
     return ["GET", "PUT"];
   }
@@ -472,7 +693,10 @@ export function createControlPlaneRouter(
       req.method === "GET" &&
       (req.path === "/workspaces" ||
         /^\/workspaces\/[^/]+\/projects$/u.test(req.path) ||
-        /^\/projects\/[^/]+\/(?:members|invitations|locales)$/u.test(req.path));
+        /^\/projects\/[^/]+\/(?:members|invitations|locales|audit-events)$/u.test(req.path) ||
+        /^\/projects\/[^/]+\/environments\/[^/]+\/(?:credentials|webhooks|invalidation-mappings|webhook-deliveries)$/u.test(
+          req.path,
+        ));
     if (rawQuery !== "" && !listQuery) {
       sendControlPlaneResponse(
         req,
@@ -1333,6 +1557,894 @@ export function createControlPlaneRouter(
         context.request.requestId,
       ),
       "Control Plane Studio registration stored.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  const webhookCollectionPath = "/projects/:projectId/environments/:environmentId/webhooks";
+  router.get(webhookCollectionPath, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.listWebhooks,
+      controlPlaneRequestCosts.list,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.control-plane.webhook.list.path",
+      decodeControlPlaneOperationalEnvironmentScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Control Plane webhook scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const queryResult = await context.execute(
+      "api.control-plane.webhook.list.query",
+      decodeControlPlaneWebhookEndpointListQuery(req.originalUrl.split("?", 2)[1] ?? ""),
+      "Control Plane webhook query decoded.",
+    );
+    const query = controlPlaneStepData(req, res, queryResult);
+    if (query === null) return;
+    const result = await context.execute(
+      "api.control-plane.webhook.list",
+      listControlPlaneWebhookEndpoints(
+        controlPlanePrincipalActor(principal),
+        controlPlanePrincipalKey(principal),
+        scope.projectId,
+        scope.environmentId,
+        query,
+      ),
+      "Control Plane webhooks loaded.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.post(webhookCollectionPath, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.manageWebhooks,
+      controlPlaneRequestCosts.create,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.control-plane.webhook.create.path",
+      decodeControlPlaneOperationalEnvironmentScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Control Plane webhook scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const bodyResult = await context.execute(
+      "api.control-plane.webhook.create.body",
+      decodeControlPlaneCreateWebhookEndpointRequest(req.body),
+      "Control Plane webhook body decoded.",
+    );
+    const body = controlPlaneStepData(req, res, bodyResult);
+    if (body === null) return;
+    const result = await context.execute(
+      "api.control-plane.webhook.create",
+      createControlPlaneWebhookEndpoint(
+        controlPlanePrincipalActor(principal),
+        scope.projectId,
+        scope.environmentId,
+        body,
+        context.request.requestId,
+      ),
+      "Control Plane webhook created.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  const webhookPath = `${webhookCollectionPath}/:endpointId`;
+  router.patch(webhookPath, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.manageWebhooks,
+      controlPlaneRequestCosts.update,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.control-plane.webhook.update.path",
+      decodeControlPlaneOperationalWebhookScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+        routeParameter(req, "endpointId"),
+      ),
+      "Control Plane webhook scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const bodyResult = await context.execute(
+      "api.control-plane.webhook.update.body",
+      decodeControlPlaneUpdateWebhookEndpointRequest(req.body),
+      "Control Plane webhook body decoded.",
+    );
+    const body = controlPlaneStepData(req, res, bodyResult);
+    if (body === null) return;
+    const result = await context.execute(
+      "api.control-plane.webhook.update",
+      updateControlPlaneWebhookEndpoint(
+        controlPlanePrincipalActor(principal),
+        scope.projectId,
+        scope.environmentId,
+        scope.endpointId,
+        body,
+        context.request.requestId,
+      ),
+      "Control Plane webhook updated.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.put(`${webhookPath}/state`, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.manageWebhooks,
+      controlPlaneRequestCosts.update,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.control-plane.webhook.state.path",
+      decodeControlPlaneOperationalWebhookScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+        routeParameter(req, "endpointId"),
+      ),
+      "Control Plane webhook scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const bodyResult = await context.execute(
+      "api.control-plane.webhook.state.body",
+      decodeControlPlaneWebhookEndpointStateRequest(req.body),
+      "Control Plane webhook state decoded.",
+    );
+    const body = controlPlaneStepData(req, res, bodyResult);
+    if (body === null) return;
+    const result = await context.execute(
+      "api.control-plane.webhook.state",
+      setControlPlaneWebhookEndpointState(
+        controlPlanePrincipalActor(principal),
+        scope.projectId,
+        scope.environmentId,
+        scope.endpointId,
+        body,
+        context.request.requestId,
+      ),
+      "Control Plane webhook state changed.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.put(`${webhookPath}/subscriptions`, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.manageWebhooks,
+      controlPlaneRequestCosts.update,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.control-plane.webhook.subscription.path",
+      decodeControlPlaneOperationalWebhookScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+        routeParameter(req, "endpointId"),
+      ),
+      "Control Plane webhook scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const bodyResult = await context.execute(
+      "api.control-plane.webhook.subscription.body",
+      decodeControlPlaneReplaceWebhookSubscriptionsRequest(req.body),
+      "Control Plane webhook subscriptions decoded.",
+    );
+    const body = controlPlaneStepData(req, res, bodyResult);
+    if (body === null) return;
+    const result = await context.execute(
+      "api.control-plane.webhook.subscription.replace",
+      replaceControlPlaneWebhookSubscriptions(
+        controlPlanePrincipalActor(principal),
+        scope.projectId,
+        scope.environmentId,
+        scope.endpointId,
+        body,
+        context.request.requestId,
+      ),
+      "Control Plane webhook subscriptions replaced.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  const secretRotationPath = `${webhookPath}/secret-rotations`;
+  router.post(secretRotationPath, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.manageWebhooks,
+      controlPlaneRequestCosts.lifecycle,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.control-plane.webhook.secret.start.path",
+      decodeControlPlaneOperationalWebhookScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+        routeParameter(req, "endpointId"),
+      ),
+      "Control Plane webhook scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const bodyResult = await context.execute(
+      "api.control-plane.webhook.secret.start.body",
+      decodeControlPlaneStartWebhookSecretRotationRequest(req.body),
+      "Control Plane webhook secret rotation decoded.",
+    );
+    const body = controlPlaneStepData(req, res, bodyResult);
+    if (body === null) return;
+    const result = await context.execute(
+      "api.control-plane.webhook.secret.start",
+      startControlPlaneWebhookSecretRotation(
+        controlPlanePrincipalActor(principal),
+        scope.projectId,
+        scope.environmentId,
+        scope.endpointId,
+        body,
+        context.request.requestId,
+      ),
+      "Control Plane webhook secret rotation started.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  const secretTransitionHandler =
+    (action: "activate" | "cancel" | "complete") => async (req: Request, res: Response) => {
+      const context = controlPlaneContext(req);
+      const principal = await prepareControlPlaneRequest(
+        req,
+        res,
+        context,
+        controlPlaneBearerRequirements.manageWebhooks,
+        controlPlaneRequestCosts.lifecycle,
+      );
+      if (principal === undefined) return;
+      const scopeResult = await context.execute(
+        `api.control-plane.webhook.secret.${action}.path`,
+        decodeControlPlaneOperationalWebhookScope(
+          routeParameter(req, "projectId"),
+          routeParameter(req, "environmentId"),
+          routeParameter(req, "endpointId"),
+        ),
+        "Control Plane webhook scope decoded.",
+      );
+      const scope = controlPlaneStepData(req, res, scopeResult);
+      if (scope === null) return;
+      const bodyResult = await context.execute(
+        `api.control-plane.webhook.secret.${action}.body`,
+        decodeControlPlaneWebhookSecretTransitionRequest(req.body),
+        "Control Plane webhook secret transition decoded.",
+      );
+      const body = controlPlaneStepData(req, res, bodyResult);
+      if (body === null) return;
+      const result = await context.execute(
+        `api.control-plane.webhook.secret.${action}`,
+        changeControlPlaneWebhookSecretRotation(
+          controlPlanePrincipalActor(principal),
+          scope.projectId,
+          scope.environmentId,
+          scope.endpointId,
+          action,
+          body,
+          context.request.requestId,
+        ),
+        "Control Plane webhook secret rotation changed.",
+      );
+      sendControlPlaneResponse(req, res, result.status, result.response);
+    };
+  router.post(`${secretRotationPath}/activate`, secretTransitionHandler("activate"));
+  router.post(`${secretRotationPath}/cancel`, secretTransitionHandler("cancel"));
+  router.post(`${secretRotationPath}/complete`, secretTransitionHandler("complete"));
+
+  const mappingCollectionPath =
+    "/projects/:projectId/environments/:environmentId/invalidation-mappings";
+  router.get(mappingCollectionPath, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.listWebhooks,
+      controlPlaneRequestCosts.list,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.control-plane.mapping.list.path",
+      decodeControlPlaneOperationalEnvironmentScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Control Plane invalidation scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const queryResult = await context.execute(
+      "api.control-plane.mapping.list.query",
+      decodeControlPlaneInvalidationMappingListQuery(req.originalUrl.split("?", 2)[1] ?? ""),
+      "Control Plane invalidation query decoded.",
+    );
+    const query = controlPlaneStepData(req, res, queryResult);
+    if (query === null) return;
+    const result = await context.execute(
+      "api.control-plane.mapping.list",
+      listControlPlaneInvalidationMappings(
+        controlPlanePrincipalActor(principal),
+        controlPlanePrincipalKey(principal),
+        scope.projectId,
+        scope.environmentId,
+        query,
+      ),
+      "Control Plane invalidation mappings loaded.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.post(mappingCollectionPath, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.manageWebhooks,
+      controlPlaneRequestCosts.create,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.control-plane.mapping.create.path",
+      decodeControlPlaneOperationalEnvironmentScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Control Plane invalidation scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const bodyResult = await context.execute(
+      "api.control-plane.mapping.create.body",
+      decodeControlPlaneCreateInvalidationMappingRequest(req.body),
+      "Control Plane invalidation mapping decoded.",
+    );
+    const body = controlPlaneStepData(req, res, bodyResult);
+    if (body === null) return;
+    const result = await context.execute(
+      "api.control-plane.mapping.create",
+      createControlPlaneInvalidationMapping(
+        controlPlanePrincipalActor(principal),
+        scope.projectId,
+        scope.environmentId,
+        body,
+        context.request.requestId,
+      ),
+      "Control Plane invalidation mapping created.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  const mappingPath = `${mappingCollectionPath}/:mappingId`;
+  router.put(mappingPath, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.manageWebhooks,
+      controlPlaneRequestCosts.update,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.control-plane.mapping.update.path",
+      decodeControlPlaneOperationalMappingScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+        routeParameter(req, "mappingId"),
+      ),
+      "Control Plane invalidation scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const bodyResult = await context.execute(
+      "api.control-plane.mapping.update.body",
+      decodeControlPlaneUpdateInvalidationMappingRequest(req.body),
+      "Control Plane invalidation mapping decoded.",
+    );
+    const body = controlPlaneStepData(req, res, bodyResult);
+    if (body === null) return;
+    const result = await context.execute(
+      "api.control-plane.mapping.update",
+      updateControlPlaneInvalidationMapping(
+        controlPlanePrincipalActor(principal),
+        scope.projectId,
+        scope.environmentId,
+        scope.mappingId,
+        body,
+        context.request.requestId,
+      ),
+      "Control Plane invalidation mapping updated.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.put(`${mappingPath}/state`, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.manageWebhooks,
+      controlPlaneRequestCosts.update,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.control-plane.mapping.state.path",
+      decodeControlPlaneOperationalMappingScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+        routeParameter(req, "mappingId"),
+      ),
+      "Control Plane invalidation scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const bodyResult = await context.execute(
+      "api.control-plane.mapping.state.body",
+      decodeControlPlaneInvalidationMappingStateRequest(req.body),
+      "Control Plane invalidation mapping state decoded.",
+    );
+    const body = controlPlaneStepData(req, res, bodyResult);
+    if (body === null) return;
+    const result = await context.execute(
+      "api.control-plane.mapping.state",
+      setControlPlaneInvalidationMappingState(
+        controlPlanePrincipalActor(principal),
+        scope.projectId,
+        scope.environmentId,
+        scope.mappingId,
+        body,
+        context.request.requestId,
+      ),
+      "Control Plane invalidation mapping state changed.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  const deliveryCollectionPath =
+    "/projects/:projectId/environments/:environmentId/webhook-deliveries";
+  router.get(deliveryCollectionPath, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.listWebhooks,
+      controlPlaneRequestCosts.list,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.control-plane.webhook.delivery.list.path",
+      decodeControlPlaneOperationalEnvironmentScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Control Plane delivery scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const queryResult = await context.execute(
+      "api.control-plane.webhook.delivery.list.query",
+      decodeControlPlaneWebhookDeliveryListQuery(req.originalUrl.split("?", 2)[1] ?? ""),
+      "Control Plane delivery query decoded.",
+    );
+    const query = controlPlaneStepData(req, res, queryResult);
+    if (query === null) return;
+    const result = await context.execute(
+      "api.control-plane.webhook.delivery.list",
+      listControlPlaneWebhookDeliveries(
+        controlPlanePrincipalActor(principal),
+        controlPlanePrincipalKey(principal),
+        scope.projectId,
+        scope.environmentId,
+        query,
+      ),
+      "Control Plane webhook deliveries loaded.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  const deliveryPath = `${deliveryCollectionPath}/:deliveryId`;
+  router.get(deliveryPath, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.listWebhooks,
+      controlPlaneRequestCosts.read,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.control-plane.webhook.delivery.get.path",
+      decodeControlPlaneOperationalDeliveryScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+        routeParameter(req, "deliveryId"),
+      ),
+      "Control Plane delivery scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const result = await context.execute(
+      "api.control-plane.webhook.delivery.get",
+      getControlPlaneWebhookDelivery(
+        controlPlanePrincipalActor(principal),
+        scope.projectId,
+        scope.environmentId,
+        scope.deliveryId,
+      ),
+      "Control Plane webhook delivery loaded.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.get(`${deliveryPath}/attempts`, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.listWebhooks,
+      controlPlaneRequestCosts.read,
+    );
+    if (principal === undefined) return;
+    const scopeResult = await context.execute(
+      "api.control-plane.webhook.attempt.list.path",
+      decodeControlPlaneOperationalDeliveryScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+        routeParameter(req, "deliveryId"),
+      ),
+      "Control Plane attempt scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const result = await context.execute(
+      "api.control-plane.webhook.attempt.list",
+      listControlPlaneWebhookAttempts(
+        controlPlanePrincipalActor(principal),
+        scope.projectId,
+        scope.environmentId,
+        scope.deliveryId,
+      ),
+      "Control Plane webhook attempts loaded.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.post(
+    "/projects/:projectId/environments/:environmentId/webhook-replays",
+    async (req, res) => {
+      const context = controlPlaneContext(req);
+      const principal = await prepareControlPlaneRequest(
+        req,
+        res,
+        context,
+        controlPlaneBearerRequirements.manageWebhooks,
+        controlPlaneRequestCosts.lifecycle,
+      );
+      if (principal === undefined) return;
+      const scopeResult = await context.execute(
+        "api.control-plane.webhook.replay.path",
+        decodeControlPlaneOperationalEnvironmentScope(
+          routeParameter(req, "projectId"),
+          routeParameter(req, "environmentId"),
+        ),
+        "Control Plane webhook replay scope decoded.",
+      );
+      const scope = controlPlaneStepData(req, res, scopeResult);
+      if (scope === null) return;
+      const bodyResult = await context.execute(
+        "api.control-plane.webhook.replay.body",
+        decodeControlPlaneReplayWebhookRequest(req.body),
+        "Control Plane webhook replay decoded.",
+      );
+      const body = controlPlaneStepData(req, res, bodyResult);
+      if (body === null) return;
+      const result = await context.execute(
+        "api.control-plane.webhook.replay",
+        replayControlPlaneWebhook(
+          controlPlanePrincipalActor(principal),
+          scope.projectId,
+          scope.environmentId,
+          body,
+          context.request.requestId,
+        ),
+        "Control Plane webhook replay created.",
+      );
+      sendControlPlaneResponse(req, res, result.status, result.response);
+    },
+  );
+
+  const credentialCollectionPath = "/projects/:projectId/environments/:environmentId/credentials";
+  router.get(credentialCollectionPath, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.listCredentials,
+      controlPlaneRequestCosts.list,
+    );
+    if (principal === undefined || principal.kind !== "oauth_user") return;
+    const scopeResult = await context.execute(
+      "api.control-plane.credential.list.path",
+      decodeControlPlaneOperationalEnvironmentScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Control Plane credential scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const queryResult = await context.execute(
+      "api.control-plane.credential.list.query",
+      decodeControlPlaneCredentialListQuery(req.originalUrl.split("?", 2)[1] ?? ""),
+      "Control Plane credential query decoded.",
+    );
+    const query = controlPlaneStepData(req, res, queryResult);
+    if (query === null) return;
+    const result = await context.execute(
+      "api.control-plane.credential.list",
+      listControlPlaneCredentials(
+        principal.userId,
+        controlPlanePrincipalKey(principal),
+        scope.projectId,
+        scope.environmentId,
+        query,
+      ),
+      "Control Plane credentials loaded.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.post(credentialCollectionPath, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.manageCredentials,
+      controlPlaneRequestCosts.create,
+    );
+    if (principal === undefined || principal.kind !== "oauth_user") return;
+    const scopeResult = await context.execute(
+      "api.control-plane.credential.issue.path",
+      decodeControlPlaneOperationalEnvironmentScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Control Plane credential scope decoded.",
+    );
+    const scope = controlPlaneStepData(req, res, scopeResult);
+    if (scope === null) return;
+    const requestResult = await context.execute(
+      "api.control-plane.credential.issue.body",
+      decodeControlPlaneIssueCredentialRequest(req.body),
+      "Control Plane credential issue body decoded.",
+    );
+    const request = controlPlaneStepData(req, res, requestResult);
+    if (request === null) return;
+    const result = await context.execute(
+      "api.control-plane.credential.issue",
+      issueControlPlaneCredential(
+        principal.userId,
+        scope.projectId,
+        scope.environmentId,
+        request,
+        context.request.requestId,
+      ),
+      "Control Plane credential issued.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.post(
+    "/projects/:projectId/environments/:environmentId/credentials/:credentialId/rotations",
+    async (req, res) => {
+      const context = controlPlaneContext(req);
+      const principal = await prepareControlPlaneRequest(
+        req,
+        res,
+        context,
+        controlPlaneBearerRequirements.manageCredentials,
+        controlPlaneRequestCosts.lifecycle,
+      );
+      if (principal === undefined || principal.kind !== "oauth_user") return;
+      const scopeResult = await context.execute(
+        "api.control-plane.credential.rotation.start.path",
+        decodeControlPlaneOperationalCredentialScope(
+          routeParameter(req, "projectId"),
+          routeParameter(req, "environmentId"),
+          routeParameter(req, "credentialId"),
+        ),
+        "Control Plane credential rotation scope decoded.",
+      );
+      const scope = controlPlaneStepData(req, res, scopeResult);
+      if (scope === null) return;
+      const requestResult = await context.execute(
+        "api.control-plane.credential.rotation.start.body",
+        decodeControlPlaneStartCredentialRotationRequest(req.body),
+        "Control Plane credential rotation body decoded.",
+      );
+      const request = controlPlaneStepData(req, res, requestResult);
+      if (request === null) return;
+      const result = await context.execute(
+        "api.control-plane.credential.rotation.start",
+        startControlPlaneCredentialRotation(
+          principal.userId,
+          scope.projectId,
+          scope.environmentId,
+          scope.credentialId,
+          request,
+          context.request.requestId,
+        ),
+        "Control Plane credential rotation started.",
+      );
+      sendControlPlaneResponse(req, res, result.status, result.response);
+    },
+  );
+
+  const credentialRotationTransitionHandler =
+    (action: "activate" | "cancel" | "complete") => async (req: Request, res: Response) => {
+      const context = controlPlaneContext(req);
+      const principal = await prepareControlPlaneRequest(
+        req,
+        res,
+        context,
+        controlPlaneBearerRequirements.manageCredentials,
+        controlPlaneRequestCosts.lifecycle,
+      );
+      if (principal === undefined || principal.kind !== "oauth_user") return;
+      const scopeResult = await context.execute(
+        `api.control-plane.credential.rotation.${action}.path`,
+        decodeControlPlaneOperationalRotationScope(
+          routeParameter(req, "projectId"),
+          routeParameter(req, "environmentId"),
+          routeParameter(req, "rotationId"),
+        ),
+        "Control Plane credential rotation scope decoded.",
+      );
+      const scope = controlPlaneStepData(req, res, scopeResult);
+      if (scope === null) return;
+      const requestResult = await context.execute(
+        `api.control-plane.credential.rotation.${action}.body`,
+        decodeControlPlaneCredentialRotationTransitionRequest(req.body),
+        "Control Plane credential rotation transition decoded.",
+      );
+      const request = controlPlaneStepData(req, res, requestResult);
+      if (request === null) return;
+      const result = await context.execute(
+        `api.control-plane.credential.rotation.${action}`,
+        changeControlPlaneCredentialRotation(
+          principal.userId,
+          scope.projectId,
+          scope.environmentId,
+          scope.rotationId,
+          action,
+          request,
+          context.request.requestId,
+        ),
+        "Control Plane credential rotation changed.",
+      );
+      sendControlPlaneResponse(req, res, result.status, result.response);
+    };
+  const rotationPath =
+    "/projects/:projectId/environments/:environmentId/credential-rotations/:rotationId";
+  router.post(`${rotationPath}/activate`, credentialRotationTransitionHandler("activate"));
+  router.post(`${rotationPath}/cancel`, credentialRotationTransitionHandler("cancel"));
+  router.post(`${rotationPath}/complete`, credentialRotationTransitionHandler("complete"));
+
+  router.post(
+    "/projects/:projectId/environments/:environmentId/credentials/:credentialId/revoke",
+    async (req, res) => {
+      const context = controlPlaneContext(req);
+      const principal = await prepareControlPlaneRequest(
+        req,
+        res,
+        context,
+        controlPlaneBearerRequirements.manageCredentials,
+        controlPlaneRequestCosts.lifecycle,
+      );
+      if (principal === undefined || principal.kind !== "oauth_user") return;
+      const scopeResult = await context.execute(
+        "api.control-plane.credential.revoke.path",
+        decodeControlPlaneOperationalCredentialScope(
+          routeParameter(req, "projectId"),
+          routeParameter(req, "environmentId"),
+          routeParameter(req, "credentialId"),
+        ),
+        "Control Plane credential revoke scope decoded.",
+      );
+      const scope = controlPlaneStepData(req, res, scopeResult);
+      if (scope === null) return;
+      const requestResult = await context.execute(
+        "api.control-plane.credential.revoke.body",
+        decodeControlPlaneRevokeCredentialRequest(req.body),
+        "Control Plane credential revoke body decoded.",
+      );
+      const request = controlPlaneStepData(req, res, requestResult);
+      if (request === null) return;
+      const result = await context.execute(
+        "api.control-plane.credential.revoke",
+        revokeControlPlaneCredential(
+          principal.userId,
+          scope.projectId,
+          scope.environmentId,
+          scope.credentialId,
+          request,
+          context.request.requestId,
+        ),
+        "Control Plane credential revoked.",
+      );
+      sendControlPlaneResponse(req, res, result.status, result.response);
+    },
+  );
+
+  router.get("/projects/:projectId/audit-events", async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.listAuditEvents,
+      controlPlaneRequestCosts.list,
+    );
+    if (principal === undefined || principal.kind !== "oauth_user") return;
+    const queryResult = await context.execute(
+      "api.control-plane.audit.list.query",
+      decodeControlPlaneProjectAuditInput(req.originalUrl.split("?", 2)[1] ?? ""),
+      "Control Plane audit query decoded.",
+    );
+    const query = controlPlaneStepData(req, res, queryResult);
+    if (query === null) return;
+    const result = await context.execute(
+      "api.control-plane.audit.list",
+      listProjectAuditEvents(
+        principal.userId,
+        controlPlanePrincipalKey(principal),
+        routeParameter(req, "projectId"),
+        query,
+        context.request.requestId,
+      ),
+      "Control Plane audit events loaded.",
     );
     sendControlPlaneResponse(req, res, result.status, result.response);
   });

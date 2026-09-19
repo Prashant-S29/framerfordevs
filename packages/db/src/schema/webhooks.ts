@@ -18,6 +18,7 @@ import {
   type PgTableExtraConfigValue,
 } from "drizzle-orm/pg-core";
 
+import { apiCredential } from "./access";
 import { user } from "./auth";
 import { cmsCollection, cmsEntry, outboxEvent } from "./cms";
 import { projectLocale } from "./locale";
@@ -114,12 +115,16 @@ export const webhookEndpoint = pgTable(
     currentDestinationId: uuid("current_destination_id"),
     enabledAt: webhookTimestamp("enabled_at"),
     disabledAt: webhookTimestamp("disabled_at"),
-    createdByUserId: text("created_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
-    changedByUserId: text("changed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    createdByCredentialId: uuid("created_by_credential_id"),
+    createdByCredentialEnvironmentId: uuid("created_by_credential_environment_id"),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
+    changedByCredentialEnvironmentId: uuid("changed_by_credential_environment_id"),
     leaseToken: uuid("lease_token"),
     leaseExpiresAt: webhookTimestamp("lease_expires_at"),
     createdAt: webhookTimestamp("created_at").defaultNow().notNull(),
@@ -130,6 +135,36 @@ export const webhookEndpoint = pgTable(
       name: "webhook_endpoint_environment_tenant_fk",
       columns: [table.environmentId, table.projectId, table.workspaceId],
       foreignColumns: [environment.id, environment.projectId, environment.workspaceId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "webhook_endpoint_created_credential_tenant_fk",
+      columns: [
+        table.createdByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.createdByCredentialEnvironmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "webhook_endpoint_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.changedByCredentialEnvironmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
     }).onDelete("restrict"),
     foreignKey({
       name: "webhook_endpoint_current_destination_scope_fk",
@@ -161,6 +196,14 @@ export const webhookEndpoint = pgTable(
     check("webhook_endpoint_state_valid", sql`${table.state} in ('enabled', 'disabled')`),
     check("webhook_endpoint_version_positive", sql`${table.version} > 0`),
     check(
+      "webhook_endpoint_created_actor_exactly_one",
+      sql`(${table.createdByUserId} is not null and ${table.createdByCredentialId} is null and ${table.createdByCredentialEnvironmentId} is null) or (${table.createdByUserId} is null and ${table.createdByCredentialId} is not null and ${table.createdByCredentialEnvironmentId} is not null)`,
+    ),
+    check(
+      "webhook_endpoint_changed_actor_exactly_one",
+      sql`(${table.changedByUserId} is not null and ${table.changedByCredentialId} is null and ${table.changedByCredentialEnvironmentId} is null) or (${table.changedByUserId} is null and ${table.changedByCredentialId} is not null and ${table.changedByCredentialEnvironmentId} is not null)`,
+    ),
+    check(
       "webhook_endpoint_lifecycle_valid",
       sql`(${table.state} = 'enabled' and ${table.currentDestinationId} is not null and ${table.enabledAt} is not null and ${table.disabledAt} is null) or (${table.state} = 'disabled' and (${table.enabledAt} is null or ${table.disabledAt} is not null))`,
     ),
@@ -181,8 +224,18 @@ export const webhookEndpoint = pgTable(
     index("webhook_endpoint_expired_lease_idx")
       .on(table.leaseExpiresAt, table.id)
       .where(sql`${table.leaseExpiresAt} is not null`),
-    index("webhook_endpoint_created_by_idx").on(table.createdByUserId),
-    index("webhook_endpoint_changed_by_idx").on(table.changedByUserId),
+    index("webhook_endpoint_created_by_idx")
+      .on(table.createdByUserId)
+      .where(sql`${table.createdByUserId} is not null`),
+    index("webhook_endpoint_changed_by_idx")
+      .on(table.changedByUserId)
+      .where(sql`${table.changedByUserId} is not null`),
+    index("webhook_endpoint_created_by_credential_idx")
+      .on(table.createdByCredentialId, table.createdByCredentialEnvironmentId)
+      .where(sql`${table.createdByCredentialId} is not null`),
+    index("webhook_endpoint_changed_by_credential_idx")
+      .on(table.changedByCredentialId, table.changedByCredentialEnvironmentId)
+      .where(sql`${table.changedByCredentialId} is not null`),
   ],
 );
 
@@ -200,9 +253,11 @@ export const webhookEndpointDestination = pgTable(
     nonce: varchar("nonce", { length: 32 }).notNull(),
     ciphertext: text("ciphertext").notNull(),
     keyedFingerprint: char("keyed_fingerprint", { length: 64 }).notNull(),
-    createdByUserId: text("created_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    createdByCredentialId: uuid("created_by_credential_id"),
+    createdByCredentialEnvironmentId: uuid("created_by_credential_environment_id"),
     createdAt: webhookTimestamp("created_at").defaultNow().notNull(),
   },
   (table): PgTableExtraConfigValue[] => [
@@ -214,6 +269,21 @@ export const webhookEndpointDestination = pgTable(
         webhookEndpoint.environmentId,
         webhookEndpoint.projectId,
         webhookEndpoint.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "webhook_destination_created_credential_tenant_fk",
+      columns: [
+        table.createdByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.createdByCredentialEnvironmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
       ],
     }).onDelete("restrict"),
     unique("webhook_destination_id_scope_unique").on(
@@ -245,8 +315,17 @@ export const webhookEndpointDestination = pgTable(
       "webhook_destination_fingerprint_valid",
       sql`${table.keyedFingerprint} ~ '^[0-9a-f]{64}$'`,
     ),
+    check(
+      "webhook_destination_created_actor_exactly_one",
+      sql`(${table.createdByUserId} is not null and ${table.createdByCredentialId} is null and ${table.createdByCredentialEnvironmentId} is null) or (${table.createdByUserId} is null and ${table.createdByCredentialId} is not null and ${table.createdByCredentialEnvironmentId} is not null)`,
+    ),
     index("webhook_destination_endpoint_sequence_idx").on(table.endpointId, table.sequence.desc()),
-    index("webhook_destination_created_by_idx").on(table.createdByUserId),
+    index("webhook_destination_created_by_idx")
+      .on(table.createdByUserId)
+      .where(sql`${table.createdByUserId} is not null`),
+    index("webhook_destination_created_by_credential_idx")
+      .on(table.createdByCredentialId, table.createdByCredentialEnvironmentId)
+      .where(sql`${table.createdByCredentialId} is not null`),
   ],
 );
 
@@ -261,12 +340,16 @@ export const webhookEndpointSubscription = pgTable(
     eventType: varchar("event_type", { length: 128 }).notNull(),
     activeFrom: webhookTimestamp("active_from").notNull(),
     activeUntil: webhookTimestamp("active_until"),
-    createdByUserId: text("created_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    createdByCredentialId: uuid("created_by_credential_id"),
+    createdByCredentialEnvironmentId: uuid("created_by_credential_environment_id"),
     closedByUserId: text("closed_by_user_id").references(() => user.id, {
       onDelete: "restrict",
     }),
+    closedByCredentialId: uuid("closed_by_credential_id"),
+    closedByCredentialEnvironmentId: uuid("closed_by_credential_environment_id"),
     createdAt: webhookTimestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -278,6 +361,36 @@ export const webhookEndpointSubscription = pgTable(
         webhookEndpoint.environmentId,
         webhookEndpoint.projectId,
         webhookEndpoint.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "webhook_subscription_created_credential_tenant_fk",
+      columns: [
+        table.createdByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.createdByCredentialEnvironmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "webhook_subscription_closed_credential_tenant_fk",
+      columns: [
+        table.closedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.closedByCredentialEnvironmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
       ],
     }).onDelete("restrict"),
     unique("webhook_subscription_id_scope_unique").on(
@@ -292,8 +405,12 @@ export const webhookEndpointSubscription = pgTable(
       .where(sql`${table.activeUntil} is null`),
     check("webhook_subscription_type_valid", sql`${table.eventType} in ${publicEventTypesSql}`),
     check(
+      "webhook_subscription_created_actor_exactly_one",
+      sql`(${table.createdByUserId} is not null and ${table.createdByCredentialId} is null and ${table.createdByCredentialEnvironmentId} is null) or (${table.createdByUserId} is null and ${table.createdByCredentialId} is not null and ${table.createdByCredentialEnvironmentId} is not null)`,
+    ),
+    check(
       "webhook_subscription_lifecycle_valid",
-      sql`(${table.activeUntil} is null and ${table.closedByUserId} is null) or (${table.activeUntil} is not null and ${table.closedByUserId} is not null and ${table.activeUntil} >= ${table.activeFrom})`,
+      sql`(${table.activeUntil} is null and ${table.closedByUserId} is null and ${table.closedByCredentialId} is null and ${table.closedByCredentialEnvironmentId} is null) or (${table.activeUntil} is not null and ${table.activeUntil} >= ${table.activeFrom} and ((${table.closedByUserId} is not null and ${table.closedByCredentialId} is null and ${table.closedByCredentialEnvironmentId} is null) or (${table.closedByUserId} is null and ${table.closedByCredentialId} is not null and ${table.closedByCredentialEnvironmentId} is not null)))`,
     ),
     index("webhook_subscription_dispatch_idx").on(
       table.environmentId,
@@ -307,10 +424,18 @@ export const webhookEndpointSubscription = pgTable(
       table.activeFrom.desc(),
       table.id.desc(),
     ),
-    index("webhook_subscription_created_by_idx").on(table.createdByUserId),
+    index("webhook_subscription_created_by_idx")
+      .on(table.createdByUserId)
+      .where(sql`${table.createdByUserId} is not null`),
     index("webhook_subscription_closed_by_idx")
       .on(table.closedByUserId)
       .where(sql`${table.closedByUserId} is not null`),
+    index("webhook_subscription_created_by_credential_idx")
+      .on(table.createdByCredentialId, table.createdByCredentialEnvironmentId)
+      .where(sql`${table.createdByCredentialId} is not null`),
+    index("webhook_subscription_closed_by_credential_idx")
+      .on(table.closedByCredentialId, table.closedByCredentialEnvironmentId)
+      .where(sql`${table.closedByCredentialId} is not null`),
   ],
 );
 
@@ -331,12 +456,16 @@ export const webhookEndpointSecret = pgTable(
     activatedAt: webhookTimestamp("activated_at"),
     retireAt: webhookTimestamp("retire_at"),
     retiredAt: webhookTimestamp("retired_at"),
-    createdByUserId: text("created_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
-    changedByUserId: text("changed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    createdByCredentialId: uuid("created_by_credential_id"),
+    createdByCredentialEnvironmentId: uuid("created_by_credential_environment_id"),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
+    changedByCredentialEnvironmentId: uuid("changed_by_credential_environment_id"),
     createdAt: webhookTimestamp("created_at").defaultNow().notNull(),
     updatedAt: webhookTimestamp("updated_at").defaultNow().notNull(),
   },
@@ -349,6 +478,36 @@ export const webhookEndpointSecret = pgTable(
         webhookEndpoint.environmentId,
         webhookEndpoint.projectId,
         webhookEndpoint.workspaceId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "webhook_secret_created_credential_tenant_fk",
+      columns: [
+        table.createdByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.createdByCredentialEnvironmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "webhook_secret_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.changedByCredentialEnvironmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
       ],
     }).onDelete("restrict"),
     unique("webhook_secret_id_scope_unique").on(
@@ -383,6 +542,14 @@ export const webhookEndpointSecret = pgTable(
     ),
     check("webhook_secret_fingerprint_valid", sql`${table.fingerprint} ~ '^[0-9a-f]{16}$'`),
     check(
+      "webhook_secret_created_actor_exactly_one",
+      sql`(${table.createdByUserId} is not null and ${table.createdByCredentialId} is null and ${table.createdByCredentialEnvironmentId} is null) or (${table.createdByUserId} is null and ${table.createdByCredentialId} is not null and ${table.createdByCredentialEnvironmentId} is not null)`,
+    ),
+    check(
+      "webhook_secret_changed_actor_exactly_one",
+      sql`(${table.changedByUserId} is not null and ${table.changedByCredentialId} is null and ${table.changedByCredentialEnvironmentId} is null) or (${table.changedByUserId} is null and ${table.changedByCredentialId} is not null and ${table.changedByCredentialEnvironmentId} is not null)`,
+    ),
+    check(
       "webhook_secret_lifecycle_valid",
       sql`(${table.state} = 'pending' and ${table.activatedAt} is null and ${table.retireAt} is null and ${table.retiredAt} is null) or (${table.state} = 'active' and ${table.activatedAt} is not null and ${table.retireAt} is null and ${table.retiredAt} is null) or (${table.state} = 'retiring' and ${table.activatedAt} is not null and ${table.retireAt} is not null and ${table.retiredAt} is null and ${table.retireAt} > ${table.activatedAt}) or (${table.state} in ('retired', 'canceled') and ${table.retiredAt} is not null)`,
     ),
@@ -391,8 +558,18 @@ export const webhookEndpointSecret = pgTable(
     index("webhook_secret_retiring_due_idx")
       .on(table.retireAt, table.id)
       .where(sql`${table.state} = 'retiring'`),
-    index("webhook_secret_created_by_idx").on(table.createdByUserId),
-    index("webhook_secret_changed_by_idx").on(table.changedByUserId),
+    index("webhook_secret_created_by_idx")
+      .on(table.createdByUserId)
+      .where(sql`${table.createdByUserId} is not null`),
+    index("webhook_secret_changed_by_idx")
+      .on(table.changedByUserId)
+      .where(sql`${table.changedByUserId} is not null`),
+    index("webhook_secret_created_by_credential_idx")
+      .on(table.createdByCredentialId, table.createdByCredentialEnvironmentId)
+      .where(sql`${table.createdByCredentialId} is not null`),
+    index("webhook_secret_changed_by_credential_idx")
+      .on(table.changedByCredentialId, table.changedByCredentialEnvironmentId)
+      .where(sql`${table.changedByCredentialId} is not null`),
   ],
 );
 
@@ -415,12 +592,16 @@ export const cmsInvalidationRouteMapping = pgTable(
       .notNull(),
     state: varchar("state", { length: 16 }).default("enabled").notNull(),
     version: integer("version").default(1).notNull(),
-    createdByUserId: text("created_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
-    changedByUserId: text("changed_by_user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    createdByCredentialId: uuid("created_by_credential_id"),
+    createdByCredentialEnvironmentId: uuid("created_by_credential_environment_id"),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
+    changedByCredentialEnvironmentId: uuid("changed_by_credential_environment_id"),
     disabledAt: webhookTimestamp("disabled_at"),
     createdAt: webhookTimestamp("created_at").defaultNow().notNull(),
     updatedAt: webhookTimestamp("updated_at").defaultNow().notNull(),
@@ -458,6 +639,36 @@ export const cmsInvalidationRouteMapping = pgTable(
       columns: [table.localeId, table.projectId, table.workspaceId],
       foreignColumns: [projectLocale.id, projectLocale.projectId, projectLocale.workspaceId],
     }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_invalidation_mapping_created_credential_tenant_fk",
+      columns: [
+        table.createdByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.createdByCredentialEnvironmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "cms_invalidation_mapping_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.changedByCredentialEnvironmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
     unique("cms_invalidation_mapping_id_scope_unique").on(
       table.id,
       table.environmentId,
@@ -487,6 +698,14 @@ export const cmsInvalidationRouteMapping = pgTable(
     check("cms_invalidation_mapping_state_valid", sql`${table.state} in ('enabled', 'disabled')`),
     check("cms_invalidation_mapping_version_positive", sql`${table.version} > 0`),
     check(
+      "cms_invalidation_mapping_created_actor_exactly_one",
+      sql`(${table.createdByUserId} is not null and ${table.createdByCredentialId} is null and ${table.createdByCredentialEnvironmentId} is null) or (${table.createdByUserId} is null and ${table.createdByCredentialId} is not null and ${table.createdByCredentialEnvironmentId} is not null)`,
+    ),
+    check(
+      "cms_invalidation_mapping_changed_actor_exactly_one",
+      sql`(${table.changedByUserId} is not null and ${table.changedByCredentialId} is null and ${table.changedByCredentialEnvironmentId} is null) or (${table.changedByUserId} is null and ${table.changedByCredentialId} is not null and ${table.changedByCredentialEnvironmentId} is not null)`,
+    ),
+    check(
       "cms_invalidation_mapping_lifecycle_valid",
       sql`(${table.state} = 'enabled' and ${table.disabledAt} is null) or (${table.state} = 'disabled' and ${table.disabledAt} is not null)`,
     ),
@@ -503,8 +722,18 @@ export const cmsInvalidationRouteMapping = pgTable(
     index("cms_invalidation_mapping_entry_idx")
       .on(table.entryId, table.localeId)
       .where(sql`${table.entryId} is not null or ${table.localeId} is not null`),
-    index("cms_invalidation_mapping_created_by_idx").on(table.createdByUserId),
-    index("cms_invalidation_mapping_changed_by_idx").on(table.changedByUserId),
+    index("cms_invalidation_mapping_created_by_idx")
+      .on(table.createdByUserId)
+      .where(sql`${table.createdByUserId} is not null`),
+    index("cms_invalidation_mapping_changed_by_idx")
+      .on(table.changedByUserId)
+      .where(sql`${table.changedByUserId} is not null`),
+    index("cms_invalidation_mapping_created_by_credential_idx")
+      .on(table.createdByCredentialId, table.createdByCredentialEnvironmentId)
+      .where(sql`${table.createdByCredentialId} is not null`),
+    index("cms_invalidation_mapping_changed_by_credential_idx")
+      .on(table.changedByCredentialId, table.changedByCredentialEnvironmentId)
+      .where(sql`${table.changedByCredentialId} is not null`),
   ],
 );
 
@@ -525,6 +754,8 @@ export const webhookDelivery = pgTable(
     replayedByUserId: text("replayed_by_user_id").references(() => user.id, {
       onDelete: "restrict",
     }),
+    replayedByCredentialId: uuid("replayed_by_credential_id"),
+    replayedByCredentialEnvironmentId: uuid("replayed_by_credential_environment_id"),
     status: varchar("status", { length: 24 }).default("queued").notNull(),
     attemptCount: integer("attempt_count").default(0).notNull(),
     nextAttemptAt: webhookTimestamp("next_attempt_at"),
@@ -574,6 +805,21 @@ export const webhookDelivery = pgTable(
       ],
     }).onDelete("restrict"),
     foreignKey({
+      name: "webhook_delivery_replayed_credential_tenant_fk",
+      columns: [
+        table.replayedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.replayedByCredentialEnvironmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
       name: "webhook_delivery_source_scope_fk",
       columns: [
         table.sourceDeliveryId,
@@ -609,7 +855,7 @@ export const webhookDelivery = pgTable(
     check("webhook_delivery_kind_valid", sql`${table.kind} in ('initial', 'replay')`),
     check(
       "webhook_delivery_replay_authority_valid",
-      sql`(${table.kind} = 'initial' and ${table.sourceDeliveryId} is null and ${table.replayCommandId} is null and ${table.replayCommandFingerprint} is null and ${table.replayedByUserId} is null) or (${table.kind} = 'replay' and ${table.replayCommandId} is not null and ${table.replayCommandFingerprint} ~ '^[0-9a-f]{64}$' and ${table.replayedByUserId} is not null)`,
+      sql`(${table.kind} = 'initial' and ${table.sourceDeliveryId} is null and ${table.replayCommandId} is null and ${table.replayCommandFingerprint} is null and ${table.replayedByUserId} is null and ${table.replayedByCredentialId} is null and ${table.replayedByCredentialEnvironmentId} is null) or (${table.kind} = 'replay' and ${table.replayCommandId} is not null and ${table.replayCommandFingerprint} ~ '^[0-9a-f]{64}$' and ((${table.replayedByUserId} is not null and ${table.replayedByCredentialId} is null and ${table.replayedByCredentialEnvironmentId} is null) or (${table.replayedByUserId} is null and ${table.replayedByCredentialId} is not null and ${table.replayedByCredentialEnvironmentId} is not null)))`,
     ),
     check(
       "webhook_delivery_status_valid",
@@ -626,7 +872,7 @@ export const webhookDelivery = pgTable(
     ),
     check(
       "webhook_delivery_outcome_valid",
-      sql`(${table.attemptCount} = 0 and ${table.lastOutcome} is null) or (${table.attemptCount} > 0 and ${table.lastOutcome} is not null and ${table.lastOutcome} ~ '^[a-z][a-z0-9_]{0,63}$')`,
+      sql`(${table.attemptCount} = 0 and (${table.lastOutcome} is null or (${table.status} = 'canceled' and ${table.lastOutcome} = 'project_archived'))) or (${table.attemptCount} > 0 and ${table.lastOutcome} is not null and ${table.lastOutcome} ~ '^[a-z][a-z0-9_]{0,63}$')`,
     ),
     check("webhook_delivery_timestamps_valid", sql`${table.updatedAt} >= ${table.createdAt}`),
     index("webhook_delivery_ready_idx")
@@ -650,6 +896,9 @@ export const webhookDelivery = pgTable(
     index("webhook_delivery_replayed_by_idx")
       .on(table.replayedByUserId)
       .where(sql`${table.replayedByUserId} is not null`),
+    index("webhook_delivery_replayed_by_credential_idx")
+      .on(table.replayedByCredentialId, table.replayedByCredentialEnvironmentId)
+      .where(sql`${table.replayedByCredentialId} is not null`),
   ],
 );
 

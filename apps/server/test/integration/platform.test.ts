@@ -5,6 +5,7 @@ import { db } from "@framerfordevs/db";
 import { and, eq, or } from "@framerfordevs/db/query";
 import {
   apiCredential,
+  apiCredentialRotation,
   apiCredentialScope,
   projectInvitation,
   projectMembership,
@@ -108,6 +109,7 @@ afterAll(async () => {
     .from(apiCredential)
     .where(eq(apiCredential.projectId, projectId));
   if (credentialRows.length > 0) {
+    await db.delete(apiCredentialRotation).where(eq(apiCredentialRotation.projectId, projectId));
     await db
       .delete(apiCredentialScope)
       .where(or(...credentialRows.map(({ id }) => eq(apiCredentialScope.credentialId, id))));
@@ -614,6 +616,66 @@ describe.sequential("platform API contracts", () => {
       },
     ],
     [
+      "platform/projects/operations/audit/list",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        query: {
+          environmentId: null,
+          category: "all",
+          actorKind: "all",
+          actorId: null,
+          action: null,
+          from: "2026-09-01T00:00:00.000Z",
+          to: "2026-09-30T00:00:00.000Z",
+          cursor: null,
+          limit: 20,
+        },
+      },
+    ],
+    [
+      "platform/projects/credentials/operationalList",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        query: {
+          family: "all",
+          status: "all",
+          cursor: null,
+          limit: 20,
+        },
+      },
+    ],
+    [
+      "webhooks/deliveries/operationalList",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        query: {
+          endpointId: null,
+          eventType: null,
+          status: null,
+          cursor: null,
+          limit: 20,
+        },
+      },
+    ],
+    [
+      "webhooks/deliveries/detail",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        deliveryId: "019fae8b-1234-7000-8000-000000000003",
+      },
+    ],
+    [
+      "webhooks/attempts/operationalList",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        deliveryId: "019fae8b-1234-7000-8000-000000000003",
+      },
+    ],
+    [
       "platform/projects/credentials/issue",
       {
         projectId: "019fae8b-1234-7000-8000-000000000001",
@@ -622,6 +684,7 @@ describe.sequential("platform API contracts", () => {
         name: "Anonymous",
         scopes: ["delivery.read"],
         expiresAt: null,
+        nonExpiringAcknowledged: true,
       },
     ],
     [
@@ -634,12 +697,24 @@ describe.sequential("platform API contracts", () => {
       },
     ],
     [
-      "platform/projects/credentials/rotate",
-      { credentialId: "019fae8b-1234-7000-8000-000000000001", version: 1 },
+      "platform/projects/credentials/rotation/start",
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        credentialId: "019fae8b-1234-7000-8000-000000000003",
+        expectedVersion: 1,
+        expiresAt: null,
+        nonExpiringAcknowledged: true,
+      },
     ],
     [
       "platform/projects/credentials/revoke",
-      { credentialId: "019fae8b-1234-7000-8000-000000000001", version: 1 },
+      {
+        projectId: "019fae8b-1234-7000-8000-000000000001",
+        environmentId: "019fae8b-1234-7000-8000-000000000002",
+        credentialId: "019fae8b-1234-7000-8000-000000000003",
+        expectedVersion: 1,
+      },
     ],
   ])("rejects anonymous access to %s", async (path, input) => {
     const response = await rpc(request.agent(app), path, input);
@@ -996,6 +1071,7 @@ describe.sequential("platform API contracts", () => {
       name: "API delivery key",
       scopes: ["delivery.read"],
       expiresAt: null,
+      nonExpiringAcknowledged: true,
     });
     const key = issued.body.json.data.key;
     const credential = issued.body.json.data.credential;
@@ -1005,13 +1081,45 @@ describe.sequential("platform API contracts", () => {
       cursor: null,
       limit: 20,
     });
-    const rotated = await rpc(firstAgent, "platform/projects/credentials/rotate", {
+    const rotated = await rpc(firstAgent, "platform/projects/credentials/rotation/start", {
+      projectId,
+      environmentId,
       credentialId: credential.id,
-      version: credential.version,
+      expectedVersion: credential.version,
+      expiresAt: credential.expiresAt,
+      nonExpiringAcknowledged: credential.expiresAt === null,
     });
+    const activated = await rpc(firstAgent, "platform/projects/credentials/rotation/change", {
+      projectId,
+      environmentId,
+      rotationId: rotated.body.json.data.rotation.id,
+      expectedVersion: rotated.body.json.data.rotation.version,
+      action: "activate",
+    });
+    const afterActivation = await rpc(firstAgent, "platform/projects/credentials/list", {
+      projectId,
+      environmentId,
+      cursor: null,
+      limit: 20,
+    });
+    const operationalList = await rpc(firstAgent, "platform/projects/credentials/operationalList", {
+      projectId,
+      environmentId,
+      query: {
+        family: "all",
+        status: "all",
+        cursor: null,
+        limit: 20,
+      },
+    });
+    const activeSuccessor = afterActivation.body.json.data.items.find(
+      (item: { id: string }) => item.id === rotated.body.json.data.successor.id,
+    );
     const revoked = await rpc(firstAgent, "platform/projects/credentials/revoke", {
-      credentialId: rotated.body.json.data.credential.id,
-      version: rotated.body.json.data.credential.version,
+      projectId,
+      environmentId,
+      credentialId: activeSuccessor.id,
+      expectedVersion: activeSuccessor.version,
     });
 
     expect(issued.status).toBe(200);
@@ -1020,6 +1128,16 @@ describe.sequential("platform API contracts", () => {
     expect(listed.body.json.data.items[0]).not.toHaveProperty("keyDigest");
     expect(rotated.status).toBe(200);
     expect(rotated.body.json.data.key).not.toBe(key);
+    expect(rotated.body.json.data.successor.status).toBe("pending");
+    expect(activated.body.json.data.status).toBe("overlap");
+    expect(operationalList.status).toBe(200);
+    expect(operationalList.body.json.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: credential.id, status: "retiring" }),
+        expect.objectContaining({ id: rotated.body.json.data.successor.id, status: "active" }),
+      ]),
+    );
+    expect(JSON.stringify(operationalList.body)).not.toContain(key);
     expect(revoked.status).toBe(200);
     expect(revoked.body.json.data.revokedAt).toBeTypeOf("string");
     expect(JSON.stringify(revoked.body)).not.toContain(key);
@@ -1031,6 +1149,7 @@ describe.sequential("platform API contracts", () => {
       name: "Tooling CI key",
       scopes: ["schema.read", "content.read"],
       expiresAt: null,
+      nonExpiringAcknowledged: true,
     });
     const managementKey = management.body.json.data.key;
     const managementCredential = management.body.json.data.credential;
@@ -1140,11 +1259,39 @@ describe.sequential("platform API contracts", () => {
     await db.delete(auditEvent).where(eq(auditEvent.actorId, managementCredential.id));
 
     const managementRevoked = await rpc(firstAgent, "platform/projects/credentials/revoke", {
+      projectId,
+      environmentId,
       credentialId: managementCredential.id,
-      version: managementCredential.version,
+      expectedVersion: managementCredential.version,
     });
     expect(managementRevoked.status).toBe(200);
     expect(JSON.stringify(managementRevoked.body)).not.toContain(managementKey);
+
+    const audit = await rpc(firstAgent, "platform/projects/operations/audit/list", {
+      projectId,
+      query: {
+        environmentId,
+        category: "security",
+        actorKind: "user",
+        actorId: firstUserId,
+        action: null,
+        from: new Date(Date.now() - 86_400_000).toISOString(),
+        to: new Date(Date.now() + 60_000).toISOString(),
+        cursor: null,
+        limit: 20,
+      },
+    });
+    expect(audit.status).toBe(200);
+    expect(audit.body.json.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actor: { kind: "user", id: firstUserId },
+          action: "project.credential.revoked",
+        }),
+      ]),
+    );
+    expect(JSON.stringify(audit.body)).not.toContain(firstEmail);
+    expect(JSON.stringify(audit.body)).not.toContain(managementKey);
   });
 
   it("archives into the archived cursor list and blocks future mutations", async () => {

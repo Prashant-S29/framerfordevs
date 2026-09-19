@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { Clock, Effect, Schema } from "effect";
 
+import type { ProjectActor } from "../../../contracts/access";
 import { RateLimitedFailure, UnauthorizedFailure } from "../../../contracts/response/errors";
 import { AuthUserId, PageLimit } from "../../../contracts/platform";
 import {
@@ -32,19 +33,24 @@ import { RateLimitManager } from "../../../services/rate-limit/manager";
 import { WebhookRepository } from "../../../services/webhook/repository";
 import { canonicalizeEntryValue } from "../../../lib/entry/values";
 
-const decodeActorId = (value: string) =>
-  Schema.decodeUnknown(AuthUserId)(value).pipe(Effect.mapError(() => UnauthorizedFailure.make()));
+const decodeActor = (value: string | ProjectActor) =>
+  typeof value === "string"
+    ? Schema.decodeUnknown(AuthUserId)(value).pipe(
+        Effect.map((id) => ({ kind: "user" as const, id })),
+        Effect.mapError(() => UnauthorizedFailure.make()),
+      )
+    : Effect.succeed(value);
 
 export const createWebhookEndpoint = Effect.fn("webhook.endpoint.create")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: CreateWebhookEndpointInput,
   requestId: string,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
+  const actor = yield* decodeActor(actorInput);
   const destinationValidator = yield* WebhookDestinationValidator;
   const crypto = yield* WebhookCrypto;
   const repository = yield* WebhookRepository;
-  const managementScope = yield* repository.resolveManagementScope(actorId, input);
+  const managementScope = yield* repository.resolveManagementScope(actor, input);
   const validated = yield* destinationValidator.validate(input.destination);
   const endpointId = randomUUID();
   const destinationId = randomUUID();
@@ -67,7 +73,7 @@ export const createWebhookEndpoint = Effect.fn("webhook.endpoint.create")(functi
   const encryptedSecret = yield* crypto.encrypt(secret, secretScope);
   const now = new Date(yield* Clock.currentTimeMillis);
   const endpoint = yield* repository.createEndpoint(
-    actorId,
+    actor,
     input,
     {
       endpointId,
@@ -86,21 +92,21 @@ export const createWebhookEndpoint = Effect.fn("webhook.endpoint.create")(functi
 });
 
 export const listWebhookEndpoints = Effect.fn("webhook.endpoint.list")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: ListWebhookEndpointsInput,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
-  return yield* (yield* WebhookRepository).listEndpoints(actorId, input);
+  const actor = yield* decodeActor(actorInput);
+  return yield* (yield* WebhookRepository).listEndpoints(actor, input);
 });
 
 export const updateWebhookEndpoint = Effect.fn("webhook.endpoint.update")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: UpdateWebhookEndpointInput,
   requestId: string,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
+  const actor = yield* decodeActor(actorInput);
   const repository = yield* WebhookRepository;
-  const managementScope = yield* repository.resolveManagementScope(actorId, input);
+  const managementScope = yield* repository.resolveManagementScope(actor, input);
   let persistence = null;
   if (input.destination !== undefined) {
     const validated = yield* (yield* WebhookDestinationValidator).validate(input.destination);
@@ -121,7 +127,7 @@ export const updateWebhookEndpoint = Effect.fn("webhook.endpoint.update")(functi
     };
   }
   return yield* repository.updateEndpoint(
-    actorId,
+    actor,
     input,
     persistence,
     new Date(yield* Clock.currentTimeMillis),
@@ -130,13 +136,13 @@ export const updateWebhookEndpoint = Effect.fn("webhook.endpoint.update")(functi
 });
 
 export const setWebhookEndpointState = Effect.fn("webhook.endpoint.state")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: SetWebhookEndpointStateInput,
   requestId: string,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
+  const actor = yield* decodeActor(actorInput);
   return yield* (yield* WebhookRepository).setEndpointState(
-    actorId,
+    actor,
     input,
     new Date(yield* Clock.currentTimeMillis),
     requestId,
@@ -144,13 +150,13 @@ export const setWebhookEndpointState = Effect.fn("webhook.endpoint.state")(funct
 });
 
 export const replaceWebhookSubscriptions = Effect.fn("webhook.subscription.replace")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: ReplaceWebhookSubscriptionsInput,
   requestId: string,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
+  const actor = yield* decodeActor(actorInput);
   return yield* (yield* WebhookRepository).replaceSubscriptions(
-    actorId,
+    actor,
     input,
     new Date(yield* Clock.currentTimeMillis),
     requestId,
@@ -158,14 +164,14 @@ export const replaceWebhookSubscriptions = Effect.fn("webhook.subscription.repla
 });
 
 export const startWebhookSecretRotation = Effect.fn("webhook.secret.start")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: StartWebhookSecretRotationInput,
   requestId: string,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
+  const actor = yield* decodeActor(actorInput);
   const repository = yield* WebhookRepository;
   const crypto = yield* WebhookCrypto;
-  const managementScope = yield* repository.resolveManagementScope(actorId, input);
+  const managementScope = yield* repository.resolveManagementScope(actor, input);
   const secretId = WebhookSecretId.make(randomUUID());
   const secret = yield* crypto.generateSigningSecret();
   const encrypted = yield* crypto.encrypt(secret, {
@@ -177,7 +183,7 @@ export const startWebhookSecretRotation = Effect.fn("webhook.secret.start")(func
     purpose: "signing_secret",
   });
   yield* repository.startSecretRotation(
-    actorId,
+    actor,
     input,
     {
       secretId,
@@ -196,20 +202,21 @@ export const startWebhookSecretRotation = Effect.fn("webhook.secret.start")(func
 });
 
 export const changeWebhookSecretRotation = Effect.fn("webhook.secret.change")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: ChangeWebhookSecretRotationInput,
   requestId: string,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
+  const actor = yield* decodeActor(actorInput);
   const endpoint = yield* (yield* WebhookRepository).changeSecretRotation(
-    actorId,
+    actor,
     input,
     new Date(yield* Clock.currentTimeMillis),
     requestId,
   );
-  const listed = yield* (yield* WebhookRepository).listEndpoints(actorId, {
+  const listed = yield* (yield* WebhookRepository).listEndpoints(actor, {
     projectId: input.projectId,
     environmentId: input.environmentId,
+    state: "all",
     cursor: null,
     limit: PageLimit.make(50),
   });
@@ -219,23 +226,23 @@ export const changeWebhookSecretRotation = Effect.fn("webhook.secret.change")(fu
 });
 
 export const createInvalidationMapping = Effect.fn("webhook.mapping.create")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: CreateInvalidationRouteMappingInput,
   requestId: string,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
+  const actor = yield* decodeActor(actorInput);
   const now = new Date(yield* Clock.currentTimeMillis);
-  return yield* (yield* WebhookRepository).createMapping(actorId, input, now, requestId);
+  return yield* (yield* WebhookRepository).createMapping(actor, input, now, requestId);
 });
 
 export const updateInvalidationMapping = Effect.fn("webhook.mapping.update")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: UpdateInvalidationRouteMappingInput,
   requestId: string,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
+  const actor = yield* decodeActor(actorInput);
   return yield* (yield* WebhookRepository).updateMapping(
-    actorId,
+    actor,
     input,
     new Date(yield* Clock.currentTimeMillis),
     requestId,
@@ -243,13 +250,13 @@ export const updateInvalidationMapping = Effect.fn("webhook.mapping.update")(fun
 });
 
 export const setInvalidationMappingState = Effect.fn("webhook.mapping.state")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: SetInvalidationRouteMappingStateInput,
   requestId: string,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
+  const actor = yield* decodeActor(actorInput);
   return yield* (yield* WebhookRepository).setMappingState(
-    actorId,
+    actor,
     input,
     new Date(yield* Clock.currentTimeMillis),
     requestId,
@@ -257,38 +264,38 @@ export const setInvalidationMappingState = Effect.fn("webhook.mapping.state")(fu
 });
 
 export const listInvalidationMappings = Effect.fn("webhook.mapping.list")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: ListInvalidationRouteMappingsInput,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
-  return yield* (yield* WebhookRepository).listMappings(actorId, input);
+  const actor = yield* decodeActor(actorInput);
+  return yield* (yield* WebhookRepository).listMappings(actor, input);
 });
 
 export const listWebhookDeliveries = Effect.fn("webhook.delivery.list")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: ListWebhookDeliveriesInput,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
-  return yield* (yield* WebhookRepository).listDeliveries(actorId, input);
+  const actor = yield* decodeActor(actorInput);
+  return yield* (yield* WebhookRepository).listDeliveries(actor, input);
 });
 
 export const listWebhookAttempts = Effect.fn("webhook.attempt.list")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: ListWebhookAttemptsInput,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
-  return yield* (yield* WebhookRepository).listAttempts(actorId, input);
+  const actor = yield* decodeActor(actorInput);
+  return yield* (yield* WebhookRepository).listAttempts(actor, input);
 });
 
 export const replayWebhookEvent = Effect.fn("webhook.delivery.replay")(function* (
-  actorUserId: string,
+  actorInput: string | ProjectActor,
   input: ReplayWebhookEventInput,
   requestId: string,
 ) {
-  const actorId = yield* decodeActorId(actorUserId);
+  const actor = yield* decodeActor(actorInput);
   const decision = yield* (yield* RateLimitManager).evaluate({
-    policy: "webhook.replay.user",
-    identity: actorId,
+    policy: actor.kind === "user" ? "webhook.replay.user" : "webhook.replay.credential",
+    identity: actor.id,
     cost: 1,
   });
   if (!decision.allowed) return yield* RateLimitedFailure.make();
@@ -300,18 +307,19 @@ export const replayWebhookEvent = Effect.fn("webhook.delivery.replay")(function*
       canonicalizeEntryValue({
         version: 1,
         operation: "webhook.delivery.replay",
-        actorId,
+        actorKind: actor.kind,
+        actorId: actor.id,
         ...encodedInput,
       }),
       "utf8",
     )
     .digest("hex");
   const delivery = yield* (yield* WebhookRepository).replayEvent(
-    actorId,
+    actor,
     input,
     fingerprint,
     new Date(yield* Clock.currentTimeMillis),
     requestId,
   );
-  return ReplayWebhookEventResult.make({ delivery, replayedByUserId: actorId });
+  return ReplayWebhookEventResult.make({ delivery, replayedBy: actor });
 });

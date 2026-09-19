@@ -27,6 +27,7 @@ import {
   type ToolingRequestMetric,
 } from "../observability/telemetry";
 import { AccessRepository, AccessRepositoryLive } from "../services/access-repository";
+import { AuditRepository, AuditRepositoryLive } from "../services/audit/repository";
 import { AuthSessionLive, AuthSessionService } from "../services/auth-session";
 import {
   ControlPlaneCursorSigner,
@@ -123,6 +124,7 @@ export type ApplicationServices =
   | PlatformRepository
   | LocaleRepository
   | AccessRepository
+  | AuditRepository
   | PolicyService
   | SecretGenerator
   | RateLimitManager
@@ -222,6 +224,7 @@ const InfrastructureLive = Layer.mergeAll(
   PlatformRepositoryLive,
   LocaleRepositoryLive,
   AccessRepositoryLive,
+  AuditRepositoryLive,
   PolicyServiceLive,
   SecretGeneratorLive,
   RateLimitManagerConfiguredLive,

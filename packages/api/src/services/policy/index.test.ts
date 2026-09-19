@@ -35,6 +35,7 @@ const expectedAllowedActions = {
     "project.credential.issue",
     "project.credential.rotate",
     "project.credential.revoke",
+    "project.audit.read",
     "locale.read",
     "locale.manage",
     "schema.read",
@@ -261,12 +262,13 @@ describe("PolicyService", () => {
             policy.decideUser({ ...selectedDeveloper, action: "webhook.read" }),
             policy.decideUser({ ...selectedDeveloper, action: "webhook.manage" }),
             policy.decideUser({ ...selectedDeveloper, action: "project.credential.revoke" }),
+            policy.decideUser({ ...selectedDeveloper, action: "project.audit.read" }),
             policy.decideUser({ ...selectedDeveloper, action: "locale.read" }),
           ]);
 
           assert.deepEqual(
             decisions.map((decision) => decision.allowed),
-            [false, false, false, false, false, false, false, false, true, true],
+            [false, false, false, false, false, false, false, false, true, false, true],
           );
         }),
     );
@@ -418,6 +420,7 @@ describe("PolicyService", () => {
       "webhook.manage",
       "content.write",
       "project.credential.revoke",
+      "project.audit.read",
     ]);
     assert.notIncludeMembers(projection.effectiveProjectActions, [
       "schema.write",
@@ -425,6 +428,7 @@ describe("PolicyService", () => {
       "delivery.configure",
       "webhook.read",
       "webhook.manage",
+      "project.audit.read",
       "content.read",
       "content.write",
       "content.review",

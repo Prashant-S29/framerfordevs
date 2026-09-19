@@ -50,12 +50,28 @@ describe("Effect metrics", () => {
         yield* telemetry.recordPreviewQueryRejection("credential_in_query");
         yield* telemetry.recordPreviewAuditFailure();
         yield* telemetry.recordControlPlaneRequest({
-          operation: "project_create",
+          operation: "credential_rotation_activate",
           subject: "oauth_user",
           outcome: "success",
           statusFamily: "2xx",
-          costBucket: "5",
+          costBucket: "3",
           durationMs: 19,
+        });
+        yield* telemetry.recordControlPlaneRequest({
+          operation: "webhook_replay",
+          subject: "management_credential",
+          outcome: "failure",
+          statusFamily: "4xx",
+          costBucket: "5",
+          durationMs: 7,
+        });
+        yield* telemetry.recordControlPlaneRequest({
+          operation: "audit_list",
+          subject: "unknown",
+          outcome: "failure",
+          statusFamily: "4xx",
+          costBucket: "2",
+          durationMs: 3,
         });
         yield* telemetry.recordToolingRequest({
           endpoint: "manifest",

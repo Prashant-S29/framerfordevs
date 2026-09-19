@@ -3,15 +3,20 @@
 import {
   CONTROL_PLANE_GOVERNANCE_READ_SCOPE,
   CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE,
+  CONTROL_PLANE_OPERATIONS_READ_SCOPE,
+  CONTROL_PLANE_OPERATIONS_WRITE_SCOPE,
   CONTROL_PLANE_PROJECT_LIFECYCLE_SCOPE,
   CONTROL_PLANE_READ_SCOPE,
+  CONTROL_PLANE_SECURITY_READ_SCOPE,
   CONTROL_PLANE_WRITE_SCOPE,
   type CliApiOAuthScope,
 } from "@framerfordevs/auth";
-import { Effect, Schema } from "effect";
+import { Clock, Effect, Schema } from "effect";
 
 import {
   AcceptProjectInvitationInput,
+  ApiCredentialId,
+  ApiCredentialRotationId,
   type CredentialScope,
   CreateProjectInvitationInput,
   ListProjectInvitationsInput,
@@ -24,9 +29,22 @@ import {
   type ControlPlaneActor,
   ControlPlaneCreateInvitationRequest,
   ControlPlaneCreateLocaleRequest,
+  ControlPlaneCredentialListQuery,
+  ControlPlaneCredentialRotationTransitionRequest,
+  ControlPlaneCreateInvalidationMappingRequest,
+  ControlPlaneCreateWebhookEndpointRequest,
+  ControlPlaneInvalidationMappingListQuery,
+  ControlPlaneInvalidationMappingStateRequest,
+  ControlPlaneIssueCredentialRequest,
+  ControlPlaneReplayWebhookRequest,
+  ControlPlaneReplaceWebhookSubscriptionsRequest,
+  ControlPlaneRevokeCredentialRequest,
+  ControlPlaneStartCredentialRotationRequest,
+  ControlPlaneStartWebhookSecretRotationRequest,
   ControlPlaneCreateProjectInput,
   ControlPlaneCreateProjectRequest,
   ControlPlaneCreateWorkspaceRequest,
+  ControlPlaneProjectAuditQuery,
   ControlPlaneEnableCapabilityInput,
   ControlPlaneEnableCapabilityRequest,
   ControlPlaneInvitationListQuery,
@@ -45,7 +63,13 @@ import {
   ControlPlanePutStudioRegistrationInput,
   ControlPlaneStudioRegistrationScope,
   ControlPlanePutStudioRegistrationRequest,
+  ControlPlaneUpdateInvalidationMappingRequest,
   ControlPlaneUpdateLocaleRequest,
+  ControlPlaneUpdateWebhookEndpointRequest,
+  ControlPlaneWebhookDeliveryListQuery,
+  ControlPlaneWebhookEndpointListQuery,
+  ControlPlaneWebhookEndpointStateRequest,
+  ControlPlaneWebhookSecretTransitionRequest,
   ControlPlaneUpdateProjectInput,
   ControlPlaneUpdateProjectRequest,
   ControlPlaneVersionRequest,
@@ -58,7 +82,12 @@ import {
   UpdateProjectLocaleDisplayNameInput,
   UpdateProjectLocaleStatusInput,
 } from "../../../contracts/locale";
-import { AuthUserId } from "../../../contracts/platform";
+import { AuthUserId, EnvironmentId, ProjectId } from "../../../contracts/platform";
+import {
+  InvalidationRouteMappingId,
+  WebhookDeliveryId,
+  WebhookEndpointId,
+} from "../../../contracts/webhook";
 import { RateLimitCost } from "../../../contracts/rate-limit";
 import { ApiErrorDetail } from "../../../contracts/response/api";
 import { UnauthorizedFailure, ValidationFailure } from "../../../contracts/response/errors";
@@ -121,6 +150,252 @@ function parseBoundedQuery(
     }
   }
   return Effect.succeed(parameters);
+}
+
+const ControlPlaneOperationalEnvironmentScope = Schema.Struct({
+  projectId: ProjectId,
+  environmentId: EnvironmentId,
+});
+const ControlPlaneOperationalCredentialScope = Schema.Struct({
+  ...ControlPlaneOperationalEnvironmentScope.fields,
+  credentialId: ApiCredentialId,
+});
+const ControlPlaneOperationalRotationScope = Schema.Struct({
+  ...ControlPlaneOperationalEnvironmentScope.fields,
+  rotationId: ApiCredentialRotationId,
+});
+const ControlPlaneOperationalWebhookScope = Schema.Struct({
+  ...ControlPlaneOperationalEnvironmentScope.fields,
+  endpointId: WebhookEndpointId,
+});
+const ControlPlaneOperationalMappingScope = Schema.Struct({
+  ...ControlPlaneOperationalEnvironmentScope.fields,
+  mappingId: InvalidationRouteMappingId,
+});
+const ControlPlaneOperationalDeliveryScope = Schema.Struct({
+  ...ControlPlaneOperationalEnvironmentScope.fields,
+  deliveryId: WebhookDeliveryId,
+});
+
+export function decodeControlPlaneOperationalEnvironmentScope(
+  projectId: string,
+  environmentId: string,
+) {
+  return decodeInput(ControlPlaneOperationalEnvironmentScope, { projectId, environmentId }, "path");
+}
+
+export function decodeControlPlaneOperationalCredentialScope(
+  projectId: string,
+  environmentId: string,
+  credentialId: string,
+) {
+  return decodeInput(
+    ControlPlaneOperationalCredentialScope,
+    { projectId, environmentId, credentialId },
+    "path",
+  );
+}
+
+export function decodeControlPlaneOperationalRotationScope(
+  projectId: string,
+  environmentId: string,
+  rotationId: string,
+) {
+  return decodeInput(
+    ControlPlaneOperationalRotationScope,
+    { projectId, environmentId, rotationId },
+    "path",
+  );
+}
+
+export function decodeControlPlaneOperationalWebhookScope(
+  projectId: string,
+  environmentId: string,
+  endpointId: string,
+) {
+  return decodeInput(
+    ControlPlaneOperationalWebhookScope,
+    { projectId, environmentId, endpointId },
+    "path",
+  );
+}
+
+export function decodeControlPlaneOperationalMappingScope(
+  projectId: string,
+  environmentId: string,
+  mappingId: string,
+) {
+  return decodeInput(
+    ControlPlaneOperationalMappingScope,
+    { projectId, environmentId, mappingId },
+    "path",
+  );
+}
+
+export function decodeControlPlaneOperationalDeliveryScope(
+  projectId: string,
+  environmentId: string,
+  deliveryId: string,
+) {
+  return decodeInput(
+    ControlPlaneOperationalDeliveryScope,
+    { projectId, environmentId, deliveryId },
+    "path",
+  );
+}
+
+export function decodeControlPlaneWebhookEndpointListQuery(raw: string) {
+  return Effect.flatMap(parseBoundedQuery(raw, ["state", "cursor", "limit"]), (query) => {
+    const limit = query.get("limit");
+    if (limit !== null && !positiveIntegerPattern.test(limit)) {
+      return Effect.fail(validationFailure("query.limit"));
+    }
+    return decodeInput(
+      ControlPlaneWebhookEndpointListQuery,
+      {
+        state: query.get("state") ?? "all",
+        cursor: query.get("cursor"),
+        limit: limit === null ? 20 : Number(limit),
+      },
+      "query",
+    );
+  });
+}
+
+export function decodeControlPlaneInvalidationMappingListQuery(raw: string) {
+  return Effect.flatMap(parseBoundedQuery(raw, ["state", "cursor", "limit"]), (query) => {
+    const limit = query.get("limit");
+    if (limit !== null && !positiveIntegerPattern.test(limit)) {
+      return Effect.fail(validationFailure("query.limit"));
+    }
+    return decodeInput(
+      ControlPlaneInvalidationMappingListQuery,
+      {
+        state: query.get("state") ?? "all",
+        cursor: query.get("cursor"),
+        limit: limit === null ? 20 : Number(limit),
+      },
+      "query",
+    );
+  });
+}
+
+export function decodeControlPlaneWebhookDeliveryListQuery(raw: string) {
+  return Effect.flatMap(
+    parseBoundedQuery(raw, ["endpointId", "eventType", "status", "cursor", "limit"]),
+    (query) => {
+      const limit = query.get("limit");
+      if (limit !== null && !positiveIntegerPattern.test(limit)) {
+        return Effect.fail(validationFailure("query.limit"));
+      }
+      return decodeInput(
+        ControlPlaneWebhookDeliveryListQuery,
+        {
+          endpointId: query.get("endpointId"),
+          eventType: query.get("eventType"),
+          status: query.get("status"),
+          cursor: query.get("cursor"),
+          limit: limit === null ? 20 : Number(limit),
+        },
+        "query",
+      );
+    },
+  );
+}
+
+export const decodeControlPlaneCreateWebhookEndpointRequest = (body: unknown) =>
+  decodeInput(ControlPlaneCreateWebhookEndpointRequest, body, "body");
+export const decodeControlPlaneUpdateWebhookEndpointRequest = (body: unknown) =>
+  decodeInput(ControlPlaneUpdateWebhookEndpointRequest, body, "body");
+export const decodeControlPlaneWebhookEndpointStateRequest = (body: unknown) =>
+  decodeInput(ControlPlaneWebhookEndpointStateRequest, body, "body");
+export const decodeControlPlaneReplaceWebhookSubscriptionsRequest = (body: unknown) =>
+  decodeInput(ControlPlaneReplaceWebhookSubscriptionsRequest, body, "body");
+export const decodeControlPlaneStartWebhookSecretRotationRequest = (body: unknown) =>
+  decodeInput(ControlPlaneStartWebhookSecretRotationRequest, body, "body");
+export const decodeControlPlaneWebhookSecretTransitionRequest = (body: unknown) =>
+  decodeInput(ControlPlaneWebhookSecretTransitionRequest, body, "body");
+export const decodeControlPlaneCreateInvalidationMappingRequest = (body: unknown) =>
+  decodeInput(ControlPlaneCreateInvalidationMappingRequest, body, "body");
+export const decodeControlPlaneUpdateInvalidationMappingRequest = (body: unknown) =>
+  decodeInput(ControlPlaneUpdateInvalidationMappingRequest, body, "body");
+export const decodeControlPlaneInvalidationMappingStateRequest = (body: unknown) =>
+  decodeInput(ControlPlaneInvalidationMappingStateRequest, body, "body");
+export const decodeControlPlaneReplayWebhookRequest = (body: unknown) =>
+  decodeInput(ControlPlaneReplayWebhookRequest, body, "body");
+
+export function decodeControlPlaneCredentialListQuery(raw: string) {
+  return Effect.flatMap(
+    parseBoundedQuery(raw, ["family", "status", "cursor", "limit"]),
+    (query) => {
+      const limit = query.get("limit");
+      if (limit !== null && !positiveIntegerPattern.test(limit)) {
+        return Effect.fail(validationFailure("query.limit"));
+      }
+      return decodeInput(
+        ControlPlaneCredentialListQuery,
+        {
+          family: query.get("family") ?? "all",
+          status: query.get("status") ?? "all",
+          cursor: query.get("cursor"),
+          limit: limit === null ? 20 : Number(limit),
+        },
+        "query",
+      );
+    },
+  );
+}
+
+export function decodeControlPlaneIssueCredentialRequest(body: unknown) {
+  return decodeInput(ControlPlaneIssueCredentialRequest, body, "body");
+}
+
+export function decodeControlPlaneStartCredentialRotationRequest(body: unknown) {
+  return decodeInput(ControlPlaneStartCredentialRotationRequest, body, "body");
+}
+
+export function decodeControlPlaneCredentialRotationTransitionRequest(body: unknown) {
+  return decodeInput(ControlPlaneCredentialRotationTransitionRequest, body, "body");
+}
+
+export function decodeControlPlaneRevokeCredentialRequest(body: unknown) {
+  return decodeInput(ControlPlaneRevokeCredentialRequest, body, "body");
+}
+
+export function decodeControlPlaneProjectAuditInput(raw: string) {
+  return Effect.gen(function* () {
+    const query = yield* parseBoundedQuery(raw, [
+      "environmentId",
+      "category",
+      "actorKind",
+      "actorId",
+      "action",
+      "from",
+      "to",
+      "cursor",
+      "limit",
+    ]);
+    const limit = query.get("limit");
+    if (limit !== null && !positiveIntegerPattern.test(limit)) {
+      return yield* validationFailure("query.limit");
+    }
+    const now = yield* Clock.currentTimeMillis;
+    return yield* decodeInput(
+      ControlPlaneProjectAuditQuery,
+      {
+        environmentId: query.get("environmentId"),
+        category: query.get("category") ?? "all",
+        actorKind: query.get("actorKind") ?? "all",
+        actorId: query.get("actorId"),
+        action: query.get("action"),
+        from: query.get("from") ?? new Date(now - 30 * 24 * 60 * 60 * 1_000).toISOString(),
+        to: query.get("to") ?? new Date(now).toISOString(),
+        cursor: query.get("cursor"),
+        limit: limit === null ? 20 : Number(limit),
+      },
+      "query",
+    );
+  });
 }
 
 export function decodeControlPlaneMemberListInput(projectId: string, raw: string) {
@@ -448,6 +723,11 @@ export const controlPlaneBearerRequirements = {
   listLocales: projectAuthority(CONTROL_PLANE_GOVERNANCE_READ_SCOPE, ["locale.read"]),
   listLocaleSettings: projectAuthority(CONTROL_PLANE_GOVERNANCE_READ_SCOPE, ["locale.manage"]),
   manageLocales: projectAuthority(CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE, ["locale.manage"]),
+  listCredentials: oauthOnly(CONTROL_PLANE_OPERATIONS_READ_SCOPE),
+  manageCredentials: oauthOnly(CONTROL_PLANE_OPERATIONS_WRITE_SCOPE),
+  listWebhooks: projectAuthority(CONTROL_PLANE_OPERATIONS_READ_SCOPE, ["webhook.read"]),
+  manageWebhooks: projectAuthority(CONTROL_PLANE_OPERATIONS_WRITE_SCOPE, ["webhook.manage"]),
+  listAuditEvents: oauthOnly(CONTROL_PLANE_SECURITY_READ_SCOPE),
 } as const satisfies Readonly<Record<string, ControlPlaneBearerRequirement>>;
 
 export const authenticateControlPlaneRequest = Effect.fn("control-plane.public.authenticate")(

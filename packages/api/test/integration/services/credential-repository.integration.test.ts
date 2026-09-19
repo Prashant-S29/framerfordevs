@@ -4,9 +4,10 @@ import { randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, layer } from "@effect/vitest";
 import { db } from "@framerfordevs/db";
-import { and, eq, or, sql } from "@framerfordevs/db/query";
+import { and, eq, inArray, or, sql } from "@framerfordevs/db/query";
 import {
   apiCredential,
+  apiCredentialRotation,
   apiCredentialScope,
   projectMembership,
 } from "@framerfordevs/db/schema/access";
@@ -22,18 +23,20 @@ import {
 import { Cause, Effect, Exit, Layer, Option, Schema } from "effect";
 
 import {
+  ChangeApiCredentialRotationInput,
   type IssuedApiCredential,
   IssueApiCredentialInput,
   ListApiCredentialsInput,
   RevokeApiCredentialInput,
-  RotateApiCredentialInput,
+  StartApiCredentialRotationInput,
 } from "../../../src/contracts/access";
 import { TelemetryLive } from "../../../src/observability/telemetry";
 import {
+  changeApiCredentialRotation,
   issueApiCredential,
   listApiCredentials,
   revokeApiCredential,
-  rotateApiCredential,
+  startApiCredentialRotation,
 } from "../../../src/operations/credentials";
 import { CredentialAttemptLimiterLive } from "../../../src/services/credential/attempt-limiter";
 import { makeRateLimitManagerLive } from "../../../src/services/rate-limit/manager";
@@ -181,6 +184,9 @@ afterAll(async () => {
     .from(apiCredential)
     .where(eq(apiCredential.projectId, required(projectModel, "project").id));
   if (credentials.length > 0) {
+    await db
+      .delete(apiCredentialRotation)
+      .where(eq(apiCredentialRotation.projectId, required(projectModel, "project").id));
     await db
       .delete(apiCredentialScope)
       .where(or(...credentials.map(({ id }) => eq(apiCredentialScope.credentialId, id))));
@@ -398,11 +404,15 @@ describe.sequential("credential repository PostgreSQL integration", () => {
         );
         const currentManagement = required(managementCredential, "management credential");
         const rotate = yield* Effect.exit(
-          rotateApiCredential(
+          startApiCredentialRotation(
             developerId,
-            yield* Schema.decodeUnknown(RotateApiCredentialInput)({
+            yield* Schema.decodeUnknown(StartApiCredentialRotationInput)({
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
               credentialId: currentManagement.credential.id,
-              version: currentManagement.credential.version,
+              expectedVersion: currentManagement.credential.version,
+              expiresAt: currentManagement.credential.expiresAt,
+              nonExpiringAcknowledged: currentManagement.credential.expiresAt === null,
             }),
             "request-m4-restricted-credential-rotate",
           ),
@@ -527,6 +537,7 @@ describe.sequential("credential repository PostgreSQL integration", () => {
       () =>
         Effect.gen(function* () {
           const authenticator = yield* CredentialAuthenticator;
+          const currentProject = required(projectModel, "project");
           const preview = required(previewCredential, "preview");
           yield* Effect.promise(() =>
             db
@@ -543,11 +554,15 @@ describe.sequential("credential repository PostgreSQL integration", () => {
             }),
           );
           const rotation = yield* Effect.exit(
-            rotateApiCredential(
+            startApiCredentialRotation(
               ownerId,
-              yield* Schema.decodeUnknown(RotateApiCredentialInput)({
+              yield* Schema.decodeUnknown(StartApiCredentialRotationInput)({
+                projectId: currentProject.id,
+                environmentId: currentProject.environment.id,
                 credentialId: preview.credential.id,
-                version: preview.credential.version,
+                expectedVersion: preview.credential.version,
+                expiresAt: preview.credential.expiresAt,
+                nonExpiringAcknowledged: false,
               }),
               "request-m10-preview-credential-legacy-rotate",
             ),
@@ -572,8 +587,10 @@ describe.sequential("credential repository PostgreSQL integration", () => {
         const revoked = yield* revokeApiCredential(
           ownerId,
           yield* Schema.decodeUnknown(RevokeApiCredentialInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
             credentialId: preview.credential.id,
-            version: preview.credential.version,
+            expectedVersion: preview.credential.version,
           }),
           "request-m3-credential-revoke",
         );
@@ -594,70 +611,424 @@ describe.sequential("credential repository PostgreSQL integration", () => {
       }),
     );
 
-    it.effect(
-      "rotates atomically, invalidates the predecessor, and authenticates the successor",
-      () =>
-        Effect.gen(function* () {
-          const authenticator = yield* CredentialAuthenticator;
-          const currentProject = required(projectModel, "project");
-          const management = required(managementCredential, "management");
-          const rotated = yield* rotateApiCredential(
-            ownerId,
-            yield* Schema.decodeUnknown(RotateApiCredentialInput)({
-              credentialId: management.credential.id,
-              version: management.credential.version,
-            }),
-            "request-m3-credential-rotate",
-          );
-          const predecessor = yield* Effect.exit(
-            authenticator.authenticate({
-              key: management.key,
-              expectedFamily: "management",
-              requiredScope: "content.read",
-              workspaceId: currentProject.workspaceId,
-              projectId: currentProject.id,
-              environmentId: currentProject.environment.id,
-              source: "198.51.100.30",
-            }),
-          );
-          const successor = yield* authenticator.authenticate({
-            key: rotated.key,
+    it.effect("stages, activates, overlaps, and completes credential rotation", () =>
+      Effect.gen(function* () {
+        const authenticator = yield* CredentialAuthenticator;
+        const currentProject = required(projectModel, "project");
+        const management = required(managementCredential, "management");
+        const started = yield* startApiCredentialRotation(
+          ownerId,
+          yield* Schema.decodeUnknown(StartApiCredentialRotationInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            credentialId: management.credential.id,
+            expectedVersion: management.credential.version,
+            expiresAt: management.credential.expiresAt,
+            nonExpiringAcknowledged: management.credential.expiresAt === null,
+          }),
+          "request-m16-credential-rotation-start",
+        );
+        const pending = yield* Effect.exit(
+          authenticator.authenticate({
+            key: started.key,
+            expectedFamily: "management",
+            requiredScope: "content.read",
+            workspaceId: currentProject.workspaceId,
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            source: "198.51.100.30",
+          }),
+        );
+        assert.strictEqual(failureTag(pending), "CredentialInvalidFailure");
+
+        const activated = yield* changeApiCredentialRotation(
+          ownerId,
+          yield* Schema.decodeUnknown(ChangeApiCredentialRotationInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            rotationId: started.rotation.id,
+            expectedVersion: started.rotation.version,
+            action: "activate",
+          }),
+          "request-m16-credential-rotation-activate",
+        );
+        const overlap = yield* Effect.all([
+          authenticator.authenticate({
+            key: management.key,
             expectedFamily: "management",
             requiredScope: "content.read",
             workspaceId: currentProject.workspaceId,
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             source: "198.51.100.31",
-          });
+          }),
+          authenticator.authenticate({
+            key: started.key,
+            expectedFamily: "management",
+            requiredScope: "content.read",
+            workspaceId: currentProject.workspaceId,
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            source: "198.51.100.32",
+          }),
+        ]);
+        assert.deepEqual(
+          overlap.map((principal) => principal.credentialId),
+          [management.credential.id, started.successor.id],
+        );
 
-          assert.strictEqual(failureTag(predecessor), "CredentialInvalidFailure");
-          assert.strictEqual(successor.credentialId, rotated.credential.id);
-          assert.notEqual(rotated.credential.id, management.credential.id);
-          managementCredential = rotated;
-        }),
+        const completed = yield* changeApiCredentialRotation(
+          ownerId,
+          yield* Schema.decodeUnknown(ChangeApiCredentialRotationInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            rotationId: activated.id,
+            expectedVersion: activated.version,
+            action: "complete",
+          }),
+          "request-m16-credential-rotation-complete",
+        );
+        const predecessor = yield* Effect.exit(
+          authenticator.authenticate({
+            key: management.key,
+            expectedFamily: "management",
+            requiredScope: "content.read",
+            workspaceId: currentProject.workspaceId,
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            source: "198.51.100.33",
+          }),
+        );
+        assert.strictEqual(completed.status, "completed");
+        assert.strictEqual(failureTag(predecessor), "CredentialInvalidFailure");
+        const listed = yield* listApiCredentials(
+          ownerId,
+          yield* Schema.decodeUnknown(ListApiCredentialsInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            cursor: null,
+            limit: 50,
+          }),
+        );
+        managementCredential = {
+          credential: required(
+            listed.items.find((credential) => credential.id === started.successor.id),
+            "active rotation successor",
+          ),
+          key: started.key,
+        };
+      }),
     );
 
-    it.effect("allows exactly one concurrent rotate or revoke mutation", () =>
+    it.effect("cancels an unknown pending successor and permits a replacement rotation", () =>
       Effect.gen(function* () {
+        const authenticator = yield* CredentialAuthenticator;
+        const currentProject = required(projectModel, "project");
+        const issued = yield* issueApiCredential(
+          ownerId,
+          yield* Schema.decodeUnknown(IssueApiCredentialInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            family: "management",
+            name: "Canceled rotation predecessor",
+            scopes: ["content.read"],
+            expiresAt: null,
+            nonExpiringAcknowledged: true,
+          }),
+          "request-m16-cancel-restart-issue",
+        );
+        const started = yield* startApiCredentialRotation(
+          ownerId,
+          yield* Schema.decodeUnknown(StartApiCredentialRotationInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            credentialId: issued.credential.id,
+            expectedVersion: issued.credential.version,
+            expiresAt: null,
+            nonExpiringAcknowledged: true,
+          }),
+          "request-m16-cancel-restart-start",
+        );
+        const canceled = yield* changeApiCredentialRotation(
+          ownerId,
+          yield* Schema.decodeUnknown(ChangeApiCredentialRotationInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            rotationId: started.rotation.id,
+            expectedVersion: started.rotation.version,
+            action: "cancel",
+          }),
+          "request-m16-cancel-restart-cancel",
+        );
+        const canceledAuthentication = yield* Effect.exit(
+          authenticator.authenticate({
+            key: started.key,
+            expectedFamily: "management",
+            requiredScope: "content.read",
+            workspaceId: currentProject.workspaceId,
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            source: "198.51.100.34",
+          }),
+        );
+        const replacement = yield* startApiCredentialRotation(
+          ownerId,
+          yield* Schema.decodeUnknown(StartApiCredentialRotationInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            credentialId: issued.credential.id,
+            expectedVersion: issued.credential.version,
+            expiresAt: null,
+            nonExpiringAcknowledged: true,
+          }),
+          "request-m16-cancel-restart-replacement",
+        );
+
+        assert.strictEqual(canceled.status, "canceled");
+        assert.strictEqual(failureTag(canceledAuthentication), "CredentialInvalidFailure");
+        assert.notStrictEqual(replacement.rotation.id, started.rotation.id);
+        yield* changeApiCredentialRotation(
+          ownerId,
+          yield* Schema.decodeUnknown(ChangeApiCredentialRotationInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            rotationId: replacement.rotation.id,
+            expectedVersion: replacement.rotation.version,
+            action: "cancel",
+          }),
+          "request-m16-cancel-restart-replacement-cancel",
+        );
+      }),
+    );
+
+    it.effect("rejects an overlap predecessor at retireAt without waiting for cleanup", () =>
+      Effect.gen(function* () {
+        const authenticator = yield* CredentialAuthenticator;
+        const currentProject = required(projectModel, "project");
+        const issued = yield* issueApiCredential(
+          ownerId,
+          yield* Schema.decodeUnknown(IssueApiCredentialInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            family: "delivery",
+            name: "Overlap expiry predecessor",
+            scopes: ["delivery.read"],
+            expiresAt: null,
+            nonExpiringAcknowledged: true,
+          }),
+          "request-m16-overlap-expiry-issue",
+        );
+        const started = yield* startApiCredentialRotation(
+          ownerId,
+          yield* Schema.decodeUnknown(StartApiCredentialRotationInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            credentialId: issued.credential.id,
+            expectedVersion: issued.credential.version,
+            expiresAt: null,
+            nonExpiringAcknowledged: true,
+          }),
+          "request-m16-overlap-expiry-start",
+        );
+        const activated = yield* changeApiCredentialRotation(
+          ownerId,
+          yield* Schema.decodeUnknown(ChangeApiCredentialRotationInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            rotationId: started.rotation.id,
+            expectedVersion: started.rotation.version,
+            action: "activate",
+          }),
+          "request-m16-overlap-expiry-activate",
+        );
+        yield* Effect.promise(() =>
+          db
+            .update(apiCredential)
+            .set({ retireAt: new Date(Date.now() - 1) })
+            .where(eq(apiCredential.id, issued.credential.id)),
+        );
+
+        const predecessor = yield* Effect.exit(
+          authenticator.authenticate({
+            key: issued.key,
+            expectedFamily: "delivery",
+            requiredScope: "delivery.read",
+            workspaceId: currentProject.workspaceId,
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            source: "198.51.100.35",
+          }),
+        );
+        const successor = yield* authenticator.authenticate({
+          key: started.key,
+          expectedFamily: "delivery",
+          requiredScope: "delivery.read",
+          workspaceId: currentProject.workspaceId,
+          projectId: currentProject.id,
+          environmentId: currentProject.environment.id,
+          source: "198.51.100.36",
+        });
+        assert.strictEqual(failureTag(predecessor), "CredentialInvalidFailure");
+        assert.strictEqual(successor.credentialId, started.successor.id);
+
+        yield* changeApiCredentialRotation(
+          ownerId,
+          yield* Schema.decodeUnknown(ChangeApiCredentialRotationInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            rotationId: activated.id,
+            expectedVersion: activated.version,
+            action: "complete",
+          }),
+          "request-m16-overlap-expiry-complete",
+        );
+      }),
+    );
+
+    it.effect("emergency revocation closes both usable overlap credentials", () =>
+      Effect.gen(function* () {
+        const authenticator = yield* CredentialAuthenticator;
+        const currentProject = required(projectModel, "project");
+        const issued = yield* issueApiCredential(
+          ownerId,
+          yield* Schema.decodeUnknown(IssueApiCredentialInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            family: "management",
+            name: "Emergency overlap predecessor",
+            scopes: ["content.read"],
+            expiresAt: null,
+            nonExpiringAcknowledged: true,
+          }),
+          "request-m16-overlap-revoke-issue",
+        );
+        const started = yield* startApiCredentialRotation(
+          ownerId,
+          yield* Schema.decodeUnknown(StartApiCredentialRotationInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            credentialId: issued.credential.id,
+            expectedVersion: issued.credential.version,
+            expiresAt: null,
+            nonExpiringAcknowledged: true,
+          }),
+          "request-m16-overlap-revoke-start",
+        );
+        yield* changeApiCredentialRotation(
+          ownerId,
+          yield* Schema.decodeUnknown(ChangeApiCredentialRotationInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            rotationId: started.rotation.id,
+            expectedVersion: started.rotation.version,
+            action: "activate",
+          }),
+          "request-m16-overlap-revoke-activate",
+        );
+        const listed = yield* listApiCredentials(
+          ownerId,
+          yield* Schema.decodeUnknown(ListApiCredentialsInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            cursor: null,
+            limit: 50,
+          }),
+        );
+        const successor = required(
+          listed.items.find((credential) => credential.id === started.successor.id),
+          "overlap successor",
+        );
+        yield* revokeApiCredential(
+          ownerId,
+          yield* Schema.decodeUnknown(RevokeApiCredentialInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            credentialId: successor.id,
+            expectedVersion: successor.version,
+          }),
+          "request-m16-overlap-revoke",
+        );
+
+        const attempts = yield* Effect.all(
+          [
+            { key: issued.key, source: "198.51.100.37" },
+            { key: started.key, source: "198.51.100.38" },
+          ].map(({ key, source }) =>
+            Effect.exit(
+              authenticator.authenticate({
+                key,
+                expectedFamily: "management",
+                requiredScope: "content.read",
+                workspaceId: currentProject.workspaceId,
+                projectId: currentProject.id,
+                environmentId: currentProject.environment.id,
+                source,
+              }),
+            ),
+          ),
+        );
+        assert.isTrue(
+          attempts.every((attempt) => failureTag(attempt) === "CredentialInvalidFailure"),
+        );
+        const [rotation] = yield* Effect.promise(() =>
+          db
+            .select({ status: apiCredentialRotation.status })
+            .from(apiCredentialRotation)
+            .where(eq(apiCredentialRotation.id, started.rotation.id)),
+        );
+        assert.strictEqual(rotation?.status, "completed");
+      }),
+    );
+
+    it.effect("allows exactly one concurrent activation or emergency revocation", () =>
+      Effect.gen(function* () {
+        const currentProject = required(projectModel, "project");
         const delivery = required(deliveryCredential, "delivery");
-        const rotateInput = yield* Schema.decodeUnknown(RotateApiCredentialInput)({
-          credentialId: delivery.credential.id,
-          version: delivery.credential.version,
+        const started = yield* startApiCredentialRotation(
+          ownerId,
+          yield* Schema.decodeUnknown(StartApiCredentialRotationInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            credentialId: delivery.credential.id,
+            expectedVersion: delivery.credential.version,
+            expiresAt: delivery.credential.expiresAt,
+            nonExpiringAcknowledged: delivery.credential.expiresAt === null,
+          }),
+          "request-m16-concurrent-start",
+        );
+        const activateInput = yield* Schema.decodeUnknown(ChangeApiCredentialRotationInput)({
+          projectId: currentProject.id,
+          environmentId: currentProject.environment.id,
+          rotationId: started.rotation.id,
+          expectedVersion: started.rotation.version,
+          action: "activate",
         });
         const revokeInput = yield* Schema.decodeUnknown(RevokeApiCredentialInput)({
+          projectId: currentProject.id,
+          environmentId: currentProject.environment.id,
           credentialId: delivery.credential.id,
-          version: delivery.credential.version,
+          expectedVersion: delivery.credential.version,
         });
         const exits = yield* Effect.all(
           [
-            Effect.exit(rotateApiCredential(ownerId, rotateInput, "request-m3-concurrent-rotate")),
-            Effect.exit(revokeApiCredential(ownerId, revokeInput, "request-m3-concurrent-revoke")),
+            Effect.exit(
+              changeApiCredentialRotation(
+                ownerId,
+                activateInput,
+                "request-m16-concurrent-activate",
+              ),
+            ),
+            Effect.exit(revokeApiCredential(ownerId, revokeInput, "request-m16-concurrent-revoke")),
           ],
           { concurrency: 2 },
         );
         assert.strictEqual(exits.filter((exit) => exit._tag === "Success").length, 1);
         assert.strictEqual(
-          exits.filter((exit) => failureTag(exit) === "VersionConflictFailure").length,
+          exits.filter(
+            (exit) =>
+              failureTag(exit) === "VersionConflictFailure" ||
+              failureTag(exit) === "InvalidStateTransitionFailure",
+          ).length,
           1,
         );
       }),
@@ -722,12 +1093,12 @@ describe.sequential("credential repository PostgreSQL integration", () => {
             .where(
               and(
                 eq(auditEvent.projectId, currentProject.id),
-                eq(auditEvent.resourceType, "api_credential"),
+                inArray(auditEvent.resourceType, ["api_credential", "api_credential_rotation"]),
               ),
             ),
         );
         const serialized = JSON.stringify(audits);
-        assert.isTrue(audits.length >= 5);
+        assert.isTrue(audits.length >= 8);
         assert.notInclude(serialized, required(managementCredential, "management").key);
         assert.notInclude(serialized, "keyDigest");
         assert.notInclude(serialized, "content.write");

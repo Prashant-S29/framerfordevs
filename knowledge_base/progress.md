@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestones 0–15 and post-M13 repository/context normalization are developer-approved and committed. M15 governance automation parity is accepted at `5460c2b`.
-**Next gate:** Design M16 operational administration and recovery, then obtain explicit developer approval before implementation.
-**Last updated:** 2026-09-16
+**Overall status:** Milestones 0–15 and post-M13 repository/context normalization are developer-approved and committed. M16 operational administration and recovery is implemented and awaiting developer review; it is not accepted or committed.
+**Next gate:** Developer review and explicit M16 acceptance; do not begin M17.
+**Last updated:** 2026-09-19
 
 ## Status legend
 
@@ -35,7 +35,7 @@
 | 13  | Code-first authoring and local editor   | `[A]`  |          1,184 | `9c68942` |
 | 14  | Control-plane bootstrap contracts       | `[A]`  |          1,259 | `6ba124a` |
 | 15  | Governance automation parity            | `[A]`  |          1,270 | `5460c2b` |
-| 16  | Operational administration and recovery | `[D]`  |              — | —         |
+| 16  | Operational administration and recovery | `[R]`  |          1,311 | —         |
 | 17  | Hosted surface separation               | `[P]`  |              — | —         |
 | 18  | Studio mount and security runtime       | `[P]`  |              — | —         |
 | 19  | Studio content and localization         | `[P]`  |              — | —         |
@@ -51,7 +51,7 @@
 | 29  | Visual publication and dependencies     | `[P]`  |              — | —         |
 | 30  | Renderer SDK and framework adapters     | `[P]`  |              — | —         |
 
-M15 is accepted at `5460c2b`. M16 is the next design target; M17–M30 preserve the developer-approved sequence and detailed context.
+M15 is accepted at `5460c2b`. Corrected M16 migration `0017` and follow-up invariant migration `0018` are developer-applied and catalog-verified; implementation and automated readiness are complete, the independent worker remains stopped, and M16 awaits developer review. M17–M30 preserve the developer-approved sequence and detailed context.
 
 ## Post-M13 repository/context normalization
 
@@ -173,21 +173,24 @@ M15 is accepted at `5460c2b`. M16 is the next design target; M17–M30 preserve 
 
 ## Recent and planned milestone record
 
-These entries remain concise because `milestone.md` owns the detailed pending context. M15 is accepted; M16 is the next design target and must not be implemented before explicit design approval, while M17–M30 remain sequenced context only. The original pre-normalization M14–M16 scope is retained explicitly in M21–M23 and M27 rather than discarded.
+These entries stay concise because `milestone.md` owns detailed pending context. M15 is accepted, M16 awaits explicit developer acceptance, and M17–M30 remain sequenced context. Earlier scope remains represented in M21–M23 and M27.
 
 ### Milestone 15 — Governance automation parity
 
-- Approved design `07bcad6` fixes policy at seven roles plus `all | selected | none`, applies complete invitation/member policy atomically, retires standalone role/locale mutations, and keeps invitation creation non-replayable with list/search → revoke → reissue recovery; custom policy remains M21 and governance remains outside the SDK.
-- Shared `ProjectActor` access/locale authority now preserves version/no-op/replay/last-owner and terminal-race behavior, tenant-qualified selected grants, exact user/credential audits, current-primary-environment locale credentials, receipt-backed locale creation, and one canonical base/project/locale permission projection consumed by hosted controls.
-- Control Plane v1 expands from 13 to 27 operations with separate governance OAuth grants, OAuth-only member/invitation routes, exact OAuth-or-management locale routes, filter/principal/project/as-of-bound cursors, bounded telemetry/errors, and complete explicit-origin CLI parity including strict repeatable flags, current-`main` projection, content-free locale journals, and stdin-only invitation proof.
-- Developer-generated/applied migration `0016_add_governance_automation_authorities` passed dependency correction, artifact/catalog inspection, 17-row journal/60-table verification, and policy/actor/tenant/English invariants. Audit fixes covered docs, hosted filters/recovery, token caching, OAuth/contention/response/accessibility evidence, and parallel-fixture uniqueness/validity; authorized cleanup removed 37 stale M2/M3/M6 rows, with zero scoped residue or invariant violations.
-- Final forced readiness passes 1,270 tests, coverage, contracts, format/lint/structure, 16 type tasks, and eight builds with zero cache hits; the worker was stopped for shared-database gates and restored healthy. The 27-operation artifact/baseline SHA-256 is `2950b28d937ef48b9ce7db98cb4dd477396b4ee0b16ea9fb7dfdef672f670145`; high/critical audits pass and four existing moderate test-tool findings remain.
-- A two-session headed Playwright review passed secure invitation acceptance, atomic member-policy changes, owner/stale/conflict/ambiguous-create recovery, filters, exact-locale denial, keyboard/focus, responsive 375 px, and 200% reflow checks. It fixed login hydration and rendered-link warnings, favicon failure, duplicate fixture locale text, and locale-tab vertical overflow; the handled optional missing-Studio lookup remains the sole expected console 404. Browser sessions closed with no retained token artifacts, and authorized guarded cleanup removed the exact two-user workspace/project fixture with zero residue before restoring the worker healthy.
-- Developer-authorized test-infrastructure R&D adds the project-owned `tools/browser-tests` workspace, pinned Playwright Test/CLI dependencies and Chromium setup, a loopback-only four-test shell/auth/invitation suite, project-local opt-in interactive skill, and mandatory no-interactive/no-visual-artifact default policy. The suite found the remaining direct protected-link React hydration mismatch; the authorized correction uses the existing request-aware session server function with data-only protected-route SSR, and the regression passes without browser errors. Developer accepted and pushed M15 as `5460c2b`; M16 implementation has not started.
+- Approved design `07bcad6` fixes seven roles and `all | selected | none`, applies complete member/invitation policy atomically, retires standalone role/locale mutations, keeps invitation issue non-replayable with list/search → revoke → reissue recovery, leaves custom policy to M21, and excludes governance from the SDK.
+- Shared `ProjectActor` authority preserves optimistic/idempotent/last-owner/race semantics, tenant-qualified locale grants, exact actors/audits, receipt-backed locale creation, and one canonical permission projection. Control Plane v1 grew from 13 to 27 operations with separate OAuth authority, signed bound cursors, bounded telemetry/errors, and explicit-origin CLI parity including strict flags, current-`main` projection, content-free journals, and stdin-only invitation proof.
+- Developer-generated/applied `0016_add_governance_automation_authorities` passed dependency, artifact/catalog, 17-journal-row/60-table, policy/actor/tenant/English, and fixture checks. Authorized cleanup removed 37 stale M2/M3/M6 rows with zero residue. Final readiness passed 1,270 tests, coverage, contracts, format/lint/structure, 16 type tasks, and eight uncached builds; artifact/baseline SHA-256 is `2950b28d937ef48b9ce7db98cb4dd477396b4ee0b16ea9fb7dfdef672f670145`, with no high/critical audit findings and four existing moderate test-tool findings.
+- Two-session headed review passed invitation/member policy, owner/stale/conflict/ambiguous recovery, filters, exact-locale denial, keyboard/focus, 375 px, and 200% reflow; fixes covered login/direct-link hydration, rendered links, favicon, fixture text, and locale overflow. It also established the project-owned pinned `tools/browser-tests` Chromium suite, loopback-only four-test regression, opt-in interactive skill, and no-interactive/no-visual-artifact default. The handled missing-Studio lookup remains the expected console 404; guarded cleanup left no browser/token/fixture residue and the stopped worker was restored healthy. Developer accepted/pushed `5460c2b`.
 
 ### Milestone 16 — Operational administration and recovery
 
-- Sequence credentials, webhooks, audit/security visibility, and recovery-safe project operations without transferring unrestricted authority to browser clients.
+- Approved 2026-09-16 design establishes digest-only pending → fixed 24-hour overlap → complete/cancel credential rotation; honest user/management-credential webhook, invalidation, delivery, and replay administration; user-only `project.audit.read` with three exact OAuth grants and a 31-day bound; summary/detail delivery projection; and archive-time operational freeze. Stable HTTP, noninteractive CLI, and hosted sessions share authority; one-time secrets are non-replayable, while Studio and the public SDK remain excluded.
+- Developer-generated/corrected/applied `0017_add_operational_administration_authorities` added explicit credential/rotation authority, tenant-qualified actors, and audit indexes. Catalog checks found 18 journal rows/61 tables, exact active-or-revoked backfill for all 130 credentials with `activated_at = created_at`, no synthetic rotations, and zero authority violations; SQL SHA-256 is `6afe41d9cb4cb8de9f58d32c41e6f573d9cc76e0e1ca12f3b3ba6939de02e3f3`. Archive testing then found the zero-attempt `project_archived` outcome mismatch; developer-generated/applied `0018_allow_unattempted_archived_delivery_outcome` permits only that canceled-row exception. Full artifact inspection found no unrelated drift; the live journal has 19 rows, the constraint is validated, residue/invariants are clean, and SQL SHA-256 is `d97ff13f7ca55d43334b7905589ff64c3b54e4b8f7187fcdfed41b5b5a7449d7`.
+- Shared Effect repositories provide staged credential recovery and generic verification failure, signed operational pagination, set-based webhook summaries, exact actor attribution, receipt-backed mapping/replay, bounded self-auditing audit reads, and archive-safe dispatch/claim/finalization. Archive integration proves queued cancellation, terminal in-flight failure, preserved in-flight success, and no restore resurrection; a monotonic-time fixture fixed test-only lease-throttle interference and passes worker/platform/archive suites concurrently.
+- Control Plane v1 now has 52 strict bearer operations with separate OAuth grants, exact management-credential webhook authority, canonical HTTP policy/costs/OpenAPI, and additive artifact/baseline SHA-256 `0be7c1bc603cdf17e2c775509c58dc9f716eeced59d0ebab9a8e13cfad39d90c`. CLI parity includes `--secret-stdout`, stdin-only destinations, exact confirmations, no credential/audit management fallback, and content-free conflict-safe journals. Hosted controls/docs cover credential recovery, webhook/delivery/mapping administration, archived recovery-only rendering, bounded audit, and secret-safe operations.
+- Authorized headed Chromium review passed credential/webhook disclosure containment and staged lifecycle, consequence gates, exact filters, unique fixed-snapshot pagination, archive allowlists/restore-no-replay, keyboard/focus, 375 px, and 200% reflow. It corrected millisecond-truncated audit bounds, falsely local-only “URL-backed” filters, missing SSR oRPC cookie forwarding, and focus loss from programmatic/replaced dialogs. The expected missing-Studio 404 is unchanged; exact guarded cleanup removed both disposable fixtures, sessions, secrets, and browser artifacts with zero residue.
+- Final `pnpm run ready` passes 1,311 tests, coverage, contract drift, format/lint/structure, 16 type tasks, four noninteractive Chromium specifications, and eight builds. High/critical audit is clear with four existing moderate test-tool findings; complete credential redaction and read-only reconciliation report zero scoped residue, orphans, invalid outcomes, archived claimable work, or non-idle test clients. The worker remains stopped.
+- **M16 `[R]`:** implementation and automated/interactive evidence are ready for explicit developer acceptance. The isolated sustained two-worker profile and production rollout/baseline checks remain environment gates; no commit, acceptance, publication, deployment, production OAuth/configuration change, worker restart, or M17 work has occurred.
 
 ### Milestone 17 — Hosted surface separation
 
@@ -271,9 +274,11 @@ Agents did not generate or apply these migrations. Developer-generated/applied a
 | `0013`–`0014` | M13           | Code-first source/hash/receipt authority and actor FKs                              |
 | `0015`        | M14           | Control-plane command receipts, Studio registration, and capability actor authority |
 | `0016`        | M15           | Invitation locale policy, locale credential actors, and locale-create receipts      |
+| `0017`        | M16           | Operational credential, webhook actor, replay, and audit authority                  |
+| `0018`        | M16           | Archive-safe zero-attempt delivery outcome invariant                                |
 
 ## Roadmap and next gate
 
-- `milestone.md` owns the approved sequence and preserved boundaries; M15 is accepted at `5460c2b`, and M16 operational administration and recovery is the next design target.
-- M16 implementation and M17–M30 design/implementation remain unauthorized until their developer gates; managed hosting, external data/backends, billing, analytics, and plugins remain unsequenced until the visual baseline is accepted.
+- `milestone.md` owns the approved sequence and preserved boundaries; M15 is accepted at `5460c2b`, and M16 is awaiting developer review with both migrations applied and the worker stopped.
+- M17–M30 design/implementation remain unauthorized until their developer gates; managed hosting, external data/backends, billing, analytics, and plugins remain unsequenced until the visual baseline is accepted.
 - Publication/versioning, production OAuth/domains/configuration, deployment, migrations, Tier 2 activation, milestone acceptance, and advancement remain developer-controlled.

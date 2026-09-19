@@ -111,6 +111,35 @@ function tokenForOrigin(apiOrigin: string) {
   return getValidAccessToken({ apiOrigin });
 }
 
+const managementControlPlaneCommands = new Set([
+  "webhook endpoint list",
+  "webhook endpoint create",
+  "webhook endpoint update",
+  "webhook endpoint state set",
+  "webhook subscription replace",
+  "webhook secret rotation start",
+  "webhook secret rotation activate",
+  "webhook secret rotation cancel",
+  "webhook secret rotation complete",
+  "invalidation mapping list",
+  "invalidation mapping create",
+  "invalidation mapping update",
+  "invalidation mapping state set",
+  "webhook delivery list",
+  "webhook delivery get",
+  "webhook attempt list",
+  "webhook replay",
+]);
+
+function tokenForControlPlane(apiOrigin: string, command: string) {
+  const management = process.env["FFD_MANAGEMENT_TOKEN"];
+  return managementControlPlaneCommands.has(command) &&
+    management !== undefined &&
+    management.length > 0
+    ? Effect.succeed(management)
+    : getValidAccessToken({ apiOrigin });
+}
+
 function pullOnline(config: CliConfig) {
   return Effect.gen(function* () {
     const token = yield* tokenForOrigin(config.apiBaseUrl);
@@ -180,7 +209,7 @@ function commandEffect(
     if (apiOrigin === undefined) return Effect.fail(new Error("CLI_API_REQUIRED"));
     return Effect.gen(function* () {
       const canonicalApiOrigin = yield* decodeControlPlaneApiOrigin(apiOrigin);
-      const token = yield* tokenForOrigin(canonicalApiOrigin);
+      const token = yield* tokenForControlPlane(canonicalApiOrigin, command);
       return yield* executeControlPlaneCommand({
         arguments: arguments_,
         apiOrigin: canonicalApiOrigin,

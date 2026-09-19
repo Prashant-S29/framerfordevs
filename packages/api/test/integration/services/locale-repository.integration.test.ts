@@ -178,6 +178,7 @@ beforeAll(async () => {
     keyPrefix: `ffd_mgmt_${credentialId}`,
     keyDigest: credentialId.replaceAll("-", "").repeat(2),
     createdByUserId: ownerId,
+    activatedAt: new Date(),
   });
   await db.insert(environment).values({
     id: secondaryEnvironmentId,
@@ -198,6 +199,7 @@ beforeAll(async () => {
     keyPrefix: `ffd_mgmt_${wrongEnvironmentCredentialId}`,
     keyDigest: wrongEnvironmentCredentialId.replaceAll("-", "").repeat(2),
     createdByUserId: ownerId,
+    activatedAt: new Date(),
   });
   await db.insert(apiCredentialScope).values([
     {

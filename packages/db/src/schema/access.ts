@@ -192,11 +192,14 @@ export const apiCredential = pgTable(
     keyPrefix: varchar("key_prefix", { length: 64 }).notNull(),
     keyDigest: char("key_digest", { length: 64 }).notNull(),
     version: integer("version").default(1).notNull(),
+    status: varchar("status", { length: 16 }).default("active").notNull(),
     rotatedFromCredentialId: uuid("rotated_from_credential_id"),
     createdByUserId: text("created_by_user_id")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
+    activatedAt: accessTimestamp("activated_at"),
     expiresAt: accessTimestamp("expires_at"),
+    retireAt: accessTimestamp("retire_at"),
     revokedAt: accessTimestamp("revoked_at"),
     revokedByUserId: text("revoked_by_user_id").references(() => user.id, {
       onDelete: "restrict",
@@ -227,8 +230,8 @@ export const apiCredential = pgTable(
       foreignColumns: [table.id, table.workspaceId, table.projectId, table.environmentId],
     }).onDelete("restrict"),
     unique("api_credential_key_digest_unique").on(table.keyDigest),
-    uniqueIndex("api_credential_rotated_from_unique")
-      .on(table.rotatedFromCredentialId)
+    index("api_credential_rotation_lineage_idx")
+      .on(table.rotatedFromCredentialId, table.createdAt.desc(), table.id.desc())
       .where(sql`${table.rotatedFromCredentialId} is not null`),
     check(
       "api_credential_family_valid",
@@ -245,12 +248,20 @@ export const apiCredential = pgTable(
     check("api_credential_key_digest_valid", sql`${table.keyDigest} ~ '^[0-9a-f]{64}$'`),
     check("api_credential_version_positive", sql`${table.version} > 0`),
     check(
+      "api_credential_status_valid",
+      sql`${table.status} in ('pending', 'active', 'retiring', 'revoked', 'canceled')`,
+    ),
+    check(
       "api_credential_expiry_valid",
       sql`${table.expiresAt} is null or ${table.expiresAt} > ${table.createdAt}`,
     ),
     check(
       "api_credential_revocation_consistent",
       sql`(${table.revokedAt} is null and ${table.revokedByUserId} is null) or (${table.revokedAt} is not null and ${table.revokedByUserId} is not null)`,
+    ),
+    check(
+      "api_credential_lifecycle_valid",
+      sql`(${table.status} = 'pending' and ${table.activatedAt} is null and ${table.retireAt} is null and ${table.revokedAt} is null) or (${table.status} = 'active' and ${table.activatedAt} is not null and ${table.retireAt} is null and ${table.revokedAt} is null) or (${table.status} = 'retiring' and ${table.activatedAt} is not null and ${table.retireAt} is not null and ${table.retireAt} > ${table.activatedAt} and ${table.revokedAt} is null) or (${table.status} = 'revoked' and ${table.revokedAt} is not null) or (${table.status} = 'canceled' and ${table.activatedAt} is null and ${table.retireAt} is null and ${table.revokedAt} is not null)`,
     ),
     index("api_credential_project_environment_active_family_created_id_idx")
       .on(
@@ -261,11 +272,116 @@ export const apiCredential = pgTable(
         table.id.desc(),
       )
       .where(sql`${table.revokedAt} is null`),
+    index("api_credential_environment_status_created_id_idx").on(
+      table.environmentId,
+      table.status,
+      table.createdAt.desc(),
+      table.id.desc(),
+    ),
+    index("api_credential_retiring_due_idx")
+      .on(table.retireAt, table.id)
+      .where(sql`${table.status} = 'retiring'`),
     index("api_credential_environment_idx").on(table.environmentId),
     index("api_credential_created_by_user_idx").on(table.createdByUserId),
     index("api_credential_revoked_by_user_idx")
       .on(table.revokedByUserId)
       .where(sql`${table.revokedByUserId} is not null`),
+  ],
+);
+
+export const apiCredentialRotation = pgTable(
+  "api_credential_rotation",
+  {
+    id: accessId("id").primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    predecessorCredentialId: uuid("predecessor_credential_id").notNull(),
+    successorCredentialId: uuid("successor_credential_id").notNull(),
+    status: varchar("status", { length: 16 }).default("pending").notNull(),
+    version: integer("version").default(1).notNull(),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    changedByUserId: text("changed_by_user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    activatedAt: accessTimestamp("activated_at"),
+    retireAt: accessTimestamp("retire_at"),
+    completedAt: accessTimestamp("completed_at"),
+    canceledAt: accessTimestamp("canceled_at"),
+    createdAt: accessTimestamp("created_at").defaultNow().notNull(),
+    updatedAt: accessTimestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "api_credential_rotation_predecessor_tenant_fk",
+      columns: [
+        table.predecessorCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "api_credential_rotation_successor_tenant_fk",
+      columns: [
+        table.successorCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    unique("api_credential_rotation_id_tenant_unique").on(
+      table.id,
+      table.workspaceId,
+      table.projectId,
+      table.environmentId,
+    ),
+    unique("api_credential_rotation_successor_unique").on(table.successorCredentialId),
+    uniqueIndex("api_credential_rotation_predecessor_open_unique")
+      .on(table.predecessorCredentialId)
+      .where(sql`${table.status} in ('pending', 'overlap')`),
+    check(
+      "api_credential_rotation_credentials_distinct",
+      sql`${table.predecessorCredentialId} <> ${table.successorCredentialId}`,
+    ),
+    check(
+      "api_credential_rotation_status_valid",
+      sql`${table.status} in ('pending', 'overlap', 'canceled', 'completed')`,
+    ),
+    check("api_credential_rotation_version_positive", sql`${table.version} > 0`),
+    check(
+      "api_credential_rotation_lifecycle_valid",
+      sql`(${table.status} = 'pending' and ${table.activatedAt} is null and ${table.retireAt} is null and ${table.completedAt} is null and ${table.canceledAt} is null) or (${table.status} = 'overlap' and ${table.activatedAt} is not null and ${table.retireAt} is not null and ${table.retireAt} > ${table.activatedAt} and ${table.completedAt} is null and ${table.canceledAt} is null) or (${table.status} = 'canceled' and ${table.activatedAt} is null and ${table.retireAt} is null and ${table.completedAt} is null and ${table.canceledAt} is not null) or (${table.status} = 'completed' and ${table.activatedAt} is not null and ${table.retireAt} is not null and ${table.completedAt} is not null and ${table.completedAt} >= ${table.activatedAt} and ${table.canceledAt} is null)`,
+    ),
+    check(
+      "api_credential_rotation_timestamps_valid",
+      sql`${table.updatedAt} >= ${table.createdAt}`,
+    ),
+    index("api_credential_rotation_environment_status_created_id_idx").on(
+      table.environmentId,
+      table.status,
+      table.createdAt.desc(),
+      table.id.desc(),
+    ),
+    index("api_credential_rotation_retiring_due_idx")
+      .on(table.retireAt, table.id)
+      .where(sql`${table.status} = 'overlap'`),
+    index("api_credential_rotation_created_by_user_idx").on(table.createdByUserId),
+    index("api_credential_rotation_changed_by_user_idx").on(table.changedByUserId),
   ],
 );
 
@@ -374,6 +490,55 @@ export const apiCredentialRelations = relations(apiCredential, ({ one, many }) =
     references: [user.id],
   }),
   scopes: many(apiCredentialScope),
+  predecessorRotations: many(apiCredentialRotation, {
+    relationName: "apiCredentialRotationPredecessor",
+  }),
+  successorRotations: many(apiCredentialRotation, {
+    relationName: "apiCredentialRotationSuccessor",
+  }),
+}));
+
+export const apiCredentialRotationRelations = relations(apiCredentialRotation, ({ one }) => ({
+  predecessor: one(apiCredential, {
+    relationName: "apiCredentialRotationPredecessor",
+    fields: [
+      apiCredentialRotation.predecessorCredentialId,
+      apiCredentialRotation.workspaceId,
+      apiCredentialRotation.projectId,
+      apiCredentialRotation.environmentId,
+    ],
+    references: [
+      apiCredential.id,
+      apiCredential.workspaceId,
+      apiCredential.projectId,
+      apiCredential.environmentId,
+    ],
+  }),
+  successor: one(apiCredential, {
+    relationName: "apiCredentialRotationSuccessor",
+    fields: [
+      apiCredentialRotation.successorCredentialId,
+      apiCredentialRotation.workspaceId,
+      apiCredentialRotation.projectId,
+      apiCredentialRotation.environmentId,
+    ],
+    references: [
+      apiCredential.id,
+      apiCredential.workspaceId,
+      apiCredential.projectId,
+      apiCredential.environmentId,
+    ],
+  }),
+  createdBy: one(user, {
+    relationName: "apiCredentialRotationCreator",
+    fields: [apiCredentialRotation.createdByUserId],
+    references: [user.id],
+  }),
+  changedBy: one(user, {
+    relationName: "apiCredentialRotationChanger",
+    fields: [apiCredentialRotation.changedByUserId],
+    references: [user.id],
+  }),
 }));
 
 export const apiCredentialScopeRelations = relations(apiCredentialScope, ({ one }) => ({

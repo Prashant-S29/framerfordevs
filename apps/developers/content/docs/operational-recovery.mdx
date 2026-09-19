@@ -1,0 +1,193 @@
+---
+title: Operational Administration and Recovery
+description: Rotate credentials safely, administer webhooks, inspect delivery failures and audit history, and recover archived projects with the CLI.
+---
+
+{/* Documents the portable M16 operational surface without exposing secret values or SDK administration. */}
+
+Use these Control Plane commands for noninteractive operational work when the dashboard or an application integration is unavailable. Every command requires `--api <origin>`. Credential administration and audit reads require OAuth user authority; exact environment-bound management credentials may be used only for webhook, mapping, delivery, attempt, and replay commands when their `webhook.read` or `webhook.manage` scope permits it.
+
+Operational administration is intentionally absent from `@framerfordevs/sdk` and Studio.
+
+## Authenticate for operational grants
+
+```bash
+ffd login --api https://api.example.com --open
+```
+
+Login requests separate operations-read, operations-write, and security-read grants. Existing refresh authority does not silently gain these grants. Log in again when the CLI reports a stable scope denial.
+
+## Inspect credentials
+
+```bash
+ffd credential list \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --environment ENVIRONMENT_ID \
+  --family all \
+  --status all \
+  --limit 20 \
+  --json
+```
+
+Credential pages contain only safe metadata, lifecycle state, and open-rotation state. They never contain a stored key or digest.
+
+Issuance returns a new key once and refuses to send unless one-time secret output is explicitly enabled:
+
+```bash
+ffd credential issue \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --environment ENVIRONMENT_ID \
+  --name deployment-reader \
+  --family delivery \
+  --scope delivery.read \
+  --expires-at 2027-01-01T00:00:00.000Z \
+  --secret-stdout \
+  --json > issued-credential.json
+```
+
+Protect and delete the redirected file according to your secret-management policy. The CLI does not put the key in configuration, the native OAuth store, retry journals, diagnostics, or telemetry.
+
+If the response is lost or uncertain, do not rerun issue blindly. List recent credential metadata, revoke any unknown issuance by its exact safe prefix and version, and explicitly issue a replacement.
+
+## Perform a staged credential rotation
+
+Start creates an unusable pending successor and discloses its key once:
+
+```bash
+ffd credential rotation start \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --environment ENVIRONMENT_ID \
+  --credential CREDENTIAL_ID \
+  --expected-version 3 \
+  --expires-at 2027-01-01T00:00:00.000Z \
+  --secret-stdout \
+  --json > pending-credential.json
+```
+
+Deploy the pending key, then activate the fixed 24-hour overlap using the exact rotation version:
+
+```bash
+ffd credential rotation activate \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --environment ENVIRONMENT_ID \
+  --rotation ROTATION_ID \
+  --expected-version 1 \
+  --confirm-overlap \
+  --json
+```
+
+After consumers use the successor, retire the predecessor early:
+
+```bash
+ffd credential rotation complete \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --environment ENVIRONMENT_ID \
+  --rotation ROTATION_ID \
+  --expected-version 2 \
+  --confirm-retirement \
+  --json
+```
+
+Before activation, `credential rotation cancel` revokes the pending successor and preserves the active predecessor. If a rotation-start response is uncertain, list credentials, cancel the visible pending rotation whose key was lost, and start again. Pending keys never authenticate.
+
+Emergency revocation requires the exact displayed safe prefix:
+
+```bash
+ffd credential revoke \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --environment ENVIRONMENT_ID \
+  --credential CREDENTIAL_ID \
+  --expected-version 4 \
+  --confirm-prefix DISPLAYED_SAFE_PREFIX \
+  --json
+```
+
+Revoking an active side closes every pending or usable key in its open rotation atomically.
+
+## Administer webhooks and invalidation mappings
+
+List endpoints and mappings with bounded signed cursors:
+
+```bash
+ffd webhook endpoint list --api https://api.example.com --project PROJECT_ID --environment ENVIRONMENT_ID --state enabled --limit 20 --json
+ffd invalidation mapping list --api https://api.example.com --project PROJECT_ID --environment ENVIRONMENT_ID --state enabled --limit 20 --json
+```
+
+Endpoint creation and signing-secret rotation require `--secret-stdout`. Destination authority is accepted only from bounded stdin, never an argument, environment variable, configuration file, URL, or retry journal:
+
+```bash
+printf '%s\n' 'https://receiver.example.com/private/path' | \
+  ffd webhook endpoint create \
+    --api https://api.example.com \
+    --project PROJECT_ID \
+    --environment ENVIRONMENT_ID \
+    --name publication-receiver \
+    --event cms.entry.published \
+    --destination-stdin \
+    --acknowledge-metadata-authority \
+    --secret-stdout \
+    --json > issued-webhook.json
+```
+
+A destination replacement requires complete re-entry over stdin and `--acknowledge-destination-replacement`. Endpoint disable, subscription replacement, and secret activation/completion explain their queued and in-flight effects and require exact versions or confirmations.
+
+Mapping create is safe to replay after an uncertain transport result because the CLI retains only a command ID and a content-free intent hash. Endpoint creation and secret rotation are not replayable because their one-time secrets are never recoverably stored.
+
+## Inspect and replay failed deliveries
+
+Delivery lists are summaries and omit canonical event bodies. Load one exact delivery and its bounded attempt history separately:
+
+```bash
+ffd webhook delivery list --api https://api.example.com --project PROJECT_ID --environment ENVIRONMENT_ID --status dead_letter --limit 20 --json
+ffd webhook delivery get --api https://api.example.com --project PROJECT_ID --environment ENVIRONMENT_ID --delivery DELIVERY_ID --json
+ffd webhook attempt list --api https://api.example.com --project PROJECT_ID --environment ENVIRONMENT_ID --delivery DELIVERY_ID --json
+```
+
+Replay preserves the immutable event ID and body but uses the endpoint's current destination and signing secret. Consumers must remain idempotent by event ID.
+
+```bash
+ffd webhook replay \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --environment ENVIRONMENT_ID \
+  --endpoint ENDPOINT_ID \
+  --event-id EVENT_ID \
+  --source-delivery DELIVERY_ID \
+  --confirm-event EVENT_ID \
+  --json
+```
+
+Replay is command-receipt-backed. An exact retry reuses the same accepted result; changed intent with the same command ID fails closed.
+
+## Read bounded audit history
+
+Audit reads are user-only, content-free, self-auditing, and limited to an ordered window of at most 31 days:
+
+```bash
+ffd audit list \
+  --api https://api.example.com \
+  --project PROJECT_ID \
+  --category security \
+  --from 2026-09-01T00:00:00.000Z \
+  --to 2026-09-30T23:59:59.000Z \
+  --limit 20 \
+  --json
+```
+
+Use exact `--actor-kind` plus `--actor-id` or exact `--action` filters when needed. Results expose stable IDs and action/resource authority, not user names or emails, credential names or scopes, destination authority, payloads, content values, or arbitrary metadata.
+
+## Recover an archived project
+
+Archive cancels queued and retry-scheduled webhook deliveries atomically. Already in-flight requests may still complete; failures do not schedule another retry. Restore never reactivates canceled deliveries or replays events automatically.
+
+While archived, eligible OAuth users can inspect credentials, webhook configuration, delivery attempts, and audit history; revoke credentials; disable endpoints; cancel pending rotations; and complete retiring credential or signing-secret overlap. Ordinary creation, activation, update, mapping mutation, and replay remain denied. Management credentials are denied every archived-project operational route.
+
+After restore, inspect preserved history and explicitly replay only selected events whose side effects are still wanted.
+
+See the [Control Plane v1 API contract](/api-reference/control-plane/v1) for exact schemas, methods, errors, and signed pagination parameters.

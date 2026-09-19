@@ -60,6 +60,12 @@ describe("rate-limit contracts", () => {
       intervalMs: 60_000,
       capacity: 50,
     });
+    expect(rateLimitPolicies["webhook.replay.credential"]).toEqual({
+      policy: "webhook.replay.credential",
+      limitPerInterval: 30,
+      intervalMs: 60_000,
+      capacity: 5,
+    });
     expect(rateLimitPolicies["webhook.replay.user"]).toEqual({
       policy: "webhook.replay.user",
       limitPerInterval: 30,

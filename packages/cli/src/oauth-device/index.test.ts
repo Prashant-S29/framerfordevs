@@ -103,7 +103,7 @@ describe("OAuth device CLI flow", () => {
         assert.deepEqual(presented, ["ABCD-EFGH"]);
         assert.strictEqual(
           requestedScope,
-          "openid profile offline_access tooling:read authoring:read authoring:draft:write authoring:content:publish authoring:schema:push control-plane:read control-plane:write control-plane:project:lifecycle control-plane:governance:read control-plane:governance:write",
+          "openid profile offline_access tooling:read authoring:read authoring:draft:write authoring:content:publish authoring:schema:push control-plane:read control-plane:write control-plane:project:lifecycle control-plane:governance:read control-plane:governance:write control-plane:operations:read control-plane:operations:write control-plane:security:read",
         );
         assert.deepEqual(browser, []);
         assert.strictEqual(polls, 0);

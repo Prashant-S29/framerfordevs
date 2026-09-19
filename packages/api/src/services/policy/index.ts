@@ -82,6 +82,7 @@ const unrestrictedLocaleActions = new Set<ProjectPermissionActionType>([
   "delivery.configure",
   "project.credential.issue",
   "project.credential.rotate",
+  "project.audit.read",
   "webhook.read",
   "webhook.manage",
 ]);
@@ -94,6 +95,7 @@ const developerActions = new Set<ProjectPermissionActionType>([
   "project.credential.issue",
   "project.credential.rotate",
   "project.credential.revoke",
+  "project.audit.read",
   "locale.read",
   "locale.manage",
   "schema.read",

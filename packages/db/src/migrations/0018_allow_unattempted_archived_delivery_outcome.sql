@@ -1,0 +1,2 @@
+ALTER TABLE "webhook_delivery" DROP CONSTRAINT "webhook_delivery_outcome_valid";--> statement-breakpoint
+ALTER TABLE "webhook_delivery" ADD CONSTRAINT "webhook_delivery_outcome_valid" CHECK (("webhook_delivery"."attempt_count" = 0 and ("webhook_delivery"."last_outcome" is null or ("webhook_delivery"."status" = 'canceled' and "webhook_delivery"."last_outcome" = 'project_archived'))) or ("webhook_delivery"."attempt_count" > 0 and "webhook_delivery"."last_outcome" is not null and "webhook_delivery"."last_outcome" ~ '^[a-z][a-z0-9_]{0,63}$'));

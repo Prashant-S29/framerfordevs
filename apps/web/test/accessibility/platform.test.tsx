@@ -4,6 +4,7 @@
 
 import {
   ApiCredential,
+  ApiCredentialRotation,
   IssuedProjectInvitation,
   ProjectInvitation,
   ProjectMember,
@@ -545,8 +546,11 @@ describe("platform management accessibility", () => {
       name: "Legacy Preview",
       keyPrefix: "ffd_prev_019fae8b-1234-7000-8000-000000000099",
       scopes: ["preview.read"],
+      status: "active",
       version: 1,
+      activatedAt: "2026-07-29T00:00:00.000Z",
       expiresAt: null,
+      retireAt: null,
       revokedAt: null,
       createdAt: "2026-07-29T00:00:00.000Z",
       updatedAt: "2026-07-29T00:00:00.000Z",
@@ -557,6 +561,79 @@ describe("platform management accessibility", () => {
     expect(screen.getByText("Legacy Preview credential blocked")).toBeTruthy();
     expect(screen.getByText(/fails authentication and cannot rotate/i)).toBeTruthy();
     expect((await axe.run(container)).violations).toEqual([]);
+  });
+
+  it("has accessible staged credential rotation and pending-state recovery semantics", async () => {
+    const baseCredential = Schema.decodeUnknownSync(ApiCredential)({
+      id: "019fae8b-1234-7000-8000-000000000091",
+      workspaceId: project.workspaceId,
+      projectId: project.id,
+      environmentId: project.environment.id,
+      family: "management",
+      name: "Deployment automation",
+      keyPrefix: "ffd_mgmt_019fae8b-1234-7000-8000-000000000091",
+      scopes: ["content.read"],
+      status: "active",
+      version: 1,
+      activatedAt: "2026-09-16T00:00:00.000Z",
+      expiresAt: null,
+      retireAt: null,
+      revokedAt: null,
+      createdAt: "2026-09-16T00:00:00.000Z",
+      updatedAt: "2026-09-16T00:00:00.000Z",
+    });
+    const pendingRotation = Schema.decodeUnknownSync(ApiCredentialRotation)({
+      id: "019fae8b-1234-7000-8000-000000000092",
+      projectId: project.id,
+      environmentId: project.environment.id,
+      predecessorCredentialId: baseCredential.id,
+      successorCredentialId: "019fae8b-1234-7000-8000-000000000093",
+      status: "pending",
+      version: 1,
+      activatedAt: null,
+      retireAt: null,
+      completedAt: null,
+      canceledAt: null,
+      createdAt: "2026-09-16T00:00:00.000Z",
+      updatedAt: "2026-09-16T00:00:00.000Z",
+    });
+    const user = userEvent.setup();
+    const pending = renderWithQueryClient(
+      <CredentialRow
+        credential={{ ...baseCredential, openRotation: pendingRotation }}
+        canChangeRotation
+        canRevoke
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Activate replacement" }));
+    expect((await axe.run(await screen.findByRole("alertdialog"))).violations).toEqual([]);
+    await user.click(screen.getByRole("button", { name: "Keep current state" }));
+    await user.click(screen.getByRole("button", { name: "Cancel rotation" }));
+    expect((await axe.run(await screen.findByRole("alertdialog"))).violations).toEqual([]);
+    pending.unmount();
+
+    const overlapRotation = Schema.decodeUnknownSync(ApiCredentialRotation)({
+      ...pendingRotation,
+      status: "overlap",
+      version: 2,
+      activatedAt: "2026-09-16T01:00:00.000Z",
+      retireAt: "2026-09-17T01:00:00.000Z",
+      updatedAt: "2026-09-16T01:00:00.000Z",
+    });
+    renderWithQueryClient(
+      <CredentialRow
+        credential={{
+          ...baseCredential,
+          status: "retiring",
+          retireAt: overlapRotation.retireAt,
+          openRotation: overlapRotation,
+        }}
+        canChangeRotation
+        canRevoke={false}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Complete rotation" }));
+    expect((await axe.run(await screen.findByRole("alertdialog"))).violations).toEqual([]);
   });
 
   it("has accessible webhook creation and secret-rotation semantics", async () => {

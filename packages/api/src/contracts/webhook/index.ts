@@ -2,11 +2,11 @@
 
 import { Schema } from "effect";
 
+import { ProjectActor } from "../access";
 import { ApiSuccessSchema } from "../response/api";
 import { EntryCommandId, EntryId } from "../entry";
 import { LocaleTag, ProjectLocaleId } from "../locale";
 import {
-  AuthUserId,
   Cursor,
   EnvironmentId,
   IsoDateTime,
@@ -241,7 +241,7 @@ const WebhookAttemptNumber = Schema.Number.pipe(
   Schema.between(1, 12),
   Schema.brand("WebhookAttemptNumber"),
 );
-const WebhookOutcome = Schema.String.pipe(
+export const WebhookOutcome = Schema.String.pipe(
   Schema.minLength(1),
   Schema.maxLength(64),
   Schema.pattern(/^[a-z][a-z0-9_]{0,63}$/u),
@@ -504,6 +504,9 @@ export class ListWebhookEndpointsInput extends Schema.Class<ListWebhookEndpoints
   "ListWebhookEndpointsInput",
 )({
   ...WebhookScope,
+  state: Schema.optionalWith(Schema.Literal("all", "enabled", "disabled"), {
+    default: () => "all",
+  }),
   cursor: Schema.NullOr(Cursor),
   limit: PageLimit,
 }) {}
@@ -621,6 +624,9 @@ export class ListInvalidationRouteMappingsInput extends Schema.Class<ListInvalid
   "ListInvalidationRouteMappingsInput",
 )({
   ...WebhookScope,
+  state: Schema.optionalWith(Schema.Literal("all", "enabled", "disabled"), {
+    default: () => "all",
+  }),
   cursor: Schema.NullOr(Cursor),
   limit: PageLimit,
 }) {}
@@ -709,7 +715,7 @@ export class ReplayWebhookEventResult extends Schema.Class<ReplayWebhookEventRes
   "ReplayWebhookEventResult",
 )({
   delivery: WebhookDelivery,
-  replayedByUserId: AuthUserId,
+  replayedBy: ProjectActor,
 }) {}
 
 export const CreateWebhookEndpointInputSchema = Schema.standardSchemaV1(CreateWebhookEndpointInput);

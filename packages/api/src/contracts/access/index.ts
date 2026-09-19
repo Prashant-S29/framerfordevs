@@ -58,6 +58,7 @@ export const projectPermissionActionValues = [
   "project.credential.issue",
   "project.credential.rotate",
   "project.credential.revoke",
+  "project.audit.read",
   "locale.read",
   "locale.manage",
   "schema.read",
@@ -99,6 +100,9 @@ export type ProjectInvitationId = typeof ProjectInvitationId.Type;
 
 export const ApiCredentialId = Schema.UUID.pipe(Schema.brand("ApiCredentialId"));
 export type ApiCredentialId = typeof ApiCredentialId.Type;
+
+export const ApiCredentialRotationId = Schema.UUID.pipe(Schema.brand("ApiCredentialRotationId"));
+export type ApiCredentialRotationId = typeof ApiCredentialRotationId.Type;
 
 export const ProjectActor = Schema.Union(
   Schema.Struct({ kind: Schema.Literal("user"), id: AuthUserId }),
@@ -205,6 +209,24 @@ export type ProjectInvitationStatus = typeof ProjectInvitationStatus.Type;
 
 export const CredentialFamily = Schema.Literal("management", "delivery", "preview");
 export type CredentialFamily = typeof CredentialFamily.Type;
+
+export const CredentialLifecycleStatus = Schema.Literal(
+  "pending",
+  "active",
+  "retiring",
+  "expired",
+  "revoked",
+  "canceled",
+);
+export type CredentialLifecycleStatus = typeof CredentialLifecycleStatus.Type;
+
+export const CredentialRotationStatus = Schema.Literal(
+  "pending",
+  "overlap",
+  "canceled",
+  "completed",
+);
+export type CredentialRotationStatus = typeof CredentialRotationStatus.Type;
 
 export const CredentialScope = Schema.Literal(...credentialScopeValues);
 export type CredentialScope = typeof CredentialScope.Type;
@@ -390,6 +412,9 @@ export class IssueApiCredentialInput extends Schema.Class<IssueApiCredentialInpu
   previewAuthorityAcknowledged: Schema.optionalWith(Schema.Boolean, {
     default: () => false,
   }),
+  nonExpiringAcknowledged: Schema.optionalWith(Schema.Boolean, {
+    default: () => false,
+  }),
 }) {}
 
 export class ListApiCredentialsInput extends Schema.Class<ListApiCredentialsInput>(
@@ -401,18 +426,34 @@ export class ListApiCredentialsInput extends Schema.Class<ListApiCredentialsInpu
   limit: PageLimit,
 }) {}
 
-export class RotateApiCredentialInput extends Schema.Class<RotateApiCredentialInput>(
-  "RotateApiCredentialInput",
+export class StartApiCredentialRotationInput extends Schema.Class<StartApiCredentialRotationInput>(
+  "StartApiCredentialRotationInput",
 )({
+  projectId: ProjectId,
+  environmentId: EnvironmentId,
   credentialId: ApiCredentialId,
-  version: ResourceVersion,
+  expectedVersion: ResourceVersion,
+  expiresAt: Schema.NullOr(IsoDateTime),
+  nonExpiringAcknowledged: Schema.Boolean,
+}) {}
+
+export class ChangeApiCredentialRotationInput extends Schema.Class<ChangeApiCredentialRotationInput>(
+  "ChangeApiCredentialRotationInput",
+)({
+  projectId: ProjectId,
+  environmentId: EnvironmentId,
+  rotationId: ApiCredentialRotationId,
+  expectedVersion: ResourceVersion,
+  action: Schema.Literal("activate", "cancel", "complete"),
 }) {}
 
 export class RevokeApiCredentialInput extends Schema.Class<RevokeApiCredentialInput>(
   "RevokeApiCredentialInput",
 )({
+  projectId: ProjectId,
+  environmentId: EnvironmentId,
   credentialId: ApiCredentialId,
-  version: ResourceVersion,
+  expectedVersion: ResourceVersion,
 }) {}
 
 export class CurrentProjectAccess extends Schema.Class<CurrentProjectAccess>(
@@ -483,15 +524,44 @@ export class ApiCredential extends Schema.Class<ApiCredential>("ApiCredential")(
   name: CredentialName,
   keyPrefix: CredentialKeyPrefix,
   scopes: CredentialScopes,
+  status: CredentialLifecycleStatus,
   version: ResourceVersion,
+  activatedAt: Schema.NullOr(IsoDateTime),
   expiresAt: Schema.NullOr(IsoDateTime),
+  retireAt: Schema.NullOr(IsoDateTime),
   revokedAt: Schema.NullOr(IsoDateTime),
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+}) {}
+
+export class ApiCredentialRotation extends Schema.Class<ApiCredentialRotation>(
+  "ApiCredentialRotation",
+)({
+  id: ApiCredentialRotationId,
+  projectId: ProjectId,
+  environmentId: EnvironmentId,
+  predecessorCredentialId: ApiCredentialId,
+  successorCredentialId: ApiCredentialId,
+  status: CredentialRotationStatus,
+  version: ResourceVersion,
+  activatedAt: Schema.NullOr(IsoDateTime),
+  retireAt: Schema.NullOr(IsoDateTime),
+  completedAt: Schema.NullOr(IsoDateTime),
+  canceledAt: Schema.NullOr(IsoDateTime),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 }) {}
 
 export class IssuedApiCredential extends Schema.Class<IssuedApiCredential>("IssuedApiCredential")({
   credential: ApiCredential,
+  key: CredentialSecret,
+}) {}
+
+export class StartedApiCredentialRotation extends Schema.Class<StartedApiCredentialRotation>(
+  "StartedApiCredentialRotation",
+)({
+  rotation: ApiCredentialRotation,
+  successor: ApiCredential,
   key: CredentialSecret,
 }) {}
 
@@ -546,7 +616,12 @@ export const UpdateProjectMemberPolicyInputSchema = Schema.standardSchemaV1(
 export const RemoveProjectMemberInputSchema = Schema.standardSchemaV1(RemoveProjectMemberInput);
 export const IssueApiCredentialInputSchema = Schema.standardSchemaV1(IssueApiCredentialInput);
 export const ListApiCredentialsInputSchema = Schema.standardSchemaV1(ListApiCredentialsInput);
-export const RotateApiCredentialInputSchema = Schema.standardSchemaV1(RotateApiCredentialInput);
+export const StartApiCredentialRotationInputSchema = Schema.standardSchemaV1(
+  StartApiCredentialRotationInput,
+);
+export const ChangeApiCredentialRotationInputSchema = Schema.standardSchemaV1(
+  ChangeApiCredentialRotationInput,
+);
 export const RevokeApiCredentialInputSchema = Schema.standardSchemaV1(RevokeApiCredentialInput);
 
 export const CurrentProjectAccessOutputSchema = Schema.standardSchemaV1(
@@ -571,6 +646,12 @@ export const ProjectInvitationPageOutputSchema = Schema.standardSchemaV1(
 export const ApiCredentialOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(ApiCredential));
 export const IssuedApiCredentialOutputSchema = Schema.standardSchemaV1(
   ApiSuccessSchema(IssuedApiCredential),
+);
+export const ApiCredentialRotationOutputSchema = Schema.standardSchemaV1(
+  ApiSuccessSchema(ApiCredentialRotation),
+);
+export const StartedApiCredentialRotationOutputSchema = Schema.standardSchemaV1(
+  ApiSuccessSchema(StartedApiCredentialRotation),
 );
 export const ApiCredentialPageOutputSchema = Schema.standardSchemaV1(
   ApiSuccessSchema(ApiCredentialPage),

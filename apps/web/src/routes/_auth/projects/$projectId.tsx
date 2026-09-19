@@ -13,7 +13,15 @@ import { Skeleton } from "@framerfordevs/ui/components/skeleton";
 import { Spinner } from "@framerfordevs/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, BoxesIcon, CheckIcon, DatabaseIcon, WebhookIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  BoxesIcon,
+  CheckIcon,
+  DatabaseIcon,
+  ShieldCheckIcon,
+  WebhookIcon,
+} from "lucide-react";
+import { useRef } from "react";
 import { toast } from "sonner";
 
 import { ArchiveProjectDialog } from "@/components/project/archive-dialog";
@@ -36,6 +44,9 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
 
 function ProjectDetail() {
   const { projectId } = Route.useParams();
+  const lifecycleActionRef = useRef<HTMLDivElement>(null);
+  const focusLifecycleAction = () =>
+    requestAnimationFrame(() => lifecycleActionRef.current?.focus());
   const queryClient = useQueryClient();
   const projectQuery = useQuery(orpc.platform.projects.get.queryOptions({ input: { projectId } }));
   const accessQuery = useQuery(
@@ -70,6 +81,7 @@ function ProjectDetail() {
   const canReadSchemas = effectiveProjectActions.has("schema.read");
   const canWriteSchemas = effectiveProjectActions.has("schema.write");
   const canReadWebhooks = effectiveProjectActions.has("webhook.read");
+  const canReadAudit = effectiveProjectActions.has("project.audit.read");
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">
@@ -95,13 +107,25 @@ function ProjectDetail() {
               {project.key}
             </p>
           </div>
-          {!isArchived && (canUpdate || canArchive) ? (
-            <div className="flex flex-wrap gap-2">
-              {canUpdate ? <EditProjectDialog key={project.version} project={project} /> : null}
-              {canArchive ? <ArchiveProjectDialog project={project} /> : null}
+          {(!isArchived && (canUpdate || canArchive)) || (isArchived && canRestore) ? (
+            <div
+              ref={lifecycleActionRef}
+              role="group"
+              aria-label="Project lifecycle actions"
+              tabIndex={-1}
+              className="flex flex-wrap gap-2"
+            >
+              {!isArchived ? (
+                <>
+                  {canUpdate ? <EditProjectDialog key={project.version} project={project} /> : null}
+                  {canArchive ? (
+                    <ArchiveProjectDialog project={project} onCompleted={focusLifecycleAction} />
+                  ) : null}
+                </>
+              ) : (
+                <RestoreProjectDialog project={project} onCompleted={focusLifecycleAction} />
+              )}
             </div>
-          ) : isArchived && canRestore ? (
-            <RestoreProjectDialog project={project} />
           ) : null}
         </div>
         <p className="text-muted-foreground max-w-3xl text-sm">
@@ -209,6 +233,27 @@ function ProjectDetail() {
         </Card>
       ) : null}
 
+      {canReadAudit || canReadWebhooks ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle>Operations &amp; security</CardTitle>
+                <CardDescription>
+                  Review bounded audit history and access operational recovery controls.
+                </CardDescription>
+              </div>
+              <ShieldCheckIcon aria-hidden="true" />
+            </div>
+          </CardHeader>
+          <CardFooter>
+            <Button render={<Link to="/projects/$projectId/operations" params={{ projectId }} />}>
+              Open Operations &amp; security
+            </Button>
+          </CardFooter>
+        </Card>
+      ) : null}
+
       {canReadLocales ? (
         <ProjectLocaleSettings
           projectId={project.id}
@@ -223,6 +268,7 @@ function ProjectDetail() {
         role={access.role}
         localeAccessMode={access.localeAccess.mode}
         effectiveProjectActions={access.effectiveProjectActions}
+        isArchived={isArchived}
       />
 
       <Card>

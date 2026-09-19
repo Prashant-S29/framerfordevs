@@ -38,6 +38,31 @@ const controlPlaneCommands = new Set([
   "locale reorder",
   "locale status set",
   "project environment get",
+  "credential list",
+  "credential issue",
+  "credential rotation start",
+  "credential rotation activate",
+  "credential rotation cancel",
+  "credential rotation complete",
+  "credential revoke",
+  "webhook endpoint list",
+  "webhook endpoint create",
+  "webhook endpoint update",
+  "webhook endpoint state set",
+  "webhook subscription replace",
+  "webhook secret rotation start",
+  "webhook secret rotation activate",
+  "webhook secret rotation cancel",
+  "webhook secret rotation complete",
+  "invalidation mapping list",
+  "invalidation mapping create",
+  "invalidation mapping update",
+  "invalidation mapping state set",
+  "webhook delivery list",
+  "webhook delivery get",
+  "webhook attempt list",
+  "webhook replay",
+  "audit list",
 ]);
 
 export function isControlPlaneCommand(command: string): boolean {
@@ -131,7 +156,9 @@ function receiptMutation<A, E, R>(options: {
     | "project.create"
     | "project.capability.enable"
     | "studio_registration.put"
-    | "project_locale.create";
+    | "project_locale.create"
+    | "invalidation_mapping.create"
+    | "webhook.delivery.replay";
   readonly suppliedCommandId: string | undefined;
   readonly input: unknown;
   readonly execute: (commandId: string) => Effect.Effect<A, E, R>;
@@ -213,6 +240,68 @@ function reorderItems(arguments_: ParsedArguments) {
   return Effect.succeed(items);
 }
 
+function enumFlag(
+  arguments_: ParsedArguments,
+  name: string,
+  values: ReadonlySet<string>,
+  fallback?: string,
+): Effect.Effect<string, Error> {
+  const value = stringFlag(arguments_, name) ?? fallback;
+  return value !== undefined && values.has(value)
+    ? Effect.succeed(value)
+    : Effect.fail(new Error(`CLI_${name.toUpperCase().replaceAll("-", "_")}_INVALID`));
+}
+
+function requireSecretStdout(arguments_: ParsedArguments) {
+  return booleanFlag(arguments_, "secret-stdout")
+    ? Effect.void
+    : Effect.fail(new Error("CLI_SECRET_STDOUT_REQUIRED"));
+}
+
+function credentialExpiry(arguments_: ParsedArguments) {
+  const expiresAt = stringFlag(arguments_, "expires-at");
+  const noExpiry = booleanFlag(arguments_, "no-expiry");
+  if ((expiresAt === undefined) === !noExpiry) {
+    return Effect.fail(new Error("CLI_EXPIRY_INTENT_REQUIRED"));
+  }
+  if (expiresAt !== undefined && !Number.isFinite(Date.parse(expiresAt))) {
+    return Effect.fail(new Error("CLI_EXPIRES_AT_INVALID"));
+  }
+  return Effect.succeed({
+    expiresAt: noExpiry ? null : (expiresAt ?? null),
+    nonExpiringAcknowledged: booleanFlag(arguments_, "acknowledge-non-expiring"),
+  });
+}
+
+function uniqueRequiredFlags(arguments_: ParsedArguments, name: string) {
+  const values = stringFlags(arguments_, name);
+  return values.length > 0 && new Set(values).size === values.length
+    ? Effect.succeed(values)
+    : Effect.fail(new Error(`CLI_${name.toUpperCase().replaceAll("-", "_")}_INVALID`));
+}
+
+function readBoundedWebhookDestination() {
+  return Effect.tryPromise({
+    try: async () => {
+      if (process.stdin.isTTY) throw new Error("CLI_DESTINATION_STDIN_REQUIRED");
+      process.stdin.setEncoding("utf8");
+      let value = "";
+      for await (const chunk of process.stdin) {
+        value += chunk;
+        if (Buffer.byteLength(value, "utf8") > 2_049) {
+          throw new Error("CLI_DESTINATION_STDIN_INVALID");
+        }
+      }
+      const destination = value.replace(/\r?\n$/u, "");
+      if (destination.length === 0 || Buffer.byteLength(destination, "utf8") > 2_048) {
+        throw new Error("CLI_DESTINATION_STDIN_INVALID");
+      }
+      return destination;
+    },
+    catch: (cause) => (cause instanceof Error ? cause : new Error("CLI_DESTINATION_STDIN_INVALID")),
+  });
+}
+
 function readBoundedInvitationToken() {
   return Effect.tryPromise({
     try: async () => {
@@ -237,6 +326,7 @@ export function executeControlPlaneCommand(options: {
   readonly token: string;
   readonly root: string;
   readonly readInvitationToken?: () => Effect.Effect<string, Error>;
+  readonly readWebhookDestination?: () => Effect.Effect<string, Error>;
 }) {
   const arguments_ = options.arguments;
   const command = arguments_.command.join(" ");
@@ -526,6 +616,437 @@ export function executeControlPlaneCommand(options: {
           status,
           confirmDraftImpact: booleanFlag(arguments_, "confirm-draft-impact"),
         }),
+      };
+    }
+    if (command === "credential list") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const family = yield* enumFlag(
+        arguments_,
+        "family",
+        new Set(["all", "management", "delivery", "preview"]),
+        "all",
+      );
+      const status = yield* enumFlag(
+        arguments_,
+        "status",
+        new Set(["all", "pending", "active", "retiring", "expired", "revoked", "canceled"]),
+        "all",
+      );
+      return {
+        command,
+        ...(yield* client.listCredentials(
+          projectId,
+          environmentId,
+          family,
+          status,
+          stringFlag(arguments_, "cursor") ?? null,
+          yield* positiveIntegerFlag(arguments_, "limit", 20),
+        )),
+      };
+    }
+    if (command === "credential issue") {
+      yield* requireSecretStdout(arguments_);
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const family = yield* enumFlag(
+        arguments_,
+        "family",
+        new Set(["management", "delivery", "preview"]),
+      );
+      const name = yield* requiredFlag(arguments_, "name");
+      const scopes = yield* uniqueRequiredFlags(arguments_, "scope");
+      const expiry = yield* credentialExpiry(arguments_);
+      return {
+        command,
+        ...(yield* client.issueCredential(projectId, environmentId, {
+          family,
+          name,
+          scopes,
+          ...expiry,
+          previewAuthorityAcknowledged: booleanFlag(arguments_, "acknowledge-preview-authority"),
+        })),
+      };
+    }
+    if (command === "credential rotation start") {
+      yield* requireSecretStdout(arguments_);
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const credentialId = yield* requiredFlag(arguments_, "credential");
+      const expectedVersion = yield* positiveIntegerFlag(arguments_, "expected-version");
+      const expiry = yield* credentialExpiry(arguments_);
+      return {
+        command,
+        ...(yield* client.startCredentialRotation(projectId, environmentId, credentialId, {
+          expectedVersion,
+          ...expiry,
+        })),
+      };
+    }
+    if (
+      command === "credential rotation activate" ||
+      command === "credential rotation cancel" ||
+      command === "credential rotation complete"
+    ) {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const rotationId = yield* requiredFlag(arguments_, "rotation");
+      const expectedVersion = yield* positiveIntegerFlag(arguments_, "expected-version");
+      const action =
+        command === "credential rotation activate"
+          ? "activate"
+          : command === "credential rotation cancel"
+            ? "cancel"
+            : "complete";
+      const acknowledged =
+        action === "complete"
+          ? booleanFlag(arguments_, "confirm-retirement")
+          : booleanFlag(arguments_, "confirm-overlap");
+      if (!acknowledged)
+        return yield* Effect.fail(new Error("CLI_AUTHORITY_CONFIRMATION_REQUIRED"));
+      return {
+        command,
+        rotation: yield* client.changeCredentialRotation(
+          projectId,
+          environmentId,
+          rotationId,
+          action,
+          { expectedVersion, authorityAcknowledged: true },
+        ),
+      };
+    }
+    if (command === "credential revoke") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const credentialId = yield* requiredFlag(arguments_, "credential");
+      const expectedVersion = yield* positiveIntegerFlag(arguments_, "expected-version");
+      const confirmPrefix = yield* requiredFlag(arguments_, "confirm-prefix");
+      const page = yield* client.listCredentials(projectId, environmentId, "all", "all", null, 50);
+      const current = page.items.find((item) => item.id === credentialId);
+      if (current === undefined || current.keyPrefix !== confirmPrefix) {
+        return yield* Effect.fail(new Error("CLI_CONFIRM_PREFIX_INVALID"));
+      }
+      return {
+        command,
+        credential: yield* client.revokeCredential(projectId, environmentId, credentialId, {
+          expectedVersion,
+          authorityAcknowledged: true,
+        }),
+      };
+    }
+    if (command === "webhook endpoint list") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const state = yield* enumFlag(
+        arguments_,
+        "state",
+        new Set(["all", "enabled", "disabled"]),
+        "all",
+      );
+      return {
+        command,
+        ...(yield* client.listWebhookEndpoints(
+          projectId,
+          environmentId,
+          state,
+          stringFlag(arguments_, "cursor") ?? null,
+          yield* positiveIntegerFlag(arguments_, "limit", 20),
+        )),
+      };
+    }
+    if (command === "webhook endpoint create") {
+      yield* requireSecretStdout(arguments_);
+      if (!booleanFlag(arguments_, "destination-stdin")) {
+        return yield* Effect.fail(new Error("CLI_DESTINATION_STDIN_REQUIRED"));
+      }
+      const destination = yield* (
+        options.readWebhookDestination?.() ?? readBoundedWebhookDestination()
+      );
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const name = yield* requiredFlag(arguments_, "name");
+      const subscriptions = yield* uniqueRequiredFlags(arguments_, "event");
+      if (!booleanFlag(arguments_, "acknowledge-metadata-authority")) {
+        return yield* Effect.fail(new Error("CLI_AUTHORITY_CONFIRMATION_REQUIRED"));
+      }
+      return {
+        command,
+        ...(yield* client.createWebhookEndpoint(projectId, environmentId, {
+          name,
+          destination,
+          subscriptions,
+          authorityAcknowledged: true,
+        })),
+      };
+    }
+    if (command === "webhook endpoint update") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const endpointId = yield* requiredFlag(arguments_, "endpoint");
+      const expectedVersion = yield* positiveIntegerFlag(arguments_, "expected-version");
+      const name = yield* requiredFlag(arguments_, "name");
+      const replaceDestination = booleanFlag(arguments_, "destination-stdin");
+      if (replaceDestination && !booleanFlag(arguments_, "acknowledge-destination-replacement")) {
+        return yield* Effect.fail(new Error("CLI_AUTHORITY_CONFIRMATION_REQUIRED"));
+      }
+      const destination = replaceDestination
+        ? yield* options.readWebhookDestination?.() ?? readBoundedWebhookDestination()
+        : null;
+      return {
+        command,
+        endpoint: yield* client.updateWebhookEndpoint(projectId, environmentId, endpointId, {
+          expectedVersion,
+          name,
+          destination,
+          destinationReplacementAcknowledged: replaceDestination,
+        }),
+      };
+    }
+    if (command === "webhook endpoint state set") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const endpointId = yield* requiredFlag(arguments_, "endpoint");
+      const expectedVersion = yield* positiveIntegerFlag(arguments_, "expected-version");
+      const state = yield* enumFlag(arguments_, "state", new Set(["enabled", "disabled"]));
+      if (state === "disabled" && stringFlag(arguments_, "confirm-disable") !== endpointId) {
+        return yield* Effect.fail(new Error("CLI_CONFIRM_ENDPOINT_INVALID"));
+      }
+      return {
+        command,
+        endpoint: yield* client.setWebhookEndpointState(projectId, environmentId, endpointId, {
+          expectedVersion,
+          state,
+          authorityAcknowledged: state === "disabled",
+        }),
+      };
+    }
+    if (command === "webhook subscription replace") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const endpointId = yield* requiredFlag(arguments_, "endpoint");
+      return {
+        command,
+        endpoint: yield* client.replaceWebhookSubscriptions(projectId, environmentId, endpointId, {
+          expectedVersion: yield* positiveIntegerFlag(arguments_, "expected-version"),
+          subscriptions: yield* uniqueRequiredFlags(arguments_, "event"),
+        }),
+      };
+    }
+    if (command === "webhook secret rotation start") {
+      yield* requireSecretStdout(arguments_);
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const endpointId = yield* requiredFlag(arguments_, "endpoint");
+      return {
+        command,
+        ...(yield* client.startWebhookSecretRotation(projectId, environmentId, endpointId, {
+          expectedVersion: yield* positiveIntegerFlag(arguments_, "expected-version"),
+          authorityAcknowledged: true,
+        })),
+      };
+    }
+    if (
+      command === "webhook secret rotation activate" ||
+      command === "webhook secret rotation cancel" ||
+      command === "webhook secret rotation complete"
+    ) {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const endpointId = yield* requiredFlag(arguments_, "endpoint");
+      const action =
+        command === "webhook secret rotation activate"
+          ? "activate"
+          : command === "webhook secret rotation cancel"
+            ? "cancel"
+            : "complete";
+      const acknowledged =
+        action === "complete"
+          ? booleanFlag(arguments_, "confirm-retirement")
+          : booleanFlag(arguments_, "confirm-overlap");
+      if (!acknowledged)
+        return yield* Effect.fail(new Error("CLI_AUTHORITY_CONFIRMATION_REQUIRED"));
+      return {
+        command,
+        endpoint: yield* client.changeWebhookSecretRotation(
+          projectId,
+          environmentId,
+          endpointId,
+          action,
+          {
+            expectedVersion: yield* positiveIntegerFlag(arguments_, "expected-version"),
+            authorityAcknowledged: true,
+          },
+        ),
+      };
+    }
+    if (command === "invalidation mapping list") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const state = yield* enumFlag(
+        arguments_,
+        "state",
+        new Set(["all", "enabled", "disabled"]),
+        "all",
+      );
+      return {
+        command,
+        ...(yield* client.listInvalidationMappings(
+          projectId,
+          environmentId,
+          state,
+          stringFlag(arguments_, "cursor") ?? null,
+          yield* positiveIntegerFlag(arguments_, "limit", 20),
+        )),
+      };
+    }
+    if (command === "invalidation mapping create" || command === "invalidation mapping update") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const collectionId = yield* requiredFlag(arguments_, "collection");
+      const name = yield* requiredFlag(arguments_, "name");
+      const eventTypes = yield* uniqueRequiredFlags(arguments_, "event");
+      const route = yield* requiredFlag(arguments_, "route");
+      const semanticTags = stringFlags(arguments_, "tag");
+      if (new Set(semanticTags).size !== semanticTags.length) {
+        return yield* Effect.fail(new Error("CLI_TAG_INVALID"));
+      }
+      const fields = {
+        collectionId,
+        entryId: stringFlag(arguments_, "entry") ?? null,
+        localeId: stringFlag(arguments_, "locale") ?? null,
+        name,
+        eventTypes,
+        route,
+        semanticTags,
+      };
+      if (command === "invalidation mapping update") {
+        const mappingId = yield* requiredFlag(arguments_, "mapping");
+        return {
+          command,
+          mapping: yield* client.updateInvalidationMapping(projectId, environmentId, mappingId, {
+            expectedVersion: yield* positiveIntegerFlag(arguments_, "expected-version"),
+            ...fields,
+          }),
+        };
+      }
+      const suppliedCommandId = yield* optionalCommandId(arguments_);
+      const mapping = yield* receiptMutation({
+        root: options.root,
+        operation: "invalidation_mapping.create",
+        suppliedCommandId,
+        input: { projectId, environmentId, ...fields },
+        execute: (commandId) =>
+          client.createInvalidationMapping(projectId, environmentId, { commandId, ...fields }),
+      });
+      return { command, mapping };
+    }
+    if (command === "invalidation mapping state set") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const mappingId = yield* requiredFlag(arguments_, "mapping");
+      return {
+        command,
+        mapping: yield* client.setInvalidationMappingState(projectId, environmentId, mappingId, {
+          expectedVersion: yield* positiveIntegerFlag(arguments_, "expected-version"),
+          state: yield* enumFlag(arguments_, "state", new Set(["enabled", "disabled"])),
+        }),
+      };
+    }
+    if (command === "webhook delivery list") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const status = stringFlag(arguments_, "status") ?? null;
+      if (
+        status !== null &&
+        ![
+          "queued",
+          "delivering",
+          "retry_scheduled",
+          "succeeded",
+          "dead_letter",
+          "canceled",
+        ].includes(status)
+      ) {
+        return yield* Effect.fail(new Error("CLI_STATUS_INVALID"));
+      }
+      return {
+        command,
+        ...(yield* client.listWebhookDeliveries(projectId, environmentId, {
+          endpointId: stringFlag(arguments_, "endpoint") ?? null,
+          eventType: stringFlag(arguments_, "event") ?? null,
+          status,
+          cursor: stringFlag(arguments_, "cursor") ?? null,
+          limit: yield* positiveIntegerFlag(arguments_, "limit", 20),
+        })),
+      };
+    }
+    if (command === "webhook delivery get" || command === "webhook attempt list") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const deliveryId = yield* requiredFlag(arguments_, "delivery");
+      return command === "webhook delivery get"
+        ? {
+            command,
+            detail: yield* client.getWebhookDelivery(projectId, environmentId, deliveryId),
+          }
+        : {
+            command,
+            ...(yield* client.listWebhookAttempts(projectId, environmentId, deliveryId)),
+          };
+    }
+    if (command === "webhook replay") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment");
+      const endpointId = yield* requiredFlag(arguments_, "endpoint");
+      const eventId = yield* requiredFlag(arguments_, "event-id");
+      if (stringFlag(arguments_, "confirm-event") !== eventId) {
+        return yield* Effect.fail(new Error("CLI_CONFIRM_EVENT_INVALID"));
+      }
+      const sourceDeliveryId = stringFlag(arguments_, "source-delivery") ?? null;
+      const suppliedCommandId = yield* optionalCommandId(arguments_);
+      const input = { projectId, environmentId, endpointId, eventId, sourceDeliveryId };
+      const replay = yield* receiptMutation({
+        root: options.root,
+        operation: "webhook.delivery.replay",
+        suppliedCommandId,
+        input,
+        execute: (commandId) =>
+          client.replayWebhook(projectId, environmentId, {
+            commandId,
+            endpointId,
+            eventId,
+            sourceDeliveryId,
+            authorityAcknowledged: true,
+          }),
+      });
+      return { command, ...replay };
+    }
+    if (command === "audit list") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const now = Date.now();
+      const actorKind = stringFlag(arguments_, "actor-kind") ?? "all";
+      const actorId = stringFlag(arguments_, "actor-id") ?? null;
+      if (
+        !["all", "user", "credential"].includes(actorKind) ||
+        (actorKind === "all") !== (actorId === null)
+      ) {
+        return yield* Effect.fail(new Error("CLI_ACTOR_FILTER_INVALID"));
+      }
+      return {
+        command,
+        ...(yield* client.listAuditEvents(projectId, {
+          environmentId: stringFlag(arguments_, "environment") ?? null,
+          category: stringFlag(arguments_, "category") ?? "all",
+          actorKind,
+          actorId,
+          action: stringFlag(arguments_, "action") ?? null,
+          from:
+            stringFlag(arguments_, "from") ??
+            new Date(now - 30 * 24 * 60 * 60 * 1_000).toISOString(),
+          to: stringFlag(arguments_, "to") ?? new Date(now).toISOString(),
+          cursor: stringFlag(arguments_, "cursor") ?? null,
+          limit: yield* positiveIntegerFlag(arguments_, "limit", 20),
+        })),
       };
     }
     if (command === "project environment get") {

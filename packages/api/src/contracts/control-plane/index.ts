@@ -1,5 +1,7 @@
 // Defines the closed, tenant-safe Control Plane v1 request and response contracts.
 
+export * from "./operational";
+
 import { Schema } from "effect";
 
 import {
@@ -124,6 +126,7 @@ export const ControlPlaneCommandOperation = Schema.Literal(
   "project.capability.enable",
   "studio_registration.put",
   "project_locale.create",
+  "invalidation_mapping.create",
 );
 export type ControlPlaneCommandOperation = typeof ControlPlaneCommandOperation.Type;
 

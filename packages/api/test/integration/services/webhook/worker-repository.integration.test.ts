@@ -47,6 +47,10 @@ describe("Webhook worker repository PostgreSQL integration", () => {
       r.collection_id as "collectionId",
       r.id as "schemaRevisionId"
       from cms_schema_revision r
+      join project p
+        on p.id = r.project_id
+        and p.workspace_id = r.workspace_id
+        and p.archived_at is null
       order by r.id
       limit 1`);
     const row = result.rows[0];
@@ -406,7 +410,9 @@ describe("Webhook worker repository PostgreSQL integration", () => {
       .limit(1);
     if (!delivery) throw new Error("Delivery fixture was not created.");
 
-    const claimAt = new Date(now.getTime() + 2_000);
+    // Keep recovery scheduling later than every historical-time fixture because the production
+    // worker intentionally throttles lease recovery process-wide across repository instances.
+    const claimAt = new Date(Date.now() + 60_000);
     const claimResults = await Promise.all([
       Effect.runPromise(makeWebhookWorkerRepository().claimAttempt(claimAt)),
       Effect.runPromise(makeWebhookWorkerRepository().claimAttempt(claimAt)),

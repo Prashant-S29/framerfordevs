@@ -5,17 +5,29 @@ import { JSONSchema, Schema } from "effect";
 import {
   ControlPlaneApiFailure,
   ControlPlaneCapabilityListResponse,
+  ControlPlaneCreateInvalidationMappingRequest,
   ControlPlaneCreateInvitationRequest,
   ControlPlaneCreateLocaleRequest,
   ControlPlaneCreateLocaleResponse,
   ControlPlaneCreateProjectRequest,
   ControlPlaneCreateProjectResponse,
   ControlPlaneCreateWorkspaceRequest,
+  ControlPlaneCreateWebhookEndpointRequest,
   ControlPlaneCreateWorkspaceResponse,
+  ControlPlaneCredentialPageResponse,
+  ControlPlaneCredentialResponse,
+  ControlPlaneCredentialRotationResponse,
+  ControlPlaneCredentialRotationTransitionRequest,
   ControlPlaneEnableCapabilityRequest,
   ControlPlaneEnableCapabilityResponse,
   ControlPlaneGovernanceResponse,
   ControlPlaneInspectedInvitationResponse,
+  ControlPlaneInvalidationMappingPageResponse,
+  ControlPlaneInvalidationMappingResponse,
+  ControlPlaneInvalidationMappingStateRequest,
+  ControlPlaneIssueCredentialRequest,
+  ControlPlaneIssuedCredentialResponse,
+  ControlPlaneIssuedWebhookEndpointResponse,
   ControlPlaneInvitationPageResponse,
   ControlPlaneInvitationResponse,
   ControlPlaneInvitationTokenRequest,
@@ -28,14 +40,32 @@ import {
   ControlPlaneMemberPageResponse,
   ControlPlaneMemberPolicyRequest,
   ControlPlaneMemberResponse,
+  ControlPlaneProjectAuditPageResponse,
   ControlPlaneProjectLifecycleRequest,
   ControlPlaneProjectPageResponse,
   ControlPlaneProjectResponse,
   ControlPlanePutStudioRegistrationRequest,
   ControlPlanePutStudioRegistrationResponse,
+  ControlPlaneReplaceWebhookSubscriptionsRequest,
+  ControlPlaneReplayWebhookRequest,
+  ControlPlaneRevokeCredentialRequest,
+  ControlPlaneRotatedWebhookSecretResponse,
+  ControlPlaneStartCredentialRotationRequest,
+  ControlPlaneStartedCredentialRotationResponse,
+  ControlPlaneStartWebhookSecretRotationRequest,
+  ControlPlaneUpdateInvalidationMappingRequest,
   ControlPlaneUpdateLocaleRequest,
   ControlPlaneUpdateProjectRequest,
+  ControlPlaneUpdateWebhookEndpointRequest,
   ControlPlaneVersionRequest,
+  ControlPlaneWebhookAttemptListResponse,
+  ControlPlaneWebhookDeliveryDetailResponse,
+  ControlPlaneWebhookDeliveryPageResponse,
+  ControlPlaneWebhookEndpointPageResponse,
+  ControlPlaneWebhookEndpointResponse,
+  ControlPlaneWebhookEndpointStateRequest,
+  ControlPlaneWebhookReplayResponse,
+  ControlPlaneWebhookSecretTransitionRequest,
   ControlPlaneWorkspacePageResponse,
   ControlPlaneWorkspaceResponse,
   StudioRegistrationResponse,
@@ -118,6 +148,48 @@ function schemaComponents() {
     ["ControlPlaneLocaleResponse", ControlPlaneLocaleResponse],
     ["ControlPlaneLocaleOrderRequest", ControlPlaneLocaleOrderRequest],
     ["ControlPlaneLocaleStatusRequest", ControlPlaneLocaleStatusRequest],
+    ["ControlPlaneCredentialPageResponse", ControlPlaneCredentialPageResponse],
+    ["ControlPlaneCredentialResponse", ControlPlaneCredentialResponse],
+    ["ControlPlaneIssueCredentialRequest", ControlPlaneIssueCredentialRequest],
+    ["ControlPlaneIssuedCredentialResponse", ControlPlaneIssuedCredentialResponse],
+    ["ControlPlaneStartCredentialRotationRequest", ControlPlaneStartCredentialRotationRequest],
+    [
+      "ControlPlaneStartedCredentialRotationResponse",
+      ControlPlaneStartedCredentialRotationResponse,
+    ],
+    [
+      "ControlPlaneCredentialRotationTransitionRequest",
+      ControlPlaneCredentialRotationTransitionRequest,
+    ],
+    ["ControlPlaneCredentialRotationResponse", ControlPlaneCredentialRotationResponse],
+    ["ControlPlaneRevokeCredentialRequest", ControlPlaneRevokeCredentialRequest],
+    ["ControlPlaneCreateWebhookEndpointRequest", ControlPlaneCreateWebhookEndpointRequest],
+    ["ControlPlaneIssuedWebhookEndpointResponse", ControlPlaneIssuedWebhookEndpointResponse],
+    ["ControlPlaneUpdateWebhookEndpointRequest", ControlPlaneUpdateWebhookEndpointRequest],
+    ["ControlPlaneWebhookEndpointStateRequest", ControlPlaneWebhookEndpointStateRequest],
+    [
+      "ControlPlaneReplaceWebhookSubscriptionsRequest",
+      ControlPlaneReplaceWebhookSubscriptionsRequest,
+    ],
+    [
+      "ControlPlaneStartWebhookSecretRotationRequest",
+      ControlPlaneStartWebhookSecretRotationRequest,
+    ],
+    ["ControlPlaneWebhookSecretTransitionRequest", ControlPlaneWebhookSecretTransitionRequest],
+    ["ControlPlaneRotatedWebhookSecretResponse", ControlPlaneRotatedWebhookSecretResponse],
+    ["ControlPlaneWebhookEndpointResponse", ControlPlaneWebhookEndpointResponse],
+    ["ControlPlaneWebhookEndpointPageResponse", ControlPlaneWebhookEndpointPageResponse],
+    ["ControlPlaneCreateInvalidationMappingRequest", ControlPlaneCreateInvalidationMappingRequest],
+    ["ControlPlaneUpdateInvalidationMappingRequest", ControlPlaneUpdateInvalidationMappingRequest],
+    ["ControlPlaneInvalidationMappingStateRequest", ControlPlaneInvalidationMappingStateRequest],
+    ["ControlPlaneInvalidationMappingResponse", ControlPlaneInvalidationMappingResponse],
+    ["ControlPlaneInvalidationMappingPageResponse", ControlPlaneInvalidationMappingPageResponse],
+    ["ControlPlaneWebhookDeliveryPageResponse", ControlPlaneWebhookDeliveryPageResponse],
+    ["ControlPlaneWebhookDeliveryDetailResponse", ControlPlaneWebhookDeliveryDetailResponse],
+    ["ControlPlaneWebhookAttemptListResponse", ControlPlaneWebhookAttemptListResponse],
+    ["ControlPlaneReplayWebhookRequest", ControlPlaneReplayWebhookRequest],
+    ["ControlPlaneWebhookReplayResponse", ControlPlaneWebhookReplayResponse],
+    ["ControlPlaneProjectAuditPageResponse", ControlPlaneProjectAuditPageResponse],
   ] as const;
   for (const [name, schema] of schemas) addEffectSchema(components, name, schema);
   return components;
@@ -201,6 +273,36 @@ const environmentParameter = {
   required: true,
   schema: { type: "string", format: "uuid" },
 } as const;
+const credentialParameter = {
+  name: "credentialId",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+} as const;
+const rotationParameter = {
+  name: "rotationId",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+} as const;
+const endpointParameter = {
+  name: "endpointId",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+} as const;
+const mappingParameter = {
+  name: "mappingId",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+} as const;
+const deliveryParameter = {
+  name: "deliveryId",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+} as const;
 const paginationParameters = [
   {
     name: "limit",
@@ -225,6 +327,67 @@ const paginationParameters = [
   },
 ] as const;
 
+const queryParameter = (
+  name: string,
+  schema: Readonly<Record<string, unknown>> = { type: "string" },
+) => ({ name, in: "query", required: false, schema });
+const credentialListParameters = [
+  queryParameter("family", {
+    type: "string",
+    enum: ["all", "management", "delivery", "preview"],
+    default: "all",
+  }),
+  queryParameter("status", {
+    type: "string",
+    enum: ["all", "pending", "active", "retiring", "expired", "revoked", "canceled"],
+    default: "all",
+  }),
+] as const;
+const stateListParameter = queryParameter("state", {
+  type: "string",
+  enum: ["all", "enabled", "disabled"],
+  default: "all",
+});
+const deliveryListParameters = [
+  queryParameter("endpointId", { type: "string", format: "uuid" }),
+  queryParameter("eventType", {
+    type: "string",
+    enum: ["cms.schema.published", "cms.entry.published", "cms.entry.unpublished"],
+  }),
+  queryParameter("status", {
+    type: "string",
+    enum: ["queued", "delivering", "retry_scheduled", "succeeded", "dead_letter", "canceled"],
+  }),
+] as const;
+const auditListParameters = [
+  queryParameter("environmentId", { type: "string", format: "uuid" }),
+  queryParameter("category", {
+    type: "string",
+    enum: [
+      "all",
+      "security",
+      "project",
+      "governance",
+      "schema",
+      "content",
+      "publication",
+      "webhook",
+      "tooling",
+      "other",
+    ],
+    default: "all",
+  }),
+  queryParameter("actorKind", {
+    type: "string",
+    enum: ["all", "user", "credential"],
+    default: "all",
+  }),
+  queryParameter("actorId", { type: "string", minLength: 1, maxLength: 255 }),
+  queryParameter("action", { type: "string", minLength: 1, maxLength: 128 }),
+  queryParameter("from", { type: "string", format: "date-time" }),
+  queryParameter("to", { type: "string", format: "date-time" }),
+] as const;
+
 const oauthRead = [{ ControlPlaneOAuthRead: [] }] as const;
 const oauthWrite = [{ ControlPlaneOAuthWrite: [] }] as const;
 const oauthLifecycle = [{ ControlPlaneOAuthLifecycle: [] }] as const;
@@ -244,6 +407,17 @@ const exactRead = [
 ] as const;
 const exactWrite = [
   { ControlPlaneOAuthWrite: [] },
+  { ControlPlaneManagementCredential: [] },
+] as const;
+const oauthOperationsRead = [{ ControlPlaneOAuthOperationsRead: [] }] as const;
+const oauthOperationsWrite = [{ ControlPlaneOAuthOperationsWrite: [] }] as const;
+const oauthSecurityRead = [{ ControlPlaneOAuthSecurityRead: [] }] as const;
+const exactOperationsRead = [
+  { ControlPlaneOAuthOperationsRead: [] },
+  { ControlPlaneManagementCredential: [] },
+] as const;
+const exactOperationsWrite = [
+  { ControlPlaneOAuthOperationsWrite: [] },
   { ControlPlaneManagementCredential: [] },
 ] as const;
 
@@ -669,6 +843,395 @@ export const controlPlaneOpenApiDocument = {
       },
       options: denyPreflight("denyControlPlaneLocaleStatusPreflight"),
     },
+    "/projects/{projectId}/environments/{environmentId}/credentials": {
+      get: {
+        operationId: "listControlPlaneCredentials",
+        summary: "List safe credential lifecycle metadata",
+        security: oauthOperationsRead,
+        parameters: [
+          projectParameter,
+          environmentParameter,
+          ...credentialListParameters,
+          ...paginationParameters,
+        ],
+        responses: {
+          "200": successResponse("ControlPlaneCredentialPageResponse", "Credential page."),
+          ...commonFailures,
+        },
+      },
+      post: {
+        operationId: "issueControlPlaneCredential",
+        summary: "Issue a credential and disclose its key once",
+        security: oauthOperationsWrite,
+        parameters: [projectParameter, environmentParameter],
+        requestBody: jsonBody("ControlPlaneIssueCredentialRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneIssuedCredentialResponse", "Issued credential."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneCredentialsPreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/credentials/{credentialId}/rotations": {
+      post: {
+        operationId: "startControlPlaneCredentialRotation",
+        summary: "Start a pending credential rotation and disclose the successor key once",
+        security: oauthOperationsWrite,
+        parameters: [projectParameter, environmentParameter, credentialParameter],
+        requestBody: jsonBody("ControlPlaneStartCredentialRotationRequest"),
+        responses: {
+          "200": successResponse(
+            "ControlPlaneStartedCredentialRotationResponse",
+            "Started credential rotation.",
+          ),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneCredentialRotationStartPreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/credential-rotations/{rotationId}/activate":
+      {
+        post: {
+          operationId: "activateControlPlaneCredentialRotation",
+          summary: "Activate the pending successor and begin bounded overlap",
+          security: oauthOperationsWrite,
+          parameters: [projectParameter, environmentParameter, rotationParameter],
+          requestBody: jsonBody("ControlPlaneCredentialRotationTransitionRequest"),
+          responses: {
+            "200": successResponse(
+              "ControlPlaneCredentialRotationResponse",
+              "Activated credential rotation.",
+            ),
+            ...commonFailures,
+          },
+        },
+        options: denyPreflight("denyControlPlaneCredentialRotationActivatePreflight"),
+      },
+    "/projects/{projectId}/environments/{environmentId}/credential-rotations/{rotationId}/cancel": {
+      post: {
+        operationId: "cancelControlPlaneCredentialRotation",
+        summary: "Cancel a pending credential rotation",
+        security: oauthOperationsWrite,
+        parameters: [projectParameter, environmentParameter, rotationParameter],
+        requestBody: jsonBody("ControlPlaneCredentialRotationTransitionRequest"),
+        responses: {
+          "200": successResponse(
+            "ControlPlaneCredentialRotationResponse",
+            "Canceled credential rotation.",
+          ),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneCredentialRotationCancelPreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/credential-rotations/{rotationId}/complete":
+      {
+        post: {
+          operationId: "completeControlPlaneCredentialRotation",
+          summary: "Retire the predecessor and complete credential rotation",
+          security: oauthOperationsWrite,
+          parameters: [projectParameter, environmentParameter, rotationParameter],
+          requestBody: jsonBody("ControlPlaneCredentialRotationTransitionRequest"),
+          responses: {
+            "200": successResponse(
+              "ControlPlaneCredentialRotationResponse",
+              "Completed credential rotation.",
+            ),
+            ...commonFailures,
+          },
+        },
+        options: denyPreflight("denyControlPlaneCredentialRotationCompletePreflight"),
+      },
+    "/projects/{projectId}/environments/{environmentId}/credentials/{credentialId}/revoke": {
+      post: {
+        operationId: "revokeControlPlaneCredential",
+        summary: "Emergency-revoke a credential and any open rotation branch",
+        security: oauthOperationsWrite,
+        parameters: [projectParameter, environmentParameter, credentialParameter],
+        requestBody: jsonBody("ControlPlaneRevokeCredentialRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneCredentialResponse", "Revoked credential."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneCredentialRevokePreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/webhooks": {
+      get: {
+        operationId: "listControlPlaneWebhookEndpoints",
+        summary: "List webhook endpoint metadata",
+        security: exactOperationsRead,
+        parameters: [
+          projectParameter,
+          environmentParameter,
+          stateListParameter,
+          ...paginationParameters,
+        ],
+        responses: {
+          "200": successResponse("ControlPlaneWebhookEndpointPageResponse", "Webhook page."),
+          ...commonFailures,
+        },
+      },
+      post: {
+        operationId: "createControlPlaneWebhookEndpoint",
+        summary: "Create an endpoint and disclose its signing secret once",
+        security: exactOperationsWrite,
+        parameters: [projectParameter, environmentParameter],
+        requestBody: jsonBody("ControlPlaneCreateWebhookEndpointRequest"),
+        responses: {
+          "200": successResponse(
+            "ControlPlaneIssuedWebhookEndpointResponse",
+            "Created webhook endpoint.",
+          ),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneWebhooksPreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}": {
+      patch: {
+        operationId: "updateControlPlaneWebhookEndpoint",
+        summary: "Update webhook endpoint metadata and optional destination",
+        security: exactOperationsWrite,
+        parameters: [projectParameter, environmentParameter, endpointParameter],
+        requestBody: jsonBody("ControlPlaneUpdateWebhookEndpointRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneWebhookEndpointResponse", "Updated endpoint."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneWebhookUpdatePreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}/state": {
+      put: {
+        operationId: "setControlPlaneWebhookEndpointState",
+        summary: "Set webhook endpoint lifecycle state",
+        security: exactOperationsWrite,
+        parameters: [projectParameter, environmentParameter, endpointParameter],
+        requestBody: jsonBody("ControlPlaneWebhookEndpointStateRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneWebhookEndpointResponse", "Updated endpoint state."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneWebhookStatePreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}/subscriptions": {
+      put: {
+        operationId: "replaceControlPlaneWebhookSubscriptions",
+        summary: "Replace the complete webhook subscription set",
+        security: exactOperationsWrite,
+        parameters: [projectParameter, environmentParameter, endpointParameter],
+        requestBody: jsonBody("ControlPlaneReplaceWebhookSubscriptionsRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneWebhookEndpointResponse", "Replaced subscriptions."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneWebhookSubscriptionsPreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}/secret-rotations": {
+      post: {
+        operationId: "startControlPlaneWebhookSecretRotation",
+        summary: "Start signing-secret rotation and disclose the pending secret once",
+        security: exactOperationsWrite,
+        parameters: [projectParameter, environmentParameter, endpointParameter],
+        requestBody: jsonBody("ControlPlaneStartWebhookSecretRotationRequest"),
+        responses: {
+          "200": successResponse(
+            "ControlPlaneRotatedWebhookSecretResponse",
+            "Started signing-secret rotation.",
+          ),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneWebhookSecretStartPreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}/secret-rotations/activate":
+      {
+        post: {
+          operationId: "activateControlPlaneWebhookSecretRotation",
+          summary: "Activate a pending signing secret",
+          security: exactOperationsWrite,
+          parameters: [projectParameter, environmentParameter, endpointParameter],
+          requestBody: jsonBody("ControlPlaneWebhookSecretTransitionRequest"),
+          responses: {
+            "200": successResponse(
+              "ControlPlaneWebhookEndpointResponse",
+              "Activated signing secret.",
+            ),
+            ...commonFailures,
+          },
+        },
+        options: denyPreflight("denyControlPlaneWebhookSecretActivatePreflight"),
+      },
+    "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}/secret-rotations/cancel":
+      {
+        post: {
+          operationId: "cancelControlPlaneWebhookSecretRotation",
+          summary: "Cancel a pending signing secret",
+          security: exactOperationsWrite,
+          parameters: [projectParameter, environmentParameter, endpointParameter],
+          requestBody: jsonBody("ControlPlaneWebhookSecretTransitionRequest"),
+          responses: {
+            "200": successResponse(
+              "ControlPlaneWebhookEndpointResponse",
+              "Canceled signing secret.",
+            ),
+            ...commonFailures,
+          },
+        },
+        options: denyPreflight("denyControlPlaneWebhookSecretCancelPreflight"),
+      },
+    "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}/secret-rotations/complete":
+      {
+        post: {
+          operationId: "completeControlPlaneWebhookSecretRotation",
+          summary: "Retire the previous signing secret",
+          security: exactOperationsWrite,
+          parameters: [projectParameter, environmentParameter, endpointParameter],
+          requestBody: jsonBody("ControlPlaneWebhookSecretTransitionRequest"),
+          responses: {
+            "200": successResponse(
+              "ControlPlaneWebhookEndpointResponse",
+              "Completed signing-secret rotation.",
+            ),
+            ...commonFailures,
+          },
+        },
+        options: denyPreflight("denyControlPlaneWebhookSecretCompletePreflight"),
+      },
+    "/projects/{projectId}/environments/{environmentId}/invalidation-mappings": {
+      get: {
+        operationId: "listControlPlaneInvalidationMappings",
+        summary: "List invalidation mappings",
+        security: exactOperationsRead,
+        parameters: [
+          projectParameter,
+          environmentParameter,
+          stateListParameter,
+          ...paginationParameters,
+        ],
+        responses: {
+          "200": successResponse("ControlPlaneInvalidationMappingPageResponse", "Mapping page."),
+          ...commonFailures,
+        },
+      },
+      post: {
+        operationId: "createControlPlaneInvalidationMapping",
+        summary: "Create an idempotent invalidation mapping",
+        security: exactOperationsWrite,
+        parameters: [projectParameter, environmentParameter],
+        requestBody: jsonBody("ControlPlaneCreateInvalidationMappingRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneInvalidationMappingResponse", "Created mapping."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneInvalidationMappingsPreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/invalidation-mappings/{mappingId}": {
+      put: {
+        operationId: "updateControlPlaneInvalidationMapping",
+        summary: "Replace invalidation mapping metadata",
+        security: exactOperationsWrite,
+        parameters: [projectParameter, environmentParameter, mappingParameter],
+        requestBody: jsonBody("ControlPlaneUpdateInvalidationMappingRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneInvalidationMappingResponse", "Updated mapping."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneInvalidationMappingUpdatePreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/invalidation-mappings/{mappingId}/state": {
+      put: {
+        operationId: "setControlPlaneInvalidationMappingState",
+        summary: "Set invalidation mapping state",
+        security: exactOperationsWrite,
+        parameters: [projectParameter, environmentParameter, mappingParameter],
+        requestBody: jsonBody("ControlPlaneInvalidationMappingStateRequest"),
+        responses: {
+          "200": successResponse(
+            "ControlPlaneInvalidationMappingResponse",
+            "Updated mapping state.",
+          ),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneInvalidationMappingStatePreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/webhook-deliveries": {
+      get: {
+        operationId: "listControlPlaneWebhookDeliveries",
+        summary: "List bounded webhook delivery summaries",
+        security: exactOperationsRead,
+        parameters: [
+          projectParameter,
+          environmentParameter,
+          ...deliveryListParameters,
+          ...paginationParameters,
+        ],
+        responses: {
+          "200": successResponse("ControlPlaneWebhookDeliveryPageResponse", "Delivery page."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneWebhookDeliveriesPreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/webhook-deliveries/{deliveryId}": {
+      get: {
+        operationId: "getControlPlaneWebhookDelivery",
+        summary: "Get one webhook delivery and its exact event",
+        security: exactOperationsRead,
+        parameters: [projectParameter, environmentParameter, deliveryParameter],
+        responses: {
+          "200": successResponse("ControlPlaneWebhookDeliveryDetailResponse", "Delivery detail."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneWebhookDeliveryPreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/webhook-deliveries/{deliveryId}/attempts": {
+      get: {
+        operationId: "listControlPlaneWebhookAttempts",
+        summary: "List the bounded attempt timeline for one delivery",
+        security: exactOperationsRead,
+        parameters: [projectParameter, environmentParameter, deliveryParameter],
+        responses: {
+          "200": successResponse("ControlPlaneWebhookAttemptListResponse", "Attempt timeline."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneWebhookAttemptsPreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/webhook-replays": {
+      post: {
+        operationId: "replayControlPlaneWebhook",
+        summary: "Create one idempotent confirmed webhook replay",
+        security: exactOperationsWrite,
+        parameters: [projectParameter, environmentParameter],
+        requestBody: jsonBody("ControlPlaneReplayWebhookRequest"),
+        responses: {
+          "200": successResponse("ControlPlaneWebhookReplayResponse", "Replay result."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneWebhookReplayPreflight"),
+    },
+    "/projects/{projectId}/audit-events": {
+      get: {
+        operationId: "listControlPlaneProjectAuditEvents",
+        summary: "List bounded content-free project audit history",
+        security: oauthSecurityRead,
+        parameters: [projectParameter, ...auditListParameters, ...paginationParameters],
+        responses: {
+          "200": successResponse("ControlPlaneProjectAuditPageResponse", "Audit page."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneProjectAuditPreflight"),
+    },
     "/projects/{projectId}/environments/{environmentId}/studio-registration": {
       get: {
         operationId: "getControlPlaneStudioRegistration",
@@ -733,6 +1296,27 @@ export const controlPlaneOpenApiDocument = {
         bearerFormat: "JWT",
         description: "Official CLI OAuth access token for governance mutations.",
         "x-required-scope": "control-plane:governance:write",
+      },
+      ControlPlaneOAuthOperationsRead: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Official CLI OAuth access token for operational inspection.",
+        "x-required-scope": "control-plane:operations:read",
+      },
+      ControlPlaneOAuthOperationsWrite: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Official CLI OAuth access token for operational mutations.",
+        "x-required-scope": "control-plane:operations:write",
+      },
+      ControlPlaneOAuthSecurityRead: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Official CLI OAuth access token for bounded security history.",
+        "x-required-scope": "control-plane:security:read",
       },
       ControlPlaneManagementCredential: {
         type: "http",

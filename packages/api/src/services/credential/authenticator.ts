@@ -8,6 +8,7 @@ import {
   type CredentialScope,
 } from "../../contracts/access";
 import { CredentialInvalidFailure, DatabaseFailure } from "../../contracts/response/errors";
+import { canCredentialAuthenticate } from "../../lib/credential/lifecycle";
 import { Telemetry } from "../../observability/telemetry";
 import { CredentialAttemptLimiter } from "./attempt-limiter";
 import { isStoredCredentialLifetimeCompliant } from "./lifetime";
@@ -87,8 +88,7 @@ export function makeCredentialAuthenticator() {
       projectId: record.credential.projectId,
       environmentId: record.credential.environmentId,
       isActive:
-        record.credential.revokedAt === null &&
-        (record.credential.expiresAt === null || record.credential.expiresAt.getTime() > now) &&
+        canCredentialAuthenticate(record.credential, new Date(now)) &&
         isStoredCredentialLifetimeCompliant(record.credential),
     });
     if (!decision.allowed) return yield* reject();

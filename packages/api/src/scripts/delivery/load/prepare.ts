@@ -252,6 +252,7 @@ try {
           name: `M9 load ${credentialRun}-${String(index).padStart(2, "0")}`,
           scopes: ["delivery.read"],
           expiresAt: null,
+          nonExpiringAcknowledged: true,
         }),
         credentialId,
         material,

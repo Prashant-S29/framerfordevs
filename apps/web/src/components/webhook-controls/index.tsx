@@ -703,10 +703,12 @@ export function WebhookEndpointActions({
   projectId,
   environmentId,
   endpoint,
+  isArchived = false,
 }: {
   readonly projectId: string;
   readonly environmentId: string;
   readonly endpoint: WebhookEndpoint;
+  readonly isArchived?: boolean;
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [editedName, setEditedName] = useState<string>(endpoint.name);
@@ -780,129 +782,138 @@ export function WebhookEndpointActions({
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogTrigger render={<Button size="sm" variant="outline" />}>Edit endpoint</DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit webhook endpoint</DialogTitle>
-            <DialogDescription>
-              Leave the destination blank to retain the encrypted current value.
-            </DialogDescription>
-          </DialogHeader>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (replacementError !== null || (replacement.length > 0 && !destinationAcknowledged))
-                return;
-              update.mutate({
-                ...scope,
-                expectedVersion: endpoint.version,
-                name: editedName.trim().normalize("NFC"),
-                ...(replacement.length === 0 ? {} : { destination: replacement }),
-              });
-            }}
-          >
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor={`webhook-name-${endpoint.id}`}>Endpoint name</FieldLabel>
-                <Input
-                  id={`webhook-name-${endpoint.id}`}
-                  value={editedName}
-                  maxLength={100}
-                  required
-                  onChange={(event) => setEditedName(event.target.value)}
-                />
-              </Field>
-              <Field data-invalid={replacementError !== null}>
-                <FieldLabel htmlFor={`webhook-destination-${endpoint.id}`}>
-                  Replacement destination
-                </FieldLabel>
-                <Input
-                  id={`webhook-destination-${endpoint.id}`}
-                  type="url"
-                  value={replacementDestination}
-                  maxLength={2_048}
-                  placeholder="Keep current encrypted destination"
-                  autoComplete="off"
-                  aria-invalid={replacementError !== null}
-                  onChange={(event) => {
-                    setReplacementDestination(event.target.value);
-                    setDestinationAcknowledged(false);
-                  }}
-                />
-                <FieldError>{replacementError}</FieldError>
-              </Field>
-              {replacement.length > 0 ? (
-                <label className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={destinationAcknowledged}
-                    onChange={(event) => setDestinationAcknowledged(event.target.checked)}
-                  />
-                  I understand destination replacement cancels queued and retry-scheduled
-                  deliveries; in-flight delivery may still complete at least once.
-                </label>
+      {!isArchived ? (
+        <>
+          <Dialog open={editOpen} onOpenChange={setEditOpen}>
+            <DialogTrigger render={<Button size="sm" variant="outline" />}>
+              Edit endpoint
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit webhook endpoint</DialogTitle>
+                <DialogDescription>
+                  Leave the destination blank to retain the encrypted current value.
+                </DialogDescription>
+              </DialogHeader>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (
+                    replacementError !== null ||
+                    (replacement.length > 0 && !destinationAcknowledged)
+                  )
+                    return;
+                  update.mutate({
+                    ...scope,
+                    expectedVersion: endpoint.version,
+                    name: editedName.trim().normalize("NFC"),
+                    ...(replacement.length === 0 ? {} : { destination: replacement }),
+                  });
+                }}
+              >
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor={`webhook-name-${endpoint.id}`}>Endpoint name</FieldLabel>
+                    <Input
+                      id={`webhook-name-${endpoint.id}`}
+                      value={editedName}
+                      maxLength={100}
+                      required
+                      onChange={(event) => setEditedName(event.target.value)}
+                    />
+                  </Field>
+                  <Field data-invalid={replacementError !== null}>
+                    <FieldLabel htmlFor={`webhook-destination-${endpoint.id}`}>
+                      Replacement destination
+                    </FieldLabel>
+                    <Input
+                      id={`webhook-destination-${endpoint.id}`}
+                      type="url"
+                      value={replacementDestination}
+                      maxLength={2_048}
+                      placeholder="Keep current encrypted destination"
+                      autoComplete="off"
+                      aria-invalid={replacementError !== null}
+                      onChange={(event) => {
+                        setReplacementDestination(event.target.value);
+                        setDestinationAcknowledged(false);
+                      }}
+                    />
+                    <FieldError>{replacementError}</FieldError>
+                  </Field>
+                  {replacement.length > 0 ? (
+                    <label className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={destinationAcknowledged}
+                        onChange={(event) => setDestinationAcknowledged(event.target.checked)}
+                      />
+                      I understand destination replacement cancels queued and retry-scheduled
+                      deliveries; in-flight delivery may still complete at least once.
+                    </label>
+                  ) : null}
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={
+                        update.isPending ||
+                        editedName.trim().length === 0 ||
+                        replacementError !== null ||
+                        (replacement.length > 0 && !destinationAcknowledged)
+                      }
+                    >
+                      {update.isPending ? <Spinner data-icon="inline-start" /> : null}
+                      {update.isPending ? "Saving…" : "Save endpoint"}
+                    </Button>
+                  </DialogFooter>
+                </FieldGroup>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={subscriptionsOpen} onOpenChange={setSubscriptionsOpen}>
+            <DialogTrigger render={<Button size="sm" variant="outline" />}>
+              Edit subscriptions
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Replace event subscriptions</DialogTitle>
+                <DialogDescription>
+                  Added event types apply only to future events. Removed types cancel queued and
+                  retry-scheduled deliveries; an in-flight attempt may still complete at least once.
+                </DialogDescription>
+              </DialogHeader>
+              <EventTypeCheckboxes value={subscriptions} onChange={setSubscriptions} />
+              {removedSubscriptions.length > 0 ? (
+                <p className="text-destructive text-sm" role="alert">
+                  Removing {removedSubscriptions.join(", ")} will cancel eligible queued deliveries.
+                </p>
               ) : null}
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+                <Button variant="outline" onClick={() => setSubscriptionsOpen(false)}>
                   Cancel
                 </Button>
                 <Button
-                  type="submit"
-                  disabled={
-                    update.isPending ||
-                    editedName.trim().length === 0 ||
-                    replacementError !== null ||
-                    (replacement.length > 0 && !destinationAcknowledged)
+                  disabled={replaceSubscriptions.isPending || subscriptions.length === 0}
+                  onClick={() =>
+                    replaceSubscriptions.mutate({
+                      ...scope,
+                      expectedVersion: endpoint.version,
+                      subscriptions: [...subscriptions],
+                    })
                   }
                 >
-                  {update.isPending ? <Spinner data-icon="inline-start" /> : null}
-                  {update.isPending ? "Saving…" : "Save endpoint"}
+                  {replaceSubscriptions.isPending ? <Spinner data-icon="inline-start" /> : null}
+                  {replaceSubscriptions.isPending ? "Saving…" : "Confirm subscriptions"}
                 </Button>
               </DialogFooter>
-            </FieldGroup>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={subscriptionsOpen} onOpenChange={setSubscriptionsOpen}>
-        <DialogTrigger render={<Button size="sm" variant="outline" />}>
-          Edit subscriptions
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Replace event subscriptions</DialogTitle>
-            <DialogDescription>
-              Added event types apply only to future events. Removed types cancel queued and
-              retry-scheduled deliveries; an in-flight attempt may still complete at least once.
-            </DialogDescription>
-          </DialogHeader>
-          <EventTypeCheckboxes value={subscriptions} onChange={setSubscriptions} />
-          {removedSubscriptions.length > 0 ? (
-            <p className="text-destructive text-sm" role="alert">
-              Removing {removedSubscriptions.join(", ")} will cancel eligible queued deliveries.
-            </p>
-          ) : null}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSubscriptionsOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={replaceSubscriptions.isPending || subscriptions.length === 0}
-              onClick={() =>
-                replaceSubscriptions.mutate({
-                  ...scope,
-                  expectedVersion: endpoint.version,
-                  subscriptions: [...subscriptions],
-                })
-              }
-            >
-              {replaceSubscriptions.isPending ? <Spinner data-icon="inline-start" /> : null}
-              {replaceSubscriptions.isPending ? "Saving…" : "Confirm subscriptions"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </DialogContent>
+          </Dialog>
+        </>
+      ) : null}
 
       {endpoint.state === "enabled" ? (
         <AlertDialog>
@@ -933,7 +944,7 @@ export function WebhookEndpointActions({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      ) : (
+      ) : !isArchived ? (
         <Button
           size="sm"
           variant="outline"
@@ -944,75 +955,80 @@ export function WebhookEndpointActions({
         >
           {state.isPending ? "Enabling…" : "Enable"}
         </Button>
-      )}
+      ) : null}
 
-      <Dialog
-        open={rotationOpen}
-        onOpenChange={(next) => {
-          if (!next && pendingSecret !== null) return;
-          setRotationOpen(next);
-        }}
-      >
-        <DialogTrigger render={<Button size="sm" variant="outline" />}>
-          <KeyRoundIcon data-icon="inline-start" />
-          Rotate secret
-        </DialogTrigger>
-        <DialogContent>
-          {pendingSecret === null ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>Rotate signing secret</DialogTitle>
-                <DialogDescription>
-                  Generate and install the next secret before activating the fixed 24-hour overlap.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setRotationOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  disabled={startRotation.isPending || endpoint.rotationState !== "active"}
-                  onClick={() =>
-                    startRotation.mutate({
-                      ...scope,
-                      expectedVersion: endpoint.version,
-                      authorityAcknowledged: true,
-                    })
-                  }
-                >
-                  {startRotation.isPending ? <Spinner data-icon="inline-start" /> : null}
-                  Generate next secret
-                </Button>
-              </DialogFooter>
-            </>
-          ) : (
-            <SecretDisclosure
-              secret={pendingSecret}
-              description="Install this pending secret at the receiver, then activate overlap from the endpoint controls."
-              onAcknowledge={() => {
-                setPendingSecret(null);
-                setRotationOpen(false);
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {!isArchived ? (
+        <Dialog
+          open={rotationOpen}
+          onOpenChange={(next) => {
+            if (!next && pendingSecret !== null) return;
+            setRotationOpen(next);
+          }}
+        >
+          <DialogTrigger render={<Button size="sm" variant="outline" />}>
+            <KeyRoundIcon data-icon="inline-start" />
+            Rotate secret
+          </DialogTrigger>
+          <DialogContent>
+            {pendingSecret === null ? (
+              <>
+                <DialogHeader>
+                  <DialogTitle>Rotate signing secret</DialogTitle>
+                  <DialogDescription>
+                    Generate and install the next secret before activating the fixed 24-hour
+                    overlap.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setRotationOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    disabled={startRotation.isPending || endpoint.rotationState !== "active"}
+                    onClick={() =>
+                      startRotation.mutate({
+                        ...scope,
+                        expectedVersion: endpoint.version,
+                        authorityAcknowledged: true,
+                      })
+                    }
+                  >
+                    {startRotation.isPending ? <Spinner data-icon="inline-start" /> : null}
+                    Generate next secret
+                  </Button>
+                </DialogFooter>
+              </>
+            ) : (
+              <SecretDisclosure
+                secret={pendingSecret}
+                description="Install this pending secret at the receiver, then activate overlap from the endpoint controls."
+                onAcknowledge={() => {
+                  setPendingSecret(null);
+                  setRotationOpen(false);
+                }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
       {endpoint.rotationState === "pending" ? (
         <>
-          <Button
-            size="sm"
-            disabled={changeRotation.isPending}
-            onClick={() =>
-              changeRotation.mutate({
-                ...scope,
-                expectedVersion: endpoint.version,
-                action: "activate",
-              })
-            }
-          >
-            Activate 24-hour overlap
-          </Button>
+          {!isArchived ? (
+            <Button
+              size="sm"
+              disabled={changeRotation.isPending}
+              onClick={() =>
+                changeRotation.mutate({
+                  ...scope,
+                  expectedVersion: endpoint.version,
+                  action: "activate",
+                })
+              }
+            >
+              Activate 24-hour overlap
+            </Button>
+          ) : null}
           <Button
             size="sm"
             variant="outline"

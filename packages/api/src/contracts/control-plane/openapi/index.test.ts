@@ -31,6 +31,28 @@ describe("Control Plane OpenAPI", () => {
       "/projects/{projectId}/locales/{localeId}",
       "/projects/{projectId}/locales/order",
       "/projects/{projectId}/locales/{localeId}/status",
+      "/projects/{projectId}/environments/{environmentId}/credentials",
+      "/projects/{projectId}/environments/{environmentId}/credentials/{credentialId}/rotations",
+      "/projects/{projectId}/environments/{environmentId}/credential-rotations/{rotationId}/activate",
+      "/projects/{projectId}/environments/{environmentId}/credential-rotations/{rotationId}/cancel",
+      "/projects/{projectId}/environments/{environmentId}/credential-rotations/{rotationId}/complete",
+      "/projects/{projectId}/environments/{environmentId}/credentials/{credentialId}/revoke",
+      "/projects/{projectId}/environments/{environmentId}/webhooks",
+      "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}",
+      "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}/state",
+      "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}/subscriptions",
+      "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}/secret-rotations",
+      "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}/secret-rotations/activate",
+      "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}/secret-rotations/cancel",
+      "/projects/{projectId}/environments/{environmentId}/webhooks/{endpointId}/secret-rotations/complete",
+      "/projects/{projectId}/environments/{environmentId}/invalidation-mappings",
+      "/projects/{projectId}/environments/{environmentId}/invalidation-mappings/{mappingId}",
+      "/projects/{projectId}/environments/{environmentId}/invalidation-mappings/{mappingId}/state",
+      "/projects/{projectId}/environments/{environmentId}/webhook-deliveries",
+      "/projects/{projectId}/environments/{environmentId}/webhook-deliveries/{deliveryId}",
+      "/projects/{projectId}/environments/{environmentId}/webhook-deliveries/{deliveryId}/attempts",
+      "/projects/{projectId}/environments/{environmentId}/webhook-replays",
+      "/projects/{projectId}/audit-events",
       "/projects/{projectId}/environments/{environmentId}/studio-registration",
     ]);
 
@@ -39,7 +61,7 @@ describe("Control Plane OpenAPI", () => {
         .filter(([method]) => dataMethods.has(method))
         .map(([, operation]) => operation.operationId),
     );
-    assert.strictEqual(operationIds.length, 27);
+    assert.strictEqual(operationIds.length, 52);
     assert.strictEqual(new Set(operationIds).size, operationIds.length);
   });
 
@@ -89,13 +111,12 @@ describe("Control Plane OpenAPI", () => {
     ]);
   });
 
-  it("contains closed schemas without dashboard, cookie, SDK, or secret administration surfaces", () => {
+  it("contains closed schemas without dashboard, cookie, SDK, or secret persistence surfaces", () => {
     const serialized = JSON.stringify(controlPlaneOpenApiDocument);
 
     assert.notInclude(serialized, "#/$defs/");
     assert.notInclude(serialized, "cookie");
     assert.notInclude(serialized, "clientSecret");
-    assert.notInclude(serialized, '"/credentials');
     assert.notInclude(serialized, "customPolicy");
     assert.notInclude(serialized, "rawTokenDigest");
     assert.strictEqual(controlPlaneOpenApiDocument["x-sdk-supported"], false);

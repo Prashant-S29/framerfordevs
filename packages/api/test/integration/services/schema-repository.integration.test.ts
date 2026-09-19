@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, it } from "@effect/vitest";
 import { db } from "@framerfordevs/db";
-import { and, eq, isNull, or, sql } from "@framerfordevs/db/query";
+import { and, eq, inArray, isNull, or, sql } from "@framerfordevs/db/query";
 import {
   apiCredential,
   apiCredentialScope,
@@ -28,6 +28,15 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
+import {
+  publicationEvent,
+  webhookDelivery,
+  webhookDeliveryAttempt,
+  webhookEndpoint,
+  webhookEndpointDestination,
+  webhookEndpointSecret,
+  webhookEndpointSubscription,
+} from "@framerfordevs/db/schema/webhooks";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
 
 import { ApiCredentialId } from "../../../src/contracts/access";
@@ -38,13 +47,16 @@ import {
   UpdateDeliveryConfigurationInput,
 } from "../../../src/contracts/delivery";
 import {
+  ArchiveProjectInput,
   AuthUserId,
   CreateProjectInput,
   CreateWorkspaceInput,
   EnableCapabilityInput,
+  RestoreProjectInput,
   type Project as ProjectModel,
   type Workspace as WorkspaceModel,
 } from "../../../src/contracts/platform";
+import { CreateWebhookEndpointInput } from "../../../src/contracts/webhook";
 import {
   CreateCollectionFieldInput,
   CreateCollectionInput,
@@ -71,6 +83,8 @@ import { makeDeliveryRepository } from "../../../src/services/delivery/repositor
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 import { makeSchemaRepository } from "../../../src/services/schema/repository";
 import { makeToolingRepository } from "../../../src/services/tooling/repository";
+import { makeWebhookRepository } from "../../../src/services/webhook/repository";
+import { makeWebhookWorkerRepository } from "../../../src/services/webhook/worker-repository";
 
 const suffix = randomUUID();
 const ownerId = `m5-schema-owner-${suffix}`;
@@ -197,6 +211,7 @@ beforeAll(async () => {
     keyPrefix: `ffd_mgmt_${managementCredentialId}`,
     keyDigest: createHash("sha256").update(managementCredentialId).digest("hex"),
     createdByUserId: ownerId,
+    activatedAt: new Date(),
   });
   await db.insert(apiCredentialScope).values(
     ["schema.read", "schema.write", "schema.publish"].map((scope) => ({
@@ -252,7 +267,34 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const actorIds = [ownerId, foreignId, readerId, managementCredentialId];
+  const ownedProjects = sql`select id from project where created_by_user_id in (${ownerId}, ${foreignId})`;
   const ownedCollections = sql`select id from cms_collection where created_by_user_id in (${ownerId}, ${foreignId})`;
+  await db
+    .delete(webhookDeliveryAttempt)
+    .where(sql`${webhookDeliveryAttempt.projectId} in (${ownedProjects})`);
+  await db.delete(webhookDelivery).where(sql`${webhookDelivery.projectId} in (${ownedProjects})`);
+  await db.delete(publicationEvent).where(sql`${publicationEvent.projectId} in (${ownedProjects})`);
+  await db
+    .delete(webhookEndpointSubscription)
+    .where(sql`${webhookEndpointSubscription.projectId} in (${ownedProjects})`);
+  await db
+    .delete(webhookEndpointSecret)
+    .where(sql`${webhookEndpointSecret.projectId} in (${ownedProjects})`);
+  await db
+    .update(webhookEndpoint)
+    .set({
+      state: "disabled",
+      currentDestinationId: null,
+      disabledAt: new Date(),
+      leaseToken: null,
+      leaseExpiresAt: null,
+      updatedAt: new Date(),
+    })
+    .where(sql`${webhookEndpoint.projectId} in (${ownedProjects})`);
+  await db
+    .delete(webhookEndpointDestination)
+    .where(sql`${webhookEndpointDestination.projectId} in (${ownedProjects})`);
+  await db.delete(webhookEndpoint).where(sql`${webhookEndpoint.projectId} in (${ownedProjects})`);
   await db.delete(outboxEvent).where(sql`${outboxEvent.subjectId} in (${ownedCollections})`);
   await db
     .delete(cmsCollectionSchemaHead)
@@ -1771,6 +1813,339 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         actorId: managementCredentialId,
       });
     }),
+  );
+
+  it.effect(
+    "cancels ready webhook work and prevents archived in-flight failures from retrying",
+    () =>
+      Effect.gen(function* () {
+        const collection = required(firstCollection, "collection");
+        const currentProject = required(projectModel, "project");
+        const events = yield* Effect.promise(() =>
+          db
+            .select()
+            .from(outboxEvent)
+            .where(eq(outboxEvent.subjectId, collection.id))
+            .orderBy(outboxEvent.occurredAt, outboxEvent.id)
+            .limit(3),
+        );
+        assert.lengthOf(events, 3);
+        const firstEvent = required(events[0], "first archive event");
+        const secondEvent = required(events[1], "second archive event");
+        const thirdEvent = required(events[2], "third archive event");
+        const actor = { kind: "user" as const, id: ownerActor };
+        const endpointId = randomUUID();
+        const destinationId = randomUUID();
+        const secretId = randomUUID();
+        const earliestEventAt = new Date(
+          Math.min(...events.map((event) => event.occurredAt.getTime())) - 1,
+        );
+        const webhook = makeWebhookRepository();
+        yield* webhook.createEndpoint(
+          actor,
+          yield* Schema.decodeUnknown(CreateWebhookEndpointInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            name: `Archive recovery ${endpointId.slice(0, 8)}`,
+            destination: "https://archive-recovery.example.test/private",
+            subscriptions: [...new Set(events.map((event) => event.eventType))],
+            authorityAcknowledged: true,
+          }),
+          {
+            endpointId,
+            destinationId,
+            secretId,
+            displayOrigin: "https://archive-recovery.example.test",
+            destination: {
+              encryptionKeyId: "archive-integration-key",
+              nonce: "A".repeat(16),
+              ciphertext: "A".repeat(22),
+            },
+            destinationFingerprint: "a".repeat(64),
+            secret: {
+              encryptionKeyId: "archive-integration-key",
+              nonce: "B".repeat(16),
+              ciphertext: "B".repeat(22),
+            },
+            secretFingerprint: "b".repeat(16),
+          },
+          earliestEventAt,
+          `request-m16-archive-endpoint-${suffix}`,
+        );
+        const successEndpointId = randomUUID();
+        const successDestinationId = randomUUID();
+        const successSecretId = randomUUID();
+        yield* webhook.createEndpoint(
+          actor,
+          yield* Schema.decodeUnknown(CreateWebhookEndpointInput)({
+            projectId: currentProject.id,
+            environmentId: currentProject.environment.id,
+            name: `Archive success ${successEndpointId.slice(0, 8)}`,
+            destination: "https://archive-success.example.test/private",
+            subscriptions: [...new Set(events.map((event) => event.eventType))],
+            authorityAcknowledged: true,
+          }),
+          {
+            endpointId: successEndpointId,
+            destinationId: successDestinationId,
+            secretId: successSecretId,
+            displayOrigin: "https://archive-success.example.test",
+            destination: {
+              encryptionKeyId: "archive-integration-key",
+              nonce: "C".repeat(16),
+              ciphertext: "C".repeat(22),
+            },
+            destinationFingerprint: "c".repeat(64),
+            secret: {
+              encryptionKeyId: "archive-integration-key",
+              nonce: "D".repeat(16),
+              ciphertext: "D".repeat(22),
+            },
+            secretFingerprint: "d".repeat(16),
+          },
+          earliestEventAt,
+          `request-m16-archive-success-endpoint-${suffix}`,
+        );
+
+        for (const event of events) {
+          const canonicalBody = JSON.stringify({ eventId: event.id, type: event.eventType });
+          yield* Effect.promise(() =>
+            db
+              .insert(publicationEvent)
+              .values({
+                eventId: event.id,
+                workspaceId: event.workspaceId,
+                projectId: event.projectId,
+                environmentId: event.environmentId,
+                eventType: event.eventType,
+                canonicalBody,
+                bodyHash: createHash("sha256").update(canonicalBody).digest("hex"),
+                bodyBytes: Buffer.byteLength(canonicalBody, "utf8"),
+                occurredAt: event.occurredAt,
+                projectedAt: new Date(
+                  Math.max(event.occurredAt.getTime(), earliestEventAt.getTime()),
+                ),
+              })
+              .onConflictDoNothing({ target: publicationEvent.eventId }),
+          );
+        }
+
+        const queuedDeliveryId = randomUUID();
+        const inFlightDeliveryId = randomUUID();
+        const attemptId = randomUUID();
+        const leaseToken = randomUUID();
+        const successDeliveryId = randomUUID();
+        const successAttemptId = randomUUID();
+        const successLeaseToken = randomUUID();
+        const deliveryTime = new Date();
+        yield* Effect.promise(async () => {
+          await db.insert(webhookDelivery).values([
+            {
+              id: queuedDeliveryId,
+              eventId: firstEvent.id,
+              endpointId,
+              destinationId,
+              workspaceId: currentProject.workspaceId,
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
+              kind: "initial",
+              status: "queued",
+              nextAttemptAt: deliveryTime,
+              createdAt: deliveryTime,
+              updatedAt: deliveryTime,
+            },
+            {
+              id: inFlightDeliveryId,
+              eventId: secondEvent.id,
+              endpointId,
+              destinationId,
+              workspaceId: currentProject.workspaceId,
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
+              kind: "initial",
+              status: "delivering",
+              attemptCount: 1,
+              nextAttemptAt: null,
+              leaseToken,
+              leaseExpiresAt: new Date(deliveryTime.getTime() + 30_000),
+              lastOutcome: "attempt_started",
+              createdAt: deliveryTime,
+              updatedAt: deliveryTime,
+            },
+            {
+              id: successDeliveryId,
+              eventId: thirdEvent.id,
+              endpointId: successEndpointId,
+              destinationId: successDestinationId,
+              workspaceId: currentProject.workspaceId,
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
+              kind: "initial",
+              status: "delivering",
+              attemptCount: 1,
+              nextAttemptAt: null,
+              leaseToken: successLeaseToken,
+              leaseExpiresAt: new Date(deliveryTime.getTime() + 30_000),
+              lastOutcome: "attempt_started",
+              createdAt: deliveryTime,
+              updatedAt: deliveryTime,
+            },
+          ]);
+          await db
+            .update(webhookEndpoint)
+            .set({ leaseToken, leaseExpiresAt: new Date(deliveryTime.getTime() + 30_000) })
+            .where(eq(webhookEndpoint.id, endpointId));
+          await db
+            .update(webhookEndpoint)
+            .set({
+              leaseToken: successLeaseToken,
+              leaseExpiresAt: new Date(deliveryTime.getTime() + 30_000),
+            })
+            .where(eq(webhookEndpoint.id, successEndpointId));
+          await db.insert(webhookDeliveryAttempt).values([
+            {
+              id: attemptId,
+              deliveryId: inFlightDeliveryId,
+              eventId: secondEvent.id,
+              endpointId,
+              workspaceId: currentProject.workspaceId,
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
+              attemptNumber: 1,
+              state: "started",
+              signingSecretIds: [secretId],
+              requestTimestamp: Math.floor(deliveryTime.getTime() / 1_000),
+              startedAt: deliveryTime,
+            },
+            {
+              id: successAttemptId,
+              deliveryId: successDeliveryId,
+              eventId: thirdEvent.id,
+              endpointId: successEndpointId,
+              workspaceId: currentProject.workspaceId,
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
+              attemptNumber: 1,
+              state: "started",
+              signingSecretIds: [successSecretId],
+              requestTimestamp: Math.floor(deliveryTime.getTime() / 1_000),
+              startedAt: deliveryTime,
+            },
+          ]);
+        });
+
+        const [currentProjectRow] = yield* Effect.promise(() =>
+          db
+            .select({ version: project.version })
+            .from(project)
+            .where(eq(project.id, currentProject.id)),
+        );
+        const archived = yield* platform.archiveProject(
+          ownerActor,
+          yield* Schema.decodeUnknown(ArchiveProjectInput)({
+            projectId: currentProject.id,
+            version: required(currentProjectRow, "archive project").version,
+          }),
+          `request-m16-archive-${suffix}`,
+        );
+        const archivedDeliveries = yield* Effect.promise(() =>
+          db
+            .select()
+            .from(webhookDelivery)
+            .where(
+              inArray(webhookDelivery.id, [
+                queuedDeliveryId,
+                inFlightDeliveryId,
+                successDeliveryId,
+              ]),
+            ),
+        );
+        assert.deepInclude(
+          required(
+            archivedDeliveries.find((delivery) => delivery?.id === queuedDeliveryId),
+            "archived queued delivery",
+          ),
+          { status: "canceled", lastOutcome: "project_archived", nextAttemptAt: null },
+        );
+        assert.strictEqual(
+          archivedDeliveries.find((delivery) => delivery.id === inFlightDeliveryId)?.status,
+          "delivering",
+        );
+        assert.strictEqual(
+          archivedDeliveries.find((delivery) => delivery.id === successDeliveryId)?.status,
+          "delivering",
+        );
+
+        const worker = makeWebhookWorkerRepository();
+        const finalized = yield* worker.finalizeAttempt({
+          deliveryId: inFlightDeliveryId,
+          endpointId,
+          attemptId,
+          leaseToken,
+          state: "retry_scheduled",
+          outcome: "retryable_network",
+          completedAt: new Date(deliveryTime.getTime() + 1_000),
+          durationMs: 1_000,
+          httpStatus: null,
+          statusFamily: null,
+          retryAfterSeconds: null,
+          nextAttemptAt: new Date(deliveryTime.getTime() + 61_000),
+        });
+        assert.isTrue(finalized);
+        const [failedAfterArchive] = yield* Effect.promise(() =>
+          db.select().from(webhookDelivery).where(eq(webhookDelivery.id, inFlightDeliveryId)),
+        );
+        assert.deepInclude(failedAfterArchive, {
+          status: "dead_letter",
+          lastOutcome: "retryable_network",
+          nextAttemptAt: null,
+        });
+        const succeeded = yield* worker.finalizeAttempt({
+          deliveryId: successDeliveryId,
+          endpointId: successEndpointId,
+          attemptId: successAttemptId,
+          leaseToken: successLeaseToken,
+          state: "succeeded",
+          outcome: "succeeded",
+          completedAt: new Date(deliveryTime.getTime() + 1_001),
+          durationMs: 1_001,
+          httpStatus: 204,
+          statusFamily: "2xx",
+          retryAfterSeconds: null,
+          nextAttemptAt: null,
+        });
+        assert.isTrue(succeeded);
+
+        yield* platform.restoreProject(
+          ownerActor,
+          yield* Schema.decodeUnknown(RestoreProjectInput)({
+            projectId: currentProject.id,
+            version: archived.version,
+          }),
+          `request-m16-restore-${suffix}`,
+        );
+        const restoredDeliveries = yield* Effect.promise(() =>
+          db
+            .select({ id: webhookDelivery.id, status: webhookDelivery.status })
+            .from(webhookDelivery)
+            .where(
+              inArray(webhookDelivery.id, [
+                queuedDeliveryId,
+                inFlightDeliveryId,
+                successDeliveryId,
+              ]),
+            ),
+        );
+        assert.deepInclude(restoredDeliveries, { id: queuedDeliveryId, status: "canceled" });
+        assert.deepInclude(restoredDeliveries, {
+          id: inFlightDeliveryId,
+          status: "dead_letter",
+        });
+        assert.deepInclude(restoredDeliveries, {
+          id: successDeliveryId,
+          status: "succeeded",
+        });
+      }),
   );
 
   it.effect(

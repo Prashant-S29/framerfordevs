@@ -9,6 +9,7 @@ import { parseArguments } from "../command-arguments";
 import {
   decodeControlPlaneApiOrigin,
   executeControlPlaneCommand,
+  isControlPlaneCommand,
   verifyControlPlaneLinkAuthority,
 } from "./index";
 
@@ -65,6 +66,103 @@ it.effect("verifies exact active project, environment, and CMS link authority", 
       "CLI_LINK_AUTHORITY_INVALID",
     );
   }),
+);
+
+it("recognizes the complete operational administration command set", () => {
+  const commands = [
+    "credential list",
+    "credential issue",
+    "credential rotation start",
+    "credential rotation activate",
+    "credential rotation cancel",
+    "credential rotation complete",
+    "credential revoke",
+    "webhook endpoint list",
+    "webhook endpoint create",
+    "webhook endpoint update",
+    "webhook endpoint state set",
+    "webhook subscription replace",
+    "webhook secret rotation start",
+    "webhook secret rotation activate",
+    "webhook secret rotation cancel",
+    "webhook secret rotation complete",
+    "invalidation mapping list",
+    "invalidation mapping create",
+    "invalidation mapping update",
+    "invalidation mapping state set",
+    "webhook delivery list",
+    "webhook delivery get",
+    "webhook attempt list",
+    "webhook replay",
+    "audit list",
+  ];
+  assert.isTrue(commands.every(isControlPlaneCommand));
+});
+
+it.live(
+  "refuses one-time secret operations before request dispatch without explicit stdout consent",
+  () =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => {
+        const originalFetch = globalThis.fetch;
+        let requests = 0;
+        globalThis.fetch = () => {
+          requests += 1;
+          return Promise.reject(new Error("unexpected request"));
+        };
+        return { originalFetch, requests: () => requests };
+      }),
+      ({ requests }) =>
+        Effect.gen(function* () {
+          const commands = [
+            [
+              "credential",
+              "issue",
+              "--project",
+              workspace.id,
+              "--environment",
+              "019fae8b-1234-7000-8000-000000000002",
+              "--family",
+              "delivery",
+              "--name",
+              "Delivery",
+              "--scope",
+              "delivery.read",
+              "--no-expiry",
+              "--acknowledge-non-expiring",
+            ],
+            [
+              "webhook",
+              "endpoint",
+              "create",
+              "--project",
+              workspace.id,
+              "--environment",
+              "019fae8b-1234-7000-8000-000000000002",
+              "--name",
+              "Production",
+              "--event",
+              "cms.entry.published",
+              "--destination-stdin",
+              "--acknowledge-metadata-authority",
+            ],
+          ];
+          for (const values of commands) {
+            const error = yield* Effect.flip(
+              executeControlPlaneCommand({
+                arguments: parseArguments(values),
+                apiOrigin: "https://api.example.test",
+                token: "oauth-token",
+                root: "/tmp",
+                readWebhookDestination: () => Effect.succeed("https://hooks.example.test/path"),
+              }),
+            );
+            assert.strictEqual(error.message, "CLI_SECRET_STDOUT_REQUIRED");
+          }
+          assert.strictEqual(requests(), 0);
+        }),
+      ({ originalFetch }) => Effect.sync(() => void (globalThis.fetch = originalFetch)),
+    ),
 );
 
 it.effect("accepts only an explicit canonical API origin", () =>

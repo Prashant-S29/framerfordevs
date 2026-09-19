@@ -1,7 +1,7 @@
 // Provides the protected non-nested M11 webhook operations workspace.
 
+import type { ControlPlaneWebhookDeliverySummary } from "@framerfordevs/api/contracts/control-plane/index";
 import type {
-  WebhookDelivery,
   WebhookDeliveryStatus,
   WebhookPublicEventType,
 } from "@framerfordevs/api/contracts/webhook/index";
@@ -104,14 +104,16 @@ export const Route = createFileRoute("/_auth/projects/$projectId_/webhooks")({
         }),
       ),
       context.queryClient.ensureQueryData(
-        context.orpc.webhooks.deliveries.list.queryOptions({
+        context.orpc.webhooks.deliveries.operationalList.queryOptions({
           input: {
             ...scope,
-            endpointId: deps.endpoint ?? null,
-            eventType: deps.event ?? null,
-            status: deps.status ?? null,
-            cursor: null,
-            limit: 25,
+            query: {
+              endpointId: deps.endpoint ?? null,
+              eventType: deps.event ?? null,
+              status: deps.status ?? null,
+              cursor: null,
+              limit: 25,
+            },
           },
         }),
       ),
@@ -157,24 +159,13 @@ function DeliveryAttempts({
 }: {
   readonly projectId: string;
   readonly environmentId: string;
-  readonly delivery: WebhookDelivery;
+  readonly delivery: ControlPlaneWebhookDeliverySummary;
   readonly onClose: () => void;
 }) {
-  const attempts = useInfiniteQuery(
-    orpc.webhooks.attempts.list.infiniteOptions({
-      input: (cursor: string | null) => ({
-        projectId,
-        environmentId,
-        deliveryId: delivery.id,
-        cursor,
-        limit: 5,
-      }),
-      initialPageParam: null,
-      getNextPageParam: (lastPage) => lastPage.data.nextCursor ?? undefined,
-      maxPages: 4,
-    }),
-  );
-  const items = attempts.data?.pages.flatMap((page) => page.data.items) ?? [];
+  const input = { projectId, environmentId, deliveryId: delivery.id };
+  const detail = useQuery(orpc.webhooks.deliveries.detail.queryOptions({ input }));
+  const attempts = useQuery(orpc.webhooks.attempts.operationalList.queryOptions({ input }));
+  const items = attempts.data?.data.items ?? [];
   return (
     <Card aria-labelledby="delivery-detail-heading">
       <CardHeader>
@@ -198,7 +189,9 @@ function DeliveryAttempts({
             className="bg-muted max-h-96 overflow-auto rounded-md p-3 text-xs whitespace-pre-wrap break-all"
             translate="no"
           >
-            {JSON.stringify(delivery.event, null, 2)}
+            {detail.isPending
+              ? "Loading canonical event…"
+              : JSON.stringify(detail.data?.data.event ?? null, null, 2)}
           </pre>
         </div>
         <div className="space-y-3">
@@ -233,12 +226,10 @@ function DeliveryAttempts({
           {!attempts.isPending && items.length === 0 ? (
             <p className="text-muted-foreground text-sm">No attempts recorded.</p>
           ) : null}
-          {attempts.hasNextPage ? (
-            <LoadMoreButton
-              label="Load more attempts"
-              loading={attempts.isFetchingNextPage}
-              onClick={() => void attempts.fetchNextPage()}
-            />
+          {attempts.isError ? (
+            <Button size="sm" variant="outline" onClick={() => void attempts.refetch()}>
+              Retry attempts
+            </Button>
           ) : null}
         </div>
       </CardContent>
@@ -253,7 +244,7 @@ function ReplayDeliveryDialog({
 }: {
   readonly projectId: string;
   readonly environmentId: string;
-  readonly delivery: WebhookDelivery;
+  readonly delivery: ControlPlaneWebhookDeliverySummary;
 }) {
   const queryClient = useQueryClient();
   const replay = useMutation(
@@ -331,14 +322,16 @@ function WebhookWorkspace() {
     enabled: environmentId.length > 0,
   });
   const deliveries = useInfiniteQuery({
-    ...orpc.webhooks.deliveries.list.infiniteOptions({
+    ...orpc.webhooks.deliveries.operationalList.infiniteOptions({
       input: (cursor: string | null) => ({
         ...scope,
-        endpointId: search.endpoint ?? null,
-        eventType: search.event ?? null,
-        status: search.status ?? null,
-        cursor,
-        limit: 25,
+        query: {
+          endpointId: search.endpoint ?? null,
+          eventType: search.event ?? null,
+          status: search.status ?? null,
+          cursor,
+          limit: 25,
+        },
       }),
       initialPageParam: null,
       getNextPageParam: (lastPage) => lastPage.data.nextCursor ?? undefined,
@@ -360,6 +353,7 @@ function WebhookWorkspace() {
   const deliveryItems = deliveries.data?.pages.flatMap((page) => page.data.items) ?? [];
   const selectedDelivery = deliveryItems.find((delivery) => delivery.id === selectedDeliveryId);
   const canManage = access.data?.data.effectiveProjectActions.includes("webhook.manage") === true;
+  const isArchived = (project.data?.data.archivedAt ?? null) !== null;
 
   function updateSearch(patch: Partial<WebhookSearch>) {
     void navigate({
@@ -388,12 +382,19 @@ function WebhookWorkspace() {
         </div>
       </header>
 
+      {isArchived ? (
+        <p className="border border-amber-300 bg-amber-50 p-3 text-amber-950 text-sm dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+          This project is archived. Operational history remains visible; only endpoint disable and
+          pending-secret cancellation or old-secret retirement remain available.
+        </p>
+      ) : null}
+
       <section aria-labelledby="webhook-endpoints-heading" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="webhook-endpoints-heading" className="text-lg font-semibold">
             Endpoints
           </h2>
-          {canManage ? (
+          {canManage && !isArchived ? (
             <CreateWebhookEndpointDialog projectId={projectId} environmentId={environmentId} />
           ) : null}
         </div>
@@ -458,6 +459,7 @@ function WebhookWorkspace() {
                       projectId={projectId}
                       environmentId={environmentId}
                       endpoint={endpoint}
+                      isArchived={isArchived}
                     />
                   ) : null}
                 </CardContent>
@@ -482,7 +484,7 @@ function WebhookWorkspace() {
           <h2 id="invalidation-mappings-heading" className="text-lg font-semibold">
             Invalidation mappings
           </h2>
-          {canManage ? (
+          {canManage && !isArchived ? (
             <CreateInvalidationMappingDialog projectId={projectId} environmentId={environmentId} />
           ) : null}
         </div>
@@ -543,7 +545,7 @@ function WebhookWorkspace() {
                       </Badge>
                     ))}
                   </div>
-                  {canManage ? (
+                  {canManage && !isArchived ? (
                     <div className="flex flex-wrap gap-2">
                       <EditInvalidationMappingDialog
                         key={mapping.version}
@@ -663,13 +665,12 @@ function WebhookWorkspace() {
         ) : null}
         <div className="grid gap-3">
           {deliveryItems.map((delivery) => {
-            const localized = delivery.event.type !== "cms.schema.published";
             return (
               <Card key={delivery.id}>
                 <CardContent className="space-y-3 pt-6 text-sm">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-medium">{delivery.event.type}</p>
+                      <p className="font-medium">{delivery.eventType}</p>
                       <span className="font-mono break-all text-muted-foreground" translate="no">
                         {delivery.eventId}
                       </span>
@@ -681,20 +682,12 @@ function WebhookWorkspace() {
                   <dl className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
                     <div>
                       <dt className="text-muted-foreground">Event time</dt>
-                      <dd>{formatDate(delivery.event.time)}</dd>
+                      <dd>{formatDate(delivery.eventTime)}</dd>
                     </div>
                     <div>
-                      <dt className="text-muted-foreground">Locale</dt>
-                      <dd>{localized ? delivery.event.data.locale.tag : "Collection-wide"}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Aggregate sequence</dt>
-                      <dd>{delivery.event.data.aggregate.sequence}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Publication sequence</dt>
-                      <dd>
-                        {localized ? delivery.event.data.publication.sequence : "Not applicable"}
+                      <dt className="text-muted-foreground">Subject</dt>
+                      <dd className="break-all font-mono text-xs" translate="no">
+                        {delivery.subject}
                       </dd>
                     </div>
                     <div>
@@ -726,7 +719,7 @@ function WebhookWorkspace() {
                     >
                       View event and attempts
                     </Button>
-                    {canManage && delivery.status === "dead_letter" ? (
+                    {canManage && !isArchived && delivery.status === "dead_letter" ? (
                       <ReplayDeliveryDialog
                         projectId={projectId}
                         environmentId={environmentId}

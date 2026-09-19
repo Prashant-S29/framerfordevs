@@ -27,17 +27,30 @@ const ControlPlaneCursorPayload = Schema.Struct({
   }),
 });
 
-export type ControlPlaneCursorRoute = "workspaces" | "projects" | "members" | "invitations";
+export type ControlPlaneCursorRoute =
+  | "workspaces"
+  | "projects"
+  | "members"
+  | "invitations"
+  | "credentials"
+  | "webhook_endpoints"
+  | "invalidation_mappings"
+  | "webhook_deliveries"
+  | "audit_events";
 
 export interface ControlPlaneCursorAuthority {
   readonly route: ControlPlaneCursorRoute;
   readonly principalKey: string;
   readonly workspaceId: string | null;
   readonly projectId?: string | null;
+  readonly environmentId?: string | null;
   readonly projectStatus: ControlPlaneProjectStatus | null;
   readonly memberRole?: string | null;
   readonly invitationStatus?: string | null;
   readonly searchDigest?: string | null;
+  readonly filterDigest?: string | null;
+  readonly windowFromEpochMs?: number | null;
+  readonly windowToEpochMs?: number | null;
   readonly limit: number;
 }
 
@@ -101,6 +114,9 @@ export function controlPlaneSearchDigest(search: string | null): string | null {
 }
 
 function authorityDigest(authority: ControlPlaneCursorAuthority): string {
+  const legacyRoute = ["workspaces", "projects", "members", "invitations"].includes(
+    authority.route,
+  );
   const values =
     authority.route === "workspaces" || authority.route === "projects"
       ? [
@@ -110,17 +126,29 @@ function authorityDigest(authority: ControlPlaneCursorAuthority): string {
           authority.projectStatus,
           authority.limit,
         ]
-      : [
-          authority.route,
-          authority.principalKey,
-          authority.workspaceId,
-          authority.projectId ?? null,
-          authority.projectStatus,
-          authority.memberRole ?? null,
-          authority.invitationStatus ?? null,
-          authority.searchDigest ?? null,
-          authority.limit,
-        ];
+      : legacyRoute
+        ? [
+            authority.route,
+            authority.principalKey,
+            authority.workspaceId,
+            authority.projectId ?? null,
+            authority.projectStatus,
+            authority.memberRole ?? null,
+            authority.invitationStatus ?? null,
+            authority.searchDigest ?? null,
+            authority.limit,
+          ]
+        : [
+            authority.route,
+            authority.principalKey,
+            authority.workspaceId,
+            authority.projectId ?? null,
+            authority.environmentId ?? null,
+            authority.filterDigest ?? null,
+            authority.windowFromEpochMs ?? null,
+            authority.windowToEpochMs ?? null,
+            authority.limit,
+          ];
   return createHash("sha256").update(JSON.stringify(values), "utf8").digest("hex");
 }
 

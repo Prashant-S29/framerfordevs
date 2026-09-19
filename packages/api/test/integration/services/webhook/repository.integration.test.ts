@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, assert, beforeAll, describe, it } from "@effect/vitest";
 import { db } from "@framerfordevs/db";
 import { eq, inArray, sql } from "@framerfordevs/db/query";
+import { apiCredential, apiCredentialScope } from "@framerfordevs/db/schema/access";
 import { auditEvent } from "@framerfordevs/db/schema/platform";
 import {
   cmsInvalidationRouteMapping,
@@ -18,6 +19,7 @@ import {
 } from "@framerfordevs/db/schema/webhooks";
 import { Effect, Schema } from "effect";
 
+import { ApiCredentialId } from "../../../../src/contracts/access";
 import { AuthUserId } from "../../../../src/contracts/platform";
 import {
   ChangeWebhookSecretRotationInput,
@@ -49,6 +51,7 @@ const resourceIds: Array<string> = [];
 const endpointIds: Array<string> = [];
 const mappingIds: Array<string> = [];
 const deliveryIds: Array<string> = [];
+const credentialIds: Array<string> = [];
 
 function fixture(): FixtureScope {
   if (!scope) throw new Error("Webhook management integration requires an owner project fixture.");
@@ -97,7 +100,10 @@ describe("Webhook repository PostgreSQL integration", () => {
 
   it("creates, updates, rotates, disables, and lists only masked endpoint authority", async () => {
     const current = fixture();
-    const actorId = Schema.decodeUnknownSync(AuthUserId)(current.actorId);
+    const actorId = {
+      kind: "user" as const,
+      id: Schema.decodeUnknownSync(AuthUserId)(current.actorId),
+    };
     const endpointId = randomUUID();
     const destinationId = randomUUID();
     const replacementDestinationId = randomUUID();
@@ -413,9 +419,252 @@ describe("Webhook repository PostgreSQL integration", () => {
     assert.includeDeepMembers(retired, [{ state: "retired", ciphertext: null }]);
   });
 
+  it("persists exact management-credential actors across webhook authority", async () => {
+    const current = fixture();
+    const credentialId = randomUUID();
+    const endpointId = randomUUID();
+    const destinationId = randomUUID();
+    const activeSecretId = randomUUID();
+    const pendingSecretId = randomUUID();
+    const now = new Date();
+    credentialIds.push(credentialId);
+    endpointIds.push(endpointId);
+    resourceIds.push(endpointId);
+    await db.transaction(async (transaction) => {
+      await transaction.insert(apiCredential).values({
+        id: credentialId,
+        workspaceId: current.workspaceId,
+        projectId: current.projectId,
+        environmentId: current.environmentId,
+        family: "management",
+        name: "M16 webhook automation",
+        keyPrefix: `ffd_mgmt_${credentialId}`,
+        keyDigest: credentialId.replaceAll("-", "").repeat(2),
+        createdByUserId: current.actorId,
+        activatedAt: now,
+      });
+      await transaction.insert(apiCredentialScope).values(
+        ["webhook.read", "webhook.manage"].map((scope) => ({
+          credentialId,
+          workspaceId: current.workspaceId,
+          projectId: current.projectId,
+          environmentId: current.environmentId,
+          scope,
+        })),
+      );
+    });
+    const actor = {
+      kind: "credential" as const,
+      id: Schema.decodeUnknownSync(ApiCredentialId)(credentialId),
+    };
+    const repository = makeWebhookRepository();
+    await Effect.runPromise(
+      repository.createEndpoint(
+        actor,
+        Schema.decodeUnknownSync(CreateWebhookEndpointInput)({
+          projectId: current.projectId,
+          environmentId: current.environmentId,
+          name: `Credential receiver ${endpointId.slice(0, 8)}`,
+          destination: "https://credential.example.test/private",
+          subscriptions: ["cms.schema.published"],
+          authorityAcknowledged: true,
+        }),
+        {
+          endpointId,
+          destinationId,
+          secretId: activeSecretId,
+          displayOrigin: "https://credential.example.test",
+          destination: ciphertext,
+          destinationFingerprint: "c".repeat(64),
+          secret: ciphertext,
+          secretFingerprint: "c".repeat(16),
+        },
+        now,
+        `webhook.credential.create.${endpointId}`,
+      ),
+    );
+    await Effect.runPromise(
+      repository.replaceSubscriptions(
+        actor,
+        Schema.decodeUnknownSync(ReplaceWebhookSubscriptionsInput)({
+          projectId: current.projectId,
+          environmentId: current.environmentId,
+          endpointId,
+          expectedVersion: 1,
+          subscriptions: ["cms.entry.published"],
+        }),
+        new Date(now.getTime() + 1_000),
+        `webhook.credential.subscriptions.${endpointId}`,
+      ),
+    );
+    await Effect.runPromise(
+      repository.startSecretRotation(
+        actor,
+        {
+          projectId: current.projectId,
+          environmentId: current.environmentId,
+          endpointId,
+          expectedVersion: 2,
+        },
+        {
+          secretId: pendingSecretId,
+          secret: ciphertext,
+          secretFingerprint: "d".repeat(16),
+        },
+        new Date(now.getTime() + 2_000),
+        `webhook.credential.rotation.start.${endpointId}`,
+      ),
+    );
+    await Effect.runPromise(
+      repository.changeSecretRotation(
+        actor,
+        Schema.decodeUnknownSync(ChangeWebhookSecretRotationInput)({
+          projectId: current.projectId,
+          environmentId: current.environmentId,
+          endpointId,
+          expectedVersion: 3,
+          action: "cancel",
+        }),
+        new Date(now.getTime() + 3_000),
+        `webhook.credential.rotation.cancel.${endpointId}`,
+      ),
+    );
+    const mapping = await Effect.runPromise(
+      repository.createMapping(
+        actor,
+        Schema.decodeUnknownSync(CreateInvalidationRouteMappingInput)({
+          projectId: current.projectId,
+          environmentId: current.environmentId,
+          collectionId: current.collectionId,
+          entryId: null,
+          localeId: null,
+          name: "Credential route",
+          eventTypes: ["cms.entry.published"],
+          route: "/credential-route",
+          semanticTags: [],
+        }),
+        new Date(now.getTime() + 4_000),
+        `mapping.credential.create.${endpointId}`,
+      ),
+    );
+    mappingIds.push(mapping.id);
+    resourceIds.push(mapping.id);
+
+    const [storedEvent] = await db
+      .select({ id: publicationEvent.eventId })
+      .from(publicationEvent)
+      .where(eq(publicationEvent.environmentId, current.environmentId))
+      .limit(1);
+    if (!storedEvent) throw new Error("Credential replay requires a canonical event.");
+    const replay = await Effect.runPromise(
+      repository.replayEvent(
+        actor,
+        Schema.decodeUnknownSync(ReplayWebhookEventInput)({
+          projectId: current.projectId,
+          environmentId: current.environmentId,
+          endpointId,
+          eventId: storedEvent.id,
+          sourceDeliveryId: null,
+          commandId: randomUUID(),
+        }),
+        "e".repeat(64),
+        new Date(now.getTime() + 5_000),
+        `webhook.credential.replay.${endpointId}`,
+      ),
+    );
+    deliveryIds.push(replay.id);
+    resourceIds.push(replay.id);
+
+    const [endpoint] = await db
+      .select()
+      .from(webhookEndpoint)
+      .where(eq(webhookEndpoint.id, endpointId));
+    const destinations = await db
+      .select()
+      .from(webhookEndpointDestination)
+      .where(eq(webhookEndpointDestination.endpointId, endpointId));
+    const subscriptions = await db
+      .select()
+      .from(webhookEndpointSubscription)
+      .where(eq(webhookEndpointSubscription.endpointId, endpointId));
+    const secrets = await db
+      .select()
+      .from(webhookEndpointSecret)
+      .where(eq(webhookEndpointSecret.endpointId, endpointId));
+    const [mappingRow] = await db
+      .select()
+      .from(cmsInvalidationRouteMapping)
+      .where(eq(cmsInvalidationRouteMapping.id, mapping.id));
+    const [delivery] = await db
+      .select()
+      .from(webhookDelivery)
+      .where(eq(webhookDelivery.id, replay.id));
+    const audits = await db
+      .select({ actorType: auditEvent.actorType, actorId: auditEvent.actorId })
+      .from(auditEvent)
+      .where(inArray(auditEvent.resourceId, [endpointId, mapping.id, replay.id]));
+
+    assert.deepInclude(endpoint, {
+      createdByUserId: null,
+      createdByCredentialId: credentialId,
+      createdByCredentialEnvironmentId: current.environmentId,
+      changedByUserId: null,
+      changedByCredentialId: credentialId,
+      changedByCredentialEnvironmentId: current.environmentId,
+    });
+    assert.isTrue(
+      destinations.every(
+        (row) => row.createdByUserId === null && row.createdByCredentialId === credentialId,
+      ),
+    );
+    assert.isTrue(
+      subscriptions.every(
+        (row) => row.createdByUserId === null && row.createdByCredentialId === credentialId,
+      ),
+    );
+    assert.isTrue(
+      subscriptions.some(
+        (row) =>
+          row.activeUntil !== null &&
+          row.closedByUserId === null &&
+          row.closedByCredentialId === credentialId,
+      ),
+    );
+    assert.isTrue(
+      secrets.every(
+        (row) =>
+          row.createdByUserId === null &&
+          row.createdByCredentialId === credentialId &&
+          row.changedByUserId === null &&
+          row.changedByCredentialId === credentialId,
+      ),
+    );
+    assert.deepInclude(mappingRow, {
+      createdByUserId: null,
+      createdByCredentialId: credentialId,
+      changedByUserId: null,
+      changedByCredentialId: credentialId,
+    });
+    assert.deepInclude(delivery, {
+      replayedByUserId: null,
+      replayedByCredentialId: credentialId,
+      replayedByCredentialEnvironmentId: current.environmentId,
+    });
+    assert.isTrue(
+      audits.length >= 5 &&
+        audits.every((row) => row.actorType === "credential" && row.actorId === credentialId),
+    );
+    await db
+      .delete(cmsInvalidationRouteMapping)
+      .where(eq(cmsInvalidationRouteMapping.id, mapping.id));
+  });
+
   it("updates and disables bounded collection-level invalidation mappings optimistically", async () => {
     const current = fixture();
-    const actorId = Schema.decodeUnknownSync(AuthUserId)(current.actorId);
+    const actorId = {
+      kind: "user" as const,
+      id: Schema.decodeUnknownSync(AuthUserId)(current.actorId),
+    };
     const repository = makeWebhookRepository();
     const created = await Effect.runPromise(
       repository.createMapping(
@@ -557,6 +806,12 @@ describe("Webhook repository PostgreSQL integration", () => {
         .delete(webhookEndpointDestination)
         .where(inArray(webhookEndpointDestination.endpointId, endpointIds));
       await db.delete(webhookEndpoint).where(inArray(webhookEndpoint.id, endpointIds));
+    }
+    if (credentialIds.length > 0) {
+      await db
+        .delete(apiCredentialScope)
+        .where(inArray(apiCredentialScope.credentialId, credentialIds));
+      await db.delete(apiCredential).where(inArray(apiCredential.id, credentialIds));
     }
   });
 });

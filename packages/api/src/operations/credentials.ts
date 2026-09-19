@@ -2,10 +2,12 @@ import { Clock, Effect, Schema } from "effect";
 
 import {
   IssuedApiCredential,
+  StartedApiCredentialRotation,
+  type ChangeApiCredentialRotationInput,
   type IssueApiCredentialInput,
   type ListApiCredentialsInput,
   type RevokeApiCredentialInput,
-  type RotateApiCredentialInput,
+  type StartApiCredentialRotationInput,
 } from "../contracts/access";
 import { UnauthorizedFailure } from "../contracts/response/errors";
 import { AuthUserId } from "../contracts/platform";
@@ -53,32 +55,53 @@ export const listApiCredentials = Effect.fn("credential.list")(function* (
     environmentId: input.environmentId,
   });
   const repository = yield* CredentialRepository;
-  return yield* repository.listCredentials(actorId, input);
+  return yield* repository.listCredentials(actorId, input, yield* currentDate);
 });
 
-export const rotateApiCredential = Effect.fn("credential.rotate")(function* (
+export const startApiCredentialRotation = Effect.fn("credential.rotation.start")(function* (
   actorUserId: string,
-  input: RotateApiCredentialInput,
+  input: StartApiCredentialRotationInput,
   requestId: string,
 ) {
   const actorId = yield* decodeActorId(actorUserId);
-  yield* Effect.annotateCurrentSpan({ credentialId: input.credentialId });
+  yield* Effect.annotateCurrentSpan({
+    projectId: input.projectId,
+    environmentId: input.environmentId,
+    credentialId: input.credentialId,
+  });
   const repository = yield* CredentialRepository;
   const secrets = yield* SecretGenerator;
   const now = yield* currentDate;
-  const preparation = yield* repository.prepareRotation(actorId, input, now);
+  const family = yield* repository.prepareRotationStart(actorId, input, now);
+  const rotationId = yield* repository.allocateRotationId();
   const successorId = yield* repository.allocateCredentialId();
-  const material = yield* secrets.generateCredentialMaterial(preparation.family, successorId);
-  const credential = yield* repository.rotateCredential(
+  const material = yield* secrets.generateCredentialMaterial(family, successorId);
+  const started = yield* repository.startRotation(
     actorId,
     input,
-    preparation,
+    rotationId,
     successorId,
     material,
     now,
     requestId,
   );
-  return IssuedApiCredential.make({ credential, key: material.key });
+  return StartedApiCredentialRotation.make({ ...started, key: material.key });
+});
+
+export const changeApiCredentialRotation = Effect.fn("credential.rotation.change")(function* (
+  actorUserId: string,
+  input: ChangeApiCredentialRotationInput,
+  requestId: string,
+) {
+  const actorId = yield* decodeActorId(actorUserId);
+  yield* Effect.annotateCurrentSpan({
+    projectId: input.projectId,
+    environmentId: input.environmentId,
+    rotationId: input.rotationId,
+    action: input.action,
+  });
+  const repository = yield* CredentialRepository;
+  return yield* repository.changeRotation(actorId, input, yield* currentDate, requestId);
 });
 
 export const revokeApiCredential = Effect.fn("credential.revoke")(function* (

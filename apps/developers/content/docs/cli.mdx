@@ -42,7 +42,7 @@ Do not run interactive login in CI and never write the management token into rep
 
 Workspace, project, capability, lifecycle, governance, member, invitation, locale, and Studio-registration commands use the separate Control Plane v1 contract. Every Control Plane command requires `--api <origin>` and supports one bounded JSON page or operation result. Member and invitation administration requires OAuth user authority; invitation proof is stdin-only. Exact primary-environment management credentials can administer locales, but governance administration is intentionally absent from the public application SDK.
 
-Start with [Bootstrap and govern a project with the CLI](/docs/control-plane-bootstrap).
+Start with [Bootstrap and govern a project with the CLI](/docs/control-plane-bootstrap). For staged credential rotation, webhook and delivery recovery, and bounded audit history, see [Operational administration and recovery](/docs/operational-recovery).
 
 ## Project Configuration
 

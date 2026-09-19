@@ -4,6 +4,8 @@ import {
   AcceptProjectInvitationInputSchema,
   ApiCredentialOutputSchema,
   ApiCredentialPageOutputSchema,
+  ApiCredentialRotationOutputSchema,
+  ChangeApiCredentialRotationInputSchema,
   CreateProjectInvitationInputSchema,
   CurrentProjectAccessOutputSchema,
   GetCurrentProjectAccessInputSchema,
@@ -22,7 +24,8 @@ import {
   RemoveProjectMemberInputSchema,
   RevokeApiCredentialInputSchema,
   RevokeProjectInvitationInputSchema,
-  RotateApiCredentialInputSchema,
+  StartApiCredentialRotationInputSchema,
+  StartedApiCredentialRotationOutputSchema,
   UpdateProjectMemberPolicyInputSchema,
 } from "../contracts/access";
 import {
@@ -116,9 +119,18 @@ import {
   WebhookEndpointPageOutputSchema,
 } from "../contracts/webhook";
 import {
+  ControlPlaneCredentialPageOutputSchema,
+  ControlPlaneProjectAuditPageOutputSchema,
+  ControlPlaneWebhookAttemptListOutputSchema,
+  ControlPlaneWebhookDeliveryDetailOutputSchema,
+  ControlPlaneWebhookDeliveryPageOutputSchema,
   ControlPlanePutStudioRegistrationInputSchema,
   ControlPlanePutStudioRegistrationOutputSchema,
   ControlPlaneStudioRegistrationScopeSchema,
+  HostedOperationalCredentialListInputSchema,
+  HostedProjectAuditListInputSchema,
+  HostedWebhookDeliveryInputSchema,
+  HostedWebhookDeliveryListInputSchema,
   StudioRegistrationOutputSchema,
 } from "../contracts/control-plane";
 import {
@@ -168,10 +180,11 @@ import {
   validateEntryPublication,
 } from "../operations/publications";
 import {
+  changeApiCredentialRotation,
   issueApiCredential,
   listApiCredentials,
   revokeApiCredential,
-  rotateApiCredential,
+  startApiCredentialRotation,
 } from "../operations/credentials";
 import {
   createProjectLocale,
@@ -206,7 +219,14 @@ import {
   getStudioRegistrationForSession,
   putStudioRegistrationForSession,
 } from "../operations/control-plane";
+import { listControlPlaneCredentials } from "../operations/control-plane/operational";
+import { listProjectAuditEvents } from "../operations/audit";
 import { healthCheck, loadPrivateData } from "../operations/system";
+import {
+  getHostedWebhookDelivery,
+  listHostedWebhookAttempts,
+  listHostedWebhookDeliveries,
+} from "../operations/webhook/hosted";
 import {
   createInvalidationMapping,
   createWebhookEndpoint,
@@ -363,6 +383,32 @@ export const appRouter = {
         ),
     },
     deliveries: {
+      operationalList: protectedProcedure
+        .input(HostedWebhookDeliveryListInputSchema)
+        .output(ControlPlaneWebhookDeliveryPageOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.delivery.operational_list",
+            listHostedWebhookDeliveries(
+              context.session.user.id,
+              `session:${context.session.user.id}`,
+              input,
+            ),
+            "Webhook delivery summaries loaded.",
+          ),
+        ),
+      detail: protectedProcedure
+        .input(HostedWebhookDeliveryInputSchema)
+        .output(ControlPlaneWebhookDeliveryDetailOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.delivery.detail",
+            getHostedWebhookDelivery(context.session.user.id, input),
+            "Webhook delivery detail loaded.",
+          ),
+        ),
       list: protectedProcedure
         .input(ListWebhookDeliveriesInputSchema)
         .output(WebhookDeliveryPageOutputSchema)
@@ -387,6 +433,17 @@ export const appRouter = {
         ),
     },
     attempts: {
+      operationalList: protectedProcedure
+        .input(HostedWebhookDeliveryInputSchema)
+        .output(ControlPlaneWebhookAttemptListOutputSchema)
+        .handler(({ context, input }) =>
+          executeProcedure(
+            context,
+            "api.webhook.attempt.operational_list",
+            listHostedWebhookAttempts(context.session.user.id, input),
+            "Webhook attempts loaded.",
+          ),
+        ),
       list: protectedProcedure
         .input(ListWebhookAttemptsInputSchema)
         .output(WebhookAttemptPageOutputSchema)
@@ -941,7 +998,45 @@ export const appRouter = {
           },
         },
       },
+      operations: {
+        audit: {
+          list: protectedProcedure
+            .input(HostedProjectAuditListInputSchema)
+            .output(ControlPlaneProjectAuditPageOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                "api.audit.project.list",
+                listProjectAuditEvents(
+                  context.session.user.id,
+                  `session:${context.session.user.id}`,
+                  input.projectId,
+                  input.query,
+                  context.request.requestId,
+                ),
+                "Project audit events loaded.",
+              ),
+            ),
+        },
+      },
       credentials: {
+        operationalList: protectedProcedure
+          .input(HostedOperationalCredentialListInputSchema)
+          .output(ControlPlaneCredentialPageOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.credential.operational_list",
+              listControlPlaneCredentials(
+                context.session.user.id,
+                `session:${context.session.user.id}`,
+                input.projectId,
+                input.environmentId,
+                input.query,
+              ),
+              "Operational credentials loaded.",
+            ),
+          ),
         issue: protectedProcedure
           .input(IssueApiCredentialInputSchema)
           .output(IssuedApiCredentialOutputSchema)
@@ -964,17 +1059,38 @@ export const appRouter = {
               "API credentials loaded.",
             ),
           ),
-        rotate: protectedProcedure
-          .input(RotateApiCredentialInputSchema)
-          .output(IssuedApiCredentialOutputSchema)
-          .handler(({ context, input }) =>
-            executeProcedure(
-              context,
-              "api.credential.rotate",
-              rotateApiCredential(context.session.user.id, input, context.request.requestId),
-              "Credential rotated. Copy the new key now.",
+        rotation: {
+          start: protectedProcedure
+            .input(StartApiCredentialRotationInputSchema)
+            .output(StartedApiCredentialRotationOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                "api.credential.rotation.start",
+                startApiCredentialRotation(
+                  context.session.user.id,
+                  input,
+                  context.request.requestId,
+                ),
+                "Credential rotation started. Copy the pending key now.",
+              ),
             ),
-          ),
+          change: protectedProcedure
+            .input(ChangeApiCredentialRotationInputSchema)
+            .output(ApiCredentialRotationOutputSchema)
+            .handler(({ context, input }) =>
+              executeProcedure(
+                context,
+                `api.credential.rotation.${input.action}`,
+                changeApiCredentialRotation(
+                  context.session.user.id,
+                  input,
+                  context.request.requestId,
+                ),
+                "Credential rotation updated.",
+              ),
+            ),
+        },
         revoke: protectedProcedure
           .input(RevokeApiCredentialInputSchema)
           .output(ApiCredentialOutputSchema)

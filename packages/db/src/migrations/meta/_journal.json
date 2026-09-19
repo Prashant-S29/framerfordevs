@@ -120,6 +120,20 @@
       "when": 1789396462214,
       "tag": "0016_add_governance_automation_authorities",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789617255511,
+      "tag": "0017_add_operational_administration_authorities",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789761076436,
+      "tag": "0018_allow_unattempted_archived_delivery_outcome",
+      "breakpoints": true
     }
   ]
 }

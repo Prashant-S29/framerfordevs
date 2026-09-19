@@ -85,6 +85,7 @@ export const ControlPlanePermissionAction = Schema.Literal(
   "project.credential.issue",
   "project.credential.rotate",
   "project.credential.revoke",
+  "project.audit.read",
   "locale.read",
   "locale.manage",
   "schema.read",
@@ -183,14 +184,14 @@ export const ControlPlaneGovernance = Schema.Struct({
   primaryEnvironment: ControlPlanePrimaryEnvironment,
   role: ControlPlaneProjectRole,
   localeAccess: ControlPlaneLocaleAccess,
-  baseRoleActions: Schema.Array(ControlPlanePermissionAction).pipe(Schema.maxItems(26)),
-  effectiveProjectActions: Schema.Array(ControlPlanePermissionAction).pipe(Schema.maxItems(26)),
+  baseRoleActions: Schema.Array(ControlPlanePermissionAction).pipe(Schema.maxItems(27)),
+  effectiveProjectActions: Schema.Array(ControlPlanePermissionAction).pipe(Schema.maxItems(27)),
   effectiveLocaleIds: Schema.Array(Uuid).pipe(Schema.maxItems(100)),
-  effectiveLocaleActions: Schema.Array(ControlPlanePermissionAction).pipe(Schema.maxItems(26)),
+  effectiveLocaleActions: Schema.Array(ControlPlanePermissionAction).pipe(Schema.maxItems(27)),
   fixedRolePolicies: Schema.Array(
     Schema.Struct({
       role: ControlPlaneProjectRole,
-      baseRoleActions: Schema.Array(ControlPlanePermissionAction).pipe(Schema.maxItems(26)),
+      baseRoleActions: Schema.Array(ControlPlanePermissionAction).pipe(Schema.maxItems(27)),
       requiresAllLocales: Schema.Boolean,
     }),
   ).pipe(Schema.minItems(7), Schema.maxItems(7)),
@@ -245,6 +246,247 @@ export const ControlPlanePutStudioRegistrationResult = Schema.Struct({
   created: Schema.Boolean,
   replayed: Schema.Boolean,
   noOp: Schema.Boolean,
+});
+
+const CredentialFamily = Schema.Literal("management", "delivery", "preview");
+const CredentialStatus = Schema.Literal(
+  "pending",
+  "active",
+  "retiring",
+  "expired",
+  "revoked",
+  "canceled",
+);
+const CredentialRotation = Schema.Struct({
+  id: Uuid,
+  projectId: Uuid,
+  environmentId: Uuid,
+  predecessorCredentialId: Uuid,
+  successorCredentialId: Uuid,
+  status: Schema.Literal("pending", "overlap", "canceled", "completed"),
+  version: Version,
+  activatedAt: Schema.NullOr(IsoDateTime),
+  retireAt: Schema.NullOr(IsoDateTime),
+  completedAt: Schema.NullOr(IsoDateTime),
+  canceledAt: Schema.NullOr(IsoDateTime),
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+});
+export const ControlPlaneCredential = Schema.Struct({
+  id: Uuid,
+  projectId: Uuid,
+  environmentId: Uuid,
+  family: CredentialFamily,
+  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
+  keyPrefix: Schema.String.pipe(Schema.minLength(44), Schema.maxLength(45)),
+  scopes: Schema.Array(Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64))).pipe(
+    Schema.minItems(1),
+    Schema.maxItems(16),
+  ),
+  status: CredentialStatus,
+  version: Version,
+  activatedAt: Schema.NullOr(IsoDateTime),
+  expiresAt: Schema.NullOr(IsoDateTime),
+  retireAt: Schema.NullOr(IsoDateTime),
+  revokedAt: Schema.NullOr(IsoDateTime),
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+  openRotation: Schema.NullOr(CredentialRotation),
+});
+export const ControlPlaneCredentialPage = Schema.Struct({
+  items: Schema.Array(ControlPlaneCredential).pipe(Schema.maxItems(50)),
+  nextCursor: Schema.NullOr(Cursor),
+});
+export const ControlPlaneIssuedCredential = Schema.Struct({
+  credential: ControlPlaneCredential,
+  key: Schema.String.pipe(Schema.minLength(88), Schema.maxLength(89)),
+});
+export const ControlPlaneStartedCredentialRotation = Schema.Struct({
+  rotation: CredentialRotation,
+  successor: ControlPlaneCredential,
+  key: Schema.String.pipe(Schema.minLength(88), Schema.maxLength(89)),
+});
+export { CredentialRotation as ControlPlaneCredentialRotation };
+
+const WebhookState = Schema.Literal("enabled", "disabled");
+const WebhookEventType = Schema.Literal(
+  "cms.schema.published",
+  "cms.entry.published",
+  "cms.entry.unpublished",
+);
+const WebhookEndpoint = Schema.Struct({
+  id: Uuid,
+  projectId: Uuid,
+  environmentId: Uuid,
+  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
+  state: WebhookState,
+  version: Version,
+  destinationOrigin: Schema.String.pipe(Schema.minLength(9), Schema.maxLength(255)),
+  subscriptions: Schema.Array(WebhookEventType).pipe(Schema.minItems(1), Schema.maxItems(3)),
+  rotationState: Schema.NullOr(
+    Schema.Literal("pending", "active", "retiring", "retired", "canceled"),
+  ),
+  rotationEndsAt: Schema.NullOr(IsoDateTime),
+  lastOutcome: Schema.NullOr(Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64))),
+  deadLetterCount: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
+  enabledAt: Schema.NullOr(IsoDateTime),
+  disabledAt: Schema.NullOr(IsoDateTime),
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+});
+export { WebhookEndpoint as ControlPlaneWebhookEndpoint };
+export const ControlPlaneWebhookEndpointPage = Schema.Struct({
+  items: Schema.Array(WebhookEndpoint).pipe(Schema.maxItems(50)),
+  nextCursor: Schema.NullOr(Cursor),
+});
+export const ControlPlaneIssuedWebhookEndpoint = Schema.Struct({
+  endpoint: WebhookEndpoint,
+  secret: Schema.String.pipe(Schema.length(49)),
+});
+export const ControlPlaneRotatedWebhookSecret = Schema.Struct({
+  endpointId: Uuid,
+  secretId: Uuid,
+  secret: Schema.String.pipe(Schema.length(49)),
+  state: Schema.Literal("pending"),
+});
+
+const InvalidationMapping = Schema.Struct({
+  id: Uuid,
+  projectId: Uuid,
+  environmentId: Uuid,
+  collectionId: Uuid,
+  entryId: Schema.NullOr(Uuid),
+  localeId: Schema.NullOr(Uuid),
+  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
+  eventTypes: Schema.Array(WebhookEventType).pipe(Schema.minItems(1), Schema.maxItems(3)),
+  route: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  semanticTags: Schema.Array(Schema.String.pipe(Schema.minLength(3), Schema.maxLength(64))).pipe(
+    Schema.maxItems(10),
+  ),
+  state: WebhookState,
+  version: Version,
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+});
+export { InvalidationMapping as ControlPlaneInvalidationMapping };
+export const ControlPlaneInvalidationMappingPage = Schema.Struct({
+  items: Schema.Array(InvalidationMapping).pipe(Schema.maxItems(50)),
+  nextCursor: Schema.NullOr(Cursor),
+});
+
+const WebhookDeliverySummary = Schema.Struct({
+  id: Uuid,
+  eventId: Uuid,
+  endpointId: Uuid,
+  eventType: WebhookEventType,
+  eventTime: IsoDateTime,
+  kind: Schema.Literal("initial", "replay"),
+  status: Schema.Literal(
+    "queued",
+    "delivering",
+    "retry_scheduled",
+    "succeeded",
+    "dead_letter",
+    "canceled",
+  ),
+  attemptCount: Schema.Number.pipe(Schema.int(), Schema.between(0, 12)),
+  nextAttemptAt: Schema.NullOr(IsoDateTime),
+  completedAt: Schema.NullOr(IsoDateTime),
+  lastOutcome: Schema.NullOr(Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64))),
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+});
+export const ControlPlaneWebhookDeliveryPage = Schema.Struct({
+  items: Schema.Array(WebhookDeliverySummary).pipe(Schema.maxItems(50)),
+  nextCursor: Schema.NullOr(Cursor),
+});
+const WebhookEvent = Schema.Struct({
+  specversion: Schema.Literal("1.0"),
+  id: Uuid,
+  source: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(160)),
+  subject: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
+  time: IsoDateTime,
+  datacontenttype: Schema.Literal("application/json"),
+  type: WebhookEventType,
+  data: Schema.Unknown,
+});
+export const ControlPlaneWebhookDeliveryDetail = Schema.Struct({
+  delivery: WebhookDeliverySummary,
+  event: WebhookEvent,
+});
+const WebhookDelivery = Schema.Struct({
+  id: Uuid,
+  eventId: Uuid,
+  endpointId: Uuid,
+  event: WebhookEvent,
+  kind: Schema.Literal("initial", "replay"),
+  status: Schema.Literal(
+    "queued",
+    "delivering",
+    "retry_scheduled",
+    "succeeded",
+    "dead_letter",
+    "canceled",
+  ),
+  attemptCount: Schema.Number.pipe(Schema.int(), Schema.between(0, 12)),
+  nextAttemptAt: Schema.NullOr(IsoDateTime),
+  completedAt: Schema.NullOr(IsoDateTime),
+  lastOutcome: Schema.NullOr(Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64))),
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+});
+export const ControlPlaneWebhookReplay = Schema.Struct({
+  delivery: WebhookDelivery,
+  replayedBy: Schema.Union(
+    Schema.Struct({ kind: Schema.Literal("user"), id: Schema.String.pipe(Schema.minLength(1)) }),
+    Schema.Struct({ kind: Schema.Literal("credential"), id: Uuid }),
+  ),
+});
+const WebhookAttempt = Schema.Struct({
+  id: Uuid,
+  deliveryId: Uuid,
+  eventId: Uuid,
+  endpointId: Uuid,
+  attemptNumber: Schema.Number.pipe(Schema.int(), Schema.between(1, 12)),
+  state: Schema.Literal(
+    "started",
+    "succeeded",
+    "retry_scheduled",
+    "dead_letter",
+    "abandoned",
+    "canceled",
+  ),
+  startedAt: IsoDateTime,
+  completedAt: Schema.NullOr(IsoDateTime),
+  durationMs: Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0))),
+  httpStatus: Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.between(100, 599))),
+  statusFamily: Schema.NullOr(Schema.Literal("1xx", "2xx", "3xx", "4xx", "5xx")),
+  outcome: Schema.NullOr(Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64))),
+  nextAttemptAt: Schema.NullOr(IsoDateTime),
+});
+export const ControlPlaneWebhookAttemptList = Schema.Struct({
+  items: Schema.Array(WebhookAttempt).pipe(Schema.maxItems(12)),
+});
+
+const ProjectActor = Schema.Union(
+  Schema.Struct({ kind: Schema.Literal("user"), id: Schema.String.pipe(Schema.minLength(1)) }),
+  Schema.Struct({ kind: Schema.Literal("credential"), id: Uuid }),
+);
+export const ControlPlaneAuditPage = Schema.Struct({
+  items: Schema.Array(
+    Schema.Struct({
+      id: Uuid,
+      projectId: Uuid,
+      environmentId: Schema.NullOr(Uuid),
+      actor: ProjectActor,
+      action: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128)),
+      resourceType: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
+      resourceId: Uuid,
+      requestId: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128)),
+      occurredAt: IsoDateTime,
+    }),
+  ).pipe(Schema.maxItems(50)),
+  nextCursor: Schema.NullOr(Cursor),
 });
 
 const ErrorDetail = Schema.Struct({

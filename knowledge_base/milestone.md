@@ -54,7 +54,9 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ### Milestone 16 — Operational administration and recovery
 
-**Status:** Next design target; design not started and implementation is not approved.
+**Status:** Implementation and automated readiness complete; awaiting developer review and explicit acceptance. Migrations `0017` and `0018` are developer-applied/catalog-verified and the worker remains stopped.
+
+**Proposal:** [`decisions/m16-operational-administration-and-recovery-design.md`](decisions/m16-operational-administration-and-recovery-design.md)
 
 **Depends on:** M14–M15.
 

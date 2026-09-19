@@ -79,6 +79,43 @@ describe("Control Plane cursor signer", () => {
     }),
   );
 
+  it.effect("binds operational route, principal, tenant, filters, window, limit, and as-of", () =>
+    Effect.gen(function* () {
+      const operationalAuthority = {
+        route: "audit_events" as const,
+        principalKey: "oauth:framerfordevs-cli:user-1",
+        workspaceId: null,
+        projectId: "019fae8b-1234-7000-8000-000000000010",
+        environmentId: "019fae8b-1234-7000-8000-000000000020",
+        projectStatus: null,
+        filterDigest: "c".repeat(64),
+        windowFromEpochMs: 1_799_000_000_000,
+        windowToEpochMs: 1_800_000_000_000,
+        limit: 50,
+      };
+      const operationalPosition = { ...position, asOfEpochMs: 1_800_000_000_000 };
+      const cursor = yield* signer.sign(operationalAuthority, operationalPosition);
+      assert.deepEqual(yield* signer.verify(cursor, operationalAuthority), operationalPosition);
+
+      const substitutions = [
+        { ...operationalAuthority, route: "webhook_deliveries" as const },
+        { ...operationalAuthority, principalKey: "credential:other" },
+        { ...operationalAuthority, projectId: "019fae8b-1234-7000-8000-000000000011" },
+        { ...operationalAuthority, environmentId: null },
+        { ...operationalAuthority, filterDigest: "d".repeat(64) },
+        { ...operationalAuthority, windowFromEpochMs: 1_799_000_000_001 },
+        { ...operationalAuthority, windowToEpochMs: 1_800_000_000_001 },
+        { ...operationalAuthority, limit: 49 },
+      ];
+      const failures = yield* Effect.all(
+        substitutions.map((substitution) => Effect.flip(signer.verify(cursor, substitution))),
+      );
+      assert.isTrue(
+        failures.every((failure) => failure._tag === "ControlPlaneCursorInvalidFailure"),
+      );
+    }),
+  );
+
   it.effect("rejects expired, oversized, and malformed cursors", () =>
     Effect.gen(function* () {
       const cursor = yield* signer.sign(authority, position);

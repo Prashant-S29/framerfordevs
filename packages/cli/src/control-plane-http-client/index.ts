@@ -11,10 +11,18 @@ import {
   ControlPlaneCapabilityList,
   ControlPlaneCreateProjectResult,
   ControlPlaneCreateWorkspaceResult,
+  ControlPlaneCredential,
+  ControlPlaneCredentialPage,
+  ControlPlaneCredentialRotation,
   ControlPlaneEnableCapabilityResult,
   ControlPlaneFailureResponse,
   ControlPlaneGovernance,
+  ControlPlaneAuditPage,
   ControlPlaneInspectedInvitation,
+  ControlPlaneInvalidationMapping,
+  ControlPlaneInvalidationMappingPage,
+  ControlPlaneIssuedCredential,
+  ControlPlaneIssuedWebhookEndpoint,
   ControlPlaneInvitation,
   ControlPlaneInvitationPage,
   ControlPlaneIssuedInvitation,
@@ -23,9 +31,17 @@ import {
   ControlPlaneMember,
   ControlPlaneMemberPage,
   ControlPlaneProject,
+  ControlPlaneRotatedWebhookSecret,
+  ControlPlaneStartedCredentialRotation,
   ControlPlaneProjectPage,
   ControlPlanePutStudioRegistrationResult,
   ControlPlaneStudioRegistration,
+  ControlPlaneWebhookAttemptList,
+  ControlPlaneWebhookDeliveryDetail,
+  ControlPlaneWebhookDeliveryPage,
+  ControlPlaneWebhookEndpoint,
+  ControlPlaneWebhookEndpointPage,
+  ControlPlaneWebhookReplay,
   ControlPlaneWorkspace,
   ControlPlaneWorkspacePage,
   controlPlaneSuccessResponse,
@@ -541,6 +557,315 @@ export function makeControlPlaneHttpClient(options: ControlPlaneHttpClientOption
         `/api/control-plane/v1/projects/${segment(projectId)}/locales/${segment(localeId)}/status`,
         ControlPlaneLocale,
         body,
+        requestOptions,
+      ),
+    listCredentials: (
+      projectId: string,
+      environmentId: string,
+      family: string,
+      status: string,
+      cursor: string | null,
+      limit: number,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "GET",
+        pagePath(
+          `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/credentials`,
+          { family, status, cursor, limit },
+        ),
+        ControlPlaneCredentialPage,
+        null,
+        requestOptions,
+      ),
+    issueCredential: (
+      projectId: string,
+      environmentId: string,
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/credentials`,
+        ControlPlaneIssuedCredential,
+        body,
+        requestOptions,
+      ),
+    startCredentialRotation: (
+      projectId: string,
+      environmentId: string,
+      credentialId: string,
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/credentials/${segment(credentialId)}/rotations`,
+        ControlPlaneStartedCredentialRotation,
+        body,
+        requestOptions,
+      ),
+    changeCredentialRotation: (
+      projectId: string,
+      environmentId: string,
+      rotationId: string,
+      action: "activate" | "cancel" | "complete",
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/credential-rotations/${segment(rotationId)}/${action}`,
+        ControlPlaneCredentialRotation,
+        body,
+        requestOptions,
+      ),
+    revokeCredential: (
+      projectId: string,
+      environmentId: string,
+      credentialId: string,
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/credentials/${segment(credentialId)}/revoke`,
+        ControlPlaneCredential,
+        body,
+        requestOptions,
+      ),
+    listWebhookEndpoints: (
+      projectId: string,
+      environmentId: string,
+      state: string,
+      cursor: string | null,
+      limit: number,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "GET",
+        pagePath(
+          `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/webhooks`,
+          { state, cursor, limit },
+        ),
+        ControlPlaneWebhookEndpointPage,
+        null,
+        requestOptions,
+      ),
+    createWebhookEndpoint: (
+      projectId: string,
+      environmentId: string,
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/webhooks`,
+        ControlPlaneIssuedWebhookEndpoint,
+        body,
+        requestOptions,
+      ),
+    updateWebhookEndpoint: (
+      projectId: string,
+      environmentId: string,
+      endpointId: string,
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "PATCH",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/webhooks/${segment(endpointId)}`,
+        ControlPlaneWebhookEndpoint,
+        body,
+        requestOptions,
+      ),
+    setWebhookEndpointState: (
+      projectId: string,
+      environmentId: string,
+      endpointId: string,
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "PUT",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/webhooks/${segment(endpointId)}/state`,
+        ControlPlaneWebhookEndpoint,
+        body,
+        requestOptions,
+      ),
+    replaceWebhookSubscriptions: (
+      projectId: string,
+      environmentId: string,
+      endpointId: string,
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "PUT",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/webhooks/${segment(endpointId)}/subscriptions`,
+        ControlPlaneWebhookEndpoint,
+        body,
+        requestOptions,
+      ),
+    startWebhookSecretRotation: (
+      projectId: string,
+      environmentId: string,
+      endpointId: string,
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/webhooks/${segment(endpointId)}/secret-rotations`,
+        ControlPlaneRotatedWebhookSecret,
+        body,
+        requestOptions,
+      ),
+    changeWebhookSecretRotation: (
+      projectId: string,
+      environmentId: string,
+      endpointId: string,
+      action: "activate" | "cancel" | "complete",
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/webhooks/${segment(endpointId)}/secret-rotations/${action}`,
+        ControlPlaneWebhookEndpoint,
+        body,
+        requestOptions,
+      ),
+    listInvalidationMappings: (
+      projectId: string,
+      environmentId: string,
+      state: string,
+      cursor: string | null,
+      limit: number,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "GET",
+        pagePath(
+          `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/invalidation-mappings`,
+          { state, cursor, limit },
+        ),
+        ControlPlaneInvalidationMappingPage,
+        null,
+        requestOptions,
+      ),
+    createInvalidationMapping: (
+      projectId: string,
+      environmentId: string,
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/invalidation-mappings`,
+        ControlPlaneInvalidationMapping,
+        body,
+        requestOptions,
+      ),
+    updateInvalidationMapping: (
+      projectId: string,
+      environmentId: string,
+      mappingId: string,
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "PUT",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/invalidation-mappings/${segment(mappingId)}`,
+        ControlPlaneInvalidationMapping,
+        body,
+        requestOptions,
+      ),
+    setInvalidationMappingState: (
+      projectId: string,
+      environmentId: string,
+      mappingId: string,
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "PUT",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/invalidation-mappings/${segment(mappingId)}/state`,
+        ControlPlaneInvalidationMapping,
+        body,
+        requestOptions,
+      ),
+    listWebhookDeliveries: (
+      projectId: string,
+      environmentId: string,
+      filters: {
+        readonly endpointId: string | null;
+        readonly eventType: string | null;
+        readonly status: string | null;
+        readonly cursor: string | null;
+        readonly limit: number;
+      },
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "GET",
+        pagePath(
+          `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/webhook-deliveries`,
+          filters,
+        ),
+        ControlPlaneWebhookDeliveryPage,
+        null,
+        requestOptions,
+      ),
+    getWebhookDelivery: (
+      projectId: string,
+      environmentId: string,
+      deliveryId: string,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "GET",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/webhook-deliveries/${segment(deliveryId)}`,
+        ControlPlaneWebhookDeliveryDetail,
+        null,
+        requestOptions,
+      ),
+    listWebhookAttempts: (
+      projectId: string,
+      environmentId: string,
+      deliveryId: string,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "GET",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/webhook-deliveries/${segment(deliveryId)}/attempts`,
+        ControlPlaneWebhookAttemptList,
+        null,
+        requestOptions,
+      ),
+    replayWebhook: (
+      projectId: string,
+      environmentId: string,
+      body: Readonly<Record<string, unknown>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/webhook-replays`,
+        ControlPlaneWebhookReplay,
+        body,
+        requestOptions,
+      ),
+    listAuditEvents: (
+      projectId: string,
+      filters: Readonly<Record<string, string | number | null>>,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "GET",
+        pagePath(`/api/control-plane/v1/projects/${segment(projectId)}/audit-events`, filters),
+        ControlPlaneAuditPage,
+        null,
         requestOptions,
       ),
     getStudioRegistration: (

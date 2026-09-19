@@ -286,6 +286,15 @@ export const auditEvent = pgTable(
     index("audit_event_environment_idx")
       .on(table.environmentId)
       .where(sql`${table.environmentId} is not null`),
+    index("audit_event_project_environment_occurred_id_idx")
+      .on(table.projectId, table.environmentId, table.occurredAt.desc(), table.id.desc())
+      .where(sql`${table.projectId} is not null and ${table.environmentId} is not null`),
+    index("audit_event_project_actor_occurred_id_idx")
+      .on(table.projectId, table.actorType, table.actorId, table.occurredAt.desc(), table.id.desc())
+      .where(sql`${table.projectId} is not null`),
+    index("audit_event_project_action_occurred_id_idx")
+      .on(table.projectId, table.action, table.occurredAt.desc(), table.id.desc())
+      .where(sql`${table.projectId} is not null`),
   ],
 );
 

@@ -22,6 +22,7 @@ import { db } from "@framerfordevs/db";
 import { and, eq, inArray, or } from "@framerfordevs/db/query";
 import {
   apiCredential,
+  apiCredentialRotation,
   apiCredentialScope,
   projectMembership,
 } from "@framerfordevs/db/schema/access";
@@ -352,6 +353,9 @@ async function deleteFixture(): Promise<void> {
       await transaction
         .delete(apiCredentialScope)
         .where(inArray(apiCredentialScope.credentialId, credentialIds));
+      await transaction
+        .delete(apiCredentialRotation)
+        .where(inArray(apiCredentialRotation.projectId, projectIds));
       await transaction.delete(apiCredential).where(inArray(apiCredential.id, credentialIds));
     }
 
@@ -465,6 +469,7 @@ beforeAll(async () => {
       "content.publish",
     ],
     expiresAt: null,
+    nonExpiringAcknowledged: true,
   });
   expect(credential.status).toBe(200);
   credentialId = credential.body.json.data.credential.id;
@@ -477,6 +482,7 @@ beforeAll(async () => {
     name: "M13 Authoring HTTP publication lifecycle",
     scopes: ["content.read", "content.publish"],
     expiresAt: null,
+    nonExpiringAcknowledged: true,
   });
   expect(publicationCredential.status).toBe(200);
   publicationCredentialId = publicationCredential.body.json.data.credential.id;
@@ -496,6 +502,7 @@ beforeAll(async () => {
       "content.publish",
     ],
     expiresAt: null,
+    nonExpiringAcknowledged: true,
   });
   expect(adversarialCredential.status).toBe(200);
   adversarialKey = adversarialCredential.body.json.data.key;
@@ -1301,26 +1308,68 @@ describe.sequential("Authoring successful HTTP lifecycles", () => {
       .set(sourcedBearer(rotatingKey, rotationSource));
     expect(beforeRotation.status).toBe(200);
 
-    const rotated = await rpc(browser, "platform/projects/credentials/rotate", {
+    const rotated = await rpc(browser, "platform/projects/credentials/rotation/start", {
+      projectId,
+      environmentId,
       credentialId: rotatingCredential.id,
-      version: rotatingCredential.version,
+      expectedVersion: rotatingCredential.version,
+      expiresAt: rotatingCredential.expiresAt,
+      nonExpiringAcknowledged: false,
     });
     expect(rotated.status).toBe(200);
     const rotatedKey = rotated.body.json.data.key;
-    const rotatedCredential = rotated.body.json.data.credential;
-    const predecessor = await api
-      .get(`${ownEntriesBase}?limit=1`)
-      .set(sourcedBearer(rotatingKey, rotationSource));
-    const successor = await api
+    const rotatedCredential = rotated.body.json.data.successor;
+    const pendingSuccessor = await api
       .get(`${ownEntriesBase}?limit=1`)
       .set(sourcedBearer(rotatedKey, rotationSource));
-    expect(predecessor.status).toBe(401);
-    expect(predecessor.body.error.code).toBe("CREDENTIAL_INVALID");
-    expect(successor.status).toBe(200);
+    expect(pendingSuccessor.status).toBe(401);
+    expect(pendingSuccessor.body.error.code).toBe("CREDENTIAL_INVALID");
 
+    const activated = await rpc(browser, "platform/projects/credentials/rotation/change", {
+      projectId,
+      environmentId,
+      rotationId: rotated.body.json.data.rotation.id,
+      expectedVersion: rotated.body.json.data.rotation.version,
+      action: "activate",
+    });
+    expect(activated.status).toBe(200);
+    const predecessorDuringOverlap = await api
+      .get(`${ownEntriesBase}?limit=1`)
+      .set(sourcedBearer(rotatingKey, rotationSource));
+    const successorDuringOverlap = await api
+      .get(`${ownEntriesBase}?limit=1`)
+      .set(sourcedBearer(rotatedKey, rotationSource));
+    expect(predecessorDuringOverlap.status).toBe(200);
+    expect(successorDuringOverlap.status).toBe(200);
+
+    const completed = await rpc(browser, "platform/projects/credentials/rotation/change", {
+      projectId,
+      environmentId,
+      rotationId: activated.body.json.data.id,
+      expectedVersion: activated.body.json.data.version,
+      action: "complete",
+    });
+    expect(completed.status).toBe(200);
+    const retiredPredecessor = await api
+      .get(`${ownEntriesBase}?limit=1`)
+      .set(sourcedBearer(rotatingKey, rotationSource));
+    expect(retiredPredecessor.status).toBe(401);
+    expect(retiredPredecessor.body.error.code).toBe("CREDENTIAL_INVALID");
+
+    const listedCredentials = await rpc(browser, "platform/projects/credentials/list", {
+      projectId,
+      environmentId,
+      cursor: null,
+      limit: 50,
+    });
+    const activeSuccessor = listedCredentials.body.json.data.items.find(
+      (item: { id: string }) => item.id === rotatedCredential.id,
+    );
     const revoked = await rpc(browser, "platform/projects/credentials/revoke", {
+      projectId,
+      environmentId,
       credentialId: rotatedCredential.id,
-      version: rotatedCredential.version,
+      expectedVersion: activeSuccessor.version,
     });
     expect(revoked.status).toBe(200);
     const revokedRead = await api
@@ -1361,6 +1410,7 @@ describe.sequential("Authoring successful HTTP lifecycles", () => {
       name: "M13 wrong-family Authoring credential",
       scopes: ["delivery.read"],
       expiresAt: null,
+      nonExpiringAcknowledged: true,
     });
     expect(delivery.status).toBe(200);
     const wrongFamily = await api

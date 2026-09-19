@@ -5,6 +5,8 @@ import { RPCLink } from "@orpc/client/fetch";
 import type { RouterClient } from "@orpc/server";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
+import { createIsomorphicFn } from "@tanstack/react-start";
+import { getRequestHeaders } from "@tanstack/react-start/server";
 import { toast } from "sonner";
 
 import { getServerUrl } from "@/lib/server-url";
@@ -28,15 +30,28 @@ export function createQueryClient() {
   });
 }
 
-const link = new RPCLink({
-  url: `${getServerUrl(env.VITE_SERVER_URL)}/rpc`,
-  fetch(url, options) {
-    return fetch(url, {
-      ...options,
-      credentials: "include",
-    });
-  },
-});
+const getClientLink = createIsomorphicFn()
+  .client(
+    () =>
+      new RPCLink({
+        url: `${getServerUrl(env.VITE_SERVER_URL)}/rpc`,
+        fetch(url, options) {
+          return fetch(url, {
+            ...options,
+            credentials: "include",
+          });
+        },
+      }),
+  )
+  .server(
+    () =>
+      new RPCLink({
+        url: `${getServerUrl(env.VITE_SERVER_URL)}/rpc`,
+        headers: () => getRequestHeaders(),
+      }),
+  );
+
+const link = getClientLink();
 
 const getORPCClient = () => {
   return createORPCClient(link) as RouterClient<AppRouter>;

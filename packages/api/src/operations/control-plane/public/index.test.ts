@@ -101,6 +101,19 @@ describe("Control Plane public principal boundary", () => {
       controlPlaneBearerRequirements.manageLocales.oauthScope,
       "control-plane:governance:write",
     );
+    assert.deepEqual(controlPlaneBearerRequirements.listCredentials.managementScopes, []);
+    assert.deepEqual(controlPlaneBearerRequirements.manageCredentials.managementScopes, []);
+    assert.deepEqual(controlPlaneBearerRequirements.listWebhooks.managementScopes, [
+      "webhook.read",
+    ]);
+    assert.deepEqual(controlPlaneBearerRequirements.manageWebhooks.managementScopes, [
+      "webhook.manage",
+    ]);
+    assert.deepEqual(controlPlaneBearerRequirements.listAuditEvents.managementScopes, []);
+    assert.strictEqual(
+      controlPlaneBearerRequirements.listAuditEvents.oauthScope,
+      "control-plane:security:read",
+    );
   });
 
   it.effect("decodes bounded page defaults and rejects ambiguous query authority", () =>

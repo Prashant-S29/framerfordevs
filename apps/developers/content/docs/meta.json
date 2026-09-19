@@ -11,6 +11,7 @@
     "---Developer Tools---",
     "authoring",
     "control-plane-bootstrap",
+    "operational-recovery",
     "sdk",
     "cli",
     "webhooks",

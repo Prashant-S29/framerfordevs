@@ -9,6 +9,7 @@ import {
   cmsSchemaRevisionField,
   outboxEvent,
 } from "@framerfordevs/db/schema/cms";
+import { project } from "@framerfordevs/db/schema/platform";
 import {
   publicationEvent,
   webhookDelivery,
@@ -264,6 +265,13 @@ export function makeWebhookWorkerRepository(database: ApplicationDb = db) {
                 })
                 .from(webhookEndpoint)
                 .innerJoin(
+                  project,
+                  and(
+                    eq(project.id, webhookEndpoint.projectId),
+                    eq(project.workspaceId, webhookEndpoint.workspaceId),
+                  ),
+                )
+                .innerJoin(
                   webhookEndpointSubscription,
                   and(
                     eq(webhookEndpointSubscription.endpointId, webhookEndpoint.id),
@@ -275,6 +283,7 @@ export function makeWebhookWorkerRepository(database: ApplicationDb = db) {
                 .where(
                   and(
                     inArray(webhookEndpoint.environmentId, environmentIds),
+                    isNull(project.archivedAt),
                     eq(webhookEndpoint.state, "enabled"),
                     lte(webhookEndpoint.enabledAt, latestOccurredAt),
                     lte(webhookEndpointSubscription.activeFrom, latestOccurredAt),
@@ -358,8 +367,15 @@ export function makeWebhookWorkerRepository(database: ApplicationDb = db) {
             try: () =>
               database.transaction(async (transaction): Promise<boolean> => {
                 const expired = await transaction
-                  .select({ delivery: webhookDelivery })
+                  .select({ delivery: webhookDelivery, archivedAt: project.archivedAt })
                   .from(webhookDelivery)
+                  .innerJoin(
+                    project,
+                    and(
+                      eq(project.id, webhookDelivery.projectId),
+                      eq(project.workspaceId, webhookDelivery.workspaceId),
+                    ),
+                  )
                   .where(
                     and(
                       eq(webhookDelivery.status, "delivering"),
@@ -369,7 +385,8 @@ export function makeWebhookWorkerRepository(database: ApplicationDb = db) {
                   .orderBy(webhookDelivery.leaseExpiresAt, webhookDelivery.id)
                   .limit(1)
                   .for("update", { skipLocked: true });
-                const stale = expired[0]?.delivery;
+                const expiredRow = expired[0];
+                const stale = expiredRow?.delivery;
                 if (stale) {
                   if (stale.leaseToken === null) {
                     throw new Error("Expired webhook delivery is missing its lease token.");
@@ -389,14 +406,16 @@ export function makeWebhookWorkerRepository(database: ApplicationDb = db) {
                         eq(webhookDeliveryAttempt.state, "started"),
                       ),
                     );
+                  const archived = expiredRow.archivedAt !== null;
                   await transaction
                     .update(webhookDelivery)
                     .set({
-                      status: "retry_scheduled",
-                      nextAttemptAt: now,
+                      status: archived ? "canceled" : "retry_scheduled",
+                      nextAttemptAt: archived ? null : now,
                       leaseToken: null,
                       leaseExpiresAt: null,
-                      lastOutcome: "retryable_network",
+                      completedAt: archived ? now : null,
+                      lastOutcome: archived ? "project_archived" : "retryable_network",
                       updatedAt: now,
                     })
                     .where(eq(webhookDelivery.id, stale.id));
@@ -426,6 +445,13 @@ export function makeWebhookWorkerRepository(database: ApplicationDb = db) {
                 destination: webhookEndpointDestination,
               })
               .from(webhookEndpoint)
+              .innerJoin(
+                project,
+                and(
+                  eq(project.id, webhookEndpoint.projectId),
+                  eq(project.workspaceId, webhookEndpoint.workspaceId),
+                ),
+              )
               .innerJoin(
                 webhookDelivery,
                 and(
@@ -457,6 +483,7 @@ export function makeWebhookWorkerRepository(database: ApplicationDb = db) {
               .where(
                 and(
                   eq(webhookEndpoint.state, "enabled"),
+                  isNull(project.archivedAt),
                   or(
                     isNull(webhookEndpoint.leaseExpiresAt),
                     lte(webhookEndpoint.leaseExpiresAt, now),
@@ -570,17 +597,33 @@ export function makeWebhookWorkerRepository(database: ApplicationDb = db) {
             ) {
               return false;
             }
+            const [projectRow] = await transaction
+              .select({ archivedAt: project.archivedAt })
+              .from(project)
+              .where(
+                and(
+                  eq(project.id, delivery.projectId),
+                  eq(project.workspaceId, delivery.workspaceId),
+                ),
+              )
+              .limit(1);
+            if (!projectRow) return false;
+            const finalizedState =
+              projectRow.archivedAt !== null && input.state === "retry_scheduled"
+                ? "dead_letter"
+                : input.state;
+            const nextAttemptAt = finalizedState === "retry_scheduled" ? input.nextAttemptAt : null;
             const finalizedAttempts = await transaction
               .update(webhookDeliveryAttempt)
               .set({
-                state: input.state,
+                state: finalizedState,
                 completedAt: input.completedAt,
                 durationMs: Math.max(0, Math.floor(input.durationMs)),
                 httpStatus: input.httpStatus,
                 statusFamily: input.statusFamily,
                 outcome: input.outcome,
                 retryAfterSeconds: input.retryAfterSeconds,
-                nextAttemptAt: input.nextAttemptAt,
+                nextAttemptAt,
               })
               .where(
                 and(
@@ -594,11 +637,11 @@ export function makeWebhookWorkerRepository(database: ApplicationDb = db) {
             await transaction
               .update(webhookDelivery)
               .set({
-                status: input.state,
-                nextAttemptAt: input.nextAttemptAt,
+                status: finalizedState,
+                nextAttemptAt,
                 leaseToken: null,
                 leaseExpiresAt: null,
-                completedAt: input.state === "retry_scheduled" ? null : input.completedAt,
+                completedAt: finalizedState === "retry_scheduled" ? null : input.completedAt,
                 lastOutcome: input.outcome,
                 updatedAt: input.completedAt,
               })

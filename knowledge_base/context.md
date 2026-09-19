@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-09-16
-**Current phase:** M15 governance automation parity is developer-approved and committed at `5460c2b`; M16 operational administration and recovery is the next design target
-**Next gate:** Design M16 and obtain explicit developer approval before implementation
+**Last updated:** 2026-09-19
+**Current phase:** M16 operational administration and recovery implementation and automated readiness are complete; developer review is pending and the worker remains stopped
+**Next gate:** Developer review and explicit M16 acceptance; do not begin M17
 
 ## Start here
 
@@ -20,7 +20,7 @@ Read relevant sections of `product.md` and `prd/cms.md` for behavioral work. Do 
 - Explicit current developer instruction, product/PRD, relevant rules/active criteria/approved decisions, then status documents govern intent in that order.
 - Committed source, tests, configuration, migrations, and generated artifacts describe executable truth; Git describes repository state.
 - Report drift instead of silently choosing an authority.
-- Work only on an approved active milestone or an explicitly authorized workstream. M16 is the next design target; implementation remains unauthorized until its design is explicitly approved, and M17+ remain sequenced context only.
+- Work only on an approved active milestone or an explicitly authorized workstream. M16 implementation is active; M17+ remain sequenced context only.
 
 ## Product direction
 
@@ -87,17 +87,18 @@ Packages never import application source. Cross-package imports use declared exp
 
 ## Completed capability map
 
-| Milestones | Capability                                                                                   |
-| ---------- | -------------------------------------------------------------------------------------------- |
-| M0–M2      | Verified foundation; Effect/error/observability runtime; workspace/project/capability kernel |
-| M3–M4      | Membership/policy/credentials and strict project locales/access                              |
-| M5–M6      | Versioned schema engine, 18-kind field system, layout, validation, generated forms           |
-| M7–M8      | Multilingual drafts/revisions and immutable exact-locale publication/snapshots               |
-| M9–M10     | Production Delivery v1 and scoped Preview v1                                                 |
-| M11        | Publication events, secure webhooks, invalidation, worker delivery                           |
-| M12        | Tooling v1, OAuth-capable CLI, SDK/generation, public contracts, docs portal                 |
-| M13        | Code-first schema/content Authoring v1, SDK/CLI, local editor, builder retirement            |
-| M14–M15    | Portable Control Plane bootstrap and governance automation parity                            |
+| Milestones | Capability                                                                                     |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| M0–M2      | Verified foundation; Effect/error/observability runtime; workspace/project/capability kernel   |
+| M3–M4      | Membership/policy/credentials and strict project locales/access                                |
+| M5–M6      | Versioned schema engine, 18-kind field system, layout, validation, generated forms             |
+| M7–M8      | Multilingual drafts/revisions and immutable exact-locale publication/snapshots                 |
+| M9–M10     | Production Delivery v1 and scoped Preview v1                                                   |
+| M11        | Publication events, secure webhooks, invalidation, worker delivery                             |
+| M12        | Tooling v1, OAuth-capable CLI, SDK/generation, public contracts, docs portal                   |
+| M13        | Code-first schema/content Authoring v1, SDK/CLI, local editor, builder retirement              |
+| M14–M15    | Portable Control Plane bootstrap and governance automation parity                              |
+| M16 review | Operational credentials/webhooks/audits/archive recovery across HTTP, CLI, and hosted controls |
 
 M0–M15 are developer-approved and committed; M13 commit is `9c68942`, M14 commit is `6ba124a`, and M15 commit is `5460c2b`. Post-M13 repository/context normalization is committed at `cd31102`, roadmap sequencing at `2d0705a`, the public SDK/CLI boundary correction at `d63f215`, and retired dashboard schema-route removal at `5f6480d`. See `progress.md` for ordered outcomes, migrations, validation, roadmap status, and release state.
 
@@ -124,8 +125,5 @@ The subsequent repository-normalization workstream also passed the complete read
 
 ## Current work and next gate
 
-- **M14 `[A]` (`6ba124a`):** Control Plane v1 shipped 13 shared bearer HTTP/CLI/dashboard operations with signed cursors, receipts, quotas, telemetry, canonical docs/artifact, and `sdkSupported: false`; migration `0015` and eight manual scenarios passed, two review findings were fixed, and final readiness passed 1,259 tests. Artifact SHA-256: `747cc0c897ed2738adb5bbc476aee6a284d0f10e89ca8208c3a813a59890a935`.
-- **M15 `[A]` (`5460c2b`):** seven fixed roles plus `all | selected | none` flow atomically through invitations/member policy; 14 shared governance/member/invitation/locale operations expand Control Plane v1 to 27 while preserving OAuth-only account governance, exact current-`main` locale credentials, signed filter-bound cursors, stdin-only invitation proof, receipt-backed locale creation, honest actors, and SDK exclusion.
-- Developer-generated/applied migration `0016` is catalog-verified at 17 journal rows/60 tables with clean policy, actor, English-locale, and tenant invariants. The checklist audit fixed documentation, filtering/recovery, token caching, and parallel-fixture defects; authorized cleanup removed 37 stale rows, and final forced readiness passes 1,270 tests, coverage, 16 type tasks, contracts/format/lint/structure, and eight builds. Artifact SHA-256: `2950b28d937ef48b9ce7db98cb4dd477396b4ee0b16ea9fb7dfdef672f670145`; audits have no high/critical and four existing moderate test-tool findings.
-- A two-session headed Playwright review passed invitation, policy, recovery, filtering, exact-locale, keyboard/focus, responsive, and reflow scenarios, then closed token-clean with guarded fixture cleanup and zero residue. Review fixes removed hydration/Button/favicon/locale-tab defects; the later project-owned `tools/browser-tests` suite adds four retry-free headless Chromium assertions, fixes and guards direct protected-link hydration, and reserves interactive sessions or visual artifacts for explicit developer requests. The handled optional missing-Studio lookup remains the sole expected console 404; all services including the worker are healthy.
-- **Next gate:** design M16 operational administration and recovery, then stop for explicit developer design approval before implementation. Do not edit/apply migrations, publish, activate production OAuth, deploy, or begin M17.
+- **Current — M16 `[R]`:** operational administration/recovery is implemented across HTTP, CLI, and hosted controls; migrations `0017`/`0018` are developer-applied and catalog-verified. Automated and headed-browser review passes, including 1,311 tests, four Chromium specifications, eight builds, clean high/critical audit and database reconciliation, archive/worker recovery, secret containment, accessibility, and authenticated SSR. The worker remains stopped; changes are uncommitted and M16 is not accepted.
+- **Next:** developer reviews and explicitly accepts M16, then commits manually. The isolated sustained two-worker profile and production baseline/smoke checks remain environment gates; do not restart the worker, deploy, publish, activate production configuration, or begin M17 without authorization.

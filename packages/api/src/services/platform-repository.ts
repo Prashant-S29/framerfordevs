@@ -1,5 +1,5 @@
 import { db } from "@framerfordevs/db";
-import { and, desc, eq, isNotNull, isNull, lt, or, sql } from "@framerfordevs/db/query";
+import { and, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "@framerfordevs/db/query";
 import { projectMembership } from "@framerfordevs/db/schema/access";
 import { studioRegistration as studioRegistrationTable } from "@framerfordevs/db/schema/control-plane";
 import { projectLocale } from "@framerfordevs/db/schema/locale";
@@ -11,6 +11,7 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
+import { webhookDelivery } from "@framerfordevs/db/schema/webhooks";
 import { Context, Effect, Layer, Schema } from "effect";
 
 import {
@@ -1226,6 +1227,9 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
+            await transaction.execute(
+              sql`select id from project where id = ${input.projectId} for update`,
+            );
             const authorization = await authorizeUserProject(
               transaction,
               actorId,
@@ -1257,6 +1261,23 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
               )
               .returning();
             if (!archived) return outcome("version_conflict");
+
+            await transaction
+              .update(webhookDelivery)
+              .set({
+                status: "canceled",
+                nextAttemptAt: null,
+                completedAt: archivedAt,
+                lastOutcome: "project_archived",
+                updatedAt: archivedAt,
+              })
+              .where(
+                and(
+                  eq(webhookDelivery.workspaceId, current.workspaceId),
+                  eq(webhookDelivery.projectId, current.id),
+                  inArray(webhookDelivery.status, ["queued", "retry_scheduled"]),
+                ),
+              );
 
             await transaction.insert(auditEvent).values(
               makeAuditValues({

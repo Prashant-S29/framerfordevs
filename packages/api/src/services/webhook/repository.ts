@@ -2,6 +2,7 @@
 
 import { db } from "@framerfordevs/db";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "@framerfordevs/db/query";
+import { outboxEvent } from "@framerfordevs/db/schema/cms";
 import { environment, auditEvent } from "@framerfordevs/db/schema/platform";
 import {
   cmsInvalidationRouteMapping,
@@ -17,15 +18,18 @@ import { Context, Effect, Layer, Schema } from "effect";
 
 import {
   ConflictFailure,
+  ControlPlaneCommandConflictFailure,
   DatabaseFailure,
   ForbiddenFailure,
+  InvalidStateTransitionFailure,
   NotFoundFailure,
   VersionConflictFailure,
   WebhookEndpointLimitReachedFailure,
   WebhookReplayNotAllowedFailure,
   WebhookSecretRotationConflictFailure,
 } from "../../contracts/response/errors";
-import type { AuthUserId } from "../../contracts/platform";
+import type { ProjectActor } from "../../contracts/access";
+import type { ControlPlaneCommandId } from "../../contracts/control-plane";
 import {
   decodeInvalidationMappingCursor,
   decodeWebhookAttemptCursor,
@@ -59,9 +63,13 @@ import {
   type UpdateInvalidationRouteMappingInput,
   type UpdateWebhookEndpointInput,
 } from "../../contracts/webhook";
+import {
+  inspectControlPlaneReceipt,
+  persistControlPlaneReceipt,
+} from "../control-plane/command-receipt";
 import type { WebhookCiphertext } from "./crypto";
 import type { ApplicationDb } from "../project-access";
-import { authorizeUserProject } from "../project-access";
+import { authorizeCmsActorProject } from "../project-access";
 
 export interface CreateWebhookEndpointPersistence {
   readonly endpointId: string;
@@ -89,6 +97,50 @@ export interface PendingWebhookSecretPersistence {
 
 function databaseFailure(operation: string, cause: unknown) {
   return DatabaseFailure.make({ operation, cause });
+}
+
+function actorIdentity(actor: ProjectActor, environmentId: string) {
+  return {
+    userId: actor.kind === "user" ? actor.id : null,
+    credentialId: actor.kind === "credential" ? actor.id : null,
+    credentialEnvironmentId: actor.kind === "credential" ? environmentId : null,
+  };
+}
+
+function createdActorValues(actor: ProjectActor, environmentId: string) {
+  const identity = actorIdentity(actor, environmentId);
+  return {
+    createdByUserId: identity.userId,
+    createdByCredentialId: identity.credentialId,
+    createdByCredentialEnvironmentId: identity.credentialEnvironmentId,
+  };
+}
+
+function changedActorValues(actor: ProjectActor, environmentId: string) {
+  const identity = actorIdentity(actor, environmentId);
+  return {
+    changedByUserId: identity.userId,
+    changedByCredentialId: identity.credentialId,
+    changedByCredentialEnvironmentId: identity.credentialEnvironmentId,
+  };
+}
+
+function closedActorValues(actor: ProjectActor, environmentId: string) {
+  const identity = actorIdentity(actor, environmentId);
+  return {
+    closedByUserId: identity.userId,
+    closedByCredentialId: identity.credentialId,
+    closedByCredentialEnvironmentId: identity.credentialEnvironmentId,
+  };
+}
+
+function replayActorValues(actor: ProjectActor, environmentId: string) {
+  const identity = actorIdentity(actor, environmentId);
+  return {
+    replayedByUserId: identity.userId,
+    replayedByCredentialId: identity.credentialId,
+    replayedByCredentialEnvironmentId: identity.credentialEnvironmentId,
+  };
 }
 
 interface EndpointSummary {
@@ -200,40 +252,105 @@ async function loadEndpointValue(
   );
 }
 
+async function loadEndpointPageValues(
+  database: ApplicationDb,
+  rows: ReadonlyArray<{
+    readonly endpoint: typeof webhookEndpoint.$inferSelect;
+    readonly origin: string;
+  }>,
+) {
+  const endpointIds = rows.map((row) => row.endpoint.id);
+  if (endpointIds.length === 0) return [];
+  const [subscriptions, secrets, deliverySummaries] = await Promise.all([
+    database
+      .select({
+        endpointId: webhookEndpointSubscription.endpointId,
+        eventType: webhookEndpointSubscription.eventType,
+      })
+      .from(webhookEndpointSubscription)
+      .where(
+        and(
+          inArray(webhookEndpointSubscription.endpointId, endpointIds),
+          isNull(webhookEndpointSubscription.activeUntil),
+        ),
+      )
+      .orderBy(webhookEndpointSubscription.endpointId, webhookEndpointSubscription.eventType),
+    database
+      .select({
+        endpointId: webhookEndpointSecret.endpointId,
+        state: webhookEndpointSecret.state,
+        retireAt: webhookEndpointSecret.retireAt,
+      })
+      .from(webhookEndpointSecret)
+      .where(
+        and(
+          inArray(webhookEndpointSecret.endpointId, endpointIds),
+          inArray(webhookEndpointSecret.state, ["pending", "active", "retiring"]),
+        ),
+      ),
+    database
+      .select({
+        endpointId: webhookDelivery.endpointId,
+        deadLetterCount: sql<number>`count(*) filter (where ${webhookDelivery.status} = 'dead_letter')::int`,
+        lastOutcome: sql<
+          string | null
+        >`(array_agg(${webhookDelivery.lastOutcome} order by ${webhookDelivery.updatedAt} desc, ${webhookDelivery.id} desc) filter (where ${webhookDelivery.lastOutcome} is not null))[1]`,
+      })
+      .from(webhookDelivery)
+      .where(inArray(webhookDelivery.endpointId, endpointIds))
+      .groupBy(webhookDelivery.endpointId),
+  ]);
+  const subscriptionsByEndpoint = new Map<string, Array<string>>();
+  for (const subscription of subscriptions) {
+    const values = subscriptionsByEndpoint.get(subscription.endpointId) ?? [];
+    values.push(subscription.eventType);
+    subscriptionsByEndpoint.set(subscription.endpointId, values);
+  }
+  const secretsByEndpoint = new Map<
+    string,
+    Array<{ readonly state: string; readonly retireAt: Date | null }>
+  >();
+  for (const secret of secrets) {
+    const values = secretsByEndpoint.get(secret.endpointId) ?? [];
+    values.push(secret);
+    secretsByEndpoint.set(secret.endpointId, values);
+  }
+  const summaryByEndpoint = new Map<string, (typeof deliverySummaries)[number]>();
+  for (const summary of deliverySummaries) {
+    summaryByEndpoint.set(summary.endpointId, summary);
+  }
+  return rows.map(({ endpoint, origin }) => {
+    const secretSummary = summarizeSecretRows(secretsByEndpoint.get(endpoint.id) ?? []);
+    const deliverySummary = summaryByEndpoint.get(endpoint.id);
+    return endpointValue(endpoint, origin, subscriptionsByEndpoint.get(endpoint.id) ?? [], {
+      ...secretSummary,
+      lastOutcome: deliverySummary?.lastOutcome ?? null,
+      deadLetterCount: deliverySummary?.deadLetterCount ?? 0,
+    });
+  });
+}
+
 async function authorizeEnvironment(
   database: ApplicationDb,
-  actorId: AuthUserId,
+  actor: ProjectActor,
   projectId: string,
   environmentId: string,
   action: "webhook.read" | "webhook.manage",
 ) {
-  const authorization = await authorizeUserProject(database, actorId, projectId, action);
-  if (authorization.kind !== "allowed") return authorization;
-  const [environmentRow] = await database
-    .select({ id: environment.id })
-    .from(environment)
-    .where(
-      and(
-        eq(environment.id, environmentId),
-        eq(environment.projectId, projectId),
-        eq(environment.workspaceId, authorization.access.project.workspaceId),
-      ),
-    )
-    .limit(1);
-  return environmentRow ? authorization : { kind: "not_found" as const };
+  return authorizeCmsActorProject(database, actor, projectId, environmentId, action);
 }
 
 export function makeWebhookRepository(database: ApplicationDb = db) {
   return {
     resolveManagementScope: Effect.fn("WebhookRepository.resolveManagementScope")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: { readonly projectId: string; readonly environmentId: string },
     ) {
       const authorization = yield* Effect.tryPromise({
         try: () =>
           authorizeEnvironment(
             database,
-            actorId,
+            actor,
             input.projectId,
             input.environmentId,
             "webhook.manage",
@@ -247,7 +364,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
     }),
 
     createEndpoint: Effect.fn("WebhookRepository.createEndpoint")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: CreateWebhookEndpointInput,
       persistence: CreateWebhookEndpointPersistence,
       now: Date,
@@ -256,13 +373,17 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const authorization = await authorizeUserProject(
+            const authorization = await authorizeCmsActorProject(
               transaction,
-              actorId,
+              actor,
               input.projectId,
+              input.environmentId,
               "webhook.manage",
             );
             if (authorization.kind !== "allowed") return authorization;
+            if (authorization.access.project.archivedAt !== null) {
+              return { kind: "invalid_state" as const };
+            }
             const workspaceId = authorization.access.project.workspaceId;
             const [environmentRow] = await transaction
               .select({ id: environment.id })
@@ -301,8 +422,8 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               state: "disabled",
               version: 1,
               currentDestinationId: null,
-              createdByUserId: actorId,
-              changedByUserId: actorId,
+              ...createdActorValues(actor, input.environmentId),
+              ...changedActorValues(actor, input.environmentId),
               createdAt: now,
               updatedAt: now,
             });
@@ -318,7 +439,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               nonce: persistence.destination.nonce,
               ciphertext: persistence.destination.ciphertext,
               keyedFingerprint: persistence.destinationFingerprint,
-              createdByUserId: actorId,
+              ...createdActorValues(actor, input.environmentId),
               createdAt: now,
             });
             await transaction.insert(webhookEndpointSubscription).values(
@@ -329,7 +450,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                 environmentId: input.environmentId,
                 eventType,
                 activeFrom: now,
-                createdByUserId: actorId,
+                ...createdActorValues(actor, input.environmentId),
                 createdAt: now,
               })),
             );
@@ -346,8 +467,8 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               ciphertext: persistence.secret.ciphertext,
               fingerprint: persistence.secretFingerprint,
               activatedAt: now,
-              createdByUserId: actorId,
-              changedByUserId: actorId,
+              ...createdActorValues(actor, input.environmentId),
+              ...changedActorValues(actor, input.environmentId),
               createdAt: now,
               updatedAt: now,
             });
@@ -367,8 +488,8 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               workspaceId,
               projectId: input.projectId,
               environmentId: input.environmentId,
-              actorType: "user",
-              actorId,
+              actorType: actor.kind,
+              actorId: actor.id,
               action: "cms.webhook.endpoint.created",
               resourceType: "webhook_endpoint",
               resourceId: persistence.endpointId,
@@ -381,6 +502,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       });
       if (result.kind === "not_found") return yield* NotFoundFailure.make({ resource: "project" });
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
+      if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
       if (result.kind === "limit") return yield* WebhookEndpointLimitReachedFailure.make();
       return endpointValue(result.endpoint, persistence.displayOrigin, input.subscriptions, {
         rotationState: "active",
@@ -391,7 +513,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
     }),
 
     listEndpoints: Effect.fn("WebhookRepository.listEndpoints")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: ListWebhookEndpointsInput,
     ) {
       const cursor =
@@ -400,7 +522,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
         try: () =>
           authorizeEnvironment(
             database,
-            actorId,
+            actor,
             input.projectId,
             input.environmentId,
             "webhook.read",
@@ -424,6 +546,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                 eq(webhookEndpoint.workspaceId, authorization.access.project.workspaceId),
                 eq(webhookEndpoint.projectId, input.projectId),
                 eq(webhookEndpoint.environmentId, input.environmentId),
+                input.state === "all" ? undefined : eq(webhookEndpoint.state, input.state),
                 cursor === null
                   ? undefined
                   : or(
@@ -440,15 +563,10 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
         catch: (cause) => databaseFailure("webhook.endpoint.list", cause),
       });
       const visibleRows = rows.slice(0, input.limit);
-      const items = [];
-      for (const row of visibleRows) {
-        items.push(
-          yield* Effect.tryPromise({
-            try: () => loadEndpointValue(database, row.endpoint, row.origin),
-            catch: (cause) => databaseFailure("webhook.endpoint.list.details", cause),
-          }),
-        );
-      }
+      const items = yield* Effect.tryPromise({
+        try: () => loadEndpointPageValues(database, visibleRows),
+        catch: (cause) => databaseFailure("webhook.endpoint.list.details", cause),
+      });
       const last = visibleRows.at(-1)?.endpoint;
       const nextCursor =
         rows.length > input.limit && last
@@ -463,7 +581,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
     }),
 
     updateEndpoint: Effect.fn("WebhookRepository.updateEndpoint")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: UpdateWebhookEndpointInput,
       persistence: UpdateWebhookDestinationPersistence | null,
       now: Date,
@@ -472,13 +590,17 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const authorization = await authorizeUserProject(
+            const authorization = await authorizeCmsActorProject(
               transaction,
-              actorId,
+              actor,
               input.projectId,
+              input.environmentId,
               "webhook.manage",
             );
             if (authorization.kind !== "allowed") return authorization;
+            if (authorization.access.project.archivedAt !== null) {
+              return { kind: "invalid_state" as const };
+            }
             const [endpoint] = await transaction
               .select()
               .from(webhookEndpoint)
@@ -515,7 +637,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                 nonce: persistence.destination.nonce,
                 ciphertext: persistence.destination.ciphertext,
                 keyedFingerprint: persistence.destinationFingerprint,
-                createdByUserId: actorId,
+                ...createdActorValues(actor, input.environmentId),
                 createdAt: now,
               });
               currentDestinationId = persistence.destinationId;
@@ -526,7 +648,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                 name: input.name,
                 currentDestinationId,
                 version: endpoint.version + 1,
-                changedByUserId: actorId,
+                ...changedActorValues(actor, input.environmentId),
                 updatedAt: now,
               })
               .where(eq(webhookEndpoint.id, endpoint.id))
@@ -536,8 +658,8 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               workspaceId: endpoint.workspaceId,
               projectId: endpoint.projectId,
               environmentId: endpoint.environmentId,
-              actorType: "user",
-              actorId,
+              actorType: actor.kind,
+              actorId: actor.id,
               action: "cms.webhook.endpoint.updated",
               resourceType: "webhook_endpoint",
               resourceId: endpoint.id,
@@ -551,6 +673,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       if (result.kind === "not_found")
         return yield* NotFoundFailure.make({ resource: "webhook endpoint" });
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
+      if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
       if (result.kind === "version") return yield* VersionConflictFailure.make();
       return yield* Effect.tryPromise({
         try: () => loadEndpointValue(database, result.endpoint),
@@ -559,7 +682,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
     }),
 
     setEndpointState: Effect.fn("WebhookRepository.setEndpointState")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: SetWebhookEndpointStateInput,
       now: Date,
       requestId: string,
@@ -567,13 +690,17 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const authorization = await authorizeUserProject(
+            const authorization = await authorizeCmsActorProject(
               transaction,
-              actorId,
+              actor,
               input.projectId,
+              input.environmentId,
               "webhook.manage",
             );
             if (authorization.kind !== "allowed") return authorization;
+            if (authorization.access.project.archivedAt !== null && input.state !== "disabled") {
+              return { kind: "invalid_state" as const };
+            }
             const [endpoint] = await transaction
               .select()
               .from(webhookEndpoint)
@@ -612,7 +739,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                 version: endpoint.version + 1,
                 enabledAt: input.state === "enabled" ? now : endpoint.enabledAt,
                 disabledAt: input.state === "disabled" ? now : null,
-                changedByUserId: actorId,
+                ...changedActorValues(actor, input.environmentId),
                 updatedAt: now,
               })
               .where(eq(webhookEndpoint.id, endpoint.id))
@@ -639,8 +766,8 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               workspaceId: endpoint.workspaceId,
               projectId: endpoint.projectId,
               environmentId: endpoint.environmentId,
-              actorType: "user",
-              actorId,
+              actorType: actor.kind,
+              actorId: actor.id,
               action:
                 input.state === "enabled"
                   ? "cms.webhook.endpoint.enabled"
@@ -658,6 +785,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
         return yield* NotFoundFailure.make({ resource: "webhook endpoint" });
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
       if (result.kind === "version") return yield* VersionConflictFailure.make();
+      if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
       if (result.kind === "limit") return yield* WebhookEndpointLimitReachedFailure.make();
       return yield* Effect.tryPromise({
         try: () => loadEndpointValue(database, result.endpoint),
@@ -666,7 +794,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
     }),
 
     replaceSubscriptions: Effect.fn("WebhookRepository.replaceSubscriptions")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: ReplaceWebhookSubscriptionsInput,
       now: Date,
       requestId: string,
@@ -674,13 +802,17 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const authorization = await authorizeUserProject(
+            const authorization = await authorizeCmsActorProject(
               transaction,
-              actorId,
+              actor,
               input.projectId,
+              input.environmentId,
               "webhook.manage",
             );
             if (authorization.kind !== "allowed") return authorization;
+            if (authorization.access.project.archivedAt !== null) {
+              return { kind: "invalid_state" as const };
+            }
             const [endpoint] = await transaction
               .select()
               .from(webhookEndpoint)
@@ -711,7 +843,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
             if (removed.length > 0) {
               await transaction
                 .update(webhookEndpointSubscription)
-                .set({ activeUntil: now, closedByUserId: actorId })
+                .set({ activeUntil: now, ...closedActorValues(actor, input.environmentId) })
                 .where(
                   inArray(
                     webhookEndpointSubscription.id,
@@ -758,13 +890,17 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                   environmentId: endpoint.environmentId,
                   eventType,
                   activeFrom: now,
-                  createdByUserId: actorId,
+                  ...createdActorValues(actor, input.environmentId),
                   createdAt: now,
                 })),
               );
             const [updated] = await transaction
               .update(webhookEndpoint)
-              .set({ version: endpoint.version + 1, changedByUserId: actorId, updatedAt: now })
+              .set({
+                version: endpoint.version + 1,
+                ...changedActorValues(actor, input.environmentId),
+                updatedAt: now,
+              })
               .where(eq(webhookEndpoint.id, endpoint.id))
               .returning();
             if (!updated) throw new Error("Webhook subscription update returned no endpoint.");
@@ -772,8 +908,8 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               workspaceId: endpoint.workspaceId,
               projectId: endpoint.projectId,
               environmentId: endpoint.environmentId,
-              actorType: "user",
-              actorId,
+              actorType: actor.kind,
+              actorId: actor.id,
               action: "cms.webhook.subscription.updated",
               resourceType: "webhook_endpoint",
               resourceId: endpoint.id,
@@ -788,6 +924,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
         return yield* NotFoundFailure.make({ resource: "webhook endpoint" });
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
       if (result.kind === "version") return yield* VersionConflictFailure.make();
+      if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
       return yield* Effect.tryPromise({
         try: () => loadEndpointValue(database, result.endpoint, undefined, input.subscriptions),
         catch: (cause) => databaseFailure("webhook.subscription.details", cause),
@@ -795,7 +932,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
     }),
 
     startSecretRotation: Effect.fn("WebhookRepository.startSecretRotation")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: {
         readonly projectId: string;
         readonly environmentId: string;
@@ -809,13 +946,17 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const authorization = await authorizeUserProject(
+            const authorization = await authorizeCmsActorProject(
               transaction,
-              actorId,
+              actor,
               input.projectId,
+              input.environmentId,
               "webhook.manage",
             );
             if (authorization.kind !== "allowed") return authorization;
+            if (authorization.access.project.archivedAt !== null) {
+              return { kind: "invalid_state" as const };
+            }
             const [endpoint] = await transaction
               .select()
               .from(webhookEndpoint)
@@ -858,21 +999,25 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               nonce: persistence.secret.nonce,
               ciphertext: persistence.secret.ciphertext,
               fingerprint: persistence.secretFingerprint,
-              createdByUserId: actorId,
-              changedByUserId: actorId,
+              ...createdActorValues(actor, input.environmentId),
+              ...changedActorValues(actor, input.environmentId),
               createdAt: now,
               updatedAt: now,
             });
             await transaction
               .update(webhookEndpoint)
-              .set({ version: endpoint.version + 1, changedByUserId: actorId, updatedAt: now })
+              .set({
+                version: endpoint.version + 1,
+                ...changedActorValues(actor, input.environmentId),
+                updatedAt: now,
+              })
               .where(eq(webhookEndpoint.id, endpoint.id));
             await transaction.insert(auditEvent).values({
               workspaceId: endpoint.workspaceId,
               projectId: endpoint.projectId,
               environmentId: endpoint.environmentId,
-              actorType: "user",
-              actorId,
+              actorType: actor.kind,
+              actorId: actor.id,
               action: "cms.webhook.secret.rotation_started",
               resourceType: "webhook_endpoint",
               resourceId: endpoint.id,
@@ -887,12 +1032,13 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
         return yield* NotFoundFailure.make({ resource: "webhook endpoint" });
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
       if (result.kind === "version") return yield* VersionConflictFailure.make();
+      if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
       if (result.kind === "rotation") return yield* WebhookSecretRotationConflictFailure.make();
       return true;
     }),
 
     changeSecretRotation: Effect.fn("WebhookRepository.changeSecretRotation")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: ChangeWebhookSecretRotationInput,
       now: Date,
       requestId: string,
@@ -900,13 +1046,17 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const authorization = await authorizeUserProject(
+            const authorization = await authorizeCmsActorProject(
               transaction,
-              actorId,
+              actor,
               input.projectId,
+              input.environmentId,
               "webhook.manage",
             );
             if (authorization.kind !== "allowed") return authorization;
+            if (authorization.access.project.archivedAt !== null && input.action === "activate") {
+              return { kind: "invalid_state" as const };
+            }
             const [endpoint] = await transaction
               .select()
               .from(webhookEndpoint)
@@ -933,14 +1083,19 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               const retireAt = new Date(now.getTime() + 24 * 60 * 60 * 1_000);
               await transaction
                 .update(webhookEndpointSecret)
-                .set({ state: "retiring", retireAt, changedByUserId: actorId, updatedAt: now })
+                .set({
+                  state: "retiring",
+                  retireAt,
+                  ...changedActorValues(actor, input.environmentId),
+                  updatedAt: now,
+                })
                 .where(eq(webhookEndpointSecret.id, active.id));
               await transaction
                 .update(webhookEndpointSecret)
                 .set({
                   state: "active",
                   activatedAt: now,
-                  changedByUserId: actorId,
+                  ...changedActorValues(actor, input.environmentId),
                   updatedAt: now,
                 })
                 .where(eq(webhookEndpointSecret.id, pending.id));
@@ -952,7 +1107,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                   nonce: null,
                   ciphertext: null,
                   retiredAt: now,
-                  changedByUserId: actorId,
+                  ...changedActorValues(actor, input.environmentId),
                   updatedAt: now,
                 })
                 .where(eq(webhookEndpointSecret.id, pending.id));
@@ -964,14 +1119,18 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                   nonce: null,
                   ciphertext: null,
                   retiredAt: now,
-                  changedByUserId: actorId,
+                  ...changedActorValues(actor, input.environmentId),
                   updatedAt: now,
                 })
                 .where(eq(webhookEndpointSecret.id, retiring.id));
             } else return { kind: "rotation" as const };
             const [updated] = await transaction
               .update(webhookEndpoint)
-              .set({ version: endpoint.version + 1, changedByUserId: actorId, updatedAt: now })
+              .set({
+                version: endpoint.version + 1,
+                ...changedActorValues(actor, input.environmentId),
+                updatedAt: now,
+              })
               .where(eq(webhookEndpoint.id, endpoint.id))
               .returning();
             if (!updated) throw new Error("Webhook rotation update returned no endpoint.");
@@ -979,8 +1138,8 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               workspaceId: endpoint.workspaceId,
               projectId: endpoint.projectId,
               environmentId: endpoint.environmentId,
-              actorType: "user",
-              actorId,
+              actorType: actor.kind,
+              actorId: actor.id,
               action: `cms.webhook.secret.rotation_${input.action === "activate" ? "activated" : input.action === "cancel" ? "canceled" : "completed"}`,
               resourceType: "webhook_endpoint",
               resourceId: endpoint.id,
@@ -995,26 +1154,35 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
         return yield* NotFoundFailure.make({ resource: "webhook endpoint" });
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
       if (result.kind === "version") return yield* VersionConflictFailure.make();
+      if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
       if (result.kind === "rotation") return yield* WebhookSecretRotationConflictFailure.make();
       return result.endpoint;
     }),
 
     createMapping: Effect.fn("WebhookRepository.createMapping")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: CreateInvalidationRouteMappingInput,
       now: Date,
       requestId: string,
+      receipt?: {
+        readonly commandId: ControlPlaneCommandId;
+        readonly fingerprint: string;
+      },
     ) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const authorization = await authorizeUserProject(
+            const authorization = await authorizeCmsActorProject(
               transaction,
-              actorId,
+              actor,
               input.projectId,
+              input.environmentId,
               "webhook.manage",
             );
             if (authorization.kind !== "allowed") return authorization;
+            if (authorization.access.project.archivedAt !== null) {
+              return { kind: "invalid_state" as const };
+            }
             const workspaceId = authorization.access.project.workspaceId;
             const [environmentRow] = await transaction
               .select({ id: environment.id })
@@ -1028,6 +1196,37 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               )
               .limit(1);
             if (!environmentRow) return { kind: "not_found" as const };
+            const receiptExpectation = receipt
+              ? {
+                  commandId: receipt.commandId,
+                  operation: "invalidation_mapping.create" as const,
+                  actor,
+                  fingerprint: receipt.fingerprint,
+                  workspaceId,
+                  projectId: input.projectId,
+                  environmentId: input.environmentId,
+                }
+              : null;
+            if (receiptExpectation !== null) {
+              const inspection = await inspectControlPlaneReceipt(transaction, receiptExpectation);
+              if (inspection.kind === "conflict") return { kind: "command_conflict" as const };
+              if (inspection.kind === "replay") {
+                const [replayed] = await transaction
+                  .select()
+                  .from(cmsInvalidationRouteMapping)
+                  .where(
+                    and(
+                      eq(cmsInvalidationRouteMapping.id, inspection.resourceId),
+                      eq(cmsInvalidationRouteMapping.workspaceId, workspaceId),
+                      eq(cmsInvalidationRouteMapping.projectId, input.projectId),
+                      eq(cmsInvalidationRouteMapping.environmentId, input.environmentId),
+                    ),
+                  )
+                  .limit(1);
+                if (!replayed) throw new Error("Invalidation mapping receipt target is missing.");
+                return { kind: "success" as const, mapping: replayed };
+              }
+            }
             await transaction.execute(
               sql`select id from environment where id = ${input.environmentId} for update`,
             );
@@ -1058,8 +1257,8 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                 semanticTags: [...input.semanticTags],
                 state: "enabled",
                 version: 1,
-                createdByUserId: actorId,
-                changedByUserId: actorId,
+                ...createdActorValues(actor, input.environmentId),
+                ...changedActorValues(actor, input.environmentId),
                 createdAt: now,
                 updatedAt: now,
               })
@@ -1069,20 +1268,35 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               workspaceId,
               projectId: input.projectId,
               environmentId: input.environmentId,
-              actorType: "user",
-              actorId,
+              actorType: actor.kind,
+              actorId: actor.id,
               action: "cms.invalidation.route.created",
               resourceType: "cms_invalidation_route_mapping",
               resourceId: mapping.id,
               requestId,
               occurredAt: now,
             });
+            if (receiptExpectation !== null) {
+              await persistControlPlaneReceipt(
+                transaction,
+                receiptExpectation,
+                {
+                  resourceType: "cms_invalidation_route_mapping",
+                  resourceId: mapping.id,
+                  disposition: "created",
+                },
+                now,
+              );
+            }
             return { kind: "success" as const, mapping };
           }),
         catch: (cause) => databaseFailure("webhook.mapping.create", cause),
       });
       if (result.kind === "not_found") return yield* NotFoundFailure.make({ resource: "project" });
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
+      if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
+      if (result.kind === "command_conflict")
+        return yield* ControlPlaneCommandConflictFailure.make();
       if (result.kind === "limit") return yield* ConflictFailure.make();
       return Schema.decodeUnknownSync(InvalidationRouteMapping)({
         id: result.mapping.id,
@@ -1103,7 +1317,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
     }),
 
     updateMapping: Effect.fn("WebhookRepository.updateMapping")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: UpdateInvalidationRouteMappingInput,
       now: Date,
       requestId: string,
@@ -1111,13 +1325,17 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const authorization = await authorizeUserProject(
+            const authorization = await authorizeCmsActorProject(
               transaction,
-              actorId,
+              actor,
               input.projectId,
+              input.environmentId,
               "webhook.manage",
             );
             if (authorization.kind !== "allowed") return authorization;
+            if (authorization.access.project.archivedAt !== null) {
+              return { kind: "invalid_state" as const };
+            }
             const [mapping] = await transaction
               .select()
               .from(cmsInvalidationRouteMapping)
@@ -1147,7 +1365,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                 routePath: input.route,
                 semanticTags: [...input.semanticTags],
                 version: mapping.version + 1,
-                changedByUserId: actorId,
+                ...changedActorValues(actor, input.environmentId),
                 updatedAt: now,
               })
               .where(eq(cmsInvalidationRouteMapping.id, mapping.id))
@@ -1157,8 +1375,8 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               workspaceId: mapping.workspaceId,
               projectId: mapping.projectId,
               environmentId: mapping.environmentId,
-              actorType: "user",
-              actorId,
+              actorType: actor.kind,
+              actorId: actor.id,
               action: "cms.invalidation.route.updated",
               resourceType: "cms_invalidation_route_mapping",
               resourceId: mapping.id,
@@ -1172,6 +1390,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       if (result.kind === "not_found")
         return yield* NotFoundFailure.make({ resource: "invalidation mapping" });
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
+      if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
       if (result.kind === "version") return yield* VersionConflictFailure.make();
       return Schema.decodeUnknownSync(InvalidationRouteMapping)({
         id: result.mapping.id,
@@ -1192,7 +1411,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
     }),
 
     setMappingState: Effect.fn("WebhookRepository.setMappingState")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: SetInvalidationRouteMappingStateInput,
       now: Date,
       requestId: string,
@@ -1200,13 +1419,17 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const authorization = await authorizeUserProject(
+            const authorization = await authorizeCmsActorProject(
               transaction,
-              actorId,
+              actor,
               input.projectId,
+              input.environmentId,
               "webhook.manage",
             );
             if (authorization.kind !== "allowed") return authorization;
+            if (authorization.access.project.archivedAt !== null) {
+              return { kind: "invalid_state" as const };
+            }
             const [mapping] = await transaction
               .select()
               .from(cmsInvalidationRouteMapping)
@@ -1247,7 +1470,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                 state: input.state,
                 disabledAt: input.state === "disabled" ? now : null,
                 version: mapping.version + 1,
-                changedByUserId: actorId,
+                ...changedActorValues(actor, input.environmentId),
                 updatedAt: now,
               })
               .where(eq(cmsInvalidationRouteMapping.id, mapping.id))
@@ -1257,8 +1480,8 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               workspaceId: mapping.workspaceId,
               projectId: mapping.projectId,
               environmentId: mapping.environmentId,
-              actorType: "user",
-              actorId,
+              actorType: actor.kind,
+              actorId: actor.id,
               action:
                 input.state === "enabled"
                   ? "cms.invalidation.route.enabled"
@@ -1275,6 +1498,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       if (result.kind === "not_found")
         return yield* NotFoundFailure.make({ resource: "invalidation mapping" });
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
+      if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
       if (result.kind === "version") return yield* VersionConflictFailure.make();
       if (result.kind === "limit") return yield* ConflictFailure.make();
       return Schema.decodeUnknownSync(InvalidationRouteMapping)({
@@ -1296,7 +1520,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
     }),
 
     listMappings: Effect.fn("WebhookRepository.listMappings")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: ListInvalidationRouteMappingsInput,
     ) {
       const cursor =
@@ -1305,7 +1529,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
         try: () =>
           authorizeEnvironment(
             database,
-            actorId,
+            actor,
             input.projectId,
             input.environmentId,
             "webhook.read",
@@ -1328,6 +1552,9 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                 ),
                 eq(cmsInvalidationRouteMapping.projectId, input.projectId),
                 eq(cmsInvalidationRouteMapping.environmentId, input.environmentId),
+                input.state === "all"
+                  ? undefined
+                  : eq(cmsInvalidationRouteMapping.state, input.state),
                 cursor === null
                   ? undefined
                   : or(
@@ -1378,8 +1605,8 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       return InvalidationRouteMappingPage.make({ items, nextCursor });
     }),
 
-    listDeliveries: Effect.fn("WebhookRepository.listDeliveries")(function* (
-      actorId: AuthUserId,
+    listDeliverySummaries: Effect.fn("WebhookRepository.listDeliverySummaries")(function* (
+      actor: ProjectActor,
       input: ListWebhookDeliveriesInput,
     ) {
       const cursor =
@@ -1388,7 +1615,106 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
         try: () =>
           authorizeEnvironment(
             database,
-            actorId,
+            actor,
+            input.projectId,
+            input.environmentId,
+            "webhook.read",
+          ),
+        catch: (cause) => databaseFailure("webhook.delivery.summary.authorize", cause),
+      });
+      if (authorization.kind === "not_found")
+        return yield* NotFoundFailure.make({ resource: "project" });
+      if (authorization.kind === "forbidden") return yield* ForbiddenFailure.make();
+      const conditions = [
+        eq(webhookDelivery.workspaceId, authorization.access.project.workspaceId),
+        eq(webhookDelivery.projectId, input.projectId),
+        eq(webhookDelivery.environmentId, input.environmentId),
+      ];
+      if (input.endpointId !== null)
+        conditions.push(eq(webhookDelivery.endpointId, input.endpointId));
+      if (input.status !== null) conditions.push(eq(webhookDelivery.status, input.status));
+      const rows = yield* Effect.tryPromise({
+        try: () =>
+          database
+            .select({
+              delivery: webhookDelivery,
+              eventType: publicationEvent.eventType,
+              eventTime: publicationEvent.occurredAt,
+              subjectType: outboxEvent.subjectType,
+              subjectId: outboxEvent.subjectId,
+            })
+            .from(webhookDelivery)
+            .innerJoin(publicationEvent, eq(publicationEvent.eventId, webhookDelivery.eventId))
+            .innerJoin(outboxEvent, eq(outboxEvent.id, publicationEvent.eventId))
+            .where(
+              and(
+                ...conditions,
+                input.eventType === null
+                  ? undefined
+                  : eq(publicationEvent.eventType, input.eventType),
+                cursor === null
+                  ? undefined
+                  : or(
+                      lt(webhookDelivery.createdAt, new Date(cursor.createdAt)),
+                      and(
+                        eq(webhookDelivery.createdAt, new Date(cursor.createdAt)),
+                        lt(webhookDelivery.id, cursor.deliveryId),
+                      ),
+                    ),
+              ),
+            )
+            .orderBy(desc(webhookDelivery.createdAt), desc(webhookDelivery.id))
+            .limit(input.limit + 1),
+        catch: (cause) => databaseFailure("webhook.delivery.summary.list", cause),
+      });
+      const visibleRows = rows.slice(0, input.limit);
+      const items = visibleRows.map(
+        ({ delivery, eventType, eventTime, subjectType, subjectId }) => ({
+          id: delivery.id,
+          eventId: delivery.eventId,
+          endpointId: delivery.endpointId,
+          event: {
+            type: eventType,
+            time: eventTime.toISOString(),
+            subject: `${subjectType}/${subjectId}`,
+          },
+          kind: delivery.kind,
+          status: delivery.status,
+          attemptCount: delivery.attemptCount,
+          nextAttemptAt: delivery.nextAttemptAt?.toISOString() ?? null,
+          completedAt: delivery.completedAt?.toISOString() ?? null,
+          lastOutcome: delivery.lastOutcome,
+          createdAt: delivery.createdAt.toISOString(),
+          updatedAt: delivery.updatedAt.toISOString(),
+        }),
+      );
+      const last = visibleRows.at(-1)?.delivery;
+      const nextCursor =
+        rows.length > input.limit && last
+          ? yield* encodeWebhookDeliveryCursor({
+              projectId: input.projectId,
+              environmentId: input.environmentId,
+              endpointFilter: input.endpointId,
+              eventTypeFilter: input.eventType,
+              statusFilter: input.status,
+              createdAt: last.createdAt.toISOString(),
+              deliveryId: last.id,
+            })
+          : null;
+      return { items, nextCursor };
+    }),
+
+    listDeliveries: Effect.fn("WebhookRepository.listDeliveries")(function* (
+      actor: ProjectActor,
+      input: ListWebhookDeliveriesInput,
+    ) {
+      const cursor =
+        input.cursor === null ? null : yield* decodeWebhookDeliveryCursor(input.cursor, input);
+      const authorization = yield* Effect.tryPromise({
+        try: () =>
+          authorizeEnvironment(
+            database,
+            actor,
             input.projectId,
             input.environmentId,
             "webhook.read",
@@ -1470,8 +1796,69 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       return WebhookDeliveryPage.make({ items, nextCursor });
     }),
 
+    getDelivery: Effect.fn("WebhookRepository.getDelivery")(function* (
+      actor: ProjectActor,
+      input: {
+        readonly projectId: string;
+        readonly environmentId: string;
+        readonly deliveryId: string;
+      },
+    ) {
+      const authorization = yield* Effect.tryPromise({
+        try: () =>
+          authorizeEnvironment(
+            database,
+            actor,
+            input.projectId,
+            input.environmentId,
+            "webhook.read",
+          ),
+        catch: (cause) => databaseFailure("webhook.delivery.get.authorize", cause),
+      });
+      if (authorization.kind === "not_found") {
+        return yield* NotFoundFailure.make({ resource: "project" });
+      }
+      if (authorization.kind === "forbidden") return yield* ForbiddenFailure.make();
+      const row = yield* Effect.tryPromise({
+        try: async () => {
+          const [selected] = await database
+            .select({ delivery: webhookDelivery, canonicalBody: publicationEvent.canonicalBody })
+            .from(webhookDelivery)
+            .innerJoin(publicationEvent, eq(publicationEvent.eventId, webhookDelivery.eventId))
+            .where(
+              and(
+                eq(webhookDelivery.id, input.deliveryId),
+                eq(webhookDelivery.workspaceId, authorization.access.project.workspaceId),
+                eq(webhookDelivery.projectId, input.projectId),
+                eq(webhookDelivery.environmentId, input.environmentId),
+              ),
+            )
+            .limit(1);
+          return selected;
+        },
+        catch: (cause) => databaseFailure("webhook.delivery.get", cause),
+      });
+      if (row === undefined) {
+        return yield* NotFoundFailure.make({ resource: "webhook delivery" });
+      }
+      return Schema.decodeUnknownSync(WebhookDelivery)({
+        id: row.delivery.id,
+        eventId: row.delivery.eventId,
+        endpointId: row.delivery.endpointId,
+        event: JSON.parse(row.canonicalBody),
+        kind: row.delivery.kind,
+        status: row.delivery.status,
+        attemptCount: row.delivery.attemptCount,
+        nextAttemptAt: row.delivery.nextAttemptAt?.toISOString() ?? null,
+        completedAt: row.delivery.completedAt?.toISOString() ?? null,
+        lastOutcome: row.delivery.lastOutcome,
+        createdAt: row.delivery.createdAt.toISOString(),
+        updatedAt: row.delivery.updatedAt.toISOString(),
+      });
+    }),
+
     listAttempts: Effect.fn("WebhookRepository.listAttempts")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: ListWebhookAttemptsInput,
     ) {
       const cursor =
@@ -1480,7 +1867,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
         try: () =>
           authorizeEnvironment(
             database,
-            actorId,
+            actor,
             input.projectId,
             input.environmentId,
             "webhook.read",
@@ -1543,7 +1930,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
     }),
 
     replayEvent: Effect.fn("WebhookRepository.replayEvent")(function* (
-      actorId: AuthUserId,
+      actor: ProjectActor,
       input: ReplayWebhookEventInput,
       commandFingerprint: string,
       now: Date,
@@ -1552,13 +1939,17 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
-            const authorization = await authorizeUserProject(
+            const authorization = await authorizeCmsActorProject(
               transaction,
-              actorId,
+              actor,
               input.projectId,
+              input.environmentId,
               "webhook.manage",
             );
             if (authorization.kind !== "allowed") return authorization;
+            if (authorization.access.project.archivedAt !== null) {
+              return { kind: "invalid_state" as const };
+            }
             const [endpoint] = await transaction
               .select()
               .from(webhookEndpoint)
@@ -1617,7 +2008,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                 sourceDeliveryId: input.sourceDeliveryId,
                 replayCommandId: input.commandId,
                 replayCommandFingerprint: commandFingerprint,
-                replayedByUserId: actorId,
+                ...replayActorValues(actor, input.environmentId),
                 status: "queued",
                 nextAttemptAt: now,
                 createdAt: now,
@@ -1629,8 +2020,8 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               workspaceId: endpoint.workspaceId,
               projectId: endpoint.projectId,
               environmentId: endpoint.environmentId,
-              actorType: "user",
-              actorId,
+              actorType: actor.kind,
+              actorId: actor.id,
               action: "cms.webhook.delivery.replayed",
               resourceType: "webhook_delivery",
               resourceId: delivery.id,
@@ -1648,6 +2039,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       if (result.kind === "not_found")
         return yield* NotFoundFailure.make({ resource: "webhook event" });
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
+      if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
       if (result.kind === "not_allowed") return yield* WebhookReplayNotAllowedFailure.make();
       if (result.kind === "conflict") return yield* VersionConflictFailure.make();
       return Schema.decodeUnknownSync(WebhookDelivery)({

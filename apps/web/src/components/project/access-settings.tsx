@@ -2,6 +2,7 @@
 
 import type {
   ApiCredential,
+  ApiCredentialRotation,
   CredentialFamily,
   CredentialScope,
   LocaleAccessMode,
@@ -74,7 +75,7 @@ import {
   UserPlusIcon,
   UsersIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { buildInvitationLink } from "@/lib/auth/invitation-link";
@@ -115,6 +116,16 @@ function applicationErrorCode(error: unknown): string | undefined {
   if ("data" in error) return applicationErrorCode(error.data);
   if ("error" in error) return applicationErrorCode(error.error);
   return undefined;
+}
+
+function credentialSecretErrorMessage(error: unknown, operation: "issue" | "rotation") {
+  const code = applicationErrorCode(error);
+  if (code === undefined || code === "INTERNAL_SERVER_ERROR" || code === "SERVICE_UNAVAILABLE") {
+    return operation === "issue"
+      ? "The issue result is uncertain. Refresh credentials, revoke any unknown key, and explicitly issue a replacement. Do not retry blindly."
+      : "The rotation result is uncertain. Refresh credentials, cancel any pending replacement whose key was lost, and explicitly start again. Do not retry blindly.";
+  }
+  return error instanceof Error ? error.message : "The credential operation failed.";
 }
 
 export function governanceErrorMessage(error: unknown, ambiguousInvitation = false): string {
@@ -184,6 +195,7 @@ interface ProjectAccessSettingsProps {
   readonly role: ProjectRole;
   readonly localeAccessMode: LocaleAccessMode;
   readonly effectiveProjectActions: ReadonlyArray<ProjectPermissionAction>;
+  readonly isArchived?: boolean;
 }
 
 export function ProjectAccessSettings({
@@ -192,6 +204,7 @@ export function ProjectAccessSettings({
   role,
   localeAccessMode,
   effectiveProjectActions,
+  isArchived = false,
 }: ProjectAccessSettingsProps) {
   const actions = new Set(effectiveProjectActions);
   const canReadMembers = actions.has("project.member.read");
@@ -246,6 +259,7 @@ export function ProjectAccessSettings({
                   canRotate={canRotateCredentials}
                   canRevoke={canRevokeCredentials}
                   localeRestricted={hasRestrictedLocaleAccess}
+                  isArchived={isArchived}
                 />
               </TabsContent>
             ) : null}
@@ -1198,6 +1212,15 @@ export function InviteMemberDialog({
   );
 }
 
+type CredentialStatusFilter =
+  | "all"
+  | "pending"
+  | "active"
+  | "retiring"
+  | "expired"
+  | "revoked"
+  | "canceled";
+
 function CredentialsPanel({
   projectId,
   environmentId,
@@ -1205,6 +1228,7 @@ function CredentialsPanel({
   canRotate,
   canRevoke,
   localeRestricted,
+  isArchived,
 }: {
   readonly projectId: string;
   readonly environmentId: string;
@@ -1212,14 +1236,21 @@ function CredentialsPanel({
   readonly canRotate: boolean;
   readonly canRevoke: boolean;
   readonly localeRestricted: boolean;
+  readonly isArchived: boolean;
 }) {
+  const [familyFilter, setFamilyFilter] = useState<"all" | CredentialFamily>("all");
+  const [statusFilter, setStatusFilter] = useState<CredentialStatusFilter>("all");
   const credentials = useInfiniteQuery(
-    orpc.platform.projects.credentials.list.infiniteOptions({
+    orpc.platform.projects.credentials.operationalList.infiniteOptions({
       input: (cursor: string | null) => ({
         projectId,
         environmentId,
-        cursor,
-        limit: 20,
+        query: {
+          family: familyFilter,
+          status: statusFilter,
+          cursor,
+          limit: 20,
+        },
       }),
       initialPageParam: null,
       getNextPageParam: (lastPage) => lastPage.data.nextCursor ?? undefined,
@@ -1252,9 +1283,60 @@ function CredentialsPanel({
             Management, delivery, and preview authority never overlap.
           </p>
         </div>
-        {canIssue ? (
+        {canIssue && !isArchived ? (
           <IssueCredentialDialog projectId={projectId} environmentId={environmentId} />
         ) : null}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2" aria-label="Filter API credentials">
+        <Field>
+          <FieldLabel htmlFor="credential-family-filter">Family</FieldLabel>
+          <NativeSelect
+            id="credential-family-filter"
+            value={familyFilter}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (value === "all") setFamilyFilter("all");
+              else {
+                const family = parseCredentialFamily(value);
+                if (family) setFamilyFilter(family);
+              }
+            }}
+          >
+            <NativeSelectOption value="all">All families</NativeSelectOption>
+            <NativeSelectOption value="management">Management</NativeSelectOption>
+            <NativeSelectOption value="delivery">Delivery</NativeSelectOption>
+            <NativeSelectOption value="preview">Preview</NativeSelectOption>
+          </NativeSelect>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="credential-status-filter">Status</FieldLabel>
+          <NativeSelect
+            id="credential-status-filter"
+            value={statusFilter}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (
+                value === "all" ||
+                value === "pending" ||
+                value === "active" ||
+                value === "retiring" ||
+                value === "expired" ||
+                value === "revoked" ||
+                value === "canceled"
+              ) {
+                setStatusFilter(value);
+              }
+            }}
+          >
+            <NativeSelectOption value="all">All statuses</NativeSelectOption>
+            <NativeSelectOption value="pending">Pending</NativeSelectOption>
+            <NativeSelectOption value="active">Active</NativeSelectOption>
+            <NativeSelectOption value="retiring">Retiring</NativeSelectOption>
+            <NativeSelectOption value="expired">Expired</NativeSelectOption>
+            <NativeSelectOption value="revoked">Revoked</NativeSelectOption>
+            <NativeSelectOption value="canceled">Canceled</NativeSelectOption>
+          </NativeSelect>
+        </Field>
       </div>
       {items.length === 0 ? (
         <Empty>
@@ -1274,7 +1356,8 @@ function CredentialsPanel({
             <CredentialRow
               key={credential.id}
               credential={credential}
-              canRotate={canRotate}
+              canStartRotation={canRotate && !isArchived}
+              canChangeRotation={canRotate}
               canRevoke={canRevoke}
             />
           ))}
@@ -1297,29 +1380,40 @@ function CredentialsPanel({
 
 export function CredentialRow({
   credential,
+  canStartRotation,
+  canChangeRotation,
   canRotate,
   canRevoke,
 }: {
-  readonly credential: ApiCredential;
-  readonly canRotate: boolean;
+  readonly credential: Omit<ApiCredential, "workspaceId" | "keyPrefix"> & {
+    readonly keyPrefix: string;
+    readonly openRotation?: ApiCredentialRotation | null;
+  };
+  readonly canStartRotation?: boolean;
+  readonly canChangeRotation?: boolean;
+  readonly canRotate?: boolean;
   readonly canRevoke: boolean;
 }) {
+  const mayStartRotation = canStartRotation ?? canRotate ?? false;
+  const mayChangeRotation = canChangeRotation ?? canRotate ?? false;
   const queryClient = useQueryClient();
+  const rowRef = useRef<HTMLDivElement>(null);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [revokePrefix, setRevokePrefix] = useState("");
   const rotate = useMutation(
-    orpc.platform.projects.credentials.rotate.mutationOptions({
+    orpc.platform.projects.credentials.rotation.start.mutationOptions({
       onSuccess: async (response) => {
         setRevealedKey(response.data.key);
         await queryClient.invalidateQueries({
           queryKey: orpc.platform.projects.credentials.key(),
         });
       },
-      onError: (error) => toast.error(error.message),
+      onError: (error) => toast.error(credentialSecretErrorMessage(error, "rotation")),
     }),
   );
-  const revoke = useMutation(
-    orpc.platform.projects.credentials.revoke.mutationOptions({
+  const changeRotation = useMutation(
+    orpc.platform.projects.credentials.rotation.change.mutationOptions({
       onSuccess: async (response) => {
         await queryClient.invalidateQueries({
           queryKey: orpc.platform.projects.credentials.key(),
@@ -1329,9 +1423,31 @@ export function CredentialRow({
       onError: (error) => toast.error(error.message),
     }),
   );
+  const revoke = useMutation(
+    orpc.platform.projects.credentials.revoke.mutationOptions({
+      onSuccess: async (response) => {
+        setRevokePrefix("");
+        await queryClient.invalidateQueries({
+          queryKey: orpc.platform.projects.credentials.key(),
+        });
+        toast.success(response.message);
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+  const predecessorRotation =
+    credential.openRotation?.predecessorCredentialId === credential.id
+      ? credential.openRotation
+      : null;
 
   return (
-    <div className="flex flex-col gap-3 border p-3">
+    <div
+      ref={rowRef}
+      role="group"
+      aria-label={`Credential ${credential.name}`}
+      tabIndex={-1}
+      className="flex flex-col gap-3 border p-3"
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{credential.name}</p>
@@ -1341,8 +1457,14 @@ export function CredentialRow({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline">{credential.family}</Badge>
-          <Badge variant={credential.revokedAt ? "secondary" : "default"}>
-            {credential.revokedAt ? "Revoked" : "Active"}
+          <Badge
+            variant={
+              credential.status === "active" || credential.status === "retiring"
+                ? "default"
+                : "secondary"
+            }
+          >
+            {credential.status}
           </Badge>
         </div>
       </div>
@@ -1353,6 +1475,9 @@ export function CredentialRow({
         {credential.expiresAt
           ? `Expires ${dateFormatter.format(new Date(credential.expiresAt))}`
           : "Does not expire"}
+        {credential.retireAt
+          ? ` · Overlap retires ${dateFormatter.format(new Date(credential.retireAt))}`
+          : ""}
       </p>
       {credential.family === "preview" && !credential.expiresAt && !credential.revokedAt ? (
         <Alert variant="destructive" role="alert">
@@ -1363,9 +1488,30 @@ export function CredentialRow({
           </AlertDescription>
         </Alert>
       ) : null}
-      {!credential.revokedAt && (canRotate || canRevoke) ? (
+      {predecessorRotation && mayChangeRotation ? (
+        <CredentialRotationActions
+          credential={credential}
+          rotation={predecessorRotation}
+          pending={changeRotation.isPending}
+          onAction={(action) =>
+            changeRotation.mutate({
+              projectId: credential.projectId,
+              environmentId: credential.environmentId,
+              rotationId: predecessorRotation.id,
+              expectedVersion: predecessorRotation.version,
+              action,
+            })
+          }
+        />
+      ) : null}
+      {credential.status === "pending" && credential.openRotation ? (
+        <p className="text-muted-foreground text-sm">
+          This pending key remains unusable until its predecessor rotation is activated.
+        </p>
+      ) : null}
+      {credential.status === "active" && (mayStartRotation || canRevoke) ? (
         <div className="flex flex-wrap gap-2">
-          {canRotate ? (
+          {mayStartRotation && !credential.openRotation ? (
             <AlertDialog>
               <AlertDialogTrigger render={<Button size="sm" variant="outline" />}>
                 <RefreshCwIcon data-icon="inline-start" />
@@ -1375,7 +1521,8 @@ export function CredentialRow({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Rotate {credential.name}?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    The current key stops working immediately. The replacement is shown once.
+                    A pending replacement is shown once and remains unusable until you activate the
+                    24-hour overlap.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -1384,8 +1531,12 @@ export function CredentialRow({
                     disabled={rotate.isPending}
                     onClick={() =>
                       rotate.mutate({
+                        projectId: credential.projectId,
+                        environmentId: credential.environmentId,
                         credentialId: credential.id,
-                        version: credential.version,
+                        expectedVersion: credential.version,
+                        expiresAt: credential.expiresAt,
+                        nonExpiringAcknowledged: credential.expiresAt === null,
                       })
                     }
                   >
@@ -1405,19 +1556,34 @@ export function CredentialRow({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Revoke {credential.name}?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Revocation is immediate and cannot be undone. Issue a new key if access is
-                    needed later.
+                    Revocation is immediate and cannot be undone.
+                    {credential.openRotation
+                      ? " Every pending or usable key in this open rotation will also be closed."
+                      : " Issue a new key if access is needed later."}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                <Field>
+                  <FieldLabel htmlFor={`credential-revoke-prefix-${credential.id}`}>
+                    Type the displayed credential prefix to confirm
+                  </FieldLabel>
+                  <Input
+                    id={`credential-revoke-prefix-${credential.id}`}
+                    autoComplete="off"
+                    value={revokePrefix}
+                    onChange={(event) => setRevokePrefix(event.target.value)}
+                  />
+                </Field>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     variant="destructive"
-                    disabled={revoke.isPending}
+                    disabled={revoke.isPending || revokePrefix !== credential.keyPrefix}
                     onClick={() =>
                       revoke.mutate({
+                        projectId: credential.projectId,
+                        environmentId: credential.environmentId,
                         credentialId: credential.id,
-                        version: credential.version,
+                        expectedVersion: credential.version,
                       })
                     }
                   >
@@ -1439,9 +1605,78 @@ export function CredentialRow({
           setRevealedKey(null);
           setAcknowledged(false);
           rotate.reset();
+          requestAnimationFrame(() => rowRef.current?.focus());
         }}
         title="Copy rotated credential"
       />
+    </div>
+  );
+}
+
+function CredentialRotationActions({
+  credential,
+  rotation,
+  pending,
+  onAction,
+}: {
+  readonly credential: Pick<ApiCredential, "name">;
+  readonly rotation: ApiCredentialRotation;
+  readonly pending: boolean;
+  readonly onAction: (action: "activate" | "cancel" | "complete") => void;
+}) {
+  const actions: ReadonlyArray<"activate" | "cancel" | "complete"> =
+    rotation.status === "pending"
+      ? ["activate", "cancel"]
+      : rotation.status === "overlap"
+        ? ["complete"]
+        : [];
+  return (
+    <div className="flex flex-wrap gap-2">
+      {actions.map((action) => {
+        const destructive = action === "cancel" || action === "complete";
+        const title =
+          action === "activate"
+            ? `Activate replacement for ${credential.name}?`
+            : action === "complete"
+              ? `Complete rotation for ${credential.name}?`
+              : `Cancel rotation for ${credential.name}?`;
+        const description =
+          action === "activate"
+            ? "The pending key becomes usable immediately and both keys overlap for no more than 24 hours."
+            : action === "complete"
+              ? "The predecessor key is revoked immediately. This cannot be undone."
+              : "The pending replacement is revoked without changing the active predecessor key.";
+        return (
+          <AlertDialog key={action}>
+            <AlertDialogTrigger
+              render={<Button size="sm" variant={destructive ? "destructive" : "outline"} />}
+            >
+              {action === "activate"
+                ? "Activate replacement"
+                : action === "complete"
+                  ? "Complete rotation"
+                  : "Cancel rotation"}
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{title}</AlertDialogTitle>
+                <AlertDialogDescription>{description}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={pending}>Keep current state</AlertDialogCancel>
+                <AlertDialogAction
+                  variant={destructive ? "destructive" : "default"}
+                  disabled={pending}
+                  onClick={() => onAction(action)}
+                >
+                  {pending ? <Spinner data-icon="inline-start" /> : null}
+                  Confirm {action}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        );
+      })}
     </div>
   );
 }
@@ -1483,7 +1718,7 @@ export function IssueCredentialDialog({
           queryKey: orpc.platform.projects.credentials.key(),
         });
       },
-      onError: (error) => toast.error(error.message),
+      onError: (error) => toast.error(credentialSecretErrorMessage(error, "issue")),
     }),
   );
 

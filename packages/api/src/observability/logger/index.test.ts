@@ -68,15 +68,18 @@ describe("structured log redaction", () => {
   });
 
   it("redacts credentials embedded in free-form error messages", () => {
+    const rawCredential =
+      "ffd_mgmt_019fae8b-1234-7000-8000-000000000001_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     const redacted = redactString(
-      "Bearer abc.def password=hunter2 postgresql://admin:secret@database/internal",
+      `Bearer abc.def password=hunter2 postgresql://admin:secret@database/internal ${rawCredential}`,
     );
 
     expect(redacted).not.toContain("abc.def");
     expect(redacted).not.toContain("hunter2");
     expect(redacted).not.toContain("admin:secret");
     expect(redacted).not.toContain("postgresql://");
-    expect(redacted).toContain("[REDACTED]");
+    expect(redacted).not.toContain(rawCredential);
+    expect(redacted).toContain("[REDACTED_CREDENTIAL]");
   });
 
   it("sanitizes errors while preserving useful diagnostic identity", () => {

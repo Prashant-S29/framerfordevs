@@ -94,7 +94,32 @@ export type ControlPlaneOperation =
   | "locale_create"
   | "locale_update"
   | "locale_reorder"
-  | "locale_status_update";
+  | "locale_status_update"
+  | "credential_list"
+  | "credential_issue"
+  | "credential_rotation_start"
+  | "credential_rotation_activate"
+  | "credential_rotation_cancel"
+  | "credential_rotation_complete"
+  | "credential_revoke"
+  | "webhook_endpoint_list"
+  | "webhook_endpoint_create"
+  | "webhook_endpoint_update"
+  | "webhook_endpoint_state"
+  | "webhook_subscription_replace"
+  | "webhook_secret_rotation_start"
+  | "webhook_secret_rotation_activate"
+  | "webhook_secret_rotation_cancel"
+  | "webhook_secret_rotation_complete"
+  | "invalidation_mapping_list"
+  | "invalidation_mapping_create"
+  | "invalidation_mapping_update"
+  | "invalidation_mapping_state"
+  | "webhook_delivery_list"
+  | "webhook_delivery_get"
+  | "webhook_attempt_list"
+  | "webhook_replay"
+  | "audit_list";
 export type ControlPlaneSubject = "oauth_user" | "management_credential" | "unknown";
 export type ControlPlaneCostBucket = "1" | "2" | "3" | "5";
 

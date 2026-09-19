@@ -12,6 +12,8 @@ export interface LogRecord {
 const sensitiveKeyPattern =
   /authorization|cookie|password|secret|token|database.?url|body|content|payload|source.?key|api.?key|label|display.?name|description|help.?text|placeholder|pattern|default|email|url|(^|[._-])mutations?($|[._-])|(^|[._-])values?($|[._-])|command.?file|schema.?document|project.?schema/i;
 const bearerPattern = /\bBearer\s+[A-Za-z0-9._~+\x2f-]+=*/gi;
+const credentialPattern =
+  /\bffd_(?:mgmt|del|prev)_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{43}\b/gi;
 const databaseUrlPattern = /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis):\/\/[^\s,;]+/gi;
 const urlCredentialsPattern = /([a-z][a-z0-9+.-]*:\/\/)([^\s/:@]+):([^\s/@]+)@/gi;
 const assignmentPattern = /\b(password|secret|token|cookie|authorization)=([^\s,;]+)/gi;
@@ -22,6 +24,7 @@ export function redactString(value: string): string {
   const bounded = value.length > 4_096 ? `${value.slice(0, 4_096)}[TRUNCATED]` : value;
   return bounded
     .replace(bearerPattern, "Bearer [REDACTED]")
+    .replace(credentialPattern, "[REDACTED_CREDENTIAL]")
     .replace(databaseUrlPattern, "[REDACTED_DATABASE_URL]")
     .replace(urlCredentialsPattern, "$1[REDACTED]@")
     .replace(assignmentPattern, "$1=[REDACTED]")

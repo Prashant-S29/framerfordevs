@@ -175,6 +175,7 @@ beforeAll(async () => {
     keyPrefix: `ffd_mgmt_${managementCredentialId}`,
     keyDigest: createHash("sha256").update(managementCredentialId).digest("hex"),
     createdByUserId: ownerId,
+    activatedAt: new Date(),
   });
   await db.insert(apiCredentialScope).values(
     ["content.read", "content.write"].map((scope) => ({

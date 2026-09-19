@@ -344,7 +344,7 @@
 
 **Incorrect assumption or decision:** The test treated the platform fixture's existing cleanup as sufficient even though that cleanup deletes credentials before the M13 apply receipt and immutable schema graph that now reference them.
 
-**Learning:** Adding a successful mutation to an older integration fixture changes that fixture's ownership graph. Assertion success is insufficient; teardown order must include every new dependent table before any referenced actor or tenant row. Prevention: Keep Authoring apply success/replay proof in its transaction-contained repository fixture until a dedicated HTTP fixture owns the complete M13 graph. Before adding cross-layer mutation tests, inventory all new actor/receipt/revision/outbox foreign keys, register idempotent cleanup before the first write, run the teardown path explicitly, and reconcile the unique namespace read-only afterward.
+**Learning:** Adding a successful mutation to an older integration fixture changes that fixture's ownership graph. Assertion success is insufficient; teardown order must include every new dependent table before any referenced actor or tenant row. Prevention: Keep Authoring apply success/replay proof in its transaction-contained repository fixture until a dedicated HTTP fixture owns the complete graph. Before adding cross-layer mutation tests, inventory all new actor/receipt/revision/outbox/lifecycle foreign keys, register idempotent cleanup before the first write, run the teardown path explicitly, and reconcile the unique namespace read-only afterward. M16 staged-rotation coverage deletes `api_credential_rotation` before its predecessor/successor credentials.
 
 ---
 
@@ -521,3 +521,35 @@
 **Incorrect assumption or decision:** Disabling SSR for the protected route tree was treated as sufficient hydration safety while its client-only `beforeLoad` replaced the server fallback with the login route during initial hydration.
 
 **Learning:** Authentication state used by an initial route guard must be resolved consistently across the server/client boundary, not only hidden from server rendering. Prevention: The protected layout now uses the existing request-aware session server function with TanStack Start `data-only` SSR, while login remains client-rendered; a noninteractive Chromium regression opens a protected deep link and requires the bounded login redirect with zero page or console errors.
+
+---
+
+## 2026-09-18 — Archive outcomes must satisfy zero-attempt delivery invariants
+
+**Incorrect assumption or decision:** Archive cancellation could stamp the required `project_archived` outcome onto every queued delivery without revisiting the preexisting rule that zero-attempt deliveries must have a null outcome. Ordinary endpoint cancellation intentionally kept such outcomes null, so readiness did not exercise the new fixed-outcome path.
+
+**Learning:** Recovery transitions must be tested with both never-attempted and previously attempted rows whenever they change terminal outcome fields. The delivery invariant now permits exactly one zero-attempt exception—`status = 'canceled'` with `last_outcome = 'project_archived'`—without inventing an attempt or weakening other outcome checks. Prevention: Construct a valid queued row in archive integration coverage before declaring archive atomicity complete, verify the live check constraint after migration, and retain explicit restore-no-replay assertions.
+
+---
+
+## 2026-09-19 — Authenticated SSR backend calls must forward request authority
+
+**Incorrect assumption or decision:** A request-aware protected-route session check was treated as sufficient for authenticated deep links while SSR oRPC queries used a shared link that did not forward the incoming cookie.
+
+**Learning:** Every authenticated SSR backend client must project per-request authority, not only the route guard. Prevention: The oRPC client now uses environment-specific TanStack Start links and supplies `getRequestHeaders()` only on the server; headed review requires authenticated project, webhook, and operations deep-link reloads to render without an auth error.
+
+---
+
+## 2026-09-19 — Declared URL-backed filters require the URL to own applied state
+
+**Incorrect assumption or decision:** The audit workspace described filters as URL-backed while keeping both draft and applied filters only in React state; reload and history silently discarded them.
+
+**Learning:** Filter persistence is a routing contract, not descriptive copy. Prevention: Applied audit filters are validated search parameters, local state is draft-only, navigation serializes canonical instants with milliseconds, and focused plus browser coverage verifies malformed-input rejection, reload, back/forward, and fixed-snapshot pagination.
+
+---
+
+## 2026-09-19 — Programmatic disclosures need an explicit focus destination
+
+**Incorrect assumption or decision:** Dialog focus restoration was assumed to work when a one-time disclosure opened after a mutation or when its trigger was replaced by the opposite lifecycle action.
+
+**Learning:** A focus trap can restore only to a surviving trigger. Programmatically opened or lifecycle-replacing dialogs need a stable labelled focus target. Prevention: Credential rows and project lifecycle actions expose non-tabbable labelled groups and focus them after close; headed review verifies credential dismissal and archive/restore transitions no longer return focus to `body`.

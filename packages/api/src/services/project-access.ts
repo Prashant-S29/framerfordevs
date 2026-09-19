@@ -165,7 +165,10 @@ export async function authorizeProjectActor(
         options.targetEnvironmentId == null
           ? undefined
           : eq(apiCredential.environmentId, options.targetEnvironmentId),
-        isNull(apiCredential.revokedAt),
+        or(
+          eq(apiCredential.status, "active"),
+          and(eq(apiCredential.status, "retiring"), gt(apiCredential.retireAt, sql`now()`)),
+        ),
         or(isNull(apiCredential.expiresAt), gt(apiCredential.expiresAt, sql`now()`)),
       ),
     )
@@ -203,6 +206,7 @@ export async function authorizeProjectActor(
     );
   if (
     !projectRow ||
+    projectRow.archivedAt !== null ||
     !environmentRow ||
     (options.requirePrimaryCredentialEnvironment === true && !environmentRow.isPrimary)
   ) {

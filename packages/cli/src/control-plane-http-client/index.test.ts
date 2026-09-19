@@ -216,6 +216,109 @@ describe("Control Plane HTTP client", () => {
     }),
   );
 
+  it.effect("owns exact methods and paths for all twenty-five operational operations", () =>
+    Effect.gen(function* () {
+      const calls: Array<{ readonly url: string; readonly method: string | undefined }> = [];
+      const client = makeControlPlaneHttpClient({
+        baseUrl: "https://api.example.test",
+        token: "oauth-token",
+        fetch: (input, init) => {
+          calls.push({ url: String(input), method: init?.method });
+          return Promise.resolve(success({}));
+        },
+      });
+      const projectId = "019fae8b-1234-7000-8000-000000000010";
+      const environmentId = "019fae8b-1234-7000-8000-000000000011";
+      const resourceId = "019fae8b-1234-7000-8000-000000000012";
+      const effects: ReadonlyArray<Effect.Effect<unknown, unknown, never>> = [
+        client.listCredentials(projectId, environmentId, "all", "all", null, 20),
+        client.issueCredential(projectId, environmentId, {}),
+        client.startCredentialRotation(projectId, environmentId, resourceId, {}),
+        client.changeCredentialRotation(projectId, environmentId, resourceId, "activate", {}),
+        client.changeCredentialRotation(projectId, environmentId, resourceId, "cancel", {}),
+        client.changeCredentialRotation(projectId, environmentId, resourceId, "complete", {}),
+        client.revokeCredential(projectId, environmentId, resourceId, {}),
+        client.listWebhookEndpoints(projectId, environmentId, "enabled", null, 20),
+        client.createWebhookEndpoint(projectId, environmentId, {}),
+        client.updateWebhookEndpoint(projectId, environmentId, resourceId, {}),
+        client.setWebhookEndpointState(projectId, environmentId, resourceId, {}),
+        client.replaceWebhookSubscriptions(projectId, environmentId, resourceId, {}),
+        client.startWebhookSecretRotation(projectId, environmentId, resourceId, {}),
+        client.changeWebhookSecretRotation(projectId, environmentId, resourceId, "activate", {}),
+        client.changeWebhookSecretRotation(projectId, environmentId, resourceId, "cancel", {}),
+        client.changeWebhookSecretRotation(projectId, environmentId, resourceId, "complete", {}),
+        client.listInvalidationMappings(projectId, environmentId, "enabled", null, 20),
+        client.createInvalidationMapping(projectId, environmentId, {}),
+        client.updateInvalidationMapping(projectId, environmentId, resourceId, {}),
+        client.setInvalidationMappingState(projectId, environmentId, resourceId, {}),
+        client.listWebhookDeliveries(projectId, environmentId, {
+          endpointId: null,
+          eventType: null,
+          status: "dead_letter",
+          cursor: null,
+          limit: 20,
+        }),
+        client.getWebhookDelivery(projectId, environmentId, resourceId),
+        client.listWebhookAttempts(projectId, environmentId, resourceId),
+        client.replayWebhook(projectId, environmentId, {}),
+        client.listAuditEvents(projectId, {
+          environmentId: null,
+          category: "security",
+          actorKind: "all",
+          actorId: null,
+          action: null,
+          from: "2026-09-01T00:00:00.000Z",
+          to: "2026-09-30T23:59:59.000Z",
+          limit: 20,
+          cursor: null,
+        }),
+      ];
+      yield* Effect.all(
+        effects.map((effect) => Effect.ignore(effect)),
+        { concurrency: 1 },
+      );
+
+      assert.lengthOf(calls, 25);
+      assert.deepEqual(
+        calls.map(({ method }) => method),
+        [
+          "GET",
+          "POST",
+          "POST",
+          "POST",
+          "POST",
+          "POST",
+          "POST",
+          "GET",
+          "POST",
+          "PATCH",
+          "PUT",
+          "PUT",
+          "POST",
+          "POST",
+          "POST",
+          "POST",
+          "GET",
+          "POST",
+          "PUT",
+          "PUT",
+          "GET",
+          "GET",
+          "GET",
+          "POST",
+          "GET",
+        ],
+      );
+      assert.include(
+        calls[0]?.url ?? "",
+        `/projects/${projectId}/environments/${environmentId}/credentials?family=all&status=all&limit=20`,
+      );
+      assert.include(calls[15]?.url ?? "", `/webhooks/${resourceId}/secret-rotations/complete`);
+      assert.include(calls[20]?.url ?? "", "status=dead_letter");
+      assert.include(calls[24]?.url ?? "", `/projects/${projectId}/audit-events?category=security`);
+    }),
+  );
+
   it.effect("returns only closed HTTP failure metadata", () =>
     Effect.gen(function* () {
       const client = makeControlPlaneHttpClient({

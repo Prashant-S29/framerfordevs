@@ -19,7 +19,13 @@ import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";
 
-export function ArchiveProjectDialog({ project }: { readonly project: Project }) {
+export function ArchiveProjectDialog({
+  project,
+  onCompleted,
+}: {
+  readonly project: Project;
+  readonly onCompleted?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
   const archiveProject = useMutation(
@@ -28,6 +34,7 @@ export function ArchiveProjectDialog({ project }: { readonly project: Project })
         await queryClient.invalidateQueries({ queryKey: orpc.platform.projects.key() });
         toast.success(response.message);
         setOpen(false);
+        onCompleted?.();
       },
       onError: (error) => toast.error(error.message),
     }),

@@ -58,7 +58,7 @@ export const controlPlaneCommandReceipt = pgTable(
     }).onDelete("restrict"),
     check(
       "control_plane_command_receipt_operation_valid",
-      sql`${table.operation} in ('workspace.create', 'project.create', 'project.capability.enable', 'studio_registration.put', 'project_locale.create')`,
+      sql`${table.operation} in ('workspace.create', 'project.create', 'project.capability.enable', 'studio_registration.put', 'project_locale.create', 'invalidation_mapping.create')`,
     ),
     check(
       "control_plane_command_receipt_actor_valid",
@@ -70,7 +70,7 @@ export const controlPlaneCommandReceipt = pgTable(
     ),
     check(
       "control_plane_command_receipt_result_type_valid",
-      sql`${table.resultResourceType} in ('workspace', 'project', 'project_capability', 'studio_registration', 'project_locale')`,
+      sql`${table.resultResourceType} in ('workspace', 'project', 'project_capability', 'studio_registration', 'project_locale', 'cms_invalidation_route_mapping')`,
     ),
     check(
       "control_plane_command_receipt_disposition_valid",
@@ -78,7 +78,7 @@ export const controlPlaneCommandReceipt = pgTable(
     ),
     check(
       "control_plane_command_receipt_scope_result_valid",
-      sql`(${table.operation} = 'workspace.create' and ${table.actorType} = 'user' and ${table.projectId} is null and ${table.environmentId} is null and ${table.resultResourceType} = 'workspace' and ${table.resultResourceId} = ${table.workspaceId} and ${table.resultDisposition} = 'created') or (${table.operation} = 'project.create' and ${table.actorType} = 'user' and ${table.projectId} is not null and ${table.environmentId} is null and ${table.resultResourceType} = 'project' and ${table.resultResourceId} = ${table.projectId} and ${table.resultDisposition} = 'created') or (${table.operation} = 'project.capability.enable' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'project_capability' and ${table.resultDisposition} = 'created') or (${table.operation} = 'studio_registration.put' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'studio_registration') or (${table.operation} = 'project_locale.create' and ${table.projectId} is not null and ((${table.actorType} = 'user' and ${table.environmentId} is null) or (${table.actorType} = 'credential' and ${table.environmentId} is not null)) and ${table.resultResourceType} = 'project_locale' and ${table.resultDisposition} = 'created')`,
+      sql`(${table.operation} = 'workspace.create' and ${table.actorType} = 'user' and ${table.projectId} is null and ${table.environmentId} is null and ${table.resultResourceType} = 'workspace' and ${table.resultResourceId} = ${table.workspaceId} and ${table.resultDisposition} = 'created') or (${table.operation} = 'project.create' and ${table.actorType} = 'user' and ${table.projectId} is not null and ${table.environmentId} is null and ${table.resultResourceType} = 'project' and ${table.resultResourceId} = ${table.projectId} and ${table.resultDisposition} = 'created') or (${table.operation} = 'project.capability.enable' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'project_capability' and ${table.resultDisposition} = 'created') or (${table.operation} = 'studio_registration.put' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'studio_registration') or (${table.operation} = 'project_locale.create' and ${table.projectId} is not null and ((${table.actorType} = 'user' and ${table.environmentId} is null) or (${table.actorType} = 'credential' and ${table.environmentId} is not null)) and ${table.resultResourceType} = 'project_locale' and ${table.resultDisposition} = 'created') or (${table.operation} = 'invalidation_mapping.create' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'cms_invalidation_route_mapping' and ${table.resultDisposition} = 'created')`,
     ),
     index("control_plane_command_receipt_actor_operation_created_idx").on(
       table.actorType,

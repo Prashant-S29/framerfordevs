@@ -812,6 +812,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
             keyPrefix: `ffd_mgmt_${studioCredentialId}`,
             keyDigest: studioCredentialId.replaceAll("-", "").repeat(2),
             createdByUserId: firstUserId,
+            activatedAt: new Date(),
           });
           await transaction.insert(apiCredentialScope).values([
             {

@@ -102,6 +102,7 @@ describe("access contracts", () => {
       });
 
       assert.isFalse(input.previewAuthorityAcknowledged);
+      assert.isFalse(input.nonExpiringAcknowledged);
     }),
   );
 
@@ -229,6 +230,10 @@ describe("access contracts", () => {
       assert.strictEqual(
         yield* Schema.decodeUnknown(ProjectPermissionAction)("project.restore"),
         "project.restore",
+      );
+      assert.strictEqual(
+        yield* Schema.decodeUnknown(ProjectPermissionAction)("project.audit.read"),
+        "project.audit.read",
       );
       const exits = yield* Effect.all([
         Effect.exit(Schema.decodeUnknown(ProjectRole)("admin")),

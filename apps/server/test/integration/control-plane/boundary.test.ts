@@ -18,6 +18,22 @@ afterAll(async () => {
   await disposeApplicationRuntime();
 });
 
+function unauthenticatedOperationalRequest(method: string, path: string) {
+  const target = request(app);
+  switch (method) {
+    case "GET":
+      return target.get(`/api/control-plane/v1${path}`);
+    case "POST":
+      return target.post(`/api/control-plane/v1${path}`).send({});
+    case "PATCH":
+      return target.patch(`/api/control-plane/v1${path}`).send({});
+    case "PUT":
+      return target.put(`/api/control-plane/v1${path}`).send({});
+    default:
+      throw new Error(`Unsupported test method ${method}.`);
+  }
+}
+
 function duplicateAuthorizationRequest(): Promise<{
   readonly status: number;
   readonly headers: Readonly<Record<string, string | ReadonlyArray<string> | undefined>>;
@@ -86,6 +102,49 @@ describe("Control Plane HTTP boundary", () => {
       costBucket: "5",
     });
     expect(classifyControlPlaneRequest("DELETE", "/projects/project-id")).toBeNull();
+  });
+
+  it("registers every operational route behind bearer authority with a closed cost", async () => {
+    const project = "019fae8b-1234-7000-8000-000000000001";
+    const environment = "019fae8b-1234-7000-8000-000000000002";
+    const resource = "019fae8b-1234-7000-8000-000000000003";
+    const base = `/projects/${project}/environments/${environment}`;
+    const routes = [
+      ["GET", `${base}/credentials`],
+      ["POST", `${base}/credentials`],
+      ["POST", `${base}/credentials/${resource}/rotations`],
+      ["POST", `${base}/credential-rotations/${resource}/activate`],
+      ["POST", `${base}/credential-rotations/${resource}/cancel`],
+      ["POST", `${base}/credential-rotations/${resource}/complete`],
+      ["POST", `${base}/credentials/${resource}/revoke`],
+      ["GET", `${base}/webhooks`],
+      ["POST", `${base}/webhooks`],
+      ["PATCH", `${base}/webhooks/${resource}`],
+      ["PUT", `${base}/webhooks/${resource}/state`],
+      ["PUT", `${base}/webhooks/${resource}/subscriptions`],
+      ["POST", `${base}/webhooks/${resource}/secret-rotations`],
+      ["POST", `${base}/webhooks/${resource}/secret-rotations/activate`],
+      ["POST", `${base}/webhooks/${resource}/secret-rotations/cancel`],
+      ["POST", `${base}/webhooks/${resource}/secret-rotations/complete`],
+      ["GET", `${base}/invalidation-mappings`],
+      ["POST", `${base}/invalidation-mappings`],
+      ["PUT", `${base}/invalidation-mappings/${resource}`],
+      ["PUT", `${base}/invalidation-mappings/${resource}/state`],
+      ["GET", `${base}/webhook-deliveries`],
+      ["GET", `${base}/webhook-deliveries/${resource}`],
+      ["GET", `${base}/webhook-deliveries/${resource}/attempts`],
+      ["POST", `${base}/webhook-replays`],
+      ["GET", `/projects/${project}/audit-events`],
+    ] as const;
+
+    for (const [method, path] of routes) {
+      expect(classifyControlPlaneRequest(method, path), `${method} ${path}`).not.toBeNull();
+      const response = await unauthenticatedOperationalRequest(method, path);
+      expect(response.status, `${method} ${path}`).toBe(401);
+      expect(response.body.error.code, `${method} ${path}`).toBe("UNAUTHORIZED");
+      expect(response.headers["cache-control"], `${method} ${path}`).toBe("no-store");
+      expect(response.headers.location, `${method} ${path}`).toBeUndefined();
+    }
   });
 
   it("serves the canonical artifact separately from bearer data routes", async () => {

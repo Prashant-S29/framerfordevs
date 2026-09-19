@@ -79,6 +79,50 @@ it.live(
           );
           assert.isTrue(Exit.isFailure(controlPlaneConflict));
           yield* clearControlPlaneCommand(root, controlPlane.commandId);
+
+          const mapping = yield* acquireControlPlaneCommand(
+            root,
+            "invalidation_mapping.create",
+            "1".repeat(64),
+          );
+          const mappingReplay = yield* acquireControlPlaneCommand(
+            root,
+            "invalidation_mapping.create",
+            "1".repeat(64),
+          );
+          assert.strictEqual(mappingReplay.commandId, mapping.commandId);
+          const mappingBytes = yield* Effect.promise(() =>
+            readFile(join(root, ".framerfordevs/retry/control-plane-command.json"), "utf8"),
+          );
+          assert.notInclude(mappingBytes, "route");
+          assert.notInclude(mappingBytes, "tag");
+          assert.notInclude(mappingBytes, "destination");
+          yield* clearControlPlaneCommand(root, mapping.commandId);
+
+          const replayCommandId = "019fae8b-1234-7000-8000-000000000002";
+          const webhookReplay = yield* acquireControlPlaneCommand(
+            root,
+            "webhook.delivery.replay",
+            "2".repeat(64),
+            replayCommandId,
+          );
+          const webhookReplayAgain = yield* acquireControlPlaneCommand(
+            root,
+            "webhook.delivery.replay",
+            "2".repeat(64),
+            replayCommandId,
+          );
+          assert.strictEqual(webhookReplayAgain.commandId, webhookReplay.commandId);
+          const replayConflict = yield* Effect.exit(
+            acquireControlPlaneCommand(
+              root,
+              "webhook.delivery.replay",
+              "3".repeat(64),
+              replayCommandId,
+            ),
+          );
+          assert.isTrue(Exit.isFailure(replayConflict));
+          yield* clearControlPlaneCommand(root, webhookReplay.commandId);
         }),
       (root) => Effect.promise(() => rm(root, { recursive: true, force: true })),
     ),
