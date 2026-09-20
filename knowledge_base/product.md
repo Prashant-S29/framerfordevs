@@ -124,8 +124,9 @@ The internal CMS is the first built-in data-source provider.
 
 The product uses separate interfaces over shared server authority:
 
-- **Marketing and documentation (`framerfordevs.com`):** product discovery, documentation, and authentication entry.
-- **Hosted control plane (`dashboard.framerfordevs.com`):** account, workspace, project, membership, credential, webhook, environment, billing, security, recovery, and Studio-registration administration. It remains available when a customer application is unavailable.
+- **Marketing and authentication entry (`framerfordevs.com`):** product discovery and validated entry redirects into dashboard-hosted authentication. It does not handle credentials or hold a platform session.
+- **Developer documentation (`developer.framerfordevs.com`):** public task documentation, guides, API references, and canonical public contract artifacts, independently deployable from marketing and the dashboard.
+- **Hosted control plane (`dashboard.framerfordevs.com`):** dashboard-hosted authentication plus account, workspace, project, membership, credential, webhook, environment, billing, security, recovery, and Studio-registration administration. Its host-only session and direct authentication/recovery routes remain available when marketing, documentation, or a customer application is unavailable.
 - **Project Studio (developer-configured application path):** a framework-neutral, role-projected editorial application for content, localization, editorial layout, preview, and future visual editing. Developers mount it at a configured path such as `/studio`; clients and developers use the same Studio with different authority.
 - **CLI:** complete noninteractive machine access to meaningful control-plane and project operations so developers and agents do not depend on browser workflows.
 - **Application and renderer SDKs:** focused content, Preview, Delivery, webhook/invalidation, generated-contract, and rendering integration for developer-owned websites; they do not mirror account, secret, or operational administration.

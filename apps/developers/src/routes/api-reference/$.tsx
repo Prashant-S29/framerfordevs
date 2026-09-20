@@ -7,12 +7,19 @@ import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layouts/docs/page";
 
 import { ApiContractPage } from "@/components/api-contract-page";
+import { canonicalDeveloperUrl } from "@/lib/canonical-url";
 import { baseOptions } from "@/lib/layout.shared";
 
 export const Route = createFileRoute("/api-reference/$")({
   component: ApiReferencePage,
   loader: ({ params }) => loadApiReference({ data: params._splat?.split("/") ?? [] }),
-  head: ({ loaderData }) => ({
+  head: ({ loaderData, params }) => ({
+    links: [
+      {
+        rel: "canonical",
+        href: canonicalDeveloperUrl(`/api-reference/${params._splat ?? ""}`),
+      },
+    ],
     meta:
       loaderData === undefined
         ? []

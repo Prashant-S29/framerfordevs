@@ -1,3 +1,5 @@
+// Verifies complete, origin-safe server configuration and production routing gates.
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const environmentKeys = [
@@ -7,7 +9,9 @@ const environmentKeys = [
   "DATABASE_IDLE_TIMEOUT_MS",
   "BETTER_AUTH_SECRET",
   "BETTER_AUTH_URL",
-  "CORS_ORIGIN",
+  "DASHBOARD_ORIGIN",
+  "OPERATOR_ORIGIN",
+  "HOST_ROUTING_ENABLED",
   "TOOLING_API_RESOURCE",
   "OAUTH_DEVICE_AUTHORIZATION_ENABLED",
   "OTEL_EXPORTER_OTLP_ENDPOINT",
@@ -43,7 +47,9 @@ beforeEach(() => {
   delete process.env.DATABASE_IDLE_TIMEOUT_MS;
   process.env.BETTER_AUTH_SECRET = "test-secret-that-is-at-least-32-characters";
   process.env.BETTER_AUTH_URL = "http://localhost:3000";
-  process.env.CORS_ORIGIN = "http://localhost:3001";
+  process.env.DASHBOARD_ORIGIN = "http://localhost:3001";
+  process.env.OPERATOR_ORIGIN = "http://operator.localhost:3000";
+  delete process.env.HOST_ROUTING_ENABLED;
   delete process.env.TOOLING_API_RESOURCE;
   delete process.env.OAUTH_DEVICE_AUTHORIZATION_ENABLED;
   delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
@@ -92,7 +98,9 @@ describe("server environment", () => {
     expect(env.DATABASE_IDLE_TIMEOUT_MS).toBe(30_000);
     expect(env.BETTER_AUTH_SECRET.length).toBeGreaterThanOrEqual(32);
     expect(new URL(env.BETTER_AUTH_URL)).toBeInstanceOf(URL);
-    expect(new URL(env.CORS_ORIGIN)).toBeInstanceOf(URL);
+    expect(new URL(env.DASHBOARD_ORIGIN)).toBeInstanceOf(URL);
+    expect(env.OPERATOR_ORIGIN).toBe("http://operator.localhost:3000");
+    expect(env.HOST_ROUTING_ENABLED).toBe(false);
     expect(env.TOOLING_API_RESOURCE).toBe("http://localhost:3000/api/tooling/v1");
     expect(env.OAUTH_DEVICE_AUTHORIZATION_ENABLED).toBe(false);
     expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
@@ -213,6 +221,10 @@ describe("server environment", () => {
 
   it("rejects a public management reference in production", async () => {
     process.env.NODE_ENV = "production";
+    process.env.BETTER_AUTH_URL = "https://api.example.com";
+    process.env.DASHBOARD_ORIGIN = "https://dashboard.example.com";
+    process.env.OPERATOR_ORIGIN = "https://operator.internal.example.com";
+    process.env.HOST_ROUTING_ENABLED = "true";
     process.env.TOOLING_API_RESOURCE = "https://api.example.com/api/tooling/v1";
     process.env.MANAGEMENT_API_REFERENCE_ENABLED = "true";
 
@@ -222,6 +234,38 @@ describe("server environment", () => {
     );
 
     expect(String(failure)).toContain("management API reference cannot be enabled");
+  });
+
+  it.each([
+    "https://dashboard.example.com/path",
+    "https://dashboard.example.com?query=unsafe",
+    "https://user:secret@dashboard.example.com",
+  ])("rejects a dashboard URL that is not an exact origin: %s", async (value) => {
+    process.env.DASHBOARD_ORIGIN = value;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(import("./index")).rejects.toBeDefined();
+    expect(consoleError).toHaveBeenCalledOnce();
+  });
+
+  it("rejects duplicate hosted origins", async () => {
+    process.env.OPERATOR_ORIGIN = process.env.DASHBOARD_ORIGIN;
+
+    await expect(import("./index")).rejects.toThrow(
+      "Public API, dashboard, and operator origins must be distinct.",
+    );
+  });
+
+  it("requires HTTPS and host routing in production", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.TOOLING_API_RESOURCE = "https://api.example.com/api/tooling/v1";
+    process.env.BETTER_AUTH_URL = "https://api.example.com";
+    process.env.DASHBOARD_ORIGIN = "https://dashboard.example.com";
+    process.env.OPERATOR_ORIGIN = "https://operator.internal.example.com";
+
+    await expect(import("./index")).rejects.toThrow(
+      "Production requires host routing enforcement.",
+    );
   });
 
   it("rejects identical Delivery cursor rotation secrets", async () => {
@@ -257,7 +301,8 @@ describe("server environment", () => {
     process.env.DATABASE_URL = "";
     process.env.BETTER_AUTH_SECRET = invalidSecret;
     process.env.BETTER_AUTH_URL = "not-a-url";
-    process.env.CORS_ORIGIN = "not-a-url";
+    process.env.DASHBOARD_ORIGIN = "not-a-url";
+    process.env.OPERATOR_ORIGIN = "not-a-url";
     process.env.TOOLING_API_RESOURCE = "not-a-url";
     process.env.NODE_ENV = "invalid";
     process.env.SKIP_ENV_VALIDATION = "false";

@@ -1,5 +1,7 @@
 // Builds the self-hosted MDX portal and emits only baseline-verified public contract artifacts.
 
+/// <reference types="vitest/config" />
+
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -41,8 +43,17 @@ function publicContractArtifacts(): Plugin {
 
 export default defineConfig(({ mode }) => ({
   server: { port: 3002 },
+  // Keep TanStack's build-time preview listener aligned with Node's IPv4 fetch resolution in containers.
+  preview: { host: "127.0.0.1" },
   resolve: {
     tsconfigPaths: true,
+  },
+  test: {
+    env: {
+      VITE_DASHBOARD_ORIGIN: "http://localhost:3001",
+      VITE_DEVELOPER_ORIGIN: "http://localhost:3002",
+      VITE_MARKETING_ORIGIN: "http://localhost:3003",
+    },
   },
   plugins:
     mode === "test"

@@ -774,24 +774,39 @@ export const evaluateControlPlaneGlobalRateLimit = Effect.fn(
   });
 });
 
+export interface ControlPlaneSessionPrincipal {
+  readonly kind: "session_user";
+  readonly userId: string;
+}
+
+export type ControlPlanePrincipal = ToolingPrincipal | ControlPlaneSessionPrincipal;
+
 export const evaluateControlPlanePrincipalRateLimit = Effect.fn(
   "control-plane.public.rate-limit.principal",
-)(function* (principal: ToolingPrincipal, cost: number) {
+)(function* (principal: ControlPlanePrincipal, cost: number) {
   return yield* (yield* RateLimitManager).evaluate({
-    policy: principal.kind === "oauth_user" ? "control-plane.user" : "control-plane.credential",
+    policy:
+      principal.kind === "management_credential"
+        ? "control-plane.credential"
+        : "control-plane.user",
     identity: controlPlanePrincipalKey(principal),
     cost: RateLimitCost.make(cost),
   });
 });
 
-export function controlPlanePrincipalActor(principal: ToolingPrincipal): ControlPlaneActor {
-  return principal.kind === "oauth_user"
-    ? { kind: "user", id: AuthUserId.make(principal.userId) }
-    : { kind: "credential", id: principal.credential.credentialId };
+/** Maps every Control Plane transport principal to the shared domain actor authority. */
+export function controlPlanePrincipalActor(principal: ControlPlanePrincipal): ControlPlaneActor {
+  return principal.kind === "management_credential"
+    ? { kind: "credential", id: principal.credential.credentialId }
+    : { kind: "user", id: AuthUserId.make(principal.userId) };
 }
 
-export function controlPlanePrincipalKey(principal: ToolingPrincipal): string {
+/** Returns a transport-distinct, content-free rate-limit and idempotency identity. */
+export function controlPlanePrincipalKey(principal: ControlPlanePrincipal): string {
+  if (principal.kind === "management_credential") {
+    return `credential:${principal.credential.credentialId}`;
+  }
   return principal.kind === "oauth_user"
     ? `oauth:${principal.clientId}:${principal.userId}`
-    : `credential:${principal.credential.credentialId}`;
+    : `session:${principal.userId}`;
 }

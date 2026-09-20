@@ -3,10 +3,14 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { HomeLayout } from "fumadocs-ui/layouts/home";
 
+import { canonicalDeveloperUrl } from "@/lib/canonical-url";
 import { baseOptions } from "@/lib/layout.shared";
 
 export const Route = createFileRoute("/api-reference/")({
   component: ApiReferenceOverview,
+  head: () => ({
+    links: [{ rel: "canonical", href: canonicalDeveloperUrl("/api-reference") }],
+  }),
 });
 
 const families = [

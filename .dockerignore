@@ -16,6 +16,11 @@ tools/webhook-test-receiver
 **/.turbo
 .turbo
 **/coverage
+**/coverage/**
+**/test-results
+**/test-results/**
+**/playwright-report
+**/playwright-report/**
 
 **/.wrangler
 **/.alchemy

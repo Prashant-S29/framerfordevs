@@ -55,20 +55,20 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ### Milestone 17 — Hosted surface separation
 
-**Status:** Next design target; design not started.
+**Status:** Implemented under `decisions/m17-hosted-surface-separation-design.md`; awaiting developer review.
 
 **Depends on:** M14–M16.
 
-**Summary:** Separate public discovery/authentication from resilient hosted administration without duplicating backend authority.
+**Summary:** Separate public discovery, developer documentation, and resilient hosted administration without duplicating backend authority.
 
-- Make `framerfordevs.com` the marketing/documentation/authentication entry and `dashboard.framerfordevs.com` the resilient account/workspace/project administration and recovery surface.
-- Move hosted UI workflows onto portable control-plane contracts without creating a second business-rule authority or coupling public packages to app source.
-- Keep the dashboard available when a customer application/Studio is unavailable and preserve bootstrap, registration, credential, webhook, security, and recovery access.
-- Define explicit host/route ownership, cookies/session boundaries, redirects, CORS/origin behavior, navigation, canonical links, and failure states for both surfaces.
-- Retain current content/editorial UI temporarily until M19–M21 prove Studio and handover parity; do not remove usable authority early.
-- Prepare production host allowlists and operator/reference isolation for M23, but leave deployment/configuration changes developer-controlled.
+- Add `apps/marketing` for `framerfordevs.com`, keep docs-only `apps/developers` at `developer.framerfordevs.com`, and keep `apps/dashboard` at `dashboard.framerfordevs.com`.
+- Keep credential UI and a host-only dashboard session on the dashboard; marketing authentication routes are validated entries only, while canonical invitation/device links point directly to dashboard.
+- Route dashboard auth, session Control Plane v1, and temporary editorial oRPC through same-origin ingress to the existing server; API-host Control Plane remains bearer-only.
+- Move M14–M16 hosted administration onto canonical Control Plane schemas/operations without creating a second business-rule authority or exposing administration through the public SDK.
+- Keep dashboard bootstrap, registration, credential, webhook, security, and recovery available when marketing, docs, customer applications, or Studio are unavailable.
+- Retain current content/editorial UI temporarily until M19–M21 prove Studio and handover parity; prepare exact host/path/origin/operator boundaries for M23 without changing production rollout.
 
-**Read before design:** product surfaces; PRD §§6.1, 11, 21; M3, M12, M13 decisions; `apps/web`, `apps/developers`, server route composition, auth configuration, Docker/ingress configuration.
+**Review authority:** the approved M17 decision; product surfaces; PRD §§6.1, 11, 21; M3, M12–M16 decisions; the three hosted apps, server host/router composition, auth configuration, and Docker/reference ingress configuration.
 
 ### Milestone 18 — Studio mount and security runtime
 

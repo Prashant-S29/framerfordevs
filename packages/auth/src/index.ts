@@ -1,3 +1,5 @@
+// Owns Better Auth session, dashboard cookie, and public OAuth issuer configuration.
+
 import { db } from "@framerfordevs/db";
 import * as schema from "@framerfordevs/db/schema/auth";
 import { env } from "@framerfordevs/env/server";
@@ -64,6 +66,10 @@ export interface ToolingOAuthPrincipal {
 }
 
 interface CreateAuthOptions {
+  readonly apiOrigin?: string;
+  readonly dashboardOrigin?: string;
+  readonly hostRoutingEnabled?: boolean;
+  readonly nodeEnv?: "development" | "production" | "test";
   readonly oauthDeviceAuthorizationEnabled?: boolean;
 }
 
@@ -80,24 +86,32 @@ interface ToolingOAuthAccessTokenVerifierOptions {
 }
 
 interface CookieAttributes {
-  readonly sameSite: "lax" | "none";
+  readonly sameSite: "lax";
   readonly secure: boolean;
   readonly httpOnly: true;
+  readonly path: "/";
 }
 
+/** Returns the dashboard-hosted, host-only session cookie attributes. */
 export function getDefaultCookieAttributes(
   nodeEnv: "development" | "production" | "test",
 ): CookieAttributes {
   return {
-    sameSite: nodeEnv === "production" ? "none" : "lax",
+    sameSite: "lax",
     secure: nodeEnv === "production",
     httpOnly: true,
+    path: "/",
   };
 }
 
+/** Builds the shared auth runtime with per-request dashboard/API base URL resolution when enforced. */
 export function createAuth(options: CreateAuthOptions = {}) {
-  const managementOrigin = new URL(env.CORS_ORIGIN).origin;
+  const apiOrigin = new URL(options.apiOrigin ?? env.BETTER_AUTH_URL).origin;
+  const dashboardOrigin = new URL(options.dashboardOrigin ?? env.DASHBOARD_ORIGIN).origin;
+  const hostRoutingEnabled = options.hostRoutingEnabled ?? env.HOST_ROUTING_ENABLED;
+  const nodeEnv = options.nodeEnv ?? env.NODE_ENV;
   const toolingResource = env.TOOLING_API_RESOURCE;
+  const issuer = new URL("/api/auth", apiOrigin).toString();
   const oauthDeviceAuthorizationEnabled =
     options.oauthDeviceAuthorizationEnabled ?? env.OAUTH_DEVICE_AUTHORIZATION_ENABLED;
 
@@ -107,7 +121,7 @@ export function createAuth(options: CreateAuthOptions = {}) {
       schema,
     }),
     disabledPaths: oauthDeviceAuthorizationEnabled ? ["/token"] : [],
-    trustedOrigins: [managementOrigin],
+    trustedOrigins: [dashboardOrigin],
     logger: {
       disabled: env.NODE_ENV === "test",
     },
@@ -119,9 +133,16 @@ export function createAuth(options: CreateAuthOptions = {}) {
       updateAge: 60 * 60 * 24,
     },
     secret: env.BETTER_AUTH_SECRET,
-    baseURL: env.BETTER_AUTH_URL,
+    baseURL: hostRoutingEnabled
+      ? {
+          allowedHosts: [new URL(apiOrigin).host, new URL(dashboardOrigin).host],
+          protocol: new URL(apiOrigin).protocol === "https:" ? "https" : "http",
+        }
+      : dashboardOrigin,
     advanced: {
-      defaultCookieAttributes: getDefaultCookieAttributes(env.NODE_ENV),
+      crossSubDomainCookies: { enabled: false },
+      defaultCookieAttributes: getDefaultCookieAttributes(nodeEnv),
+      trustedProxyHeaders: env.TRUST_PROXY_HOPS > 0,
     },
     plugins: oauthDeviceAuthorizationEnabled
       ? [
@@ -129,11 +150,12 @@ export function createAuth(options: CreateAuthOptions = {}) {
             disableSettingJwtHeader: true,
             jwt: {
               audience: toolingResource,
+              issuer,
             },
           }),
           oauthProvider({
-            loginPage: new URL("/login", managementOrigin).toString(),
-            consentPage: new URL("/oauth/consent", managementOrigin).toString(),
+            loginPage: new URL("/login", dashboardOrigin).toString(),
+            consentPage: new URL("/oauth/consent", dashboardOrigin).toString(),
             scopes: [...CLI_OAUTH_SCOPES],
             resources: [
               {
@@ -157,7 +179,7 @@ export function createAuth(options: CreateAuthOptions = {}) {
             resourcePrivileges: () => false,
           }),
           oauthDeviceAuthorization({
-            verificationUri: new URL("/device", managementOrigin).toString(),
+            verificationUri: new URL("/device", dashboardOrigin).toString(),
             expiresIn: "10m",
             interval: "5s",
             deviceCodeLength: 32,
@@ -292,6 +314,7 @@ export function makeToolingOAuthAccessTokenVerifier(
           token,
           issuer,
         },
+        headers: new Headers({ host: new URL(issuer).host }),
       });
       const payload: Record<string, unknown> | null = result.payload;
       if (payload === null) return null;

@@ -1,0 +1,9 @@
+/node_modules
+/coverage
+/dist
+.output
+.tanstack
+.nitro
+*.tsbuildinfo
+.env*
+!.env.example

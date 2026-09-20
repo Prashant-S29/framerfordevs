@@ -4,17 +4,17 @@ import { observeRuntimeErrors } from "../support/runtime-diagnostics";
 
 const invitationToken = "b".repeat(43);
 
-test("loads the public application shell without browser runtime errors", async ({ page }) => {
+test("loads the dashboard authentication surface without browser runtime errors", async ({
+  page,
+}) => {
   const diagnostics = observeRuntimeErrors(page);
-  const response = await page.goto("/");
+  const response = await page.goto("/login");
 
   expect(response?.ok()).toBe(true);
-  await expect(
-    page.getByRole("heading", {
-      name: "Structured content and website operations without giving up your stack.",
-    }),
-  ).toBeVisible();
-  await expect(page.getByText("Connected", { exact: true })).toBeVisible();
+  diagnostics.expectNone();
+  await expect(page.getByRole("heading", { name: "Create Account" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Framer for Devs" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Docs", exact: true })).toBeVisible();
 
   const favicon = await page.request.get("/favicon.svg");
   expect(favicon.ok()).toBe(true);

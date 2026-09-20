@@ -158,9 +158,16 @@ import express, {
 } from "express";
 
 import { createControlPlaneRouter } from "./control-plane-router";
+import { classifyHostPath, normalizeEffectiveHost } from "./http/host-profile";
 export { classifyControlPlaneRequest } from "./control-plane-router";
 
 const generatedPublicArtifacts = generatePublicArtifacts();
+
+/** Selects the externally effective host only from the configured trusted proxy boundary. */
+function effectiveRequestHost(req: Request): string | undefined {
+  const forwardedHost = env.TRUST_PROXY_HOPS > 0 ? req.headers["x-forwarded-host"] : undefined;
+  return typeof forwardedHost === "string" ? forwardedHost : req.headers.host;
+}
 
 function publicArtifactBytes(key: PublicContractRegistryKey): string {
   const artifact = generatedPublicArtifacts.find((candidate) => candidate.key === key);
@@ -2354,6 +2361,7 @@ export interface CreateAppOptions {
   readonly deliveryApiEnabled?: boolean;
   readonly previewApiEnabled?: boolean;
   readonly managementApiReferenceEnabled?: boolean;
+  readonly hostRoutingEnabled?: boolean;
   readonly authoringEffectTransform?: ApplicationEffectTransform;
   readonly controlPlaneEffectTransform?: ApplicationEffectTransform;
 }
@@ -2364,6 +2372,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   const previewApiEnabled = options.previewApiEnabled ?? env.PREVIEW_API_ENABLED;
   const managementApiReferenceEnabled =
     options.managementApiReferenceEnabled ?? env.MANAGEMENT_API_REFERENCE_ENABLED;
+  const hostRoutingEnabled = options.hostRoutingEnabled ?? env.HOST_ROUTING_ENABLED;
   app.set("trust proxy", env.TRUST_PROXY_HOPS);
 
   app.use((req, res, next) => {
@@ -2380,12 +2389,48 @@ export function createApp(options: CreateAppOptions = {}): Express {
     next();
   });
 
+  app.use((req, res, next) => {
+    if (!hostRoutingEnabled) {
+      next();
+      return;
+    }
+
+    const decision = classifyHostPath(effectiveRequestHost(req), req.path, {
+      dashboardOrigin: env.DASHBOARD_ORIGIN,
+      operatorOrigin: env.OPERATOR_ORIGIN,
+      publicApiOrigin: env.BETTER_AUTH_URL,
+    });
+    if (decision.allowed) {
+      next();
+      return;
+    }
+
+    res.status(404).json(
+      apiFailure({
+        code: "NOT_FOUND",
+        message: "The requested resource was not found.",
+        requestId: requestContext(req).requestId,
+        retryable: false,
+      }),
+    );
+  });
+
   app.use("/api/authoring/v1", createAuthoringRouter(options.authoringEffectTransform));
   app.use(
     "/api/control-plane/v1",
     createControlPlaneRouter(
       publicArtifactBytes("control-plane/v1"),
       options.controlPlaneEffectTransform,
+      {
+        dashboardOrigin: env.DASHBOARD_ORIGIN,
+        resolveAuthenticationMode: hostRoutingEnabled
+          ? (req) =>
+              normalizeEffectiveHost(effectiveRequestHost(req)) ===
+              new URL(env.DASHBOARD_ORIGIN).host.toLowerCase()
+                ? "session"
+                : "bearer"
+          : undefined,
+      },
     ),
   );
   app.use("/api/delivery/v1", createDeliveryRouter(deliveryApiEnabled));
@@ -2395,7 +2440,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use((req, res, next) => {
     const origin = req.headers.origin;
 
-    if (origin && origin !== env.CORS_ORIGIN) {
+    if (origin && origin !== env.DASHBOARD_ORIGIN) {
       const failure = apiFailure({
         code: "FORBIDDEN",
         message: "The request origin is not allowed.",
@@ -2412,7 +2457,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use(
     cors({
       origin(origin, callback) {
-        callback(null, origin === env.CORS_ORIGIN);
+        callback(null, origin === env.DASHBOARD_ORIGIN);
       },
       methods: ["GET", "POST", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization", "Traceparent", "X-Request-Id"],

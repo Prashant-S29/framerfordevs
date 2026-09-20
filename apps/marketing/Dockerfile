@@ -1,0 +1,31 @@
+FROM node:24-slim AS base
+RUN npm install -g pnpm@10.25.0
+WORKDIR /app
+ENV SKIP_EFFECT_SOURCE_SETUP=1
+ENV SKIP_ENV_VALIDATION=true
+
+COPY . .
+RUN --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
+
+ARG VITE_DASHBOARD_ORIGIN
+ARG VITE_DEVELOPER_ORIGIN
+ARG VITE_MARKETING_ORIGIN
+ENV VITE_DASHBOARD_ORIGIN=${VITE_DASHBOARD_ORIGIN}
+ENV VITE_DEVELOPER_ORIGIN=${VITE_DEVELOPER_ORIGIN}
+ENV VITE_MARKETING_ORIGIN=${VITE_MARKETING_ORIGIN}
+ENV NODE_ENV=production
+ENV SKIP_ENV_VALIDATION=
+RUN test -n "$VITE_DASHBOARD_ORIGIN" \
+  && test -n "$VITE_DEVELOPER_ORIGIN" \
+  && test -n "$VITE_MARKETING_ORIGIN" \
+  && cd apps/marketing \
+  && pnpm run build
+ENV SKIP_EFFECT_SOURCE_SETUP=
+
+ENV HOST=0.0.0.0
+ENV PORT=3003
+EXPOSE 3003
+
+# SSR chunks require() externals at runtime; must run from the workspace
+WORKDIR /app/apps/marketing
+CMD ["node", ".output/server/index.mjs"]

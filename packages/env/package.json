@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./server": "./src/server/index.ts",
-    "./web": "./src/web/index.ts"
+    "./dashboard": "./src/dashboard/index.ts",
+    "./developers": "./src/developers/index.ts",
+    "./marketing": "./src/marketing/index.ts",
+    "./server": "./src/server/index.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",

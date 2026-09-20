@@ -1,25 +1,127 @@
+import { randomUUID } from "node:crypto";
 import { request as requestHttp } from "node:http";
 
+import type { ApplicationEffectTransform } from "@framerfordevs/api/context";
 import { controlPlaneLimits } from "@framerfordevs/api/contracts/control-plane/index";
+import { RateLimitCost, RateLimitDecision } from "@framerfordevs/api/contracts/rate-limit/index";
 import { disposeApplicationRuntime } from "@framerfordevs/api/runtime/index";
+import {
+  RateLimitManager,
+  type RateLimitManagerService,
+} from "@framerfordevs/api/services/rate-limit/manager/index";
+import { db } from "@framerfordevs/db";
+import { user } from "@framerfordevs/db/schema/auth";
 import { generatePublicArtifacts } from "@framerfordevs/public-contracts";
+import { eq } from "drizzle-orm";
+import { Effect } from "effect";
 import request from "supertest";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { classifyControlPlaneRequest, createApp } from "../../../src/app";
 
-const app = createApp();
+const unlimitedRateLimitManager: RateLimitManagerService = {
+  evaluate: (input) =>
+    Effect.succeed(
+      RateLimitDecision.make({
+        allowed: true,
+        policy: input.policy,
+        cost: RateLimitCost.make(input.cost),
+        limit: input.policy === "control-plane.global" ? 3_000 : 120,
+        remaining: input.policy === "control-plane.global" ? 3_000 : 120,
+        resetAtEpochMs: Date.now() + 60_000,
+        retryAfterSeconds: null,
+        enforcementMode: "memory",
+      }),
+    ),
+  reset: () => Effect.void,
+  retainedFallbackEntryCount: Effect.succeed(0),
+};
+const controlPlaneEffectTransform: ApplicationEffectTransform = (effect) =>
+  Effect.provideService(effect, RateLimitManager, unlimitedRateLimitManager);
+const app = createApp({ controlPlaneEffectTransform });
+const routedApp = createApp({ hostRoutingEnabled: true, controlPlaneEffectTransform });
+const disposableUserEmails = new Set<string>();
 const artifact = generatePublicArtifacts().find(
   (candidate) => candidate.key === "control-plane/v1",
 );
 if (artifact === undefined) throw new Error("Missing Control Plane public artifact.");
 
 afterAll(async () => {
+  for (const email of disposableUserEmails) {
+    await db.delete(user).where(eq(user.email, email));
+  }
   await disposeApplicationRuntime();
 });
 
-function unauthenticatedOperationalRequest(method: string, path: string) {
-  const target = request(app);
+type ControlPlaneTestMethod = "GET" | "PATCH" | "POST" | "PUT";
+type ControlPlaneTestRoute = readonly [ControlPlaneTestMethod, string];
+
+const projectId = "019fae8b-1234-7000-8000-000000000001";
+const environmentId = "019fae8b-1234-7000-8000-000000000002";
+const resourceId = "019fae8b-1234-7000-8000-000000000003";
+const projectPath = `/projects/${projectId}`;
+const environmentPath = `${projectPath}/environments/${environmentId}`;
+
+const canonicalControlPlaneRoutes = [
+  ["POST", "/invitations/accept"],
+  ["POST", "/invitations/inspect"],
+  ["GET", "/workspaces"],
+  ["POST", "/workspaces"],
+  ["GET", `/workspaces/${resourceId}`],
+  ["GET", `/workspaces/${resourceId}/projects`],
+  ["POST", `/workspaces/${resourceId}/projects`],
+  ["GET", projectPath],
+  ["PATCH", projectPath],
+  ["POST", `${projectPath}/archive`],
+  ["POST", `${projectPath}/restore`],
+  ["GET", `${projectPath}/capabilities`],
+  ["PUT", `${projectPath}/capabilities/cms`],
+  ["GET", `${environmentPath}/studio-registration`],
+  ["PUT", `${environmentPath}/studio-registration`],
+  ["GET", `${projectPath}/governance`],
+  ["GET", `${projectPath}/members`],
+  ["PUT", `${projectPath}/members/${resourceId}/policy`],
+  ["POST", `${projectPath}/members/${resourceId}/remove`],
+  ["GET", `${projectPath}/invitations`],
+  ["POST", `${projectPath}/invitations`],
+  ["POST", `${projectPath}/invitations/${resourceId}/revoke`],
+  ["GET", `${projectPath}/locales`],
+  ["POST", `${projectPath}/locales`],
+  ["PATCH", `${projectPath}/locales/${resourceId}`],
+  ["PUT", `${projectPath}/locales/order`],
+  ["PUT", `${projectPath}/locales/${resourceId}/status`],
+  ["GET", `${environmentPath}/credentials`],
+  ["POST", `${environmentPath}/credentials`],
+  ["POST", `${environmentPath}/credentials/${resourceId}/rotations`],
+  ["POST", `${environmentPath}/credential-rotations/${resourceId}/activate`],
+  ["POST", `${environmentPath}/credential-rotations/${resourceId}/cancel`],
+  ["POST", `${environmentPath}/credential-rotations/${resourceId}/complete`],
+  ["POST", `${environmentPath}/credentials/${resourceId}/revoke`],
+  ["GET", `${environmentPath}/webhooks`],
+  ["POST", `${environmentPath}/webhooks`],
+  ["PATCH", `${environmentPath}/webhooks/${resourceId}`],
+  ["PUT", `${environmentPath}/webhooks/${resourceId}/state`],
+  ["PUT", `${environmentPath}/webhooks/${resourceId}/subscriptions`],
+  ["POST", `${environmentPath}/webhooks/${resourceId}/secret-rotations`],
+  ["POST", `${environmentPath}/webhooks/${resourceId}/secret-rotations/activate`],
+  ["POST", `${environmentPath}/webhooks/${resourceId}/secret-rotations/cancel`],
+  ["POST", `${environmentPath}/webhooks/${resourceId}/secret-rotations/complete`],
+  ["GET", `${environmentPath}/invalidation-mappings`],
+  ["POST", `${environmentPath}/invalidation-mappings`],
+  ["PUT", `${environmentPath}/invalidation-mappings/${resourceId}`],
+  ["PUT", `${environmentPath}/invalidation-mappings/${resourceId}/state`],
+  ["GET", `${environmentPath}/webhook-deliveries`],
+  ["GET", `${environmentPath}/webhook-deliveries/${resourceId}`],
+  ["GET", `${environmentPath}/webhook-deliveries/${resourceId}/attempts`],
+  ["POST", `${environmentPath}/webhook-replays`],
+  ["GET", `${projectPath}/audit-events`],
+] as const satisfies ReadonlyArray<ControlPlaneTestRoute>;
+
+function controlPlaneRequest(
+  targetApp: Parameters<typeof request>[0],
+  [method, path]: ControlPlaneTestRoute,
+) {
+  const target = request(targetApp);
   switch (method) {
     case "GET":
       return target.get(`/api/control-plane/v1${path}`);
@@ -29,9 +131,11 @@ function unauthenticatedOperationalRequest(method: string, path: string) {
       return target.patch(`/api/control-plane/v1${path}`).send({});
     case "PUT":
       return target.put(`/api/control-plane/v1${path}`).send({});
-    default:
-      throw new Error(`Unsupported test method ${method}.`);
   }
+}
+
+function unauthenticatedOperationalRequest(method: ControlPlaneTestMethod, path: string) {
+  return controlPlaneRequest(app, [method, path]);
 }
 
 function duplicateAuthorizationRequest(): Promise<{
@@ -145,6 +249,136 @@ describe("Control Plane HTTP boundary", () => {
       expect(response.headers["cache-control"], `${method} ${path}`).toBe("no-store");
       expect(response.headers.location, `${method} ${path}`).toBeUndefined();
     }
+  });
+
+  it("isolates bearer and session authority across all 52 canonical operations", async () => {
+    expect(canonicalControlPlaneRoutes).toHaveLength(52);
+    const email = `m17-control-plane-${randomUUID()}@example.test`;
+    disposableUserEmails.add(email);
+    const signUp = await request(routedApp)
+      .post("/api/auth/sign-up/email")
+      .set("Host", "localhost:3001")
+      .set("Origin", "http://localhost:3001")
+      .send({ name: "M17 Control Plane Matrix", email, password: "M17-Test-Password-123!" });
+    expect(signUp.status).toBe(200);
+    const sessionCookie = String(signUp.headers["set-cookie"]?.[0] ?? "").split(";", 1)[0];
+    if (sessionCookie === undefined || sessionCookie === "") {
+      throw new Error("Expected a dashboard session cookie for the Control Plane matrix.");
+    }
+
+    for (const route of canonicalControlPlaneRoutes) {
+      const label = route.join(" ");
+      expect(classifyControlPlaneRequest(route[0], route[1]), label).not.toBeNull();
+
+      const cookieOnlyApi = await controlPlaneRequest(app, route).set(
+        "Cookie",
+        "session=must-not-authenticate",
+      );
+      expect(cookieOnlyApi.status, `${label} API cookie`).toBe(401);
+      expect(cookieOnlyApi.body.error.code, `${label} API cookie`).toBe("UNAUTHORIZED");
+      expect(cookieOnlyApi.headers["www-authenticate"], `${label} API cookie`).toBe(
+        'Bearer realm="control-plane"',
+      );
+
+      const anonymousDashboard = controlPlaneRequest(routedApp, route).set(
+        "Host",
+        "localhost:3001",
+      );
+      if (route[0] !== "GET") anonymousDashboard.set("Origin", "http://localhost:3001");
+      const anonymousDashboardResponse = await anonymousDashboard;
+      expect(anonymousDashboardResponse.status, `${label} dashboard anonymous`).toBe(401);
+      expect(
+        anonymousDashboardResponse.headers["www-authenticate"],
+        `${label} dashboard anonymous`,
+      ).toBeUndefined();
+
+      const bearerDashboard = controlPlaneRequest(routedApp, route)
+        .set("Host", "localhost:3001")
+        .set("Authorization", "Bearer must-not-authenticate");
+      if (route[0] !== "GET") bearerDashboard.set("Origin", "http://localhost:3001");
+      const bearerDashboardResponse = await bearerDashboard;
+      expect(bearerDashboardResponse.status, `${label} dashboard bearer`).toBe(400);
+      expect(bearerDashboardResponse.body.error.code, `${label} dashboard bearer`).toBe(
+        "VALIDATION_ERROR",
+      );
+    }
+
+    for (let offset = 0; offset < canonicalControlPlaneRoutes.length; offset += 4) {
+      await Promise.all(
+        canonicalControlPlaneRoutes.slice(offset, offset + 4).map(async (route) => {
+          const label = route.join(" ");
+          const sessionDashboard = controlPlaneRequest(routedApp, route)
+            .set("Host", "localhost:3001")
+            .set("Cookie", sessionCookie);
+          if (route[0] !== "GET") sessionDashboard.set("Origin", "http://localhost:3001");
+          const response = await sessionDashboard.timeout({ response: 5_000, deadline: 10_000 });
+          expect(response.status, `${label} dashboard session`).not.toBe(401);
+          expect(response.status, `${label} dashboard session quota`).not.toBe(429);
+          expect(
+            response.headers["www-authenticate"],
+            `${label} dashboard session`,
+          ).toBeUndefined();
+          expect(response.headers["cache-control"], `${label} dashboard session`).toBe("no-store");
+          expect(response.headers.vary, `${label} dashboard session`).toBe("Cookie, Origin");
+          expect(response.headers["ratelimit-limit"], `${label} dashboard session`).toEqual(
+            expect.any(String),
+          );
+          expect(response.headers["x-request-id"], `${label} dashboard session`).toEqual(
+            expect.any(String),
+          );
+        }),
+      );
+    }
+  }, 60_000);
+
+  it("closes dashboard CSRF, Fetch Metadata, preflight, and content-type boundaries", async () => {
+    const mutation = "/api/control-plane/v1/workspaces";
+    for (const origin of ["https://hostile.example", "null"]) {
+      const response = await request(routedApp)
+        .post(mutation)
+        .set("Host", "localhost:3001")
+        .set("Origin", origin)
+        .send({});
+      expect(response.status, origin).toBe(403);
+      expect(response.headers["access-control-allow-origin"], origin).toBeUndefined();
+    }
+
+    const crossSiteRead = await request(routedApp)
+      .get(mutation)
+      .set("Host", "localhost:3001")
+      .set("Sec-Fetch-Site", "cross-site");
+    expect(crossSiteRead.status).toBe(403);
+
+    const preflight = await request(routedApp)
+      .options(mutation)
+      .set("Host", "localhost:3001")
+      .set("Origin", "https://hostile.example")
+      .set("Access-Control-Request-Method", "POST");
+    expect(preflight.status).toBe(403);
+    expect(preflight.headers["access-control-allow-credentials"]).toBeUndefined();
+
+    for (const contentType of [
+      "application/x-www-form-urlencoded",
+      "multipart/form-data; boundary=test",
+      "text/plain",
+      "application/json; charset=iso-8859-1",
+    ]) {
+      const response = await request(routedApp)
+        .post(mutation)
+        .set("Host", "localhost:3001")
+        .set("Origin", "http://localhost:3001")
+        .set("Content-Type", contentType)
+        .send("{}");
+      expect(response.status, contentType).toBe(400);
+      expect(response.body.error.code, contentType).toBe("VALIDATION_ERROR");
+    }
+
+    const missingContentType = await request(routedApp)
+      .post(mutation)
+      .set("Host", "localhost:3001")
+      .set("Origin", "http://localhost:3001")
+      .send();
+    expect(missingContentType.status).toBe(400);
   });
 
   it("serves the canonical artifact separately from bearer data routes", async () => {

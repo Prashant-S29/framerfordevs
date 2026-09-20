@@ -120,7 +120,11 @@ export type ControlPlaneOperation =
   | "webhook_attempt_list"
   | "webhook_replay"
   | "audit_list";
-export type ControlPlaneSubject = "oauth_user" | "management_credential" | "unknown";
+export type ControlPlaneSubject =
+  | "oauth_user"
+  | "session_user"
+  | "management_credential"
+  | "unknown";
 export type ControlPlaneCostBucket = "1" | "2" | "3" | "5";
 
 export interface ControlPlaneRequestMetric {

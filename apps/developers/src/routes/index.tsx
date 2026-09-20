@@ -4,10 +4,12 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { HomeLayout } from "fumadocs-ui/layouts/home";
 import { ArrowRight, BookOpen, Braces, TerminalSquare, Webhook } from "lucide-react";
 
+import { canonicalDeveloperUrl } from "@/lib/canonical-url";
 import { baseOptions } from "@/lib/layout.shared";
 
 export const Route = createFileRoute("/")({
   component: Home,
+  head: () => ({ links: [{ rel: "canonical", href: canonicalDeveloperUrl("/") }] }),
 });
 
 const paths = [

@@ -47,7 +47,7 @@ Then, run the development server:
 pnpm run dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
+Open [http://localhost:3001](http://localhost:3001) for the dashboard or [http://localhost:3003](http://localhost:3003) for marketing.
 The API is running at [http://localhost:3000](http://localhost:3000).
 
 - Liveness: `GET http://localhost:3000/`
@@ -67,7 +67,7 @@ React web apps in this stack share shadcn/ui primitives through `packages/ui`.
 
 - Change design tokens and global styles in `packages/ui/src/styles/globals.css`
 - Update shared primitives in `packages/ui/src/components/*`
-- Adjust shadcn aliases or style config in `packages/ui/components.json` and `apps/web/components.json`
+- Adjust shadcn aliases or style config in `packages/ui/components.json`, `apps/dashboard/components.json`, and `apps/marketing/components.json`
 
 ### Add more shared components
 
@@ -85,20 +85,20 @@ import { Button } from "@framerfordevs/ui/components/button";
 
 ### Add app-specific blocks
 
-If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from `apps/web`.
+If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from the owning app directory.
 
 ## Deployment
 
 ### Docker Compose
 
-- Target: web + server
+- Target: dashboard + marketing + server
 - Config: `docker-compose.yml` (app Dockerfiles live in `apps/*/Dockerfile`)
 - Build images: pnpm run docker:build
 - Start: pnpm run docker:up
 - Logs: pnpm run docker:logs
 - Stop: pnpm run docker:down
 
-Environment variables are read from each app's `.env` file (baked into web builds for public variables) and overridden in `docker-compose.yml` for container networking.
+Environment variables are read from each app's `.env` file (baked into browser builds for public variables) and overridden in `docker-compose.yml` for container networking.
 
 For more details, see the guide on [Deploying with Docker Compose](https://www.better-t-stack.dev/docs/guides/docker).
 
@@ -112,8 +112,10 @@ For more details, see the guide on [Deploying with Docker Compose](https://www.b
 ```
 framerfordevs/
 ├── apps/
-│   ├── web/         # Frontend application (React + TanStack Start)
-│   ├── server/      # Backend API (Express, ORPC)
+│   ├── dashboard/   # Authenticated dashboard (React + TanStack Start)
+│   ├── developers/  # Public developer documentation
+│   ├── marketing/   # Public marketing and validated login entry
+│   ├── server/      # Backend API and same-origin dashboard ingress target
 │   └── worker/      # Dedicated publication webhook worker
 ├── packages/
 │   ├── ui/          # Shared shadcn/ui components and styles
@@ -139,7 +141,8 @@ See [`knowledge_base/decisions/repository-test-structure.md`](knowledge_base/dec
 - `pnpm run test:accessibility`: Run broad accessibility suites
 - `pnpm run test:coverage`: Run tests with coverage
 - `pnpm run ready`: Format, lint, type-check, test, collect coverage, and build
-- `pnpm run dev:web`: Start only the web application
+- `pnpm run dev:dashboard`: Start only the dashboard application
+- `pnpm run dev:marketing`: Start only the marketing application
 - `pnpm run dev:server`: Start only the server
 - `pnpm run check-types`: Check TypeScript types across all apps
 - `pnpm run db:push`: Push schema changes to database

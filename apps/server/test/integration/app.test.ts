@@ -830,16 +830,19 @@ describe.sequential("Better Auth foundation", () => {
       sameSite: "lax",
       secure: false,
       httpOnly: true,
+      path: "/",
     });
     expect(getDefaultCookieAttributes("test")).toEqual({
       sameSite: "lax",
       secure: false,
       httpOnly: true,
+      path: "/",
     });
     expect(getDefaultCookieAttributes("production")).toEqual({
-      sameSite: "none",
+      sameSite: "lax",
       secure: true,
       httpOnly: true,
+      path: "/",
     });
   });
 
@@ -858,7 +861,9 @@ describe.sequential("Better Auth foundation", () => {
     const setCookie = String(signUp.headers["set-cookie"] ?? "");
     expect(setCookie).toContain("HttpOnly");
     expect(setCookie).toContain("SameSite=Lax");
+    expect(setCookie).toContain("Path=/");
     expect(setCookie).not.toContain("Secure");
+    expect(setCookie).not.toContain("Domain=");
 
     const currentSession = await agent
       .get("/api/auth/get-session")
@@ -866,6 +871,110 @@ describe.sequential("Better Auth foundation", () => {
 
     expect(currentSession.status).toBe(200);
     expect(currentSession.body.user.email).toBe(email);
+  });
+
+  it("proves dashboard-host cookies coexist with the API-host OAuth issuer", async () => {
+    const dashboardOrigin = "https://dashboard.example.test";
+    const apiOrigin = "https://api.example.test";
+    const splitAuth = createAuth({
+      apiOrigin,
+      dashboardOrigin,
+      hostRoutingEnabled: true,
+      nodeEnv: "production",
+      oauthDeviceAuthorizationEnabled: true,
+    });
+    const splitApp = express();
+    splitApp.all("/api/auth{/*path}", toNodeHandler(splitAuth));
+
+    const email = makeEmail();
+    const signUp = await request(splitApp)
+      .post("/api/auth/sign-up/email")
+      .set("Host", "dashboard.example.test")
+      .set("Origin", dashboardOrigin)
+      .send({ name: "M17 Compatibility User", email, password });
+
+    expect(signUp.status).toBe(200);
+    const setCookie = String(signUp.headers["set-cookie"] ?? "");
+    expect(setCookie).toContain("Secure");
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie).toContain("SameSite=Lax");
+    expect(setCookie).toContain("Path=/");
+    expect(setCookie).not.toContain("Domain=");
+
+    const sessionCookie = String(signUp.headers["set-cookie"]?.[0] ?? "").split(";", 1)[0];
+    if (sessionCookie === undefined || sessionCookie === "") {
+      throw new Error("Expected a dashboard session cookie.");
+    }
+    const session = await request(splitApp)
+      .get("/api/auth/get-session")
+      .set("Host", "dashboard.example.test")
+      .set("Cookie", sessionCookie);
+    expect(session.status).toBe(200);
+    expect(session.body.user.email).toBe(email);
+
+    const metadata = await request(splitApp)
+      .get("/api/auth/.well-known/openid-configuration")
+      .set("Host", "api.example.test");
+
+    expect(metadata.status).toBe(200);
+    expect(metadata.body.issuer).toBe(`${apiOrigin}/api/auth`);
+    expect(metadata.body.authorization_endpoint).toBe(`${apiOrigin}/api/auth/oauth2/authorize`);
+    expect(metadata.body.token_endpoint).toBe(`${apiOrigin}/api/auth/oauth2/token`);
+  });
+
+  it("separates dashboard sessions from bearer-only API routes by host", async () => {
+    const routedApp = createApp({ hostRoutingEnabled: true });
+    const dashboardAgent = request.agent(routedApp);
+    const email = makeEmail();
+    const signUp = await dashboardAgent
+      .post("/api/auth/sign-up/email")
+      .set("Host", "localhost:3001")
+      .set("Origin", "http://localhost:3001")
+      .send({ name: "M17 Session User", email, password });
+
+    expect(signUp.status).toBe(200);
+
+    const sessionControlPlane = await dashboardAgent
+      .get("/api/control-plane/v1/workspaces")
+      .set("Host", "localhost:3001");
+    expect(sessionControlPlane.status).toBe(200);
+    expect(sessionControlPlane.body.ok).toBe(true);
+    expect(sessionControlPlane.headers.vary).toBe("Cookie, Origin");
+    expect(sessionControlPlane.headers["www-authenticate"]).toBeUndefined();
+
+    const missingMutationOrigin = await dashboardAgent
+      .post("/api/control-plane/v1/workspaces")
+      .set("Host", "localhost:3001")
+      .send({});
+    expect(missingMutationOrigin.status).toBe(403);
+
+    const forbiddenBearerFallback = await dashboardAgent
+      .get("/api/control-plane/v1/workspaces")
+      .set("Host", "localhost:3001")
+      .set("Authorization", "Bearer ignored");
+    expect(forbiddenBearerFallback.status).toBe(400);
+
+    const apiCookieOnly = await dashboardAgent
+      .get("/api/control-plane/v1/workspaces")
+      .set("Host", "localhost:3000");
+    expect(apiCookieOnly.status).toBe(401);
+    expect(apiCookieOnly.headers["www-authenticate"]).toBe('Bearer realm="control-plane"');
+
+    const crossHostAuth = await dashboardAgent
+      .get("/api/auth/get-session")
+      .set("Host", "localhost:3000");
+    expect(crossHostAuth.status).toBe(404);
+
+    const dashboardPublicApi = await dashboardAgent
+      .get("/api/delivery/v1/openapi.json")
+      .set("Host", "localhost:3001");
+    expect(dashboardPublicApi.status).toBe(404);
+
+    const spoofedForwardedHost = await request(routedApp)
+      .get("/")
+      .set("Host", "unknown.example.test")
+      .set("X-Forwarded-Host", "localhost:3000");
+    expect(spoofedForwardedHost.status).toBe(404);
   });
 
   it("rejects duplicate sign-up without creating another user", async () => {
@@ -1078,12 +1187,21 @@ describe.sequential("official CLI OAuth device authorization", () => {
 
   it("issues only an explicitly approved scoped device token and verifies its Tooling claims", async () => {
     await ensureOfficialCliOAuthAuthority({ enabled: true });
-    const oauthAuth = createAuth({ oauthDeviceAuthorizationEnabled: true });
+    const apiOrigin = "https://api.example.test";
+    const dashboardOrigin = "https://dashboard.example.test";
+    const oauthAuth = createAuth({
+      apiOrigin,
+      dashboardOrigin,
+      hostRoutingEnabled: true,
+      nodeEnv: "production",
+      oauthDeviceAuthorizationEnabled: true,
+    });
     const oauthApp = express();
     oauthApp.all("/api/auth{/*path}", toNodeHandler(oauthAuth));
 
     const code = await request(oauthApp)
       .post("/api/auth/device/code")
+      .set("Host", "api.example.test")
       .send({
         client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
         scope: CLI_OAUTH_SCOPES.join(" "),
@@ -1095,22 +1213,27 @@ describe.sequential("official CLI OAuth device authorization", () => {
       expect.objectContaining({
         device_code: expect.any(String),
         user_code: expect.any(String),
-        verification_uri: "http://localhost:3001/device",
+        verification_uri: `${dashboardOrigin}/device`,
         expires_in: 600,
         interval: 5,
       }),
     );
 
-    const pending = await request(oauthApp).post("/api/auth/oauth2/token").type("form").send({
-      grant_type: CLI_OAUTH_GRANT_TYPES[0],
-      device_code: code.body.device_code,
-      client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
-    });
+    const pending = await request(oauthApp)
+      .post("/api/auth/oauth2/token")
+      .set("Host", "api.example.test")
+      .type("form")
+      .send({
+        grant_type: CLI_OAUTH_GRANT_TYPES[0],
+        device_code: code.body.device_code,
+        client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+      });
     expect(pending.status).toBe(400);
     expect(pending.body.error).toBe("authorization_pending");
 
     const approvedCode = await request(oauthApp)
       .post("/api/auth/device/code")
+      .set("Host", "api.example.test")
       .send({
         client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
         scope: CLI_OAUTH_SCOPES.join(" "),
@@ -1119,16 +1242,22 @@ describe.sequential("official CLI OAuth device authorization", () => {
     expect(approvedCode.status).toBe(200);
 
     const email = makeEmail();
-    const browser = request.agent(oauthApp);
-    const signUp = await browser
+    const signUp = await request(oauthApp)
       .post("/api/auth/sign-up/email")
-      .set("Origin", "http://localhost:3001")
+      .set("Host", "dashboard.example.test")
+      .set("Origin", dashboardOrigin)
       .send({ name: "M12 OAuth Test User", email, password });
     expect(signUp.status).toBe(200);
     oauthTestUserIds.add(signUp.body.user.id);
+    const sessionCookie = String(signUp.headers["set-cookie"]?.[0] ?? "").split(";", 1)[0];
+    if (sessionCookie === undefined || sessionCookie === "") {
+      throw new Error("Expected a dashboard session cookie.");
+    }
 
-    const verify = await browser
+    const verify = await request(oauthApp)
       .get("/api/auth/device")
+      .set("Host", "dashboard.example.test")
+      .set("Cookie", sessionCookie)
       .query({ user_code: approvedCode.body.user_code });
     expect(verify.status).toBe(200);
     expect(verify.body).toEqual(
@@ -1140,18 +1269,24 @@ describe.sequential("official CLI OAuth device authorization", () => {
       }),
     );
 
-    const approval = await browser
+    const approval = await request(oauthApp)
       .post("/api/auth/device/approve")
-      .set("Origin", "http://localhost:3001")
+      .set("Host", "dashboard.example.test")
+      .set("Cookie", sessionCookie)
+      .set("Origin", dashboardOrigin)
       .send({ userCode: approvedCode.body.user_code });
     expect(approval.status).toBe(200);
     expect(approval.body).toEqual({ success: true });
 
-    const token = await request(oauthApp).post("/api/auth/oauth2/token").type("form").send({
-      grant_type: CLI_OAUTH_GRANT_TYPES[0],
-      device_code: approvedCode.body.device_code,
-      client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
-    });
+    const token = await request(oauthApp)
+      .post("/api/auth/oauth2/token")
+      .set("Host", "api.example.test")
+      .type("form")
+      .send({
+        grant_type: CLI_OAUTH_GRANT_TYPES[0],
+        device_code: approvedCode.body.device_code,
+        client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+      });
     expect(token.status).toBe(200);
     expect(token.body).toEqual(
       expect.objectContaining({
@@ -1169,7 +1304,7 @@ describe.sequential("official CLI OAuth device authorization", () => {
     const verifyAccessToken = makeToolingOAuthAccessTokenVerifier({
       authInstance: oauthAuth,
       enabled: true,
-      issuer: "http://localhost:3000/api/auth",
+      issuer: `${apiOrigin}/api/auth`,
       resource: env.TOOLING_API_RESOURCE,
     });
     const principal = await verifyAccessToken(token.body.access_token);
@@ -1197,12 +1332,16 @@ describe.sequential("official CLI OAuth device authorization", () => {
       verifyAccessToken(`${header}.${payload}.${tamperedSignature}`),
     ).resolves.toBeNull();
 
-    const refreshed = await request(oauthApp).post("/api/auth/oauth2/token").type("form").send({
-      grant_type: "refresh_token",
-      refresh_token: token.body.refresh_token,
-      client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
-      resource: env.TOOLING_API_RESOURCE,
-    });
+    const refreshed = await request(oauthApp)
+      .post("/api/auth/oauth2/token")
+      .set("Host", "api.example.test")
+      .type("form")
+      .send({
+        grant_type: "refresh_token",
+        refresh_token: token.body.refresh_token,
+        client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+        resource: env.TOOLING_API_RESOURCE,
+      });
     expect(refreshed.status).toBe(200);
     expect(refreshed.body.refresh_token).toEqual(expect.any(String));
     expect(refreshed.body.refresh_token).not.toBe(token.body.refresh_token);
@@ -1210,12 +1349,16 @@ describe.sequential("official CLI OAuth device authorization", () => {
       expect.objectContaining({ userId: signUp.body.user.id }),
     );
 
-    const replay = await request(oauthApp).post("/api/auth/oauth2/token").type("form").send({
-      grant_type: "refresh_token",
-      refresh_token: token.body.refresh_token,
-      client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
-      resource: env.TOOLING_API_RESOURCE,
-    });
+    const replay = await request(oauthApp)
+      .post("/api/auth/oauth2/token")
+      .set("Host", "api.example.test")
+      .type("form")
+      .send({
+        grant_type: "refresh_token",
+        refresh_token: token.body.refresh_token,
+        client_id: OFFICIAL_CLI_OAUTH_CLIENT_ID,
+        resource: env.TOOLING_API_RESOURCE,
+      });
     expect(replay.status).toBe(400);
     expect(replay.body.error).toBe("invalid_grant");
   });

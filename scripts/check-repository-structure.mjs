@@ -274,7 +274,7 @@ async function checkDomainStructure(violations) {
       allowed: new Set(["experimental-schema-build.ts"]),
     },
     {
-      root: "apps/web/src/components",
+      root: "apps/dashboard/src/components",
       domains: [
         "archive-project",
         "collection-entries",
@@ -288,7 +288,7 @@ async function checkDomainStructure(violations) {
       ],
     },
     {
-      root: "apps/web/src/lib",
+      root: "apps/dashboard/src/lib",
       domains: [
         "auth-client",
         "auth-navigation",

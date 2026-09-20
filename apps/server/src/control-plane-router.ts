@@ -126,6 +126,7 @@ import {
   evaluateControlPlaneGlobalRateLimit,
   evaluateControlPlanePrincipalRateLimit,
   type ControlPlaneBearerRequirement,
+  type ControlPlanePrincipal,
 } from "@framerfordevs/api/operations/control-plane/public/index";
 import { makeRequestContext } from "@framerfordevs/api/observability/request-context/index";
 import {
@@ -135,8 +136,9 @@ import {
   toStatusFamily,
 } from "@framerfordevs/api/observability/telemetry/index";
 import { observeControlPlaneRequest, reportBoundaryDefect } from "@framerfordevs/api/runtime/index";
-import type { ToolingPrincipal } from "@framerfordevs/api/services/tooling/principal-authenticator/index";
+import { requireSession } from "@framerfordevs/api/operations/system/index";
 import { apiReference } from "@scalar/express-api-reference";
+import { fromNodeHeaders } from "better-auth/node";
 import express, { type NextFunction, type Request, type Response, type Router } from "express";
 
 function routeParameter(req: Request, key: string): string {
@@ -170,6 +172,15 @@ interface ControlPlaneHttpObservation {
 }
 
 const controlPlaneHttpObservations = new WeakMap<Response, ControlPlaneHttpObservation>();
+
+type ControlPlaneAuthenticationMode = "bearer" | "session";
+
+interface ControlPlaneRouterOptions {
+  readonly dashboardOrigin?: string;
+  readonly resolveAuthenticationMode?: (req: Request) => ControlPlaneAuthenticationMode;
+}
+
+const controlPlaneAuthenticationModes = new WeakMap<Request, ControlPlaneAuthenticationMode>();
 
 export function classifyControlPlaneRequest(
   method: string,
@@ -387,10 +398,13 @@ export function classifyControlPlaneRequest(
   return null;
 }
 
-function setControlPlaneHeaders(res: Response): void {
+function setControlPlaneHeaders(req: Request, res: Response): void {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("Vary", "Authorization");
+  res.setHeader(
+    "Vary",
+    controlPlaneAuthenticationModes.get(req) === "session" ? "Cookie, Origin" : "Authorization",
+  );
 }
 
 function sendControlPlaneResponse(
@@ -399,8 +413,10 @@ function sendControlPlaneResponse(
   status: number,
   response: ApiResponse<ApiData>,
 ): void {
-  setControlPlaneHeaders(res);
-  if (status === 401) res.setHeader("WWW-Authenticate", 'Bearer realm="control-plane"');
+  setControlPlaneHeaders(req, res);
+  if (status === 401 && controlPlaneAuthenticationModes.get(req) !== "session") {
+    res.setHeader("WWW-Authenticate", 'Bearer realm="control-plane"');
+  }
   let finalStatus = status;
   let finalResponse = response;
   let body = Buffer.from(JSON.stringify(finalResponse), "utf8");
@@ -435,7 +451,7 @@ async function enforceControlPlaneQuota(
   req: Request,
   res: Response,
   context: Context,
-  principal: ToolingPrincipal | null,
+  principal: ControlPlanePrincipal | null,
   cost: number,
 ): Promise<boolean> {
   const result = await context.execute(
@@ -471,25 +487,60 @@ async function prepareControlPlaneRequest(
   context: Context,
   requirement: ControlPlaneBearerRequirement,
   cost: number,
-): Promise<ToolingPrincipal | undefined> {
-  const principalResult = await context.execute(
-    "api.control-plane.authenticate",
-    authenticateControlPlaneRequest(
-      req.headers.authorization ?? null,
-      selectCanonicalNetworkSource(req.ip, req.socket.remoteAddress),
-      requirement,
-    ),
-    "Control Plane principal authenticated.",
-  );
-  if (!principalResult.response.ok) {
-    sendControlPlaneResponse(req, res, principalResult.status, principalResult.response);
-    return undefined;
+): Promise<ControlPlanePrincipal | undefined> {
+  const authenticationMode = controlPlaneAuthenticationModes.get(req) ?? "bearer";
+  let principal: ControlPlanePrincipal;
+  if (authenticationMode === "session") {
+    const sessionResult = await context.execute(
+      "api.control-plane.authenticate-session",
+      requireSession(fromNodeHeaders(req.headers)),
+      "Control Plane session principal authenticated.",
+    );
+    if (!sessionResult.response.ok) {
+      sendControlPlaneResponse(req, res, sessionResult.status, sessionResult.response);
+      return undefined;
+    }
+    principal = { kind: "session_user", userId: sessionResult.response.data.user.id };
+  } else {
+    const bearerResult = await context.execute(
+      "api.control-plane.authenticate",
+      authenticateControlPlaneRequest(
+        req.headers.authorization ?? null,
+        selectCanonicalNetworkSource(req.ip, req.socket.remoteAddress),
+        requirement,
+      ),
+      "Control Plane principal authenticated.",
+    );
+    if (!bearerResult.response.ok) {
+      sendControlPlaneResponse(req, res, bearerResult.status, bearerResult.response);
+      return undefined;
+    }
+    principal = bearerResult.response.data;
   }
-  const principal = principalResult.response.data;
   const observation = controlPlaneHttpObservations.get(res);
   if (observation !== undefined) observation.subject = principal.kind;
   if (!(await enforceControlPlaneQuota(req, res, context, principal, cost))) return undefined;
   return principal;
+}
+
+function controlPlaneUserId(
+  req: Request,
+  res: Response,
+  principal: ControlPlanePrincipal,
+): string | null {
+  if (principal.kind !== "management_credential") return principal.userId;
+  sendControlPlaneResponse(
+    req,
+    res,
+    403,
+    apiFailure({
+      code: "FORBIDDEN",
+      message: "You do not have permission to perform this action.",
+      requestId: requestContext(req).requestId,
+      retryable: false,
+    }),
+  );
+  return null;
 }
 
 function authorizationHeaderCount(req: Request): number {
@@ -580,12 +631,15 @@ function controlPlaneAllowedMethods(path: string): ReadonlyArray<string> | null 
 export function createControlPlaneRouter(
   openApiBytes: string,
   transformEffect?: ApplicationEffectTransform,
+  options: ControlPlaneRouterOptions = {},
 ): Router {
   const router = express.Router();
   const controlPlaneContext = (req: Request) =>
     createContext(transformEffect === undefined ? { req } : { req, transformEffect });
 
   router.use(async (req, res, next) => {
+    const authenticationMode = options.resolveAuthenticationMode?.(req) ?? "bearer";
+    controlPlaneAuthenticationModes.set(req, authenticationMode);
     const classified = classifyControlPlaneRequest(req.method, req.path);
     if (classified !== null) {
       const observation: ControlPlaneHttpObservation = {
@@ -605,20 +659,31 @@ export function createControlPlaneRouter(
         }).catch(() => undefined);
       });
     }
-    setControlPlaneHeaders(res);
+    setControlPlaneHeaders(req, res);
     const specificationRoute = req.path === "/openapi.json" || req.path === "/docs";
     if (specificationRoute) {
       next();
       return;
     }
-    if (req.headers.origin !== undefined || req.method === "OPTIONS") {
+    const origin = req.headers.origin;
+    const fetchSite = req.headers["sec-fetch-site"];
+    const unsafeMethod = req.method !== "GET" && req.method !== "HEAD";
+    const invalidBearerOrigin =
+      authenticationMode === "bearer" && (origin !== undefined || req.method === "OPTIONS");
+    const invalidSessionOrigin =
+      authenticationMode === "session" &&
+      ((origin !== undefined && origin !== options.dashboardOrigin) ||
+        (unsafeMethod && origin !== options.dashboardOrigin));
+    const invalidSessionFetchMetadata =
+      authenticationMode === "session" && fetchSite === "cross-site";
+    if (invalidBearerOrigin || invalidSessionOrigin || invalidSessionFetchMetadata) {
       sendControlPlaneResponse(
         req,
         res,
         403,
         apiFailure({
           code: "FORBIDDEN",
-          message: "Browser-origin Control Plane requests are not allowed.",
+          message: "The Control Plane request origin is not allowed.",
           requestId: requestContext(req).requestId,
           retryable: false,
         }),
@@ -660,14 +725,18 @@ export function createControlPlaneRouter(
       );
       return;
     }
-    if (authorizationHeaderCount(req) > 1) {
+    const authorizationHeaders = authorizationHeaderCount(req);
+    if (
+      authorizationHeaders > 1 ||
+      (authenticationMode === "session" && authorizationHeaders > 0)
+    ) {
       sendControlPlaneResponse(
         req,
         res,
         400,
         apiFailure({
           code: "VALIDATION_ERROR",
-          message: "Use exactly one Authorization header.",
+          message: "The Authorization header is invalid for this Control Plane surface.",
           requestId: requestContext(req).requestId,
           retryable: false,
         }),
@@ -747,7 +816,11 @@ export function createControlPlaneRouter(
       );
       return;
     }
-    if (["POST", "PUT", "PATCH"].includes(req.method) && !req.is("application/json")) {
+    const contentType = req.headers["content-type"];
+    const validJsonContentType =
+      typeof contentType === "string" &&
+      /^application\/json(?:\s*;\s*charset=utf-8)?$/iu.test(contentType);
+    if (["POST", "PUT", "PATCH"].includes(req.method) && !validJsonContentType) {
       sendControlPlaneResponse(
         req,
         res,
@@ -2203,7 +2276,9 @@ export function createControlPlaneRouter(
       controlPlaneBearerRequirements.listCredentials,
       controlPlaneRequestCosts.list,
     );
-    if (principal === undefined || principal.kind !== "oauth_user") return;
+    if (principal === undefined) return;
+    const actorUserId = controlPlaneUserId(req, res, principal);
+    if (actorUserId === null) return;
     const scopeResult = await context.execute(
       "api.control-plane.credential.list.path",
       decodeControlPlaneOperationalEnvironmentScope(
@@ -2224,7 +2299,7 @@ export function createControlPlaneRouter(
     const result = await context.execute(
       "api.control-plane.credential.list",
       listControlPlaneCredentials(
-        principal.userId,
+        actorUserId,
         controlPlanePrincipalKey(principal),
         scope.projectId,
         scope.environmentId,
@@ -2244,7 +2319,9 @@ export function createControlPlaneRouter(
       controlPlaneBearerRequirements.manageCredentials,
       controlPlaneRequestCosts.create,
     );
-    if (principal === undefined || principal.kind !== "oauth_user") return;
+    if (principal === undefined) return;
+    const actorUserId = controlPlaneUserId(req, res, principal);
+    if (actorUserId === null) return;
     const scopeResult = await context.execute(
       "api.control-plane.credential.issue.path",
       decodeControlPlaneOperationalEnvironmentScope(
@@ -2265,7 +2342,7 @@ export function createControlPlaneRouter(
     const result = await context.execute(
       "api.control-plane.credential.issue",
       issueControlPlaneCredential(
-        principal.userId,
+        actorUserId,
         scope.projectId,
         scope.environmentId,
         request,
@@ -2287,7 +2364,9 @@ export function createControlPlaneRouter(
         controlPlaneBearerRequirements.manageCredentials,
         controlPlaneRequestCosts.lifecycle,
       );
-      if (principal === undefined || principal.kind !== "oauth_user") return;
+      if (principal === undefined) return;
+      const actorUserId = controlPlaneUserId(req, res, principal);
+      if (actorUserId === null) return;
       const scopeResult = await context.execute(
         "api.control-plane.credential.rotation.start.path",
         decodeControlPlaneOperationalCredentialScope(
@@ -2309,7 +2388,7 @@ export function createControlPlaneRouter(
       const result = await context.execute(
         "api.control-plane.credential.rotation.start",
         startControlPlaneCredentialRotation(
-          principal.userId,
+          actorUserId,
           scope.projectId,
           scope.environmentId,
           scope.credentialId,
@@ -2332,7 +2411,9 @@ export function createControlPlaneRouter(
         controlPlaneBearerRequirements.manageCredentials,
         controlPlaneRequestCosts.lifecycle,
       );
-      if (principal === undefined || principal.kind !== "oauth_user") return;
+      if (principal === undefined) return;
+      const actorUserId = controlPlaneUserId(req, res, principal);
+      if (actorUserId === null) return;
       const scopeResult = await context.execute(
         `api.control-plane.credential.rotation.${action}.path`,
         decodeControlPlaneOperationalRotationScope(
@@ -2354,7 +2435,7 @@ export function createControlPlaneRouter(
       const result = await context.execute(
         `api.control-plane.credential.rotation.${action}`,
         changeControlPlaneCredentialRotation(
-          principal.userId,
+          actorUserId,
           scope.projectId,
           scope.environmentId,
           scope.rotationId,
@@ -2383,7 +2464,9 @@ export function createControlPlaneRouter(
         controlPlaneBearerRequirements.manageCredentials,
         controlPlaneRequestCosts.lifecycle,
       );
-      if (principal === undefined || principal.kind !== "oauth_user") return;
+      if (principal === undefined) return;
+      const actorUserId = controlPlaneUserId(req, res, principal);
+      if (actorUserId === null) return;
       const scopeResult = await context.execute(
         "api.control-plane.credential.revoke.path",
         decodeControlPlaneOperationalCredentialScope(
@@ -2405,7 +2488,7 @@ export function createControlPlaneRouter(
       const result = await context.execute(
         "api.control-plane.credential.revoke",
         revokeControlPlaneCredential(
-          principal.userId,
+          actorUserId,
           scope.projectId,
           scope.environmentId,
           scope.credentialId,
@@ -2427,7 +2510,9 @@ export function createControlPlaneRouter(
       controlPlaneBearerRequirements.listAuditEvents,
       controlPlaneRequestCosts.list,
     );
-    if (principal === undefined || principal.kind !== "oauth_user") return;
+    if (principal === undefined) return;
+    const actorUserId = controlPlaneUserId(req, res, principal);
+    if (actorUserId === null) return;
     const queryResult = await context.execute(
       "api.control-plane.audit.list.query",
       decodeControlPlaneProjectAuditInput(req.originalUrl.split("?", 2)[1] ?? ""),
@@ -2438,7 +2523,7 @@ export function createControlPlaneRouter(
     const result = await context.execute(
       "api.control-plane.audit.list",
       listProjectAuditEvents(
-        principal.userId,
+        actorUserId,
         controlPlanePrincipalKey(principal),
         routeParameter(req, "projectId"),
         query,

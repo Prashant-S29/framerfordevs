@@ -4,6 +4,8 @@ import "dotenv/config";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 
+import { exactOriginSchema } from "../origin";
+
 const validatedEnv = createEnv({
   server: {
     DATABASE_URL: z.string().min(1),
@@ -11,8 +13,13 @@ const validatedEnv = createEnv({
     DATABASE_ACQUIRE_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(2_000),
     DATABASE_IDLE_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(300_000).default(30_000),
     BETTER_AUTH_SECRET: z.string().min(32),
-    BETTER_AUTH_URL: z.url(),
-    CORS_ORIGIN: z.url(),
+    BETTER_AUTH_URL: exactOriginSchema,
+    DASHBOARD_ORIGIN: exactOriginSchema,
+    OPERATOR_ORIGIN: exactOriginSchema.default("http://operator.localhost:3000"),
+    HOST_ROUTING_ENABLED: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
     TOOLING_API_RESOURCE: z.url().default("http://localhost:3000/api/tooling/v1"),
     OAUTH_DEVICE_AUTHORIZATION_ENABLED: z
       .enum(["true", "false"])
@@ -81,6 +88,26 @@ if (toolingApiResource.protocol !== "https:" && !toolingResourceUsesLocalHttp) {
 
 if (validatedEnv.NODE_ENV === "production" && toolingApiResource.protocol !== "https:") {
   throw new Error("The production Tooling API OAuth resource requires HTTPS.");
+}
+
+const hostedOrigins = [
+  validatedEnv.BETTER_AUTH_URL,
+  validatedEnv.DASHBOARD_ORIGIN,
+  validatedEnv.OPERATOR_ORIGIN,
+];
+if (new Set(hostedOrigins).size !== hostedOrigins.length) {
+  throw new Error("Public API, dashboard, and operator origins must be distinct.");
+}
+
+if (
+  validatedEnv.NODE_ENV === "production" &&
+  hostedOrigins.some((origin) => new URL(origin).protocol !== "https:")
+) {
+  throw new Error("Production hosted origins require HTTPS.");
+}
+
+if (validatedEnv.NODE_ENV === "production" && !validatedEnv.HOST_ROUTING_ENABLED) {
+  throw new Error("Production requires host routing enforcement.");
 }
 
 if (

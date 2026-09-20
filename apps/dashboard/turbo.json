@@ -1,0 +1,14 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "env": [
+        "INTERNAL_SERVER_URL",
+        "VITE_DASHBOARD_ORIGIN",
+        "VITE_DEVELOPER_ORIGIN",
+        "VITE_MARKETING_ORIGIN"
+      ],
+      "outputs": [".output/**", "!.output/cache/**"]
+    }
+  }
+}

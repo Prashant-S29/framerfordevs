@@ -8,6 +8,7 @@ import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layo
 import { Suspense, use } from "react";
 
 import { useMDXComponents } from "@/components/mdx";
+import { canonicalDeveloperUrl } from "@/lib/canonical-url";
 import { baseOptions } from "@/lib/layout.shared";
 import { docs, source } from "@/lib/source";
 
@@ -19,7 +20,13 @@ export const Route = createFileRoute("/docs/$")({
     await docs.getPage(data.path)?.preload();
     return data;
   },
-  head: ({ loaderData }) => ({
+  head: ({ loaderData, params }) => ({
+    links: [
+      {
+        rel: "canonical",
+        href: canonicalDeveloperUrl(`/docs/${params._splat ?? ""}`),
+      },
+    ],
     meta:
       loaderData === undefined
         ? []

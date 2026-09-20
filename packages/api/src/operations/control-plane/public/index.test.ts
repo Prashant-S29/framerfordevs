@@ -1,3 +1,5 @@
+// Verifies canonical Control Plane decoding, authority requirements, and transport principal adaptation.
+
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 
@@ -31,6 +33,7 @@ const credential = Schema.decodeUnknownSync(CredentialPrincipal)({
   scopes: ["project.read", "project.update", "project.capability.manage"],
 });
 const credentialPrincipal = { kind: "management_credential" as const, credential };
+const sessionPrincipal = { kind: "session_user" as const, userId: "user-1" };
 
 describe("Control Plane public principal boundary", () => {
   it("uses the developer-approved weighted operation costs", () => {
@@ -186,7 +189,9 @@ describe("Control Plane public principal boundary", () => {
       kind: "credential",
       id: credential.credentialId,
     });
+    assert.deepEqual(controlPlanePrincipalActor(sessionPrincipal), { kind: "user", id: "user-1" });
     assert.strictEqual(controlPlanePrincipalKey(oauthPrincipal), "oauth:framerfordevs-cli:user-1");
+    assert.strictEqual(controlPlanePrincipalKey(sessionPrincipal), "session:user-1");
     assert.strictEqual(
       controlPlanePrincipalKey(credentialPrincipal),
       `credential:${credential.credentialId}`,

@@ -4,10 +4,14 @@ import webhookSchema from "@framerfordevs/public-contracts/artifacts/webhooks/v1
 import { createFileRoute } from "@tanstack/react-router";
 import { HomeLayout } from "fumadocs-ui/layouts/home";
 
+import { canonicalDeveloperUrl } from "@/lib/canonical-url";
 import { baseOptions } from "@/lib/layout.shared";
 
 export const Route = createFileRoute("/api-reference/webhooks/v1")({
   component: WebhookReference,
+  head: () => ({
+    links: [{ rel: "canonical", href: canonicalDeveloperUrl("/api-reference/webhooks/v1") }],
+  }),
 });
 
 const schemaText = JSON.stringify(webhookSchema, null, 2);
