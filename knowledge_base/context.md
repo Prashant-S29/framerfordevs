@@ -1,8 +1,8 @@
 # Agent Session Context
 
 **Last updated:** 2026-09-20
-**Current phase:** M17 hosted surface separation is implemented and awaiting developer review; M16 remains accepted at `c3f9430` and the worker remains stopped
-**Next gate:** Developer review of M17; acceptance, commit, rollout, deployment, and M18 remain unauthorized
+**Current phase:** M17 hosted surface separation is developer-accepted at `d6b506d`; the worker remains stopped
+**Next gate:** Design the unnumbered `api-ops-test` milestone; implementation, M18 design/implementation, rollout, and deployment remain unauthorized
 
 ## Start here
 
@@ -20,7 +20,7 @@ Read relevant sections of `product.md` and `prd/cms.md` for behavioral work. Do 
 - Explicit current developer instruction, product/PRD, relevant rules/active criteria/approved decisions, then status documents govern intent in that order.
 - Committed source, tests, configuration, migrations, and generated artifacts describe executable truth; Git describes repository state.
 - Report drift instead of silently choosing an authority.
-- Work only on an approved active milestone or explicitly authorized workstream. M17 is awaiting developer review under its approved decision; M18+ remain sequenced context only.
+- Work only on an approved active milestone or explicitly authorized workstream. The unnumbered `api-ops-test` milestone is the next design target; its implementation, M18 design/implementation, and M19+ remain unauthorized.
 
 ## Product direction
 
@@ -34,7 +34,7 @@ The intended surfaces are:
 - Developer-configured project path such as `/studio`: framework-neutral, role-projected content/editorial/preview/future visual Studio.
 - Stable HTTP plus the CLI: complete machine-readable agent/developer automation. The public SDK is intentionally limited to content/runtime integration and never mirrors control-plane or secret administration.
 
-The approved execution sequence is: portable control-plane authority and governance automation parity; operational administration and recovery; hosted surface separation; secure framework-neutral Studio; client handover/editorial safety; data durability and production hardening; advanced CMS operations; preserved visual-readiness contracts; visual composition/publication; and a renderer SDK baseline. `milestone.md` maps M14–M30 with detailed context and explicitly preserves every point from the original pre-normalization M14–M16. Managed hosting, external data, billing, analytics, and plugins remain unsequenced long-term directions in `product.md` until this baseline is accepted.
+The approved execution sequence is: portable control-plane authority and governance automation parity; operational administration and recovery; hosted surface separation; a deterministic full API operations test gate; secure framework-neutral Studio; client handover/editorial safety; data durability and production hardening; advanced CMS operations; preserved visual-readiness contracts; visual composition/publication; and a renderer SDK baseline. `milestone.md` maps M14–M30 with detailed context and explicitly preserves every point from the original pre-normalization M14–M16. Managed hosting, external data, billing, analytics, and plugins remain unsequenced long-term directions in `product.md` until this baseline is accepted.
 
 ## Stack and workspace ownership
 
@@ -101,8 +101,9 @@ Packages never import application source. Cross-package imports use declared exp
 | M13        | Code-first schema/content Authoring v1, SDK/CLI, local editor, builder retirement              |
 | M14–M15    | Portable Control Plane bootstrap and governance automation parity                              |
 | M16        | Operational credentials/webhooks/audits/archive recovery across HTTP, CLI, and hosted controls |
+| M17        | Independent marketing/docs/dashboard surfaces and dashboard-session Control Plane ingress      |
 
-M0–M16 are developer-approved and committed; M13 is `9c68942`, M14 `6ba124a`, M15 `5460c2b`, and M16 `c3f9430`. Post-M13 repository/context normalization is `cd31102`, roadmap sequencing `2d0705a`, the public SDK/CLI boundary correction `d63f215`, and retired dashboard schema-route removal `5f6480d`. See `progress.md` for ordered outcomes, migrations, validation, roadmap status, and release state.
+M0–M17 are developer-approved and committed; M13 is `9c68942`, M14 `6ba124a`, M15 `5460c2b`, M16 `c3f9430`, and M17 `d6b506d`. Post-M13 repository/context normalization is `cd31102`, roadmap sequencing `2d0705a`, the public SDK/CLI boundary correction `d63f215`, and retired dashboard schema-route removal `5f6480d`. See `progress.md` for ordered outcomes, migrations, validation, roadmap status, and release state.
 
 ## Architecture landmarks
 
@@ -125,9 +126,9 @@ Accepted M13 baseline: `pnpm run ready` passed 1,184 tests, 15 type-check tasks,
 
 The subsequent repository-normalization workstream also passed the complete readiness gate with the same 1,184 tests and 15 type-check tasks. All 1,089 production JS/CSS artifact counts remained stable; aggregate output was 43,467,370 raw/8,706,685 gzip bytes, down 822,525/201,790 bytes from the pre-refactor baseline. The SDK/CLI boundary correction passed full readiness with 1,190 tests, 15 type-check tasks, contract drift, coverage, and eight builds, plus packaged schema/Presentation/content/editor workflows. The current complete removal of pre-release dashboard schema-authoring procedures passes the same gate with 1,177 tests, including 721 API and 127 server tests. The worker was stopped for shared-database gates and restored healthy afterward.
 
-M17 readiness passes 1,422 tests, coverage, contract drift, formatting/lint/structure, 17 type tasks, and nine builds. Separate retry-free headless evidence passes ten browser specifications plus exhaustive 57-mapping dashboard transport and 52-route host/auth/CSRF matrices. Fresh Compose images are healthy, the worker remains stopped, and production ingress source restriction/DNS/TLS remains an M23 deployment gate rather than local acceptance evidence.
+The accepted M17 baseline passes 1,422 tests, coverage, contract drift, formatting/lint/structure, 17 type tasks, and nine builds. Separate retry-free headless evidence passes ten browser specifications plus exhaustive 57-mapping dashboard transport and 52-route host/auth/CSRF matrices. Fresh Compose images are healthy, the worker remains stopped, and production ingress source restriction/DNS/TLS remains an M23 deployment gate rather than local acceptance evidence.
 
 ## Current work and next gate
 
-- **Current — M17 `[R]`:** implementation and automated evidence are complete under `decisions/m17-hosted-surface-separation-design.md`; the three-app split, dashboard-only host session, same-origin ingress, canonical Control Plane session adapter, and split-host Better Auth/OAuth gate pass.
-- **Next — developer review:** review M17 without accepting, committing, rolling out, deploying, or starting M18; M16 stays accepted at `c3f9430`, and the worker remains stopped.
+- **Current — M17 `[A]`:** developer accepted and pushed `d6b506d`; the three-app split, dashboard-only host session, same-origin ingress, canonical Control Plane session adapter, and split-host Better Auth/OAuth gate are the committed baseline.
+- **Next — `api-ops-test` design:** design one deterministic, noninteractive command and isolated harness that reconcile and exercise every API operation, record redacted results, and clean up without agent/developer runtime input; do not implement it, start M18 design/implementation, deploy, or alter production rollout without developer approval.

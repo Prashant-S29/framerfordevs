@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestones 0–16 and post-M13 repository/context normalization are developer-approved, committed, and pushed. M17 hosted surface separation is implemented and awaiting developer review.
-**Next gate:** Developer review of M17; acceptance, commit, rollout, deployment, and M18 remain unauthorized.
+**Overall status:** Milestones 0–17 and post-M13 repository/context normalization are developer-approved, committed, and pushed. M17 hosted surface separation is accepted at `d6b506d`.
+**Next gate:** Design the unnumbered `api-ops-test` milestone; implementation, M18 design/implementation, rollout, and deployment remain unauthorized.
 **Last updated:** 2026-09-20
 
 ## Status legend
@@ -36,7 +36,8 @@
 | 14  | Control-plane bootstrap contracts       | `[A]`  |          1,259 | `6ba124a` |
 | 15  | Governance automation parity            | `[A]`  |          1,270 | `5460c2b` |
 | 16  | Operational administration and recovery | `[A]`  |          1,311 | `c3f9430` |
-| 17  | Hosted surface separation               | `[R]`  |          1,422 | —         |
+| 17  | Hosted surface separation               | `[A]`  |          1,422 | `d6b506d` |
+| —   | API operations end-to-end test gate     | `[D]`  |              — | —         |
 | 18  | Studio mount and security runtime       | `[P]`  |              — | —         |
 | 19  | Studio content and localization         | `[P]`  |              — | —         |
 | 20  | Studio editorial lifecycle              | `[P]`  |              — | —         |
@@ -51,7 +52,7 @@
 | 29  | Visual publication and dependencies     | `[P]`  |              — | —         |
 | 30  | Renderer SDK and framework adapters     | `[P]`  |              — | —         |
 
-M16 is accepted at `c3f9430`; migrations `0017` and `0018` are developer-applied/catalog-verified and the independent worker remains stopped. M17 awaits developer review; M18–M30 retain the approved sequence.
+M17 is accepted at `d6b506d`; migrations `0017` and `0018` remain developer-applied/catalog-verified and the independent worker remains stopped. The unnumbered `api-ops-test` milestone is the next design target; M18–M30 retain their existing numbers and approved sequence.
 
 ## Post-M13 repository/context normalization
 
@@ -173,7 +174,7 @@ M16 is accepted at `c3f9430`; migrations `0017` and `0018` are developer-applied
 
 ## Recent and planned milestone record
 
-These entries stay concise because `milestone.md` owns detailed pending context. M15–M16 are accepted, M17 awaits developer review, and M18–M30 remain sequenced context. Earlier scope remains represented in M21–M23 and M27.
+These entries stay concise because `milestone.md` owns detailed pending context. M15–M17 are accepted, the unnumbered `api-ops-test` milestone is the next design target, and M18–M30 remain sequenced context. Earlier scope remains represented in M21–M23 and M27.
 
 ### Milestone 15 — Governance automation parity
 
@@ -200,7 +201,12 @@ These entries stay concise because `milestone.md` owns detailed pending context.
 - Canonical Control Plane operations now accept either API bearer principals or dashboard session principals at the host boundary without duplicating business authority; dashboard governance and operations use bounded canonical request/response adaptation while API-host Control Plane remains bearer-only.
 - Final automated validation passes formatting/lint/structure, contract drift, 17 type tasks, 1,422 tests, coverage, nine production builds, and ten retry-free headless Chromium specifications. Exhaustive matrices cover all 57 dashboard transport mappings and all 52 canonical Control Plane routes across API-cookie denial, dashboard-bearer denial, dashboard-session reachability, CSRF/Fetch Metadata/content-type handling, request correlation, rate limits, `Vary`, and `no-store` behavior. Review follow-up removed stale OAuth-only guards from user-only credential and audit handlers, added a bounded credential-list failure state, and removed quota masking from the 52-route matrix so every session request must complete without a 429.
 - Fresh Compose images are healthy with the worker stopped; all three public apps pass independent-outage probes, browser assets contain no internal service URL or secret value, images contain no environment, coverage, or browser-result artifact, and the docs image prerenders all 45 routes after pinning its build-time preview listener to IPv4. A built-dashboard session credential probe now completes through same-origin ingress rather than remaining pending. The ten browser specifications cover cross-host navigation/redirect denial, host-only cookie and storage isolation, direct recovery routes, canonical/robots policy, runtime diagnostics, and automated WCAG A/AA scans.
-- **M17 `[R]`:** implementation and automated evidence are complete and stopped for developer review. Production ingress source restriction/DNS/TLS remains an M23 deployment gate; direct access to a server configured to trust forwarded authority must therefore stay unavailable. No migration, package publication, production configuration/rollout, deployment, commit, acceptance, or M18 work occurred; the worker remains stopped.
+- **M17 `[A]`:** developer accepted, committed, and pushed `d6b506d`. Production ingress source restriction/DNS/TLS remains an M23 deployment gate; direct access to a server configured to trust forwarded authority must therefore stay unavailable. No migration, package publication, production configuration/rollout, deployment, or M18 implementation occurred; the worker remains stopped.
+
+### Unnumbered milestone — API Ops Test (`api-ops-test`)
+
+- Next design target: one deterministic, noninteractive command must reconcile the complete API endpoint/method inventory, execute full isolated lifecycle and boundary scenarios, emit redacted machine/human reports, clean all fixtures/processes automatically, and require no agent or developer input while running.
+- Design and implementation have not started. Existing focused suites remain authoritative; the new suite must compose rather than replace them, must never touch production, and must not advance Studio work.
 
 ### Milestone 18 — Studio mount and security runtime
 
@@ -256,7 +262,7 @@ These entries stay concise because `milestone.md` owns detailed pending context.
 
 ## Current validation and release state
 
-- The accepted M16 baseline passes readiness with 1,311 tests, coverage, contracts, format/lint/structure, 16 type tasks, four noninteractive Chromium specifications, and eight builds; shared-database residue/invariants are clean and the worker remains stopped.
+- The accepted M17 baseline passes readiness with 1,422 tests, coverage, contracts, format/lint/structure, 17 type tasks, ten noninteractive Chromium specifications, and nine builds; shared-database residue/invariants are clean and the worker remains stopped.
 - Canonical OpenAPI SHA-256 values are Authoring `d9500549cd95067857b87f494b77375e3d575c4832589478858e125ab3f31205` and Control Plane `0be7c1bc603cdf17e2c775509c58dc9f716eeced59d0ebab9a8e13cfad39d90c`.
 - The live schema records developer-applied migrations through `0018`; actor, tenant, locale, receipt, credential rotation, publication, outbox, and webhook/archive invariants are clean.
 - Schema/SDK/CLI packages remain unpublished at `0.0.0`; schema push and Presentation mutation remain CLI-only, and production OAuth/configuration/deployment plus Tier 2 production/default activation have not occurred.
@@ -285,6 +291,6 @@ Agents did not generate or apply these migrations. Developer-generated/applied a
 
 ## Roadmap and next gate
 
-- `milestone.md` owns the approved sequence and preserved boundaries; M16 is accepted at `c3f9430`, both migrations are applied, and the worker remains stopped.
-- M17 is implemented and awaiting developer review; M18–M30 remain gated. Managed hosting, external data/backends, billing, analytics, and plugins remain unsequenced until the visual baseline is accepted.
+- `milestone.md` owns the approved sequence and preserved boundaries; M17 is accepted at `d6b506d`, both M16 migrations are applied, and the worker remains stopped.
+- The unnumbered `api-ops-test` milestone is the next design target; its implementation, M18 design/implementation, and M19–M30 remain gated. Managed hosting, external data/backends, billing, analytics, and plugins remain unsequenced until the visual baseline is accepted.
 - Publication/versioning, production OAuth/domains/configuration, deployment, migrations, Tier 2 activation, milestone acceptance, and advancement remain developer-controlled.

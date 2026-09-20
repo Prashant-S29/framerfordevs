@@ -48,27 +48,47 @@ Agents may edit an approved Drizzle schema but must never generate, edit, apply,
 | 14  | Add portable Control Plane v1 bootstrap, complete CLI parity, hosted controls, and project recovery.         | 1,259 tests; `6ba124a` |
 | 15  | Add governance automation parity across HTTP, CLI, hosted controls, and shared policy authority.             | 1,270 tests; `5460c2b` |
 | 16  | Add operational credential, webhook, audit, delivery, and archive recovery across HTTP, CLI, and hosted UI.  | 1,311 tests; `c3f9430` |
+| 17  | Separate marketing, docs, and dashboard with host-only sessions and canonical same-origin control ingress.   | 1,422 tests; `d6b506d` |
 
 Post-M13 repository/context normalization is developer-approved and committed at `cd31102`. Its owner-directory structure, direct-import policy, generalized pair/prefix checks, stable exports, and production entrypoints are the baseline for all pending work.
 
 ## Pending milestones
 
-### Milestone 17 — Hosted surface separation
+### Unnumbered milestone — API Ops Test (`api-ops-test`)
 
-**Status:** Implemented under `decisions/m17-hosted-surface-separation-design.md`; awaiting developer review.
+**Status:** Next design target; design not started.
 
-**Depends on:** M14–M16.
+**Depends on:** The accepted M0–M17 API, protocol, host, authentication, persistence, and worker boundaries.
 
-**Summary:** Separate public discovery, developer documentation, and resilient hosted administration without duplicating backend authority.
+**Summary:** Add one committed, deterministic, fully automated end-to-end operations suite that exercises the complete executable API inventory without requiring a developer, agent, or interactive prompt while it runs.
 
-- Add `apps/marketing` for `framerfordevs.com`, keep docs-only `apps/developers` at `developer.framerfordevs.com`, and keep `apps/dashboard` at `dashboard.framerfordevs.com`.
-- Keep credential UI and a host-only dashboard session on the dashboard; marketing authentication routes are validated entries only, while canonical invitation/device links point directly to dashboard.
-- Route dashboard auth, session Control Plane v1, and temporary editorial oRPC through same-origin ingress to the existing server; API-host Control Plane remains bearer-only.
-- Move M14–M16 hosted administration onto canonical Control Plane schemas/operations without creating a second business-rule authority or exposing administration through the public SDK.
-- Keep dashboard bootstrap, registration, credential, webhook, security, and recovery available when marketing, docs, customer applications, or Studio are unavailable.
-- Retain current content/editorial UI temporarily until M19–M21 prove Studio and handover parity; prepare exact host/path/origin/operator boundaries for M23 without changing production rollout.
+#### Required outcome
 
-**Review authority:** the approved M17 decision; product surfaces; PRD §§6.1, 11, 21; M3, M12–M16 decisions; the three hosted apps, server host/router composition, auth configuration, and Docker/reference ingress configuration.
+- Provide one documented repository command that provisions or verifies every required isolated dependency, runs the complete suite noninteractively, records bounded results, cleans up, and exits zero only when every expected operation passes.
+- Maintain an explicit, machine-checkable inventory of every owned endpoint and method across Better Auth/OAuth protocol routes, Delivery, Preview, Tooling, Authoring, Control Plane, retained editorial oRPC, webhook/worker interactions, and applicable dashboard same-origin ingress. A new or removed route must fail inventory reconciliation until deliberately classified.
+- Exercise each endpoint's meaningful lifecycle rather than only route reachability: create, inspect/get, list/search/page, update/replace, transition, delete/archive/revoke/unpublish, replay/idempotency, and unsupported-method behavior as applicable. APIs without literal CRUD verbs use their canonical lifecycle equivalents.
+- Cover representative success plus authentication, authorization, tenant/project/environment/locale isolation, validation/bounds, stale version, idempotent replay, cursor, not-found/non-enumeration, origin/CSRF/CORS, and expected protocol-native failure behavior without weakening existing focused tests.
+- Own deterministic fixture orchestration and cleanup, including disposable users/sessions/OAuth authority, projects/environments/locales/content, credentials, webhooks/deliveries, caches, receiver processes, and a dedicated worker when required. It must not depend on pre-existing mutable fixtures, production services, wall-clock races, test order, or a separately running development worker.
+- Run against an isolated disposable database/cache/service topology and leave zero fixture, process, port, browser, worker, receipt, audit, or outbox residue. It must never generate, edit, or apply a new real migration or touch production configuration/data.
+- Emit stable machine-readable and human-readable reports containing the endpoint/scenario identity, expected and actual outcome, bounded duration, and failure summary. Reports must exclude credentials, cookies, tokens, one-time secrets, content bodies, sensitive headers, environment values, and unbounded server output.
+- Use fixed seeds, controlled clocks/IDs where authority permits, stable ordering, explicit timeouts, and zero test retries. Repeated runs from the same commit and configuration must produce the same scenario inventory and pass/fail result.
+- Run identically from local automation and CI with no AI dependency. Agents may inspect the completed report afterward and fix failures, but may not be required to plan steps, answer prompts, repair fixtures, choose scenarios, or interpret output for the command to finish.
+
+#### Acceptance gates
+
+- A clean-checkout operator can run one command and receive a complete pass/fail result without input after launch.
+- Inventory reconciliation proves every current endpoint/method is either lifecycle-tested or explicitly classified as a non-operation artifact with a documented reason.
+- A second consecutive run passes with the same ordered scenario inventory and zero residue from either run.
+- Deliberately breaking one representative route, authorization rule, response contract, and cleanup path causes a deterministic nonzero failure and a precise redacted report.
+- The suite preserves native protocol contracts, existing `{ ok, data, error, message }` application envelopes, exact host/auth boundaries, immutable/idempotent authority, and worker-only webhook delivery.
+- Applicable format, lint, structure, type, focused tests, coverage, build, audit, and the new API operations command pass before developer review.
+
+#### Explicit non-goals
+
+- Do not redesign API behavior, add product operations solely for test convenience, replace focused unit/integration/contract/browser suites, run load/soak/chaos testing, contact production, or begin Studio M18 implementation.
+- Do not require an interactive browser, screenshots, traces, video, AI-generated runtime steps, or developer-provided secrets beyond documented test-environment bootstrap configuration.
+
+**Read before design:** API/session/security/testing/observability rules; repository test-structure and browser-workflow decisions; M1, M3, M9–M17 decisions; every server router/host profile, public artifact registry, CLI HTTP client, retained oRPC route, worker/receiver harness, current integration cleanup utilities, and Compose/test configuration.
 
 ### Milestone 18 — Studio mount and security runtime
 
