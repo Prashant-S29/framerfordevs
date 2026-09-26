@@ -1,7 +1,7 @@
 // Owns dashboard credentials and resumes only server-signed OAuth or validated UI destinations.
 
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import SignInForm from "@/components/auth/sign/in-form";
 import { authClient } from "@/lib/auth/client";
@@ -48,11 +48,14 @@ function RouteComponent() {
   const { oauth, returnTo } = Route.useSearch();
   const session = authClient.useSession();
   const [oauthError, setOAuthError] = useState<string | null>(null);
+  const oauthErrorRef = useRef<HTMLParagraphElement>(null);
 
   async function continueOAuth() {
-    const result = await authClient.oauth2.continue({});
+    const result = await authClient.oauth2.continue({ postLogin: true });
     if (result.error || !result.data?.url) {
-      setOAuthError("The authorization request is invalid or expired. Restart the CLI login flow.");
+      setOAuthError(
+        "The authorization request is invalid or expired. Restart authorization from the application that sent you here.",
+      );
       return;
     }
     window.location.assign(result.data.url);
@@ -61,6 +64,10 @@ function RouteComponent() {
   useEffect(() => {
     if (oauth && session.data?.user) void continueOAuth();
   }, [oauth, session.data?.user]);
+
+  useEffect(() => {
+    if (oauthError) oauthErrorRef.current?.focus();
+  }, [oauthError]);
 
   function handleAuthenticated() {
     if (oauth) {
@@ -78,9 +85,14 @@ function RouteComponent() {
   if (oauthError) {
     return (
       <main className="mx-auto flex min-h-svh max-w-xl items-center px-6 py-16">
-        <p role="alert" className="text-destructive">
-          {oauthError}
-        </p>
+        <section className="space-y-4">
+          <p ref={oauthErrorRef} role="alert" tabIndex={-1} className="text-destructive">
+            {oauthError}
+          </p>
+          <a className="underline underline-offset-4" href="/dashboard">
+            Return to the dashboard
+          </a>
+        </section>
       </main>
     );
   }

@@ -140,6 +140,22 @@ export function validateFlags(arguments_: ParsedArguments): void {
       "command-id": "string",
       json: "boolean",
     },
+    "studio runtime activate": {
+      api: "string",
+      project: "string",
+      "environment-id": "string",
+      "expected-version": "string",
+      "command-id": "string",
+      json: "boolean",
+    },
+    "studio runtime deactivate": {
+      api: "string",
+      project: "string",
+      "environment-id": "string",
+      "expected-version": "string",
+      "command-id": "string",
+      json: "boolean",
+    },
     "governance inspect": { api: "string", project: "string", json: "boolean" },
     "member list": {
       api: "string",

@@ -101,6 +101,11 @@ import {
 } from "../services/tooling/principal-authenticator";
 import { ToolingRepository, ToolingRepositoryLive } from "../services/tooling/repository";
 import {
+  StudioOAuthTokenVerifier,
+  StudioOAuthTokenVerifierLive,
+} from "../services/studio/principal-authenticator";
+import { StudioRepository, StudioRepositoryLive } from "../services/studio/repository";
+import {
   WebhookCrypto,
   WebhookCryptoUnavailableLive,
   makeWebhookCryptoLive,
@@ -147,6 +152,8 @@ export type ApplicationServices =
   | ToolingOAuthTokenVerifier
   | ToolingPrincipalAuthenticator
   | ToolingRepository
+  | StudioOAuthTokenVerifier
+  | StudioRepository
   | WebhookCrypto
   | WebhookDestinationValidator
   | WebhookRepository;
@@ -245,6 +252,8 @@ const InfrastructureLive = Layer.mergeAll(
   AuthoringPresentationRepositoryLive,
   ToolingOAuthTokenVerifierLive,
   ToolingPrincipalAuthenticatorLive,
+  StudioOAuthTokenVerifierLive,
+  StudioRepositoryLive,
   WebhookCryptoLive,
   WebhookDestinationValidatorLive,
   WebhookRepositoryLive,

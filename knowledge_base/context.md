@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-09-20
-**Current phase:** M17 hosted surface separation is developer-accepted at `d6b506d`; the worker remains stopped
-**Next gate:** Design the unnumbered `api-ops-test` milestone; implementation, M18 design/implementation, rollout, and deployment remain unauthorized
+**Last updated:** 2026-09-26
+**Current phase:** M18A remediation migration `0020_allow_studio_credential_kill_switch` is developer-generated and independently verified as a constraint-only 0019 successor; it is not applied and the worker remains stopped
+**Next gate:** Developer-apply migration 0020, then verify its live catalog and rerun full M18A readiness/residue evidence; M18B and all rollout remain gated
 
 ## Start here
 
@@ -20,7 +20,7 @@ Read relevant sections of `product.md` and `prd/cms.md` for behavioral work. Do 
 - Explicit current developer instruction, product/PRD, relevant rules/active criteria/approved decisions, then status documents govern intent in that order.
 - Committed source, tests, configuration, migrations, and generated artifacts describe executable truth; Git describes repository state.
 - Report drift instead of silently choosing an authority.
-- Work only on an approved active milestone or explicitly authorized workstream. The unnumbered `api-ops-test` milestone is the next design target; its implementation, M18 design/implementation, and M19+ remain unauthorized.
+- Work only on an approved active milestone or explicitly authorized workstream. M18A is awaiting independent developer review after implementation and readiness validation; M18B and M19+ remain unauthorized.
 
 ## Product direction
 
@@ -34,7 +34,7 @@ The intended surfaces are:
 - Developer-configured project path such as `/studio`: framework-neutral, role-projected content/editorial/preview/future visual Studio.
 - Stable HTTP plus the CLI: complete machine-readable agent/developer automation. The public SDK is intentionally limited to content/runtime integration and never mirrors control-plane or secret administration.
 
-The approved execution sequence is: portable control-plane authority and governance automation parity; operational administration and recovery; hosted surface separation; a deterministic full API operations test gate; secure framework-neutral Studio; client handover/editorial safety; data durability and production hardening; advanced CMS operations; preserved visual-readiness contracts; visual composition/publication; and a renderer SDK baseline. `milestone.md` maps M14–M30 with detailed context and explicitly preserves every point from the original pre-normalization M14–M16. Managed hosting, external data, billing, analytics, and plugins remain unsequenced long-term directions in `product.md` until this baseline is accepted.
+The approved execution sequence is: portable control-plane authority and governance automation parity; operational administration and recovery; hosted surface separation; secure framework-neutral Studio; client handover/editorial safety; data durability and production hardening; advanced CMS operations; preserved visual-readiness contracts; visual composition/publication; and a renderer SDK baseline. `milestone.md` maps M14–M30 with detailed context and explicitly preserves every point from the original pre-normalization M14–M16. Managed hosting, external data, billing, analytics, and plugins remain unsequenced long-term directions in `product.md` until this baseline is accepted.
 
 ## Stack and workspace ownership
 
@@ -130,5 +130,5 @@ The accepted M17 baseline passes 1,422 tests, coverage, contract drift, formatti
 
 ## Current work and next gate
 
-- **Current — M17 `[A]`:** developer accepted and pushed `d6b506d`; the three-app split, dashboard-only host session, same-origin ingress, canonical Control Plane session adapter, and split-host Better Auth/OAuth gate are the committed baseline.
-- **Next — `api-ops-test` design:** design one deterministic, noninteractive command and isolated harness that reconcile and exercise every API operation, record redacted results, and clean up without agent/developer runtime input; do not implement it, start M18 design/implementation, deploy, or alter production rollout without developer approval.
+- **Current — M18A `[R]`:** developer-applied 0020 is catalog-verified at migration row 21/timestamp `1790399741342`; fresh readiness passes 1,498 tests, 13 browser specifications, coverage, 18 type tasks, and nine builds, with clean scoped residue and the worker stopped.
+- **Next — developer review:** decide M18A acceptance. Do not alter 0019/0020, mark accepted, commit, start M18B, publish, configure production, or deploy before that decision.

@@ -12,6 +12,7 @@ import {
   ControlPlaneLocaleListResponse,
   ControlPlaneMemberPageResponse,
   ControlPlanePutStudioRegistrationRequest,
+  ControlPlaneSetStudioRuntimeRequest,
   StudioApplicationOrigin,
   StudioMountPath,
   controlPlaneLimits,
@@ -169,6 +170,36 @@ describe("Control Plane contracts", () => {
       assert.strictEqual(createOnly.expectedVersion, null);
       assert.strictEqual(update.expectedVersion, 2);
       assert.isTrue(Exit.isFailure(zeroVersion));
+    }),
+  );
+
+  it.effect("requires a positive expected version for user-controlled Studio runtime changes", () =>
+    Effect.gen(function* () {
+      const valid = yield* Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+        commandId,
+        expectedVersion: 3,
+        enabled: true,
+      });
+      const createStyle = yield* Effect.exit(
+        Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+          commandId,
+          expectedVersion: null,
+          enabled: true,
+        }),
+      );
+      const excess = yield* Effect.exit(
+        Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+          commandId,
+          expectedVersion: 3,
+          enabled: false,
+          actorId: "caller-selected",
+        }),
+      );
+
+      assert.strictEqual(valid.expectedVersion, 3);
+      assert.strictEqual(valid.enabled, true);
+      assert.isTrue(Exit.isFailure(createStyle));
+      assert.isTrue(Exit.isFailure(excess));
     }),
   );
 

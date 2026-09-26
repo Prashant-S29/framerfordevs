@@ -30,6 +30,8 @@ import type {
 } from "@framerfordevs/api/contracts/authoring/schema/index";
 import type { DeliveryAccessPrincipal } from "@framerfordevs/api/contracts/delivery/index";
 import { toolingLimits } from "@framerfordevs/api/contracts/tooling/index";
+import { studioLimits } from "@framerfordevs/api/contracts/studio/index";
+import { studioOpenApiJson } from "@framerfordevs/api/contracts/studio/openapi/index";
 import {
   generatePublicArtifacts,
   type PublicContractRegistryKey,
@@ -76,6 +78,14 @@ import {
   unpublishAuthoringEntry,
   validateAuthoringPublication,
 } from "@framerfordevs/api/operations/authoring/public/index";
+import {
+  authenticateStudioRequest,
+  decodeStudioBootstrapScope,
+  evaluateStudioGlobalRateLimit,
+  evaluateStudioUserRateLimit,
+  getStudioBootstrap,
+  validateStudioEmptyQuery,
+} from "@framerfordevs/api/operations/studio-public/index";
 import {
   authenticateToolingRequest,
   decodeToolingCollectionRevisionScope,
@@ -140,7 +150,7 @@ import {
   reportBoundaryDefect,
 } from "@framerfordevs/api/runtime/index";
 import { appRouter } from "@framerfordevs/api/routers/index";
-import { auth } from "@framerfordevs/auth";
+import { auth, type StudioOAuthPrincipal } from "@framerfordevs/auth";
 import { env } from "@framerfordevs/env/server";
 import { OpenAPIHandler } from "@orpc/openapi/node";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
@@ -1018,6 +1028,262 @@ function createPreviewRouter(previewApiEnabled: boolean): Router {
         message: "An unexpected error occurred.",
         requestId: context.requestId,
         retryable: false,
+      }),
+    );
+  });
+  return router;
+}
+
+function studioAuthorizationHeaderCount(req: Request): number {
+  let count = 0;
+  for (let index = 0; index < req.rawHeaders.length; index += 2) {
+    if (req.rawHeaders[index]?.toLowerCase() === "authorization") count += 1;
+  }
+  return count;
+}
+
+function setStudioHeaders(res: Response): void {
+  res.setHeader("Cache-Control", "private, no-store, max-age=0");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Vary", "Authorization");
+}
+
+function sendStudioResponse(
+  req: Request,
+  res: Response,
+  status: number,
+  response: ApiResponse<ApiData>,
+): void {
+  setStudioHeaders(res);
+  if (status === 401) {
+    res.setHeader("WWW-Authenticate", 'Bearer realm="studio", error="invalid_token"');
+  }
+  sendApplicationResponse(req, res, status, response);
+}
+
+async function enforceStudioQuota(
+  req: Request,
+  res: Response,
+  context: Context,
+  principal: StudioOAuthPrincipal | null,
+): Promise<boolean> {
+  const result = await context.execute(
+    principal === null ? "api.studio.rate_limit.global" : "api.studio.rate_limit.user",
+    principal === null
+      ? evaluateStudioGlobalRateLimit(1)
+      : evaluateStudioUserRateLimit(principal, 1),
+    "Studio quota evaluated.",
+  );
+  if (!result.response.ok) {
+    sendStudioResponse(req, res, result.status, result.response);
+    return false;
+  }
+  setRateLimitHeaders(res, result.response.data);
+  if (result.response.data.allowed) return true;
+  sendStudioResponse(
+    req,
+    res,
+    429,
+    apiFailure({
+      code: "RATE_LIMITED",
+      message: "Too many Studio requests. Try again later.",
+      requestId: context.request.requestId,
+      retryable: true,
+    }),
+  );
+  return false;
+}
+
+function createStudioRouter(transformEffect?: ApplicationEffectTransform): Router {
+  const router = express.Router();
+  router.use((req, res, next) => {
+    setStudioHeaders(res);
+    const specificationRoute = req.path === "/openapi.json" || req.path === "/docs";
+    if (!specificationRoute && (req.headers.origin !== undefined || req.method === "OPTIONS")) {
+      sendStudioResponse(
+        req,
+        res,
+        403,
+        apiFailure({
+          code: "FORBIDDEN",
+          message: "Browser-origin Studio API requests are not allowed.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    const bootstrapRoute =
+      req.method === "GET" && /^\/projects\/[^/]+\/environments\/[^/]+\/bootstrap$/u.test(req.path);
+    if (bootstrapRoute) {
+      if (req.headers.cookie !== undefined || studioAuthorizationHeaderCount(req) > 1) {
+        sendStudioResponse(
+          req,
+          res,
+          401,
+          apiFailure({
+            code: "UNAUTHORIZED",
+            message: "Studio API requests require one bearer token and do not accept cookies.",
+            requestId: requestContext(req).requestId,
+            retryable: false,
+          }),
+        );
+        return;
+      }
+      const contentLength = req.headers["content-length"];
+      const transferEncoding = req.headers["transfer-encoding"];
+      if (
+        typeof contentLength === "string" &&
+        /^[0-9]+$/u.test(contentLength) &&
+        Number(contentLength) > studioLimits.requestBytes
+      ) {
+        sendStudioResponse(
+          req,
+          res,
+          413,
+          apiFailure({
+            code: "REQUEST_TOO_LARGE",
+            message: "The Studio request exceeds the maximum size.",
+            requestId: requestContext(req).requestId,
+            retryable: false,
+          }),
+        );
+        return;
+      }
+      if (
+        transferEncoding !== undefined ||
+        (contentLength !== undefined &&
+          (typeof contentLength !== "string" ||
+            !/^[0-9]+$/u.test(contentLength) ||
+            Number(contentLength) !== 0))
+      ) {
+        sendStudioResponse(
+          req,
+          res,
+          400,
+          apiFailure({
+            code: "VALIDATION_ERROR",
+            message: "Studio bootstrap requests must not include a body.",
+            requestId: requestContext(req).requestId,
+            retryable: false,
+          }),
+        );
+        return;
+      }
+    }
+    next();
+  });
+  router.get("/openapi.json", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.type("application/json").send(studioOpenApiJson);
+  });
+  router.get(
+    "/docs",
+    (_req, res, next) => {
+      res.setHeader("Cache-Control", "public, max-age=300");
+      next();
+    },
+    apiReference({
+      pageTitle: "Framer for Devs Studio API",
+      url: "/api/studio/v1/openapi.json",
+    }),
+  );
+  router.get("/projects/:projectId/environments/:environmentId/bootstrap", async (req, res) => {
+    const context = createContext(
+      transformEffect === undefined ? { req } : { req, transformEffect },
+    );
+    const queryResult = await context.execute(
+      "api.studio.bootstrap.query",
+      validateStudioEmptyQuery(req.originalUrl.split("?", 2)[1] ?? ""),
+      "Studio bootstrap query decoded.",
+    );
+    if (!queryResult.response.ok) {
+      sendStudioResponse(req, res, queryResult.status, queryResult.response);
+      return;
+    }
+    const scopeResult = await context.execute(
+      "api.studio.bootstrap.scope",
+      decodeStudioBootstrapScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Studio bootstrap scope decoded.",
+    );
+    if (!scopeResult.response.ok) {
+      sendStudioResponse(req, res, scopeResult.status, scopeResult.response);
+      return;
+    }
+    if (!(await enforceStudioQuota(req, res, context, null))) return;
+    const principalResult = await context.execute(
+      "api.studio.authenticate",
+      authenticateStudioRequest(req.headers.authorization ?? null),
+      "Studio principal authenticated.",
+    );
+    if (!principalResult.response.ok) {
+      sendStudioResponse(req, res, principalResult.status, principalResult.response);
+      return;
+    }
+    const principal = principalResult.response.data;
+    if (!(await enforceStudioQuota(req, res, context, principal))) return;
+    const result = await context.execute(
+      "api.studio.bootstrap.get",
+      getStudioBootstrap(principal, scopeResult.response.data),
+      "Studio bootstrap loaded.",
+    );
+    if (!result.response.ok) {
+      const status = result.response.error.code === "CMS_CAPABILITY_REQUIRED" ? 403 : result.status;
+      sendStudioResponse(req, res, status, result.response);
+      return;
+    }
+    const body = Buffer.from(JSON.stringify(result.response), "utf8");
+    if (body.byteLength > studioLimits.responseBytes) {
+      sendStudioResponse(
+        req,
+        res,
+        413,
+        apiFailure({
+          code: "STUDIO_RESPONSE_TOO_LARGE",
+          message: "The Studio bootstrap response is too large.",
+          requestId: context.request.requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    res.status(200).setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Content-Length", String(body.byteLength));
+    res.end(body);
+  });
+  router.use((req, res) => {
+    sendStudioResponse(
+      req,
+      res,
+      404,
+      apiFailure({
+        code: "NOT_FOUND",
+        message: "The requested Studio resource was not found.",
+        requestId: requestContext(req).requestId,
+        retryable: false,
+      }),
+    );
+  });
+  router.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      next(error);
+      return;
+    }
+    const context = requestContext(req);
+    void reportBoundaryDefect(context, error).catch(() => undefined);
+    sendStudioResponse(
+      req,
+      res,
+      500,
+      apiFailure({
+        code: "INTERNAL_ERROR",
+        message: "An unexpected error occurred.",
+        requestId: context.requestId,
+        retryable: true,
       }),
     );
   });
@@ -2364,6 +2630,8 @@ export interface CreateAppOptions {
   readonly hostRoutingEnabled?: boolean;
   readonly authoringEffectTransform?: ApplicationEffectTransform;
   readonly controlPlaneEffectTransform?: ApplicationEffectTransform;
+  readonly studioEffectTransform?: ApplicationEffectTransform;
+  readonly authInstance?: typeof auth;
 }
 
 export function createApp(options: CreateAppOptions = {}): Express {
@@ -2373,6 +2641,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   const managementApiReferenceEnabled =
     options.managementApiReferenceEnabled ?? env.MANAGEMENT_API_REFERENCE_ENABLED;
   const hostRoutingEnabled = options.hostRoutingEnabled ?? env.HOST_ROUTING_ENABLED;
+  const authInstance = options.authInstance ?? auth;
   app.set("trust proxy", env.TRUST_PROXY_HOPS);
 
   app.use((req, res, next) => {
@@ -2436,6 +2705,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use("/api/delivery/v1", createDeliveryRouter(deliveryApiEnabled));
   app.use("/api/preview/v1", createPreviewRouter(previewApiEnabled));
   app.use("/api/tooling/v1", createToolingRouter());
+  app.use("/api/studio/v1", createStudioRouter(options.studioEffectTransform));
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;
@@ -2466,7 +2736,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     }),
   );
 
-  app.all("/api/auth{/*path}", toNodeHandler(auth));
+  app.all("/api/auth{/*path}", toNodeHandler(authInstance));
 
   app.use(async (req, res, next) => {
     const context = createContext({ req });

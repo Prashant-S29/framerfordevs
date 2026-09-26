@@ -20,9 +20,14 @@ const publicApiPrefixes = [
   "/api/delivery/v1",
   "/api/preview/v1",
   "/api/tooling/v1",
+  "/api/studio/v1",
 ] as const;
 const oauthProtocolPrefixes = ["/api/auth/jwks", "/api/auth/oauth2"] as const;
-const dashboardOAuthPaths = ["/api/auth/oauth2/consent", "/api/auth/oauth2/continue"] as const;
+const dashboardOAuthPaths = [
+  "/api/auth/oauth2/consent",
+  "/api/auth/oauth2/continue",
+  "/api/auth/oauth2/public-client-prelogin",
+] as const;
 const oauthDeviceProtocolPaths = ["/api/auth/device/code", "/api/auth/device/token"] as const;
 const publicDiscoveryPaths = [
   "/.well-known/oauth-authorization-server",

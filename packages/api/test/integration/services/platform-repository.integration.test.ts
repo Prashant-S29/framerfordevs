@@ -12,7 +12,13 @@ import {
   controlPlaneCommandReceipt,
   studioRegistration,
 } from "@framerfordevs/db/schema/control-plane";
-import { user } from "@framerfordevs/db/schema/auth";
+import {
+  oauthAccessToken,
+  oauthClient,
+  oauthConsent,
+  oauthRefreshToken,
+  user,
+} from "@framerfordevs/db/schema/auth";
 import { projectLocale } from "@framerfordevs/db/schema/locale";
 import {
   auditEvent,
@@ -29,6 +35,7 @@ import {
   ControlPlaneCreateProjectRequest,
   ControlPlaneCreateWorkspaceRequest,
   ControlPlanePutStudioRegistrationRequest,
+  ControlPlaneSetStudioRuntimeRequest,
   ControlPlaneUpdateProjectRequest,
 } from "../../../src/contracts/control-plane";
 import { ApiCredentialId } from "../../../src/contracts/access";
@@ -51,6 +58,7 @@ import {
   persistControlPlaneReceipt,
   type ControlPlaneReceiptExpectation,
 } from "../../../src/services/control-plane/command-receipt";
+import { studioClientId } from "../../../src/lib/studio/authority";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 
 const repository = makePlatformRepository();
@@ -62,6 +70,7 @@ const secondEmail = `m2-owner-b-${suffix}@example.test`;
 const firstActor = Schema.decodeUnknownSync(AuthUserId)(firstUserId);
 const secondActor = Schema.decodeUnknownSync(AuthUserId)(secondUserId);
 const studioCredentialId = randomUUID();
+const studioKillCredentialId = randomUUID();
 
 let firstWorkspace: WorkspaceModel | undefined;
 let secondWorkspace: WorkspaceModel | undefined;
@@ -103,6 +112,7 @@ afterAll(async () => {
     eq(auditEvent.actorId, firstUserId),
     eq(auditEvent.actorId, secondUserId),
     eq(auditEvent.actorId, studioCredentialId),
+    eq(auditEvent.actorId, studioKillCredentialId),
   );
   await db
     .delete(controlPlaneCommandReceipt)
@@ -111,7 +121,31 @@ afterAll(async () => {
         eq(controlPlaneCommandReceipt.actorId, firstUserId),
         eq(controlPlaneCommandReceipt.actorId, secondUserId),
         eq(controlPlaneCommandReceipt.actorId, studioCredentialId),
+        eq(controlPlaneCommandReceipt.actorId, studioKillCredentialId),
       ),
+    );
+  await db
+    .delete(oauthAccessToken)
+    .where(or(eq(oauthAccessToken.userId, firstUserId), eq(oauthAccessToken.userId, secondUserId)));
+  await db
+    .delete(oauthRefreshToken)
+    .where(
+      or(eq(oauthRefreshToken.userId, firstUserId), eq(oauthRefreshToken.userId, secondUserId)),
+    );
+  await db
+    .delete(oauthConsent)
+    .where(or(eq(oauthConsent.userId, firstUserId), eq(oauthConsent.userId, secondUserId)));
+  const studioClients = await db
+    .select({ clientId: oauthClient.clientId })
+    .from(oauthClient)
+    .where(eq(oauthClient.userId, firstUserId));
+  for (const client of studioClients) {
+    await db.delete(oauthClient).where(eq(oauthClient.clientId, client.clientId));
+  }
+  await db
+    .delete(oauthClient)
+    .where(
+      sql`${oauthClient.referenceId} in (select id::text from studio_registration where created_by_user_id in (${firstUserId}, ${secondUserId}))`,
     );
   await db
     .delete(studioRegistration)
@@ -132,8 +166,17 @@ afterAll(async () => {
     );
   await db
     .delete(apiCredentialScope)
-    .where(eq(apiCredentialScope.credentialId, studioCredentialId));
-  await db.delete(apiCredential).where(eq(apiCredential.id, studioCredentialId));
+    .where(
+      or(
+        eq(apiCredentialScope.credentialId, studioCredentialId),
+        eq(apiCredentialScope.credentialId, studioKillCredentialId),
+      ),
+    );
+  await db
+    .delete(apiCredential)
+    .where(
+      or(eq(apiCredential.id, studioCredentialId), eq(apiCredential.id, studioKillCredentialId)),
+    );
   await db
     .delete(environment)
     .where(
@@ -699,6 +742,174 @@ describe.sequential("platform repository PostgreSQL integration", () => {
     }),
   );
 
+  it.effect(
+    "atomically activates, invalidates, and revokes registration-derived Studio OAuth authority",
+    () =>
+      Effect.gen(function* () {
+        const ownerWorkspace = required(firstWorkspace, "first workspace");
+        const created = yield* repository.createProject(
+          firstActor,
+          yield* Schema.decodeUnknown(CreateProjectInput)({
+            workspaceId: ownerWorkspace.id,
+            name: "Studio Runtime Project",
+            key: `studio-runtime-${suffix}`,
+            description: null,
+          }),
+          "request-m18-studio-runtime-project",
+        );
+        yield* repository.enableCapability(
+          firstActor,
+          yield* Schema.decodeUnknown(EnableCapabilityInput)({
+            projectId: created.id,
+            capability: "cms",
+          }),
+          "request-m18-studio-runtime-cms",
+        );
+        const registered = yield* repository.putStudioRegistration(
+          { kind: "user", id: firstActor },
+          created.id,
+          created.environment.id,
+          yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+            commandId: randomUUID(),
+            expectedVersion: null,
+            applicationOrigin: "https://runtime.example.test",
+            mountPath: "/studio",
+          }),
+          "request-m18-studio-runtime-register",
+        );
+        const activationInput = yield* Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+          commandId: randomUUID(),
+          expectedVersion: registered.registration.version,
+          enabled: true,
+        });
+        const activated = yield* repository.setStudioRuntime(
+          { kind: "user", id: firstActor },
+          created.id,
+          created.environment.id,
+          activationInput,
+          "request-m18-studio-runtime-activate",
+        );
+        const replay = yield* repository.setStudioRuntime(
+          { kind: "user", id: firstActor },
+          created.id,
+          created.environment.id,
+          activationInput,
+          "request-m18-studio-runtime-activate-replay",
+        );
+        const expectedClientId = studioClientId(registered.registration.id);
+        const [activeClient] = yield* Effect.promise(() =>
+          db.select().from(oauthClient).where(eq(oauthClient.clientId, expectedClientId)).limit(1),
+        );
+        assert.strictEqual(activated.runtimeStatus, "active");
+        assert.isFalse(activated.noOp);
+        assert.isTrue(replay.replayed);
+        assert.strictEqual(activeClient?.disabled, false);
+        assert.strictEqual(activeClient?.tokenEndpointAuthMethod, "none");
+        assert.strictEqual(activeClient?.requirePKCE, true);
+        assert.deepEqual(activeClient?.scopes, ["studio:session", "offline_access"]);
+        assert.deepEqual(activeClient?.redirectUris, [
+          "https://runtime.example.test/studio/auth/callback",
+        ]);
+        assert.deepInclude(activeClient?.metadata, {
+          kind: "studio_v1",
+          registrationId: registered.registration.id,
+          registrationVersion: activated.registration.version,
+          projectId: created.id,
+          environmentId: created.environment.id,
+        });
+
+        const now = new Date();
+        const refreshId = randomUUID();
+        yield* Effect.promise(() =>
+          db.transaction(async (transaction) => {
+            await transaction.insert(oauthRefreshToken).values({
+              id: refreshId,
+              token: `refresh-${suffix}`,
+              clientId: expectedClientId,
+              userId: firstUserId,
+              expiresAt: new Date(now.getTime() + 60_000),
+              createdAt: now,
+              scopes: ["studio:session", "offline_access"],
+            });
+            await transaction.insert(oauthAccessToken).values({
+              id: randomUUID(),
+              token: `access-${suffix}`,
+              clientId: expectedClientId,
+              userId: firstUserId,
+              refreshId,
+              expiresAt: new Date(now.getTime() + 60_000),
+              createdAt: now,
+              scopes: ["studio:session"],
+            });
+            await transaction.insert(oauthConsent).values({
+              id: randomUUID(),
+              clientId: expectedClientId,
+              userId: firstUserId,
+              scopes: ["studio:session", "offline_access"],
+              createdAt: now,
+              updatedAt: now,
+            });
+          }),
+        );
+
+        const invalidated = yield* repository.putStudioRegistration(
+          { kind: "user", id: firstActor },
+          created.id,
+          created.environment.id,
+          yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+            commandId: randomUUID(),
+            expectedVersion: activated.registration.version,
+            applicationOrigin: "https://runtime-next.example.test",
+            mountPath: "/studio",
+          }),
+          "request-m18-studio-runtime-invalidate",
+        );
+        const [disabledClient] = yield* Effect.promise(() =>
+          db.select().from(oauthClient).where(eq(oauthClient.clientId, expectedClientId)).limit(1),
+        );
+        const [revokedAccess] = yield* Effect.promise(() =>
+          db
+            .select()
+            .from(oauthAccessToken)
+            .where(eq(oauthAccessToken.clientId, expectedClientId))
+            .limit(1),
+        );
+        const [revokedRefresh] = yield* Effect.promise(() =>
+          db
+            .select()
+            .from(oauthRefreshToken)
+            .where(eq(oauthRefreshToken.clientId, expectedClientId))
+            .limit(1),
+        );
+        const consentRows = yield* Effect.promise(() =>
+          db.select().from(oauthConsent).where(eq(oauthConsent.clientId, expectedClientId)),
+        );
+        const runtimeAudits = yield* Effect.promise(() =>
+          db
+            .select({ action: auditEvent.action })
+            .from(auditEvent)
+            .where(
+              and(
+                eq(auditEvent.projectId, created.id),
+                or(
+                  eq(auditEvent.action, "studio.registration.runtime.activated"),
+                  eq(auditEvent.action, "studio.registration.runtime.deactivated"),
+                ),
+              ),
+            ),
+        );
+        assert.strictEqual(invalidated.registration.runtimeStatus, "inactive");
+        assert.strictEqual(disabledClient?.disabled, true);
+        assert.isNotNull(revokedAccess?.revoked);
+        assert.isNotNull(revokedRefresh?.revoked);
+        assert.isEmpty(consentRows);
+        assert.deepEqual(runtimeAudits.map(({ action }) => action).sort(), [
+          "studio.registration.runtime.activated",
+          "studio.registration.runtime.deactivated",
+        ]);
+      }),
+  );
+
   it.effect("serializes singleton Studio registration creation and optimistic updates", () =>
     Effect.gen(function* () {
       const ownerWorkspace = required(firstWorkspace, "first workspace");
@@ -901,6 +1112,174 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       assert.strictEqual(updatedProject.name, "Credential-updated Marketing Site");
       assert.strictEqual(projectAudit?.actorType, "credential");
       assert.strictEqual(projectAudit?.actorId, studioCredentialId);
+    }),
+  );
+
+  it.effect("separates active Studio edits from the management credential kill switch", () =>
+    Effect.gen(function* () {
+      const ownerWorkspace = required(firstWorkspace, "first workspace");
+      const created = yield* repository.createProject(
+        firstActor,
+        yield* Schema.decodeUnknown(CreateProjectInput)({
+          workspaceId: ownerWorkspace.id,
+          name: "Studio Credential Kill Switch",
+          key: `studio-credential-kill-${suffix}`,
+          description: null,
+        }),
+        "request-m18-studio-credential-kill-project",
+      );
+      yield* repository.enableCapability(
+        firstActor,
+        yield* Schema.decodeUnknown(EnableCapabilityInput)({
+          projectId: created.id,
+          capability: "cms",
+        }),
+        "request-m18-studio-credential-kill-cms",
+      );
+      const registered = yield* repository.putStudioRegistration(
+        { kind: "user", id: firstActor },
+        created.id,
+        created.environment.id,
+        yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+          commandId: randomUUID(),
+          expectedVersion: null,
+          applicationOrigin: "https://credential-kill.example.test",
+          mountPath: "/studio",
+        }),
+        "request-m18-studio-credential-kill-register",
+      );
+      const activated = yield* repository.setStudioRuntime(
+        { kind: "user", id: firstActor },
+        created.id,
+        created.environment.id,
+        yield* Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+          commandId: randomUUID(),
+          expectedVersion: registered.registration.version,
+          enabled: true,
+        }),
+        "request-m18-studio-credential-kill-activate",
+      );
+      yield* Effect.promise(() =>
+        db.transaction(async (transaction) => {
+          await transaction.insert(apiCredential).values({
+            id: studioKillCredentialId,
+            workspaceId: created.workspaceId,
+            projectId: created.id,
+            environmentId: created.environment.id,
+            family: "management",
+            name: "M18 Studio kill switch",
+            keyPrefix: `ffd_mgmt_${studioKillCredentialId}`,
+            keyDigest: studioKillCredentialId.replaceAll("-", "").repeat(2),
+            createdByUserId: firstUserId,
+            activatedAt: new Date(),
+          });
+          await transaction.insert(apiCredentialScope).values([
+            {
+              credentialId: studioKillCredentialId,
+              workspaceId: created.workspaceId,
+              projectId: created.id,
+              environmentId: created.environment.id,
+              scope: "project.read",
+            },
+            {
+              credentialId: studioKillCredentialId,
+              workspaceId: created.workspaceId,
+              projectId: created.id,
+              environmentId: created.environment.id,
+              scope: "project.update",
+            },
+          ]);
+        }),
+      );
+      const actor = {
+        kind: "credential" as const,
+        id: ApiCredentialId.make(studioKillCredentialId),
+      };
+      const blockedActiveEdit = yield* Effect.exit(
+        repository.putStudioRegistration(
+          actor,
+          created.id,
+          created.environment.id,
+          yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+            commandId: randomUUID(),
+            expectedVersion: activated.registration.version,
+            applicationOrigin: "https://credential-repoint-denied.example.test",
+            mountPath: "/studio",
+          }),
+          "request-m18-studio-credential-active-edit-denied",
+        ),
+      );
+      const blockedActivation = yield* Effect.exit(
+        repository.setStudioRuntime(
+          actor,
+          created.id,
+          created.environment.id,
+          yield* Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+            commandId: randomUUID(),
+            expectedVersion: activated.registration.version,
+            enabled: true,
+          }),
+          "request-m18-studio-credential-activation-denied",
+        ),
+      );
+      const deactivated = yield* repository.setStudioRuntime(
+        actor,
+        created.id,
+        created.environment.id,
+        yield* Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+          commandId: randomUUID(),
+          expectedVersion: activated.registration.version,
+          enabled: false,
+        }),
+        "request-m18-studio-credential-kill-switch",
+      );
+      const metadataChanged = yield* repository.putStudioRegistration(
+        actor,
+        created.id,
+        created.environment.id,
+        yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+          commandId: randomUUID(),
+          expectedVersion: deactivated.registration.version,
+          applicationOrigin: "https://credential-inactive-edit.example.test",
+          mountPath: "/studio",
+        }),
+        "request-m18-studio-credential-inactive-edit",
+      );
+      const [persisted] = yield* Effect.promise(() =>
+        db
+          .select()
+          .from(studioRegistration)
+          .where(eq(studioRegistration.id, registered.registration.id))
+          .limit(1),
+      );
+      const [client] = yield* Effect.promise(() =>
+        db
+          .select({ disabled: oauthClient.disabled })
+          .from(oauthClient)
+          .where(eq(oauthClient.clientId, studioClientId(registered.registration.id)))
+          .limit(1),
+      );
+      const [audit] = yield* Effect.promise(() =>
+        db
+          .select({ actorType: auditEvent.actorType, actorId: auditEvent.actorId })
+          .from(auditEvent)
+          .where(eq(auditEvent.requestId, "request-m18-studio-credential-kill-switch"))
+          .limit(1),
+      );
+
+      assert.strictEqual(failureTag(blockedActiveEdit), "ForbiddenFailure");
+      assert.strictEqual(failureTag(blockedActivation), "ForbiddenFailure");
+      assert.strictEqual(deactivated.runtimeStatus, "inactive");
+      assert.isNull(deactivated.registration.runtimeChangedAt);
+      assert.isNull(deactivated.registration.runtimeChangedByUserId);
+      assert.strictEqual(
+        metadataChanged.registration.applicationOrigin,
+        "https://credential-inactive-edit.example.test",
+      );
+      assert.strictEqual(persisted?.changedByCredentialId, studioKillCredentialId);
+      assert.isNull(persisted?.changedByUserId);
+      assert.strictEqual(client?.disabled, true);
+      assert.deepEqual(audit, { actorType: "credential", actorId: studioKillCredentialId });
     }),
   );
 

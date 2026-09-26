@@ -1,6 +1,15 @@
 import { db } from "@framerfordevs/db";
+import { env } from "@framerfordevs/env/server";
 import { and, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "@framerfordevs/db/query";
 import { projectMembership } from "@framerfordevs/db/schema/access";
+import {
+  oauthAccessToken,
+  oauthClient,
+  oauthClientResource,
+  oauthConsent,
+  oauthRefreshToken,
+  oauthResource,
+} from "@framerfordevs/db/schema/auth";
 import { studioRegistration as studioRegistrationTable } from "@framerfordevs/db/schema/control-plane";
 import { projectLocale } from "@framerfordevs/db/schema/locale";
 import {
@@ -43,24 +52,31 @@ import {
   type ControlPlaneUpdateProjectRequest,
   ControlPlanePutStudioRegistrationResult,
   type ControlPlanePutStudioRegistrationRequest,
+  ControlPlaneSetStudioRuntimeResult,
+  type ControlPlaneSetStudioRuntimeRequest,
   ControlPlaneWorkspace,
+  StudioApplicationOrigin,
+  StudioMountPath,
   StudioRegistration,
+  StudioRegistrationId,
 } from "../contracts/control-plane";
 import {
   type ArchiveProjectInput,
-  type AuthUserId,
+  AuthUserId,
   Capability,
   type CreateProjectInput,
   type CreateWorkspaceInput,
   type EnableCapabilityInput,
   EnvironmentId,
   type GetProjectInput,
+  IsoDateTime,
   type ListProjectsInput,
   type ListWorkspacesInput,
   Project,
   ProjectId,
   ProjectPage,
   ProjectSummary,
+  ResourceVersion,
   type RestoreProjectInput,
   type UpdateProjectInput,
   Workspace,
@@ -72,6 +88,8 @@ import {
   controlPlaneActorReferences,
   controlPlaneCommandFingerprint,
 } from "../lib/control-plane/command-fingerprint";
+import { deriveStudioOAuthClient, studioClientId } from "../lib/studio/authority";
+import { decideStudioRuntimeTransition } from "../lib/studio/runtime";
 import {
   authorizeControlPlaneProject,
   controlPlaneProjectPolicyAction,
@@ -85,6 +103,10 @@ import {
 } from "./control-plane/command-receipt";
 import { decideCredentialPolicy, decideUserPolicy } from "./policy";
 import { authorizeUserProject, type UserProjectAccess } from "./project-access";
+
+const STUDIO_OAUTH_RESOURCE_ROW_ID = "oauth-resource-studio-v1";
+const STUDIO_ACCESS_TOKEN_LIFETIME_SECONDS = 5 * 60;
+const STUDIO_REFRESH_TOKEN_LIFETIME_SECONDS = 8 * 60 * 60;
 
 const mainEnvironment: {
   readonly key: "main";
@@ -333,10 +355,33 @@ function studioRegistrationValue(row: typeof studioRegistrationTable.$inferSelec
     environmentId: row.environmentId,
     applicationOrigin: row.applicationOrigin,
     mountPath: row.mountPath,
+    runtimeStatus: row.runtimeStatus,
+    runtimeChangedAt: row.runtimeChangedAt === null ? null : toIso(row.runtimeChangedAt),
+    runtimeChangedByUserId: row.runtimeChangedByUserId,
     version: row.version,
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
   };
+}
+
+async function revokeStudioOAuthAuthority(
+  executor: PlatformTransaction,
+  clientId: string,
+  now: Date,
+) {
+  await executor
+    .update(oauthClient)
+    .set({ disabled: true, updatedAt: now })
+    .where(eq(oauthClient.clientId, clientId));
+  await executor
+    .update(oauthAccessToken)
+    .set({ revoked: now })
+    .where(and(eq(oauthAccessToken.clientId, clientId), isNull(oauthAccessToken.revoked)));
+  await executor
+    .update(oauthRefreshToken)
+    .set({ revoked: now })
+    .where(and(eq(oauthRefreshToken.clientId, clientId), isNull(oauthRefreshToken.revoked)));
+  await executor.delete(oauthConsent).where(eq(oauthConsent.clientId, clientId));
 }
 
 function makeAuditValues(options: {
@@ -398,10 +443,12 @@ export interface ControlPlaneListResult<A> {
 
 interface RepositoryOptions {
   readonly database?: PlatformDb;
+  readonly studioApiOrigin?: string;
 }
 
 export function makePlatformRepository(options: RepositoryOptions = {}) {
   const database = options.database ?? db;
+  const studioApiOrigin = options.studioApiOrigin ?? env.BETTER_AUTH_URL;
 
   return {
     createControlPlaneWorkspace: Effect.fn("PlatformRepository.createControlPlaneWorkspace")(
@@ -1926,11 +1973,27 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
               });
             }
 
+            const invalidatesRuntime = current.runtimeStatus === "active";
+            if (invalidatesRuntime && actor.kind !== "user") return outcome("forbidden");
+            if (invalidatesRuntime) {
+              await revokeStudioOAuthAuthority(
+                transaction,
+                studioClientId(StudioRegistrationId.make(current.id)),
+                now,
+              );
+            }
             const [updated] = await transaction
               .update(studioRegistrationTable)
               .set({
                 applicationOrigin: input.applicationOrigin,
                 mountPath: input.mountPath,
+                ...(invalidatesRuntime && actor.kind === "user"
+                  ? {
+                      runtimeStatus: "inactive" as const,
+                      runtimeChangedAt: now,
+                      runtimeChangedByUserId: actor.id,
+                    }
+                  : {}),
                 version: sql`${studioRegistrationTable.version} + 1`,
                 changedByUserId: actorRefs.userId,
                 changedByCredentialId: actorRefs.credentialId,
@@ -1947,7 +2010,7 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
               )
               .returning();
             if (!updated) return outcome("version_conflict");
-            await transaction.insert(auditEvent).values(
+            await transaction.insert(auditEvent).values([
               makeControlPlaneAuditValues({
                 workspaceId: currentProject.workspaceId,
                 projectId,
@@ -1958,7 +2021,21 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                 resourceId: updated.id,
                 requestId,
               }),
-            );
+              ...(invalidatesRuntime
+                ? [
+                    makeControlPlaneAuditValues({
+                      workspaceId: currentProject.workspaceId,
+                      projectId,
+                      environmentId,
+                      actor,
+                      action: "studio.registration.runtime.deactivated",
+                      resourceType: "studio_registration",
+                      resourceId: updated.id,
+                      requestId,
+                    }),
+                  ]
+                : []),
+            ]);
             await persistControlPlaneReceipt(
               transaction,
               receiptExpectation,
@@ -2002,6 +2079,343 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
           return ControlPlanePutStudioRegistrationResult.make({
             registration,
             created: result.created,
+            replayed: result.replayed,
+            noOp: result.noOp,
+          });
+        }
+      }
+    }),
+
+    setStudioRuntime: Effect.fn("PlatformRepository.setStudioRuntime")(function* (
+      actor: ControlPlaneActor,
+      projectId: ProjectId,
+      environmentId: EnvironmentId,
+      input: ControlPlaneSetStudioRuntimeRequest,
+      requestId: string,
+    ) {
+      const result = yield* Effect.tryPromise({
+        try: () =>
+          database.transaction(async (transaction) => {
+            const authorization = await authorizeControlPlaneProject(
+              transaction,
+              actor,
+              projectId,
+              "studio_registration.write",
+              environmentId,
+            );
+            if (authorization.kind === "not_found") return outcome("not_found");
+            if (authorization.kind === "forbidden") return outcome("forbidden");
+            const currentProject = authorization.access.project;
+            const workspaceId = WorkspaceId.make(currentProject.workspaceId);
+            const fingerprint = controlPlaneCommandFingerprint({
+              operation: "studio_registration.runtime.set",
+              actor,
+              scope: { workspaceId, projectId, environmentId },
+              input: { expectedVersion: input.expectedVersion, enabled: input.enabled },
+            });
+            const receiptExpectation: ControlPlaneReceiptExpectation = {
+              commandId: input.commandId,
+              operation: "studio_registration.runtime.set",
+              actor,
+              fingerprint,
+              workspaceId,
+              projectId,
+              environmentId,
+            };
+            const receipt = await inspectControlPlaneReceipt(transaction, receiptExpectation);
+            if (receipt.kind === "conflict") return outcome("command_conflict");
+            if (receipt.kind === "replay") {
+              if (receipt.resourceType !== "studio_registration") {
+                return outcome("command_conflict");
+              }
+              const [registration] = await transaction
+                .select()
+                .from(studioRegistrationTable)
+                .where(
+                  and(
+                    eq(studioRegistrationTable.id, receipt.resourceId),
+                    eq(studioRegistrationTable.workspaceId, currentProject.workspaceId),
+                    eq(studioRegistrationTable.projectId, projectId),
+                    eq(studioRegistrationTable.environmentId, environmentId),
+                  ),
+                )
+                .limit(1);
+              return registration
+                ? outcomeWith("success", {
+                    registration,
+                    replayed: true,
+                    noOp: receipt.disposition === "no_op",
+                  })
+                : outcome("not_found");
+            }
+
+            await transaction.execute(
+              sql`select id from studio_registration where workspace_id = ${currentProject.workspaceId} and project_id = ${projectId} and environment_id = ${environmentId} for update`,
+            );
+            const [current] = await transaction
+              .select()
+              .from(studioRegistrationTable)
+              .where(
+                and(
+                  eq(studioRegistrationTable.workspaceId, currentProject.workspaceId),
+                  eq(studioRegistrationTable.projectId, projectId),
+                  eq(studioRegistrationTable.environmentId, environmentId),
+                ),
+              )
+              .limit(1);
+            if (!current) return outcome("not_found");
+
+            const [cmsCapability] = await transaction
+              .select({ status: projectCapability.status })
+              .from(projectCapability)
+              .where(
+                and(
+                  eq(projectCapability.workspaceId, currentProject.workspaceId),
+                  eq(projectCapability.projectId, projectId),
+                  eq(projectCapability.key, "cms"),
+                ),
+              )
+              .limit(1);
+            const now = new Date();
+            const decision = decideStudioRuntimeTransition({
+              currentStatus: current.runtimeStatus === "active" ? "active" : "inactive",
+              currentVersion: ResourceVersion.make(current.version),
+              currentChangedAt:
+                current.runtimeChangedAt === null
+                  ? null
+                  : IsoDateTime.make(toIso(current.runtimeChangedAt)),
+              currentChangedByUserId:
+                current.runtimeChangedByUserId === null
+                  ? null
+                  : AuthUserId.make(current.runtimeChangedByUserId),
+              expectedVersion: input.expectedVersion,
+              enabled: input.enabled,
+              actorKind: actor.kind,
+              actorUserId: actor.kind === "user" ? actor.id : null,
+              projectActive: currentProject.archivedAt === null,
+              cmsEnabled: cmsCapability?.status === "enabled",
+              environmentMatches: true,
+              projectUpdateAllowed: true,
+              oauthUserGrant: actor.kind === "user",
+              now: IsoDateTime.make(toIso(now)),
+            });
+            if (!decision.allowed) {
+              if (decision.reason === "version_conflict") return outcome("version_conflict");
+              if (
+                decision.reason === "policy_denied" ||
+                decision.reason === "user_actor_required"
+              ) {
+                return outcome("forbidden");
+              }
+              return outcome("invalid_state");
+            }
+
+            if (decision.noOp) {
+              await persistControlPlaneReceipt(
+                transaction,
+                receiptExpectation,
+                {
+                  resourceType: "studio_registration",
+                  resourceId: current.id,
+                  disposition: "no_op",
+                },
+                now,
+              );
+              return outcomeWith("success", {
+                registration: current,
+                replayed: false,
+                noOp: true,
+              });
+            }
+
+            const clientConfiguration = deriveStudioOAuthClient(
+              {
+                id: StudioRegistrationId.make(current.id),
+                version: decision.version,
+                projectId,
+                environmentId,
+                applicationOrigin: StudioApplicationOrigin.make(current.applicationOrigin),
+                mountPath: StudioMountPath.make(current.mountPath),
+              },
+              studioApiOrigin,
+            );
+            if (input.enabled) {
+              await transaction
+                .insert(oauthResource)
+                .values({
+                  id: STUDIO_OAUTH_RESOURCE_ROW_ID,
+                  identifier: clientConfiguration.resources[0],
+                  name: "Framer for Developers Studio API",
+                  accessTokenTtl: STUDIO_ACCESS_TOKEN_LIFETIME_SECONDS,
+                  refreshTokenTtl: STUDIO_REFRESH_TOKEN_LIFETIME_SECONDS,
+                  allowedScopes: [...clientConfiguration.scopes],
+                  dpopBoundAccessTokensRequired: false,
+                  disabled: false,
+                  createdAt: now,
+                  updatedAt: now,
+                  policyVersion: 1,
+                  metadata: { kind: "studio_v1" },
+                })
+                .onConflictDoUpdate({
+                  target: oauthResource.identifier,
+                  set: {
+                    name: "Framer for Developers Studio API",
+                    accessTokenTtl: STUDIO_ACCESS_TOKEN_LIFETIME_SECONDS,
+                    refreshTokenTtl: STUDIO_REFRESH_TOKEN_LIFETIME_SECONDS,
+                    allowedScopes: [...clientConfiguration.scopes],
+                    dpopBoundAccessTokensRequired: false,
+                    disabled: false,
+                    updatedAt: now,
+                    policyVersion: 1,
+                    metadata: { kind: "studio_v1" },
+                  },
+                });
+              await transaction
+                .insert(oauthClient)
+                .values({
+                  id: `oauth-client-studio-${current.id}`,
+                  clientId: clientConfiguration.clientId,
+                  clientSecret: null,
+                  disabled: false,
+                  skipConsent: false,
+                  enableEndSession: false,
+                  subjectType: "public",
+                  scopes: [...clientConfiguration.scopes],
+                  clientCredentialsScopes: [],
+                  createdAt: now,
+                  updatedAt: now,
+                  name: `${currentProject.name} Studio`,
+                  uri: current.applicationOrigin,
+                  redirectUris: [...clientConfiguration.redirectUris],
+                  postLogoutRedirectUris: [],
+                  tokenEndpointAuthMethod: "none",
+                  applicationType: "web",
+                  grantTypes: [...clientConfiguration.grantTypes],
+                  responseTypes: [...clientConfiguration.responseTypes],
+                  requirePKCE: true,
+                  dpopBoundAccessTokens: false,
+                  referenceId: current.id,
+                  metadata: clientConfiguration.metadata,
+                })
+                .onConflictDoUpdate({
+                  target: oauthClient.clientId,
+                  set: {
+                    clientSecret: null,
+                    disabled: false,
+                    skipConsent: false,
+                    enableEndSession: false,
+                    subjectType: "public",
+                    scopes: [...clientConfiguration.scopes],
+                    clientCredentialsScopes: [],
+                    updatedAt: now,
+                    name: `${currentProject.name} Studio`,
+                    uri: current.applicationOrigin,
+                    redirectUris: [...clientConfiguration.redirectUris],
+                    postLogoutRedirectUris: [],
+                    tokenEndpointAuthMethod: "none",
+                    applicationType: "web",
+                    grantTypes: [...clientConfiguration.grantTypes],
+                    responseTypes: [...clientConfiguration.responseTypes],
+                    requirePKCE: true,
+                    dpopBoundAccessTokens: false,
+                    referenceId: current.id,
+                    metadata: clientConfiguration.metadata,
+                  },
+                });
+              await transaction
+                .insert(oauthClientResource)
+                .values({
+                  id: `oauth-client-resource-studio-${current.id}`,
+                  clientId: clientConfiguration.clientId,
+                  resourceId: clientConfiguration.resources[0],
+                  metadata: { registrationId: current.id },
+                  createdAt: now,
+                })
+                .onConflictDoUpdate({
+                  target: [oauthClientResource.clientId, oauthClientResource.resourceId],
+                  set: { metadata: { registrationId: current.id } },
+                });
+            } else {
+              await revokeStudioOAuthAuthority(transaction, clientConfiguration.clientId, now);
+            }
+
+            const actorRefs = controlPlaneActorReferences(actor);
+            const [updated] = await transaction
+              .update(studioRegistrationTable)
+              .set({
+                runtimeStatus: decision.status,
+                runtimeChangedAt: decision.changedAt === null ? null : new Date(decision.changedAt),
+                runtimeChangedByUserId: decision.changedByUserId,
+                version: decision.version,
+                changedByUserId: actorRefs.userId,
+                changedByCredentialId: actorRefs.credentialId,
+                updatedAt: now,
+              })
+              .where(
+                and(
+                  eq(studioRegistrationTable.id, current.id),
+                  eq(studioRegistrationTable.workspaceId, currentProject.workspaceId),
+                  eq(studioRegistrationTable.projectId, projectId),
+                  eq(studioRegistrationTable.environmentId, environmentId),
+                  eq(studioRegistrationTable.version, current.version),
+                ),
+              )
+              .returning();
+            if (!updated) return outcome("version_conflict");
+
+            await transaction.insert(auditEvent).values(
+              makeControlPlaneAuditValues({
+                workspaceId: currentProject.workspaceId,
+                projectId,
+                environmentId,
+                actor,
+                action: input.enabled
+                  ? "studio.registration.runtime.activated"
+                  : "studio.registration.runtime.deactivated",
+                resourceType: "studio_registration",
+                resourceId: updated.id,
+                requestId,
+              }),
+            );
+            await persistControlPlaneReceipt(
+              transaction,
+              receiptExpectation,
+              {
+                resourceType: "studio_registration",
+                resourceId: updated.id,
+                disposition: "updated",
+              },
+              now,
+            );
+            return outcomeWith("success", {
+              registration: updated,
+              replayed: false,
+              noOp: false,
+            });
+          }),
+        catch: (cause) => databaseFailure("platform.studio-registration.runtime.set", cause),
+      });
+
+      switch (result.kind) {
+        case "not_found":
+          return yield* NotFoundFailure.make({ resource: "studio_registration" });
+        case "forbidden":
+          return yield* ForbiddenFailure.make();
+        case "invalid_state":
+          return yield* InvalidStateTransitionFailure.make();
+        case "version_conflict":
+          return yield* VersionConflictFailure.make();
+        case "command_conflict":
+          return yield* ControlPlaneCommandConflictFailure.make();
+        case "success": {
+          const registration = yield* decodeDatabaseValue(
+            "platform.studio-registration.runtime.set",
+            StudioRegistration,
+            studioRegistrationValue(result.registration),
+          );
+          return ControlPlaneSetStudioRuntimeResult.make({
+            registration,
+            runtimeStatus: registration.runtimeStatus,
             replayed: result.replayed,
             noOp: result.noOp,
           });

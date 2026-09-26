@@ -132,7 +132,7 @@ describe("Control Plane HTTP client", () => {
     }),
   );
 
-  it.effect("owns exact methods and paths for all thirteen operations", () =>
+  it.effect("owns exact methods and paths for all fourteen operations", () =>
     Effect.gen(function* () {
       const calls: Array<{ readonly url: string; readonly method: string | undefined }> = [];
       const responses = [
@@ -149,6 +149,7 @@ describe("Control Plane HTTP client", () => {
         { capability, replayed: false },
         registration,
         { registration, created: false, replayed: false, noOp: true },
+        { registration, runtimeStatus: "inactive", replayed: false, noOp: true },
       ];
       const client = makeControlPlaneHttpClient({
         baseUrl: "https://api.example.test",
@@ -188,6 +189,11 @@ describe("Control Plane HTTP client", () => {
         applicationOrigin: registration.applicationOrigin,
         mountPath: registration.mountPath,
       });
+      yield* client.setStudioRuntime(project.id, project.primaryEnvironment.id, {
+        commandId,
+        expectedVersion: 1,
+        enabled: false,
+      });
 
       assert.deepEqual(
         calls.map((call) => call.method),
@@ -205,13 +211,14 @@ describe("Control Plane HTTP client", () => {
           "PUT",
           "GET",
           "PUT",
+          "PUT",
         ],
       );
-      assert.strictEqual(calls.length, 13);
+      assert.strictEqual(calls.length, 14);
       assert.include(calls[3]?.url ?? "", `/workspaces/${workspace.id}/projects?status=active`);
       assert.include(
-        calls[12]?.url ?? "",
-        `/projects/${project.id}/environments/${project.primaryEnvironment.id}/studio-registration`,
+        calls[13]?.url ?? "",
+        `/projects/${project.id}/environments/${project.primaryEnvironment.id}/studio-registration/runtime`,
       );
     }),
   );

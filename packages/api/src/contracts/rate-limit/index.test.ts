@@ -41,6 +41,39 @@ describe("rate-limit contracts", () => {
     });
   });
 
+  it("keeps approved Studio budgets closed and source-controlled", () => {
+    expect(rateLimitPolicies["studio.oauth.global"]).toEqual({
+      policy: "studio.oauth.global",
+      limitPerInterval: 3_000,
+      intervalMs: 60_000,
+      capacity: 250,
+    });
+    expect(rateLimitPolicies["studio.oauth.client"]).toEqual({
+      policy: "studio.oauth.client",
+      limitPerInterval: 120,
+      intervalMs: 60_000,
+      capacity: 20,
+    });
+    expect(rateLimitPolicies["studio.oauth.user"]).toEqual({
+      policy: "studio.oauth.user",
+      limitPerInterval: 60,
+      intervalMs: 60_000,
+      capacity: 10,
+    });
+    expect(rateLimitPolicies["studio.global"]).toEqual({
+      policy: "studio.global",
+      limitPerInterval: 3_000,
+      intervalMs: 60_000,
+      capacity: 250,
+    });
+    expect(rateLimitPolicies["studio.user"]).toEqual({
+      policy: "studio.user",
+      limitPerInterval: 120,
+      intervalMs: 60_000,
+      capacity: 20,
+    });
+  });
+
   it("keeps approved Preview and webhook budgets closed and source-controlled", () => {
     expect(rateLimitPolicies["preview.global"]).toEqual({
       policy: "preview.global",

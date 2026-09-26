@@ -126,6 +126,8 @@ import {
   ControlPlaneWebhookDeliveryPageOutputSchema,
   ControlPlanePutStudioRegistrationInputSchema,
   ControlPlanePutStudioRegistrationOutputSchema,
+  ControlPlaneSetStudioRuntimeInputSchema,
+  ControlPlaneSetStudioRuntimeOutputSchema,
   ControlPlaneStudioRegistrationScopeSchema,
   HostedOperationalCredentialListInputSchema,
   HostedProjectAuditListInputSchema,
@@ -218,6 +220,7 @@ import {
 import {
   getStudioRegistrationForSession,
   putStudioRegistrationForSession,
+  setStudioRuntimeForSession,
 } from "../operations/control-plane";
 import { listControlPlaneCredentials } from "../operations/control-plane/operational";
 import { listProjectAuditEvents } from "../operations/audit";
@@ -563,6 +566,17 @@ export const appRouter = {
                 context.request.requestId,
               ),
               "Studio registration saved.",
+            ),
+          ),
+        setRuntime: protectedProcedure
+          .input(ControlPlaneSetStudioRuntimeInputSchema)
+          .output(ControlPlaneSetStudioRuntimeOutputSchema)
+          .handler(({ context, input }) =>
+            executeProcedure(
+              context,
+              "api.control-plane.studio-registration.runtime.set",
+              setStudioRuntimeForSession(context.session.user.id, input, context.request.requestId),
+              input.enabled ? "Studio runtime activated." : "Studio runtime deactivated.",
             ),
           ),
       },

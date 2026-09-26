@@ -78,6 +78,7 @@ const canonicalControlPlaneRoutes = [
   ["PUT", `${projectPath}/capabilities/cms`],
   ["GET", `${environmentPath}/studio-registration`],
   ["PUT", `${environmentPath}/studio-registration`],
+  ["PUT", `${environmentPath}/studio-registration/runtime`],
   ["GET", `${projectPath}/governance`],
   ["GET", `${projectPath}/members`],
   ["PUT", `${projectPath}/members/${resourceId}/policy`],
@@ -197,6 +198,12 @@ describe("Control Plane HTTP boundary", () => {
         "/projects/project-id/environments/environment-id/studio-registration",
       ),
     ).toEqual({ operation: "studio_registration_put", costBucket: "5" });
+    expect(
+      classifyControlPlaneRequest(
+        "PUT",
+        "/projects/project-id/environments/environment-id/studio-registration/runtime",
+      ),
+    ).toEqual({ operation: "studio_registration_runtime_set", costBucket: "5" });
     expect(classifyControlPlaneRequest("GET", "/projects/project-id/members")).toEqual({
       operation: "member_list",
       costBucket: "2",
@@ -251,8 +258,8 @@ describe("Control Plane HTTP boundary", () => {
     }
   });
 
-  it("isolates bearer and session authority across all 52 canonical operations", async () => {
-    expect(canonicalControlPlaneRoutes).toHaveLength(52);
+  it("isolates bearer and session authority across all 53 canonical operations", async () => {
+    expect(canonicalControlPlaneRoutes).toHaveLength(53);
     const email = `m17-control-plane-${randomUUID()}@example.test`;
     disposableUserEmails.add(email);
     const signUp = await request(routedApp)

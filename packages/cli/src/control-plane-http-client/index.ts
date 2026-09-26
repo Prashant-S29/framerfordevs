@@ -35,6 +35,7 @@ import {
   ControlPlaneStartedCredentialRotation,
   ControlPlaneProjectPage,
   ControlPlanePutStudioRegistrationResult,
+  ControlPlaneSetStudioRuntimeResult,
   ControlPlaneStudioRegistration,
   ControlPlaneWebhookAttemptList,
   ControlPlaneWebhookDeliveryDetail,
@@ -118,6 +119,12 @@ export interface PutStudioRegistrationRequest {
   readonly expectedVersion: number | null;
   readonly applicationOrigin: string;
   readonly mountPath: string;
+}
+
+export interface SetStudioRuntimeRequest {
+  readonly commandId: string;
+  readonly expectedVersion: number;
+  readonly enabled: boolean;
 }
 
 function transportError(operation: string, cause: unknown) {
@@ -890,6 +897,19 @@ export function makeControlPlaneHttpClient(options: ControlPlaneHttpClientOption
         "PUT",
         `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/studio-registration`,
         ControlPlanePutStudioRegistrationResult,
+        body,
+        requestOptions,
+      ),
+    setStudioRuntime: (
+      projectId: string,
+      environmentId: string,
+      body: SetStudioRuntimeRequest,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "PUT",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/studio-registration/runtime`,
+        ControlPlaneSetStudioRuntimeResult,
         body,
         requestOptions,
       ),

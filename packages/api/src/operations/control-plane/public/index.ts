@@ -61,8 +61,10 @@ import {
   ControlPlaneProjectLifecycleRequest,
   ControlPlaneProjectScope,
   ControlPlanePutStudioRegistrationInput,
+  ControlPlaneSetStudioRuntimeInput,
   ControlPlaneStudioRegistrationScope,
   ControlPlanePutStudioRegistrationRequest,
+  ControlPlaneSetStudioRuntimeRequest,
   ControlPlaneUpdateInvalidationMappingRequest,
   ControlPlaneUpdateLocaleRequest,
   ControlPlaneUpdateWebhookEndpointRequest,
@@ -677,6 +679,20 @@ export function decodeControlPlanePutStudioRegistrationInput(
   );
 }
 
+export function decodeControlPlaneSetStudioRuntimeInput(
+  projectId: string,
+  environmentId: string,
+  body: unknown,
+) {
+  return Effect.flatMap(decodeInput(ControlPlaneSetStudioRuntimeRequest, body, "body"), (decoded) =>
+    decodeInput(
+      ControlPlaneSetStudioRuntimeInput,
+      { projectId, environmentId, ...decoded },
+      "path",
+    ),
+  );
+}
+
 export interface ControlPlaneBearerRequirement {
   readonly oauthScope: CliApiOAuthScope;
   readonly authority: "oauth_only" | "oauth_or_management";
@@ -711,6 +727,7 @@ export const controlPlaneBearerRequirements = {
   enableCapability: projectAuthority(CONTROL_PLANE_WRITE_SCOPE, ["project.capability.manage"]),
   getStudioRegistration: projectAuthority(CONTROL_PLANE_READ_SCOPE, ["project.read"]),
   putStudioRegistration: projectAuthority(CONTROL_PLANE_WRITE_SCOPE, ["project.update"]),
+  setStudioRuntime: oauthOnly(CONTROL_PLANE_WRITE_SCOPE),
   getGovernance: oauthOnly(CONTROL_PLANE_GOVERNANCE_READ_SCOPE),
   listMembers: oauthOnly(CONTROL_PLANE_GOVERNANCE_READ_SCOPE),
   updateMemberPolicy: oauthOnly(CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE),

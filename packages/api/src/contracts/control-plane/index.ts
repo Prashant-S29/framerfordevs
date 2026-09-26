@@ -26,6 +26,7 @@ import {
   ProjectLocaleStatus,
 } from "../locale";
 import {
+  AuthUserId,
   Capability,
   EnvironmentId,
   IsoDateTime,
@@ -125,6 +126,7 @@ export const ControlPlaneCommandOperation = Schema.Literal(
   "project.create",
   "project.capability.enable",
   "studio_registration.put",
+  "studio_registration.runtime.set",
   "project_locale.create",
   "invalidation_mapping.create",
 );
@@ -132,6 +134,9 @@ export type ControlPlaneCommandOperation = typeof ControlPlaneCommandOperation.T
 
 export const StudioRegistrationId = Schema.UUID.pipe(Schema.brand("StudioRegistrationId"));
 export type StudioRegistrationId = typeof StudioRegistrationId.Type;
+
+export const StudioRuntimeStatus = Schema.Literal("inactive", "active");
+export type StudioRuntimeStatus = typeof StudioRuntimeStatus.Type;
 
 export const ControlPlaneCursorInput = Schema.String.pipe(
   Schema.minLength(1),
@@ -260,6 +265,9 @@ export class StudioRegistration extends Schema.Class<StudioRegistration>("Studio
   environmentId: EnvironmentId,
   applicationOrigin: StudioApplicationOrigin,
   mountPath: StudioMountPath,
+  runtimeStatus: StudioRuntimeStatus,
+  runtimeChangedAt: Schema.NullOr(IsoDateTime),
+  runtimeChangedByUserId: Schema.NullOr(AuthUserId),
   version: ResourceVersion,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -427,6 +435,26 @@ export class ControlPlanePutStudioRegistrationInput extends Schema.Class<Control
   expectedVersion: Schema.NullOr(ResourceVersion),
   applicationOrigin: StudioApplicationOrigin,
   mountPath: StudioMountPath,
+}) {}
+
+export const ControlPlaneSetStudioRuntimeRequest = Schema.Struct({
+  commandId: ControlPlaneCommandId,
+  expectedVersion: ResourceVersion,
+  enabled: Schema.Boolean,
+}).annotations({
+  identifier: "ControlPlaneSetStudioRuntimeRequest",
+  parseOptions: { onExcessProperty: "error" },
+});
+export type ControlPlaneSetStudioRuntimeRequest = typeof ControlPlaneSetStudioRuntimeRequest.Type;
+
+export class ControlPlaneSetStudioRuntimeInput extends Schema.Class<ControlPlaneSetStudioRuntimeInput>(
+  "ControlPlaneSetStudioRuntimeInput",
+)({
+  projectId: ProjectId,
+  environmentId: EnvironmentId,
+  commandId: ControlPlaneCommandId,
+  expectedVersion: ResourceVersion,
+  enabled: Schema.Boolean,
 }) {}
 
 export const ControlPlaneMemberListQuery = Schema.Struct({
@@ -622,6 +650,15 @@ export class ControlPlanePutStudioRegistrationResult extends Schema.Class<Contro
   noOp: Schema.Boolean,
 }) {}
 
+export class ControlPlaneSetStudioRuntimeResult extends Schema.Class<ControlPlaneSetStudioRuntimeResult>(
+  "ControlPlaneSetStudioRuntimeResult",
+)({
+  registration: StudioRegistration,
+  runtimeStatus: StudioRuntimeStatus,
+  replayed: Schema.Boolean,
+  noOp: Schema.Boolean,
+}) {}
+
 export const ControlPlaneApiErrorCode = Schema.Literal(
   "VALIDATION_ERROR",
   "UNAUTHORIZED",
@@ -689,6 +726,9 @@ export const StudioRegistrationResponse = ApiSuccessSchema(StudioRegistration);
 export const ControlPlanePutStudioRegistrationResponse = ApiSuccessSchema(
   ControlPlanePutStudioRegistrationResult,
 );
+export const ControlPlaneSetStudioRuntimeResponse = ApiSuccessSchema(
+  ControlPlaneSetStudioRuntimeResult,
+);
 export const ControlPlaneGovernanceResponse = ApiSuccessSchema(ControlPlaneGovernance);
 export const ControlPlaneMemberResponse = ApiSuccessSchema(ProjectMember);
 export const ControlPlaneMemberPageResponse = ApiSuccessSchema(ControlPlaneMemberPage);
@@ -730,7 +770,13 @@ export const ControlPlaneStudioRegistrationScopeSchema = Schema.standardSchemaV1
 export const ControlPlanePutStudioRegistrationInputSchema = Schema.standardSchemaV1(
   ControlPlanePutStudioRegistrationInput,
 );
+export const ControlPlaneSetStudioRuntimeInputSchema = Schema.standardSchemaV1(
+  ControlPlaneSetStudioRuntimeInput,
+);
 export const StudioRegistrationOutputSchema = Schema.standardSchemaV1(StudioRegistrationResponse);
 export const ControlPlanePutStudioRegistrationOutputSchema = Schema.standardSchemaV1(
   ControlPlanePutStudioRegistrationResponse,
+);
+export const ControlPlaneSetStudioRuntimeOutputSchema = Schema.standardSchemaV1(
+  ControlPlaneSetStudioRuntimeResponse,
 );

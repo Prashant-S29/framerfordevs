@@ -18,6 +18,7 @@ const sourceExtensions = [".cjs", ".js", ".jsx", ".mjs", ".ts", ".tsx"];
 const allowedTestCategories = new Set(["accessibility", "contract", "integration", "support"]);
 const allowedTestRootFiles = new Set([".gitkeep", "setup.ts", "setup.tsx"]);
 const importSpecifierPattern = /(?:from\s*|import\s*\(|require\s*\()\s*["']([^"']+)["']/gu;
+const studioOAuthHarnessPackage = "@framerfordevs/studio-oauth-harness";
 
 /** Reports a structural violation and leaves process termination to the final aggregate check. */
 function report(violations, message) {
@@ -91,6 +92,14 @@ async function checkSourceBoundary(workspaceRoot, violations) {
     while (match !== null) {
       const specifier = match[1] ?? "";
       if (
+        specifier === studioOAuthHarnessPackage ||
+        specifier.startsWith(`${studioOAuthHarnessPackage}/`)
+      ) {
+        report(
+          violations,
+          `${normalizedPath}: production source imports private Studio OAuth harness`,
+        );
+      } else if (
         specifier.includes(".test.") ||
         specifier === "test" ||
         specifier.startsWith("test/") ||
@@ -316,6 +325,25 @@ async function checkDomainStructure(violations) {
   }
 }
 
+/** Keeps the private Studio OAuth client out of production dependencies and publishable packages. */
+async function checkStudioOAuthHarnessBoundary(workspaceRoots, violations) {
+  for (const root of workspaceRoots) {
+    const manifestPath = join(root, "package.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    if (manifest.name === studioOAuthHarnessPackage && manifest.private !== true) {
+      report(violations, `${manifestPath}: Studio OAuth harness must remain private`);
+    }
+    for (const field of ["dependencies", "optionalDependencies", "peerDependencies"]) {
+      if (manifest[field]?.[studioOAuthHarnessPackage] !== undefined) {
+        report(
+          violations,
+          `${manifestPath}: Studio OAuth harness is allowed only as a development dependency`,
+        );
+      }
+    }
+  }
+}
+
 /** Runs all repository structure checks and exits nonzero with stable path-only diagnostics on failure. */
 async function main() {
   const violations = [];
@@ -331,6 +359,7 @@ async function main() {
     await checkTestDirectory(root, violations);
   }
   await checkRepeatedModuleFamilies("scripts", violations);
+  await checkStudioOAuthHarnessBoundary(workspaceRoots, violations);
   await checkKnowledgeBase(violations);
   await checkDomainStructure(violations);
   if (violations.length > 0) {

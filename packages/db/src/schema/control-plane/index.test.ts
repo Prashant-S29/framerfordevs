@@ -66,6 +66,9 @@ describe("M14 Control Plane persistence authority", () => {
     ]);
     expect(
       checkSql(controlPlaneCommandReceipt, "control_plane_command_receipt_operation_valid"),
+    ).toContain("'studio_registration.runtime.set'");
+    expect(
+      checkSql(controlPlaneCommandReceipt, "control_plane_command_receipt_operation_valid"),
     ).toContain("'project_locale.create'");
     expect(
       checkSql(controlPlaneCommandReceipt, "control_plane_command_receipt_operation_valid"),
@@ -76,6 +79,14 @@ describe("M14 Control Plane persistence authority", () => {
     expect(
       checkSql(controlPlaneCommandReceipt, "control_plane_command_receipt_result_type_valid"),
     ).toContain("'cms_invalidation_route_mapping'");
+    const scopeResultSql = checkSql(
+      controlPlaneCommandReceipt,
+      "control_plane_command_receipt_scope_result_valid",
+    );
+    expect(scopeResultSql).toContain("'studio_registration.runtime.set'");
+    expect(scopeResultSql).not.toMatch(
+      /'studio_registration\.runtime\.set'\s+and\s+[^)]*actor_type/u,
+    );
     expect(
       checkSql(controlPlaneCommandReceipt, "control_plane_command_receipt_scope_result_valid"),
     ).toContain("'project_locale.create'");
@@ -84,9 +95,13 @@ describe("M14 Control Plane persistence authority", () => {
     ).toContain("'invalidation_mapping.create'");
   });
 
-  it("stores one versioned metadata-only Studio registration per environment", () => {
+  it("stores one versioned, default-inactive Studio registration per environment", () => {
     expect(studioRegistration.applicationOrigin.notNull).toBe(true);
     expect(studioRegistration.mountPath.notNull).toBe(true);
+    expect(studioRegistration.runtimeStatus.notNull).toBe(true);
+    expect(studioRegistration.runtimeStatus.default).toBe("inactive");
+    expect(studioRegistration.runtimeChangedAt.notNull).toBe(false);
+    expect(studioRegistration.runtimeChangedByUserId.notNull).toBe(false);
     expect(studioRegistration.version.notNull).toBe(true);
     expect(columnNames(studioRegistration)).toEqual([
       "id",
@@ -95,6 +110,9 @@ describe("M14 Control Plane persistence authority", () => {
       "environment_id",
       "application_origin",
       "mount_path",
+      "runtime_status",
+      "runtime_changed_at",
+      "runtime_changed_by_user_id",
       "version",
       "created_by_user_id",
       "created_by_credential_id",
@@ -118,9 +136,14 @@ describe("M14 Control Plane persistence authority", () => {
       "studio_registration_changed_actor_exactly_one",
       "studio_registration_application_origin_valid",
       "studio_registration_mount_path_valid",
+      "studio_registration_runtime_status_valid",
+      "studio_registration_runtime_actor_time_coherent",
+      "studio_registration_active_runtime_authority",
       "studio_registration_version_positive",
     ]);
     expectNames(indexNames(studioRegistration), [
+      "studio_registration_active_authority_idx",
+      "studio_registration_runtime_changed_by_user_idx",
       "studio_registration_created_by_user_idx",
       "studio_registration_changed_by_user_idx",
       "studio_registration_created_by_credential_idx",
@@ -131,6 +154,12 @@ describe("M14 Control Plane persistence authority", () => {
     );
     expect(checkSql(studioRegistration, "studio_registration_application_origin_valid")).toContain(
       `= 'http://[::1]:'`,
+    );
+    expect(checkSql(studioRegistration, "studio_registration_runtime_status_valid")).toContain(
+      "'inactive', 'active'",
+    );
+    expect(checkSql(studioRegistration, "studio_registration_active_runtime_authority")).toContain(
+      "runtime_changed_by_user_id",
     );
   });
 

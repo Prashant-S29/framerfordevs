@@ -364,6 +364,8 @@ function commandEffect(
         "ffd locale status set --api <origin> --project <id> --locale <id> --expected-version <n> --status enabled|disabled|removed [--confirm-draft-impact]",
         "ffd studio registration get --api <origin> --project <id> --environment-id <id>",
         "ffd studio registration set --api <origin> --project <id> --environment-id <id> --origin <origin> --path <path> [--expected-version <n>] [--command-id <uuid>]",
+        "ffd studio runtime activate --api <origin> --project <id> --environment-id <id> --expected-version <n> [--command-id <uuid>]",
+        "ffd studio runtime deactivate --api <origin> --project <id> --environment-id <id> --expected-version <n> [--command-id <uuid>]",
         "ffd link --api <origin> --project <id> --environment <key> [--output <path>] [--schema <path>]",
         "ffd schema pull",
         "ffd schema build [--check]",

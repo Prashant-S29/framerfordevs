@@ -15,6 +15,7 @@ import {
   ControlPlaneEnableCapabilityResult,
   ControlPlaneProject,
   ControlPlanePutStudioRegistrationResult,
+  ControlPlaneSetStudioRuntimeResult,
   ControlPlaneWorkspace,
   StudioRegistration,
 } from "@framerfordevs/api/contracts/control-plane/index";
@@ -193,6 +194,9 @@ const registration = Schema.decodeUnknownSync(StudioRegistration)({
   environmentId: currentProject.primaryEnvironment.id,
   applicationOrigin: "https://studio.example.test",
   mountPath: "/studio",
+  runtimeStatus: "inactive",
+  runtimeChangedAt: null,
+  runtimeChangedByUserId: null,
   version: 1,
   createdAt: "2026-08-14T00:00:00.000Z",
   updatedAt: "2026-08-14T00:00:00.000Z",
@@ -272,6 +276,15 @@ const repository = {
       ControlPlanePutStudioRegistrationResult.make({
         registration,
         created: false,
+        replayed: false,
+        noOp: true,
+      }),
+    ),
+  setStudioRuntime: () =>
+    Effect.succeed(
+      ControlPlaneSetStudioRuntimeResult.make({
+        registration,
+        runtimeStatus: registration.runtimeStatus,
         replayed: false,
         noOp: true,
       }),
@@ -387,7 +400,7 @@ function expectSuccess(response: request.Response) {
 }
 
 describe("Control Plane HTTP success contracts", () => {
-  it("serves all thirteen operations through shared domain authority", async () => {
+  it("serves all fourteen operations through shared domain authority", async () => {
     const commandId = "019fae8b-1234-7000-8000-000000000010";
     const projectId = currentProject.id;
     const environmentId = currentProject.primaryEnvironment.id;
@@ -445,14 +458,20 @@ describe("Control Plane HTTP success contracts", () => {
           applicationOrigin: registration.applicationOrigin,
           mountPath: registration.mountPath,
         }),
+      api
+        .put(
+          `/api/control-plane/v1/projects/${projectId}/environments/${environmentId}/studio-registration/runtime`,
+        )
+        .set(authorization)
+        .send({ commandId, expectedVersion: 1, enabled: false }),
     ];
 
     for (const pending of requests) expectSuccess(await pending);
-    expect(evaluatedRates).toHaveLength(26);
+    expect(evaluatedRates).toHaveLength(28);
     expect(evaluatedRates.filter((rate) => rate.policy === "control-plane.global")).toHaveLength(
-      13,
+      14,
     );
-    expect(evaluatedRates.filter((rate) => rate.policy === "control-plane.user")).toHaveLength(13);
+    expect(evaluatedRates.filter((rate) => rate.policy === "control-plane.user")).toHaveLength(14);
     expect(evaluatedRates.map((rate) => rate.cost)).toEqual(expect.arrayContaining([1, 3, 5]));
   });
 

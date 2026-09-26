@@ -248,6 +248,13 @@ export const ControlPlanePutStudioRegistrationResult = Schema.Struct({
   noOp: Schema.Boolean,
 });
 
+export const ControlPlaneSetStudioRuntimeResult = Schema.Struct({
+  registration: ControlPlaneStudioRegistration,
+  runtimeStatus: Schema.Literal("inactive", "active"),
+  replayed: Schema.Boolean,
+  noOp: Schema.Boolean,
+});
+
 const CredentialFamily = Schema.Literal("management", "delivery", "preview");
 const CredentialStatus = Schema.Literal(
   "pending",

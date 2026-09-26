@@ -1,4 +1,7 @@
-import { ControlPlanePutStudioRegistrationRequest } from "@framerfordevs/api/contracts/control-plane/index";
+import {
+  ControlPlanePutStudioRegistrationRequest,
+  ControlPlaneSetStudioRuntimeRequest,
+} from "@framerfordevs/api/contracts/control-plane/index";
 import type { Project } from "@framerfordevs/api/contracts/platform/index";
 import { Alert, AlertDescription, AlertTitle } from "@framerfordevs/ui/components/alert";
 import { Button } from "@framerfordevs/ui/components/button";
@@ -45,6 +48,7 @@ export function StudioRegistrationSettings({
   const [mountPath, setMountPath] = useState("/studio");
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const pendingCommand = useRef<PendingCommand | null>(null);
+  const pendingRuntimeCommand = useRef<PendingCommand | null>(null);
   const scope = { projectId: project.id, environmentId: project.environment.id };
   const registrationQuery = useQuery({
     ...orpc.platform.projects.studioRegistration.get.queryOptions({ input: scope }),
@@ -73,6 +77,34 @@ export function StudioRegistrationSettings({
       onError: (error) => toast.error(error.message),
     }),
   );
+
+  const setRuntime = useMutation(
+    orpc.platform.projects.studioRegistration.setRuntime.mutationOptions({
+      onSuccess: async (response) => {
+        pendingRuntimeCommand.current = null;
+        await queryClient.invalidateQueries({ queryKey: orpc.platform.projects.key() });
+        toast.success(response.message);
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+
+  const changeRuntime = (enabled: boolean) => {
+    if (!registration) return;
+    const intent = JSON.stringify([registration.version, enabled]);
+    if (pendingRuntimeCommand.current?.intent !== intent) {
+      pendingRuntimeCommand.current = { intent, commandId: crypto.randomUUID() };
+    }
+    const decoded = Option.getOrUndefined(
+      Schema.decodeUnknownOption(ControlPlaneSetStudioRuntimeRequest)({
+        commandId: pendingRuntimeCommand.current.commandId,
+        expectedVersion: registration.version,
+        enabled,
+      }),
+    );
+    if (!decoded) return;
+    setRuntime.mutate({ ...scope, ...decoded });
+  };
 
   const save = () => {
     const intent = JSON.stringify([registration?.version ?? null, applicationOrigin, mountPath]);
@@ -105,8 +137,8 @@ export function StudioRegistrationSettings({
           <div>
             <CardTitle>Studio registration</CardTitle>
             <CardDescription>
-              Inert application metadata for this exact environment. It grants no session, redirect,
-              or browser credential authority.
+              Exact application metadata and delegated runtime authority for this environment.
+              Browser code never receives OAuth tokens or management credentials.
             </CardDescription>
           </div>
           <ExternalLinkIcon aria-hidden="true" />
@@ -155,7 +187,7 @@ export function StudioRegistrationSettings({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-muted-foreground text-xs">
                 {registration
-                  ? `Registered version ${registration.version}.`
+                  ? `Registered version ${registration.version}; runtime ${registration.runtimeStatus}.`
                   : "No Studio application is registered."}
               </p>
               {canWrite && project.archivedAt === null ? (
@@ -169,6 +201,44 @@ export function StudioRegistrationSettings({
                 </Button>
               ) : null}
             </div>
+            {registration ? (
+              <Alert variant={registration.runtimeStatus === "active" ? "default" : "destructive"}>
+                <AlertTitle>
+                  Studio runtime is{" "}
+                  {registration.runtimeStatus === "active" ? "active" : "inactive"}
+                </AlertTitle>
+                <AlertDescription>
+                  {registration.runtimeStatus === "active"
+                    ? "Saving a different origin or mount path disables Studio and revokes its delegated sessions."
+                    : "Activation creates an exact public OAuth client. Every local Studio session still requires your explicit project-and-origin approval."}
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            {registration && canWrite ? (
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant={registration.runtimeStatus === "active" ? "destructive" : "default"}
+                  disabled={
+                    setRuntime.isPending ||
+                    (registration.runtimeStatus === "inactive" &&
+                      (project.archivedAt !== null ||
+                        !project.capabilities.some(
+                          (capability) =>
+                            capability.key === "cms" && capability.status === "enabled",
+                        )))
+                  }
+                  onClick={() => changeRuntime(registration.runtimeStatus !== "active")}
+                >
+                  {setRuntime.isPending ? <Spinner data-icon="inline-start" /> : null}
+                  {setRuntime.isPending
+                    ? "Updating runtime…"
+                    : registration.runtimeStatus === "active"
+                      ? "Deactivate Studio runtime"
+                      : "Activate Studio runtime"}
+                </Button>
+              </div>
+            ) : null}
           </FieldGroup>
         )}
       </CardContent>

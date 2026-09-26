@@ -1,0 +1,23 @@
+{
+  "name": "@framerfordevs/studio-oauth-harness",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "devDependencies": {
+    "@framerfordevs/config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "^3.2.7"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

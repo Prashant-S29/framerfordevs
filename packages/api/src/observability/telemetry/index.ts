@@ -81,6 +81,7 @@ export type ControlPlaneOperation =
   | "capability_enable"
   | "studio_registration_get"
   | "studio_registration_put"
+  | "studio_registration_runtime_set"
   | "governance_get"
   | "member_list"
   | "member_policy_update"

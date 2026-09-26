@@ -553,3 +553,11 @@
 **Incorrect assumption or decision:** Dialog focus restoration was assumed to work when a one-time disclosure opened after a mutation or when its trigger was replaced by the opposite lifecycle action.
 
 **Learning:** A focus trap can restore only to a surviving trigger. Programmatically opened or lifecycle-replacing dialogs need a stable labelled focus target. Prevention: Credential rows and project lifecycle actions expose non-tabbable labelled groups and focus them after close; headed review verifies credential dismissal and archive/restore transitions no longer return focus to `body`.
+
+---
+
+## 2026-09-21 — OAuth resource behavior must be proven against the pinned provider
+
+**Incorrect assumption or decision:** The first M18A pass assumed an existing dashboard session could resume Better Auth OAuth with an empty continue body, that the verifier configured for the Tooling audience would accept a correctly issued Studio-resource token, and that successful JWT access tokens would have persisted access-token rows.
+
+**Learning:** OAuth library behavior at login continuation, redirect validation, token issuance, persistence, and verification is executable security authority. Prevention: The private compatibility harness now proves the exact pinned provider flow; dashboard continuation explicitly sets `postLogin: true`, the JWT verifier allowlists both exact API resources, and a pre-provider Studio guard rejects unregistered redirect URIs without redirecting because the pinned provider otherwise delays that check until after consent and returns its error through the unregistered URI. M18A must also enforce current registration, grant, and audit-marker state during bootstrap because Better Auth persists the refresh token but emits the short-lived access token as a stateless JWT.

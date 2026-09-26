@@ -23,6 +23,8 @@ const controlPlaneCommands = new Set([
   "project capability enable",
   "studio registration get",
   "studio registration set",
+  "studio runtime activate",
+  "studio runtime deactivate",
   "governance inspect",
   "member list",
   "member policy set",
@@ -156,6 +158,7 @@ function receiptMutation<A, E, R>(options: {
     | "project.create"
     | "project.capability.enable"
     | "studio_registration.put"
+    | "studio_registration.runtime.set"
     | "project_locale.create"
     | "invalidation_mapping.create"
     | "webhook.delivery.replay";
@@ -1061,6 +1064,27 @@ export function executeControlPlaneCommand(options: {
         command,
         registration: yield* client.getStudioRegistration(projectId, environmentId),
       };
+    }
+    if (command === "studio runtime activate" || command === "studio runtime deactivate") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment-id");
+      const expectedVersion = yield* positiveIntegerFlag(arguments_, "expected-version");
+      const enabled = command === "studio runtime activate";
+      const suppliedCommandId = yield* optionalCommandId(arguments_);
+      const input = { projectId, environmentId, expectedVersion, enabled };
+      const result = yield* receiptMutation({
+        root: options.root,
+        operation: "studio_registration.runtime.set",
+        suppliedCommandId,
+        input,
+        execute: (commandId) =>
+          client.setStudioRuntime(projectId, environmentId, {
+            commandId,
+            expectedVersion,
+            enabled,
+          }),
+      });
+      return { command, ...result };
     }
     if (command === "studio registration set") {
       const projectId = yield* requiredFlag(arguments_, "project");

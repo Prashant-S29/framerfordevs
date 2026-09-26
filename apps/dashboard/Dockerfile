@@ -1,4 +1,4 @@
-FROM node:24-slim AS base
+FROM node:24-slim AS builder
 RUN npm install -g pnpm@10.25.0
 WORKDIR /app
 ENV SKIP_EFFECT_SOURCE_SETUP=1
@@ -23,12 +23,16 @@ RUN test -n "$INTERNAL_SERVER_URL" \
   && test -n "$VITE_MARKETING_ORIGIN" \
   && cd apps/dashboard \
   && pnpm run build
-ENV SKIP_EFFECT_SOURCE_SETUP=
+RUN pnpm --filter dashboard deploy --prod --legacy /runtime \
+  && cp -R apps/dashboard/.output /runtime/.output \
+  && node scripts/prune-production-image.mjs /runtime
 
+FROM node:24-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3001
-EXPOSE 3001
+COPY --from=builder /runtime /app
 
-# SSR chunks require() externals at runtime; must run from the workspace
-WORKDIR /app/apps/dashboard
+EXPOSE 3001
 CMD ["node", ".output/server/index.mjs"]

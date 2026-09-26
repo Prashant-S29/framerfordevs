@@ -46,6 +46,8 @@ import {
   ControlPlaneProjectResponse,
   ControlPlanePutStudioRegistrationRequest,
   ControlPlanePutStudioRegistrationResponse,
+  ControlPlaneSetStudioRuntimeRequest,
+  ControlPlaneSetStudioRuntimeResponse,
   ControlPlaneReplaceWebhookSubscriptionsRequest,
   ControlPlaneReplayWebhookRequest,
   ControlPlaneRevokeCredentialRequest,
@@ -130,6 +132,8 @@ function schemaComponents() {
     ["StudioRegistrationResponse", StudioRegistrationResponse],
     ["ControlPlanePutStudioRegistrationRequest", ControlPlanePutStudioRegistrationRequest],
     ["ControlPlanePutStudioRegistrationResponse", ControlPlanePutStudioRegistrationResponse],
+    ["ControlPlaneSetStudioRuntimeRequest", ControlPlaneSetStudioRuntimeRequest],
+    ["ControlPlaneSetStudioRuntimeResponse", ControlPlaneSetStudioRuntimeResponse],
     ["ControlPlaneGovernanceResponse", ControlPlaneGovernanceResponse],
     ["ControlPlaneMemberPageResponse", ControlPlaneMemberPageResponse],
     ["ControlPlaneMemberResponse", ControlPlaneMemberResponse],
@@ -1231,6 +1235,25 @@ export const controlPlaneOpenApiDocument = {
         },
       },
       options: denyPreflight("denyControlPlaneProjectAuditPreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/studio-registration/runtime": {
+      put: {
+        operationId: "setControlPlaneStudioRuntime",
+        summary: "Activate or deactivate Studio runtime authority",
+        description:
+          "Idempotent runtime transition. Activation is user-only and derives the exact public OAuth client and resource binding. A project/environment management credential with project.update may only deactivate as a fail-closed kill switch; deactivation revokes outstanding Studio authority.",
+        security: exactWrite,
+        parameters: [projectParameter, environmentParameter],
+        requestBody: jsonBody("ControlPlaneSetStudioRuntimeRequest"),
+        responses: {
+          "200": successResponse(
+            "ControlPlaneSetStudioRuntimeResponse",
+            "Studio runtime transition result.",
+          ),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlaneStudioRuntimePreflight"),
     },
     "/projects/{projectId}/environments/{environmentId}/studio-registration": {
       get: {

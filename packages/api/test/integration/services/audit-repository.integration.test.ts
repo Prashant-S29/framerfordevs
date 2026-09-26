@@ -317,7 +317,7 @@ describe.sequential("audit repository PostgreSQL integration", () => {
         assert.lengthOf(reads, 2);
 
         const firstCursor = required(first.nextCursor ?? undefined, "first audit cursor");
-        const tampered = `${firstCursor.slice(0, -1)}x`;
+        const tampered = `${firstCursor[0] === "x" ? "y" : "x"}${firstCursor.slice(1)}`;
         const exit = yield* Effect.exit(
           listProjectAuditEvents(
             ownerId,

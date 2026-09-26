@@ -54,65 +54,48 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ## Pending milestones
 
-### Unnumbered milestone — API Ops Test (`api-ops-test`)
+### Milestone 18A — Studio platform authority
 
-**Status:** Next design target; design not started.
-
-**Depends on:** The accepted M0–M17 API, protocol, host, authentication, persistence, and worker boundaries.
-
-**Summary:** Add one committed, deterministic, fully automated end-to-end operations suite that exercises the complete executable API inventory without requiring a developer, agent, or interactive prompt while it runs.
-
-#### Required outcome
-
-- Provide one documented repository command that provisions or verifies every required isolated dependency, runs the complete suite noninteractively, records bounded results, cleans up, and exits zero only when every expected operation passes.
-- Maintain an explicit, machine-checkable inventory of every owned endpoint and method across Better Auth/OAuth protocol routes, Delivery, Preview, Tooling, Authoring, Control Plane, retained editorial oRPC, webhook/worker interactions, and applicable dashboard same-origin ingress. A new or removed route must fail inventory reconciliation until deliberately classified.
-- Exercise each endpoint's meaningful lifecycle rather than only route reachability: create, inspect/get, list/search/page, update/replace, transition, delete/archive/revoke/unpublish, replay/idempotency, and unsupported-method behavior as applicable. APIs without literal CRUD verbs use their canonical lifecycle equivalents.
-- Cover representative success plus authentication, authorization, tenant/project/environment/locale isolation, validation/bounds, stale version, idempotent replay, cursor, not-found/non-enumeration, origin/CSRF/CORS, and expected protocol-native failure behavior without weakening existing focused tests.
-- Own deterministic fixture orchestration and cleanup, including disposable users/sessions/OAuth authority, projects/environments/locales/content, credentials, webhooks/deliveries, caches, receiver processes, and a dedicated worker when required. It must not depend on pre-existing mutable fixtures, production services, wall-clock races, test order, or a separately running development worker.
-- Run against an isolated disposable database/cache/service topology and leave zero fixture, process, port, browser, worker, receipt, audit, or outbox residue. It must never generate, edit, or apply a new real migration or touch production configuration/data.
-- Emit stable machine-readable and human-readable reports containing the endpoint/scenario identity, expected and actual outcome, bounded duration, and failure summary. Reports must exclude credentials, cookies, tokens, one-time secrets, content bodies, sensitive headers, environment values, and unbounded server output.
-- Use fixed seeds, controlled clocks/IDs where authority permits, stable ordering, explicit timeouts, and zero test retries. Repeated runs from the same commit and configuration must produce the same scenario inventory and pass/fail result.
-- Run identically from local automation and CI with no AI dependency. Agents may inspect the completed report afterward and fix failures, but may not be required to plan steps, answer prompts, repair fixtures, choose scenarios, or interpret output for the command to finish.
-
-#### Acceptance gates
-
-- A clean-checkout operator can run one command and receive a complete pass/fail result without input after launch.
-- Inventory reconciliation proves every current endpoint/method is either lifecycle-tested or explicitly classified as a non-operation artifact with a documented reason.
-- A second consecutive run passes with the same ordered scenario inventory and zero residue from either run.
-- Deliberately breaking one representative route, authorization rule, response contract, and cleanup path causes a deterministic nonzero failure and a precise redacted report.
-- The suite preserves native protocol contracts, existing `{ ok, data, error, message }` application envelopes, exact host/auth boundaries, immutable/idempotent authority, and worker-only webhook delivery.
-- Applicable format, lint, structure, type, focused tests, coverage, build, audit, and the new API operations command pass before developer review.
-
-#### Explicit non-goals
-
-- Do not redesign API behavior, add product operations solely for test convenience, replace focused unit/integration/contract/browser suites, run load/soak/chaos testing, contact production, or begin Studio M18 implementation.
-- Do not require an interactive browser, screenshots, traces, video, AI-generated runtime steps, or developer-provided secrets beyond documented test-environment bootstrap configuration.
-
-**Read before design:** API/session/security/testing/observability rules; repository test-structure and browser-workflow decisions; M1, M3, M9–M17 decisions; every server router/host profile, public artifact registry, CLI HTTP client, retained oRPC route, worker/receiver harness, current integration cleanup utilities, and Compose/test configuration.
-
-### Milestone 18 — Studio mount and security runtime
-
-**Status:** Planned; design not started.
+**Status:** `[R]` Implementation and readiness validation are complete; migration `0019_add_studio_runtime_authority` is developer-applied/catalog-verified, and M18A awaits independent developer review.
 
 **Depends on:** M14 and M17.
 
-**Summary:** Establish the secure framework-neutral runtime and mounting contract on which every project Studio workflow depends.
+**Summary:** Establish registration-derived Studio delegation and a bounded server-to-server bootstrap authority before shipping a developer runtime.
 
-- Define a framework-neutral Studio SPA mounted at a developer-configured path such as `/studio`, with deterministic asset/base-path behavior and no framework-specific business authority.
-- Define a Web Standards `Request → Response` BFF contract plus thin supported framework adapters; adapters translate hosting/runtime concerns but do not reimplement policy.
-- Specify Studio registration/discovery, project/environment binding, session handoff, sign-in/recovery redirects, and behavior when the hosted platform or customer app is unavailable.
-- Use short-lived user/session authority, exact operation allowlists, CSRF/origin/CSP protections, bounded bodies/responses, `no-store` where sensitive, and no hosted bearer/refresh/management credentials in browser code.
-- Reuse shared form/editor packages and converge with the secure M13 local-editor BFF without weakening its loopback-only and secret-isolation properties.
-- Establish role/project/environment projection and safe bootstrap payloads before content routes; browser state must not become hosted content authority.
-- Cover configurable paths, adapter parity, auth expiry/revocation, hostile origins, traversal, redirects, bundle boundaries, secret scanning, accessibility shell, and framework-neutral packaging.
+- Add explicit inactive/active registration lifecycle without retroactively trusting M14 rows, with exact user-only Control Plane HTTP/CLI/dashboard activation and recovery.
+- Prove and add one deterministic public OAuth Code + S256 PKCE client per active registration, exact Studio resource/scope/claims, current project pre-authorization, and no dynamic registration.
+- Require dashboard-hosted project/origin-specific acknowledgement for every new local Studio session; a project updater cannot silently capture another member's delegated authority.
+- Add shared `studio.oauth.*` and `studio.*` abuse policies, fail-closed session-establishment security audit with a synchronous response-gating fallback, exact revocation/version invalidation, and a five-minute access/eight-hour refresh bound.
+- Ship a private test-only public OAuth harness that proves authorize through bootstrap and cannot enter production imports/artifacts; use it for dashboard acknowledgement browser/accessibility coverage.
+- Add only the role/project/environment-projected Studio v1 bootstrap API and deterministic OpenAPI source; immutable public-contract baseline registration waits for M18B, and browser/BFF packages plus all content/editorial routes remain excluded.
+- Accept explicitly that pre-M23 unauthenticated OAuth ingress has installation-wide overload protection but no trustworthy source fairness.
+- Complete the developer-controlled migration gate and provider compatibility stop gate, then stop for independent M18A review.
 
-**Read before design:** product Studio surface; PRD §§6.1, 20–22; M3, M6, M10, M13 decisions; local editor loopback/protocol/app, content-form package, hosted dashboard router/auth middleware.
+**Read before design:** product Studio surface; PRD §§6.1, 20–22; M3, M10, M12, M14, and M17 decisions; Better Auth provider/auth schema; Control Plane registration, policy, audit, and rate-limit authority.
+
+### Milestone 18B — Studio mount and security runtime
+
+**Status:** Proposed split boundary only; detailed confirmation/design and implementation are not authorized.
+
+**Depends on:** accepted M18A.
+
+**Summary:** Mount the authenticated empty Studio through a developer-owned BFF after platform delegation authority is accepted.
+
+- Define a framework-neutral Studio SPA mounted at an exact configured path, with deterministic assets/base behavior and no framework-specific business authority.
+- Ship a Web Standards `Request → Response` BFF core, thin Express 5/TanStack Start adapters, direct Fetch conformance, and claims limited to the supported Node/Web Request baseline.
+- Keep OAuth tokens in encrypted server-side sessions behind opaque path-scoped browser cookies; encrypt PKCE attempts too and make local logout semantics explicit.
+- Ship a production-capable Redis store/limiter adapter plus the custom-store conformance contract; production requires a shared, process-restart-stable store and has no memory fallback.
+- Revalidate bootstrap through the real BFF before registering the canonical Studio artifact and immutable compatibility baseline.
+- Cover exact path/origin/proxy/CSRF/CSP behavior, refresh/expiry/revocation/outages, key-retirement forced logout, secret scanning, accessibility shell, and package boundaries.
+- Support one exact `main` origin only; wildcard/per-branch preview deployment lifecycle remains deferred.
+
+**Read before design:** accepted M18A implementation/contracts; M6, M10, M13, M14, and M17 decisions; local editor loopback/protocol/app; content-form package; supported framework request boundaries.
 
 ### Milestone 19 — Studio content and localization
 
 **Status:** Planned; design not started.
 
-**Depends on:** M18.
+**Depends on:** M18B.
 
 **Summary:** Move everyday role-projected content and exact-locale draft authoring into the mounted project Studio.
 

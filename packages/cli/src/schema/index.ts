@@ -374,6 +374,7 @@ export const ControlPlaneMutationOperation = Schema.Literal(
   "project.create",
   "project.capability.enable",
   "studio_registration.put",
+  "studio_registration.runtime.set",
   "project_locale.create",
   "invalidation_mapping.create",
   "webhook.delivery.replay",

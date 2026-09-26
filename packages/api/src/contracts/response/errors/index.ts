@@ -168,6 +168,22 @@ export class ToolingResponseTooLargeFailure extends Schema.TaggedError<ToolingRe
   "ToolingResponseTooLargeFailure",
 )("ToolingResponseTooLargeFailure", {}) {}
 
+export class StudioRegistrationInactiveFailure extends Schema.TaggedError<StudioRegistrationInactiveFailure>(
+  "StudioRegistrationInactiveFailure",
+)("StudioRegistrationInactiveFailure", {}) {}
+
+export class StudioAuthorityChangedFailure extends Schema.TaggedError<StudioAuthorityChangedFailure>(
+  "StudioAuthorityChangedFailure",
+)("StudioAuthorityChangedFailure", {}) {}
+
+export class StudioGrantInvalidFailure extends Schema.TaggedError<StudioGrantInvalidFailure>(
+  "StudioGrantInvalidFailure",
+)("StudioGrantInvalidFailure", {}) {}
+
+export class StudioResponseTooLargeFailure extends Schema.TaggedError<StudioResponseTooLargeFailure>(
+  "StudioResponseTooLargeFailure",
+)("StudioResponseTooLargeFailure", {}) {}
+
 export class ControlPlaneCommandConflictFailure extends Schema.TaggedError<ControlPlaneCommandConflictFailure>(
   "ControlPlaneCommandConflictFailure",
 )("ControlPlaneCommandConflictFailure", {}) {}
@@ -323,6 +339,10 @@ export type ApplicationError =
   | ToolingCursorInvalidFailure
   | ToolingConcurrentSchemaChangeFailure
   | ToolingResponseTooLargeFailure
+  | StudioRegistrationInactiveFailure
+  | StudioAuthorityChangedFailure
+  | StudioGrantInvalidFailure
+  | StudioResponseTooLargeFailure
   | ControlPlaneCommandConflictFailure
   | ControlPlaneCursorInvalidFailure
   | ControlPlaneRequestTooLargeFailure
@@ -382,6 +402,10 @@ export const apiErrorHttpStatus = {
   TOOLING_CURSOR_INVALID: 400,
   TOOLING_CONCURRENT_SCHEMA_CHANGE: 409,
   TOOLING_RESPONSE_TOO_LARGE: 413,
+  STUDIO_REGISTRATION_INACTIVE: 403,
+  STUDIO_AUTHORITY_CHANGED: 403,
+  STUDIO_GRANT_INVALID: 403,
+  STUDIO_RESPONSE_TOO_LARGE: 413,
   CONTROL_PLANE_CURSOR_INVALID: 400,
   CONTROL_PLANE_REQUEST_TOO_LARGE: 413,
   CONTROL_PLANE_RESPONSE_TOO_LARGE: 413,
@@ -693,6 +717,30 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
       return {
         code: "TOOLING_RESPONSE_TOO_LARGE",
         message: "The Tooling response exceeds the maximum size.",
+        retryable: false,
+      };
+    case "StudioRegistrationInactiveFailure":
+      return {
+        code: "STUDIO_REGISTRATION_INACTIVE",
+        message: "The Studio registration is not active.",
+        retryable: false,
+      };
+    case "StudioAuthorityChangedFailure":
+      return {
+        code: "STUDIO_AUTHORITY_CHANGED",
+        message: "Studio authority changed. Start a new Studio session.",
+        retryable: false,
+      };
+    case "StudioGrantInvalidFailure":
+      return {
+        code: "STUDIO_GRANT_INVALID",
+        message: "The Studio grant is no longer valid.",
+        retryable: false,
+      };
+    case "StudioResponseTooLargeFailure":
+      return {
+        code: "STUDIO_RESPONSE_TOO_LARGE",
+        message: "The Studio response exceeds the maximum size.",
         retryable: false,
       };
     case "ControlPlaneCommandConflictFailure":

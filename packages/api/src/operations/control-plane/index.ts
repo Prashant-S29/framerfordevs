@@ -15,10 +15,12 @@ import {
   type ControlPlaneProjectLifecycleInput,
   type ControlPlaneProjectScope,
   type ControlPlanePutStudioRegistrationInput,
+  type ControlPlaneSetStudioRuntimeInput,
   type ControlPlaneUpdateProjectInput,
   type ControlPlaneWorkspaceScope,
   ControlPlaneWorkspacePage,
   ControlPlanePutStudioRegistrationRequest,
+  ControlPlaneSetStudioRuntimeRequest,
   type ControlPlaneStudioRegistrationScope,
 } from "../../contracts/control-plane";
 import { ArchiveProjectInput, AuthUserId, RestoreProjectInput } from "../../contracts/platform";
@@ -321,4 +323,36 @@ export const putStudioRegistrationForSession = Effect.fn(
   "control-plane.studio-registration.put-session",
 )(function* (userId: string, input: ControlPlanePutStudioRegistrationInput, requestId: string) {
   return yield* putStudioRegistration(yield* decodeSessionActor(userId), input, requestId);
+});
+
+export const setStudioRuntime = Effect.fn("control-plane.studio-registration.runtime.set")(
+  function* (
+    actor: ControlPlaneActor,
+    input: ControlPlaneSetStudioRuntimeInput,
+    requestId: string,
+  ) {
+    yield* Effect.annotateCurrentSpan({
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      enabled: input.enabled,
+    });
+    const repository = yield* PlatformRepository;
+    return yield* repository.setStudioRuntime(
+      actor,
+      input.projectId,
+      input.environmentId,
+      ControlPlaneSetStudioRuntimeRequest.make({
+        commandId: input.commandId,
+        expectedVersion: input.expectedVersion,
+        enabled: input.enabled,
+      }),
+      requestId,
+    );
+  },
+);
+
+export const setStudioRuntimeForSession = Effect.fn(
+  "control-plane.studio-registration.runtime.set-session",
+)(function* (userId: string, input: ControlPlaneSetStudioRuntimeInput, requestId: string) {
+  return yield* setStudioRuntime(yield* decodeSessionActor(userId), input, requestId);
 });

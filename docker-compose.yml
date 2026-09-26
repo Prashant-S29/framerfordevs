@@ -102,6 +102,7 @@ services:
       HOST_ROUTING_ENABLED: "true"
       TRUST_PROXY_HOPS: 1
       NODE_ENV: development
+      OAUTH_DEVICE_AUTHORIZATION_ENABLED: "true"
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/framerfordevs
       TOOLING_API_RESOURCE: ${TOOLING_API_RESOURCE:-http://localhost:3000/api/tooling/v1}
     healthcheck:

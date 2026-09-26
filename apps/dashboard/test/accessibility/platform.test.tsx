@@ -245,7 +245,7 @@ describe("platform management accessibility", () => {
     await expectOpenDialogToHaveNoViolations(/restore project/i, "alertdialog");
   });
 
-  it("has accessible inert Studio registration semantics", async () => {
+  it("has accessible Studio registration and runtime semantics", async () => {
     const queryClient = new QueryClient();
     const registration = Schema.decodeUnknownSync(StudioRegistration)({
       id: "019fae8b-1234-7000-8000-000000000009",
@@ -253,6 +253,9 @@ describe("platform management accessibility", () => {
       environmentId: project.environment.id,
       applicationOrigin: "https://studio.example.test",
       mountPath: "/studio",
+      runtimeStatus: "inactive",
+      runtimeChangedAt: null,
+      runtimeChangedByUserId: null,
       version: 1,
       createdAt: "2026-08-14T00:00:00.000Z",
       updatedAt: "2026-08-14T00:00:00.000Z",
@@ -274,9 +277,9 @@ describe("platform management accessibility", () => {
     expect(await screen.findByLabelText("Application origin")).toBeTruthy();
     expect(screen.getByLabelText("Mount path")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save registration" })).toBeTruthy();
-    expect(
-      screen.getByText(/grants no session, redirect, or browser credential authority/i),
-    ).toBeTruthy();
+    expect(screen.getByText(/browser code never receives OAuth tokens/i)).toBeTruthy();
+    expect(screen.getByText(/Studio runtime is inactive/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Activate Studio runtime" })).toBeTruthy();
     expect((await axe.run(container)).violations).toEqual([]);
   });
 

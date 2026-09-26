@@ -134,6 +134,20 @@
       "when": 1789761076436,
       "tag": "0018_allow_unattempted_archived_delivery_outcome",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790177386836,
+      "tag": "0019_add_studio_runtime_authority",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790399741342,
+      "tag": "0020_allow_studio_credential_kill_switch",
+      "breakpoints": true
     }
   ]
 }

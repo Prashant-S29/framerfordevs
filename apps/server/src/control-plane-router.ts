@@ -42,6 +42,7 @@ import {
   listProjects as listControlPlaneProjects,
   listWorkspaces as listControlPlaneWorkspaces,
   putStudioRegistration as putControlPlaneStudioRegistration,
+  setStudioRuntime as setControlPlaneStudioRuntime,
   restoreProject as restoreControlPlaneProject,
   updateProject as updateControlPlaneProject,
 } from "@framerfordevs/api/operations/control-plane/index";
@@ -106,6 +107,7 @@ import {
   decodeControlPlaneProjectLifecycleInput,
   decodeControlPlaneProjectScope,
   decodeControlPlanePutStudioRegistrationInput,
+  decodeControlPlaneSetStudioRuntimeInput,
   decodeControlPlaneReplaceWebhookSubscriptionsRequest,
   decodeControlPlaneReplayWebhookRequest,
   decodeControlPlaneRevokeCredentialRequest,
@@ -395,6 +397,12 @@ export function classifyControlPlaneRequest(
   ) {
     return { operation: "studio_registration_put", costBucket: "5" };
   }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/studio-registration\/runtime$/u.test(path) &&
+    method === "PUT"
+  ) {
+    return { operation: "studio_registration_runtime_set", costBucket: "5" };
+  }
   return null;
 }
 
@@ -624,6 +632,9 @@ function controlPlaneAllowedMethods(path: string): ReadonlyArray<string> | null 
   }
   if (/^\/projects\/[^/]+\/environments\/[^/]+\/studio-registration$/u.test(path)) {
     return ["GET", "PUT"];
+  }
+  if (/^\/projects\/[^/]+\/environments\/[^/]+\/studio-registration\/runtime$/u.test(path)) {
+    return ["PUT"];
   }
   return null;
 }
@@ -1630,6 +1641,39 @@ export function createControlPlaneRouter(
         context.request.requestId,
       ),
       "Control Plane Studio registration stored.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  router.put(`${studioPath}/runtime`, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.setStudioRuntime,
+      controlPlaneRequestCosts.studioWrite,
+    );
+    if (principal === undefined) return;
+    const inputResult = await context.execute(
+      "api.control-plane.studio-registration.runtime.set.input",
+      decodeControlPlaneSetStudioRuntimeInput(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+        req.body,
+      ),
+      "Control Plane Studio runtime input decoded.",
+    );
+    const input = controlPlaneStepData(req, res, inputResult);
+    if (input === null) return;
+    const result = await context.execute(
+      "api.control-plane.studio-registration.runtime.set",
+      setControlPlaneStudioRuntime(
+        controlPlanePrincipalActor(principal),
+        input,
+        context.request.requestId,
+      ),
+      input.enabled ? "Studio runtime activated." : "Studio runtime deactivated.",
     );
     sendControlPlaneResponse(req, res, result.status, result.response);
   });

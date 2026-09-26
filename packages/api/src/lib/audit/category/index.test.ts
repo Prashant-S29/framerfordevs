@@ -6,6 +6,8 @@ describe("project audit categories", () => {
   it("classifies current operational action families", () => {
     assert.strictEqual(projectAuditCategory("project.credential.rotation_started"), "security");
     assert.strictEqual(projectAuditCategory("project.audit.read"), "security");
+    assert.strictEqual(projectAuditCategory("studio.session.established"), "security");
+    assert.strictEqual(projectAuditCategory("studio.registration.runtime.activated"), "security");
     assert.strictEqual(projectAuditCategory("project.archived"), "project");
     assert.strictEqual(projectAuditCategory("project.membership.policy.updated"), "governance");
     assert.strictEqual(projectAuditCategory("project.locale.created"), "governance");

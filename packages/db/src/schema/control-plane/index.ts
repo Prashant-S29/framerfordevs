@@ -58,7 +58,7 @@ export const controlPlaneCommandReceipt = pgTable(
     }).onDelete("restrict"),
     check(
       "control_plane_command_receipt_operation_valid",
-      sql`${table.operation} in ('workspace.create', 'project.create', 'project.capability.enable', 'studio_registration.put', 'project_locale.create', 'invalidation_mapping.create')`,
+      sql`${table.operation} in ('workspace.create', 'project.create', 'project.capability.enable', 'studio_registration.put', 'studio_registration.runtime.set', 'project_locale.create', 'invalidation_mapping.create')`,
     ),
     check(
       "control_plane_command_receipt_actor_valid",
@@ -78,7 +78,7 @@ export const controlPlaneCommandReceipt = pgTable(
     ),
     check(
       "control_plane_command_receipt_scope_result_valid",
-      sql`(${table.operation} = 'workspace.create' and ${table.actorType} = 'user' and ${table.projectId} is null and ${table.environmentId} is null and ${table.resultResourceType} = 'workspace' and ${table.resultResourceId} = ${table.workspaceId} and ${table.resultDisposition} = 'created') or (${table.operation} = 'project.create' and ${table.actorType} = 'user' and ${table.projectId} is not null and ${table.environmentId} is null and ${table.resultResourceType} = 'project' and ${table.resultResourceId} = ${table.projectId} and ${table.resultDisposition} = 'created') or (${table.operation} = 'project.capability.enable' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'project_capability' and ${table.resultDisposition} = 'created') or (${table.operation} = 'studio_registration.put' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'studio_registration') or (${table.operation} = 'project_locale.create' and ${table.projectId} is not null and ((${table.actorType} = 'user' and ${table.environmentId} is null) or (${table.actorType} = 'credential' and ${table.environmentId} is not null)) and ${table.resultResourceType} = 'project_locale' and ${table.resultDisposition} = 'created') or (${table.operation} = 'invalidation_mapping.create' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'cms_invalidation_route_mapping' and ${table.resultDisposition} = 'created')`,
+      sql`(${table.operation} = 'workspace.create' and ${table.actorType} = 'user' and ${table.projectId} is null and ${table.environmentId} is null and ${table.resultResourceType} = 'workspace' and ${table.resultResourceId} = ${table.workspaceId} and ${table.resultDisposition} = 'created') or (${table.operation} = 'project.create' and ${table.actorType} = 'user' and ${table.projectId} is not null and ${table.environmentId} is null and ${table.resultResourceType} = 'project' and ${table.resultResourceId} = ${table.projectId} and ${table.resultDisposition} = 'created') or (${table.operation} = 'project.capability.enable' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'project_capability' and ${table.resultDisposition} = 'created') or (${table.operation} = 'studio_registration.put' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'studio_registration') or (${table.operation} = 'studio_registration.runtime.set' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'studio_registration' and ${table.resultDisposition} in ('updated', 'no_op')) or (${table.operation} = 'project_locale.create' and ${table.projectId} is not null and ((${table.actorType} = 'user' and ${table.environmentId} is null) or (${table.actorType} = 'credential' and ${table.environmentId} is not null)) and ${table.resultResourceType} = 'project_locale' and ${table.resultDisposition} = 'created') or (${table.operation} = 'invalidation_mapping.create' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'cms_invalidation_route_mapping' and ${table.resultDisposition} = 'created')`,
     ),
     index("control_plane_command_receipt_actor_operation_created_idx").on(
       table.actorType,
@@ -106,6 +106,11 @@ export const studioRegistration = pgTable(
     environmentId: uuid("environment_id").notNull(),
     applicationOrigin: varchar("application_origin", { length: 2048 }).notNull(),
     mountPath: varchar("mount_path", { length: 240 }).notNull(),
+    runtimeStatus: varchar("runtime_status", { length: 16 }).default("inactive").notNull(),
+    runtimeChangedAt: controlPlaneTimestamp("runtime_changed_at"),
+    runtimeChangedByUserId: text("runtime_changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
     version: integer("version").default(1).notNull(),
     createdByUserId: text("created_by_user_id").references(() => user.id, {
       onDelete: "restrict",
@@ -177,7 +182,25 @@ export const studioRegistration = pgTable(
       "studio_registration_mount_path_valid",
       sql`octet_length(${table.mountPath}) between 1 and 240 and ${table.mountPath} = btrim(${table.mountPath}) and left(${table.mountPath}, 1) = '/' and ${table.mountPath} <> '/' and right(${table.mountPath}, 1) <> '/' and ${table.mountPath} !~ '[[:cntrl:][:space:]?#%]' and position(chr(92) in ${table.mountPath}) = 0 and position('//' in ${table.mountPath}) = 0 and ${table.mountPath} !~ '(^|/)[.]{1,2}(/|$)'`,
     ),
+    check(
+      "studio_registration_runtime_status_valid",
+      sql`${table.runtimeStatus} in ('inactive', 'active')`,
+    ),
+    check(
+      "studio_registration_runtime_actor_time_coherent",
+      sql`(${table.runtimeChangedAt} is null and ${table.runtimeChangedByUserId} is null) or (${table.runtimeChangedAt} is not null and ${table.runtimeChangedByUserId} is not null)`,
+    ),
+    check(
+      "studio_registration_active_runtime_authority",
+      sql`${table.runtimeStatus} = 'inactive' or (${table.runtimeChangedAt} is not null and ${table.runtimeChangedByUserId} is not null)`,
+    ),
     check("studio_registration_version_positive", sql`${table.version} > 0`),
+    index("studio_registration_active_authority_idx")
+      .on(table.workspaceId, table.projectId, table.environmentId, table.version)
+      .where(sql`${table.runtimeStatus} = 'active'`),
+    index("studio_registration_runtime_changed_by_user_idx")
+      .on(table.runtimeChangedByUserId)
+      .where(sql`${table.runtimeChangedByUserId} is not null`),
     index("studio_registration_created_by_user_idx")
       .on(table.createdByUserId)
       .where(sql`${table.createdByUserId} is not null`),
@@ -227,6 +250,11 @@ export const studioRegistrationRelations = relations(studioRegistration, ({ one 
       studioRegistration.workspaceId,
     ],
     references: [environment.id, environment.projectId, environment.workspaceId],
+  }),
+  runtimeChangedByUser: one(user, {
+    relationName: "studioRegistrationRuntimeUserChanger",
+    fields: [studioRegistration.runtimeChangedByUserId],
+    references: [user.id],
   }),
   createdByUser: one(user, {
     relationName: "studioRegistrationUserCreator",

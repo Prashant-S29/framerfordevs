@@ -53,6 +53,7 @@ describe("Control Plane OpenAPI", () => {
       "/projects/{projectId}/environments/{environmentId}/webhook-deliveries/{deliveryId}/attempts",
       "/projects/{projectId}/environments/{environmentId}/webhook-replays",
       "/projects/{projectId}/audit-events",
+      "/projects/{projectId}/environments/{environmentId}/studio-registration/runtime",
       "/projects/{projectId}/environments/{environmentId}/studio-registration",
     ]);
 
@@ -61,7 +62,7 @@ describe("Control Plane OpenAPI", () => {
         .filter(([method]) => dataMethods.has(method))
         .map(([, operation]) => operation.operationId),
     );
-    assert.strictEqual(operationIds.length, 52);
+    assert.strictEqual(operationIds.length, 53);
     assert.strictEqual(new Set(operationIds).size, operationIds.length);
   });
 
@@ -101,12 +102,20 @@ describe("Control Plane OpenAPI", () => {
       controlPlaneOpenApiDocument.paths["/projects/{projectId}/archive"].post.security;
     const exactProjectSecurity =
       controlPlaneOpenApiDocument.paths["/projects/{projectId}"].get.security;
+    const studioRuntimeSecurity =
+      controlPlaneOpenApiDocument.paths[
+        "/projects/{projectId}/environments/{environmentId}/studio-registration/runtime"
+      ].put.security;
 
     assert.deepStrictEqual(workspaceSecurity, [{ ControlPlaneOAuthRead: [] }]);
     assert.deepStrictEqual(projectListSecurity, [{ ControlPlaneOAuthRead: [] }]);
     assert.deepStrictEqual(archiveSecurity, [{ ControlPlaneOAuthLifecycle: [] }]);
     assert.deepStrictEqual(exactProjectSecurity, [
       { ControlPlaneOAuthRead: [] },
+      { ControlPlaneManagementCredential: [] },
+    ]);
+    assert.deepStrictEqual(studioRuntimeSecurity, [
+      { ControlPlaneOAuthWrite: [] },
       { ControlPlaneManagementCredential: [] },
     ]);
   });

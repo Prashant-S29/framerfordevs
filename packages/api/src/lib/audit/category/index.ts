@@ -20,7 +20,12 @@ const publicationActions = new Set([
 
 /** Classifies existing and future bounded audit actions without hiding unknown history. */
 export function projectAuditCategory(action: string): ProjectAuditCategory {
-  if (action === "project.audit.read" || action.startsWith("project.credential.")) {
+  if (
+    action === "project.audit.read" ||
+    action.startsWith("project.credential.") ||
+    action.startsWith("studio.registration.") ||
+    action.startsWith("studio.session.")
+  ) {
     return "security";
   }
   if (action.startsWith("cms.webhook.") || action.startsWith("cms.invalidation.")) {

@@ -1,4 +1,4 @@
-FROM node:24-slim AS base
+FROM node:24-slim AS builder
 RUN npm install -g pnpm@10.25.0
 WORKDIR /app
 ENV SKIP_EFFECT_SOURCE_SETUP=1
@@ -20,11 +20,16 @@ RUN test -n "$VITE_DASHBOARD_ORIGIN" \
   && test -n "$VITE_MARKETING_ORIGIN" \
   && cd apps/developers \
   && pnpm run build
-ENV SKIP_EFFECT_SOURCE_SETUP=
+RUN pnpm --filter developers deploy --prod --legacy /runtime \
+  && cp -R apps/developers/.output /runtime/.output \
+  && node scripts/prune-production-image.mjs /runtime
 
+FROM node:24-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3002
-EXPOSE 3002
+COPY --from=builder /runtime /app
 
-WORKDIR /app/apps/developers
+EXPOSE 3002
 CMD ["node", ".output/server/index.mjs"]
