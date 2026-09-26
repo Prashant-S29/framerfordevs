@@ -56,7 +56,7 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ### Milestone 18A — Studio platform authority
 
-**Status:** `[R]` Implementation and readiness validation are complete; migration `0019_add_studio_runtime_authority` is developer-applied/catalog-verified, and M18A awaits independent developer review.
+**Status:** `[A]` Developer accepted, committed, and pushed `317a295`; migrations `0019_add_studio_runtime_authority` and `0020_allow_studio_credential_kill_switch` are developer-applied/catalog-verified, with 1,498 accepted tests plus 13 browser specifications.
 
 **Depends on:** M14 and M17.
 
@@ -75,7 +75,7 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ### Milestone 18B — Studio mount and security runtime
 
-**Status:** Proposed split boundary only; detailed confirmation/design and implementation are not authorized.
+**Status:** Next design target; the proposed split boundary requires detailed revalidation and separate developer authorization before implementation.
 
 **Depends on:** accepted M18A.
 

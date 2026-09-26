@@ -130,5 +130,5 @@ The accepted M17 baseline passes 1,422 tests, coverage, contract drift, formatti
 
 ## Current work and next gate
 
-- **Current — M18A `[R]`:** developer-applied 0020 is catalog-verified at migration row 21/timestamp `1790399741342`; fresh readiness passes 1,498 tests, 13 browser specifications, coverage, 18 type tasks, and nine builds, with clean scoped residue and the worker stopped.
-- **Next — developer review:** decide M18A acceptance. Do not alter 0019/0020, mark accepted, commit, start M18B, publish, configure production, or deploy before that decision.
+- **Current — M18A `[A]`:** developer accepted, committed, and pushed `317a295`; migration 0020 is catalog-verified, readiness passes 1,498 tests plus 13 browser specifications, and scoped residue is clean with the worker stopped.
+- **Next — M18B design gate:** revalidate the developer-owned BFF/mount/security-runtime design before separate implementation authorization. Do not implement M18B, publish, configure production, or deploy yet.

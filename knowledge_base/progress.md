@@ -1,7 +1,7 @@
 # CMS Development Progress
 
-**Overall status:** Milestones 0–17 and post-M13 repository/context normalization are developer-approved, committed, and pushed. M18A is full-green and awaiting developer review after application and verification of remediation migration 0020.
-**Next gate:** Developer acceptance decision for M18A; M18B and all rollout, publication, production configuration, and deployment remain gated.
+**Overall status:** Milestones 0–17, M18A, and post-M13 repository/context normalization are developer-approved, committed, and pushed. M18A is accepted at `317a295` with migrations through 0020 applied and verified.
+**Next gate:** Revalidate the detailed M18B developer-owned BFF/mount/security-runtime design before separate implementation authorization; rollout, publication, production configuration, and deployment remain gated.
 **Last updated:** 2026-09-26
 
 ## Status legend
@@ -38,7 +38,7 @@
 | 16  | Operational administration and recovery | `[A]`  |          1,311 | `c3f9430` |
 | 17  | Hosted surface separation               | `[A]`  |          1,422 | `d6b506d` |
 | 18  | Studio authority/runtime parent         | `[~]`  |              — | —         |
-| 18A | Studio platform authority               | `[R]`  |              — | —         |
+| 18A | Studio platform authority               | `[A]`  |          1,498 | `317a295` |
 | 18B | Studio mount and security runtime       | `[P]`  |              — | —         |
 | 19  | Studio content and localization         | `[P]`  |              — | —         |
 | 20  | Studio editorial lifecycle              | `[P]`  |              — | —         |
@@ -53,7 +53,7 @@
 | 29  | Visual publication and dependencies     | `[P]`  |              — | —         |
 | 30  | Renderer SDK and framework adapters     | `[P]`  |              — | —         |
 
-M17 is accepted at `d6b506d`; migrations `0017`–`0020` are developer-applied/catalog-verified and the independent worker remains stopped. M18A is full-green at `[R]`; M18B plus M19–M30 remain gated pending explicit developer acceptance and separate authorization.
+M17 is accepted at `d6b506d`; M18A is accepted and pushed at `317a295`; migrations `0017`–`0020` are developer-applied/catalog-verified and the independent worker remains stopped. M18B is the next design target, while its implementation and M19–M30 remain gated.
 
 ## Post-M13 repository/context normalization
 
@@ -220,13 +220,13 @@ These entries stay concise because `milestone.md` owns detailed pending context.
 - The pre-remediation readiness checkpoint passed format, lint, structure, contract drift, 18 type tasks, 1,495 tests including 13 retry-free noninteractive Chromium specifications, coverage, nine builds, and `git diff --check`. Accessibility covered runtime controls, exact project/origin acknowledgement, focus/recovery, 375 px, 200% zoom, and WCAG A/AA automation. All five production images contained no test/browser/coverage/environment/harness fixture residue; the high/critical audit gate was clear with four moderate findings. Read-only catalog/index-plan and residue checks confirmed migration row 20/timestamp, three columns/six constraints/two intended indexes, index eligibility, and zero scoped residue. That checkpoint's Control Plane digest was `9cfe2052930a7059f0e48ddaae4dae4a712b72544039279bf25a68d83a2ce7ac`; standalone 30,112-byte Studio OpenAPI remains `e8daa1e9e8b2d16b966cb5f30a019eda73ead1846f8ab151265123a5ee540745` without premature baseline registration.
 - Review remediation subsequently removed the unordered eight-row active-grant lookup, added a nine-concurrent-session regression, and approved an explicit authority split: active metadata edits and activation are user-only, while an exact management credential may only force `active -> inactive`. The existing registration actor-union columns and audit identify credential deactivation; user-only runtime confirmation fields clear rather than implying human confirmation. Developer-generated `0020_allow_studio_credential_kill_switch` is an exact constraint-only successor: SQL only drops/re-adds `control_plane_command_receipt_scope_result_valid`, snapshot 0020 changes only that constraint and chains from 0019, and journal index 20/timestamp is `1790399741342`. The developer applied it; read-only evidence confirms migration row 21, the expected constraint, three runtime columns, six intended constraints, two eligible indexes, and zero incoherent rows.
 - Fresh post-remediation readiness passes format, lint, structure, contract drift, 18 type tasks, 1,498 tests including 13 retry-free noninteractive Chromium specifications, coverage, and nine builds. Five fresh production images build and contain no environment, test, coverage, browser-result, OAuth-harness, or M18 fixture residue. The audit gate has no high/critical findings and four reviewed moderate test-tool findings. Final read-only evidence is clean for scoped users, workspaces, projects, registrations, audits, receipts, OAuth authority, webhook fixtures, claimable outbox, incoherent runtime rows, and non-idle peer clients; Control Plane and Studio digests are `3dd7c890b7a0448bfb497db663fadfee7f3eeaf614a026e405da3638a595d59b` and `e8daa1e9e8b2d16b966cb5f30a019eda73ead1846f8ab151265123a5ee540745` (30,112 bytes).
-- **M18A `[R]`:** independent review found no unresolved acceptance issue. No commit, rollout, deployment, package publication, production configuration, M18B work, or milestone acceptance occurred; the independent worker remains stopped.
+- **M18A `[A]`:** independent review found no unresolved acceptance issue; the developer accepted, committed, and pushed `317a295`. No rollout, deployment, package publication, production configuration, or M18B implementation occurred; the independent worker remains stopped.
 
 #### M18B — Studio mount and security runtime
 
 - Proposed as a separate post-M18A gate for the developer BFF, encrypted attempts/tokens, production Redis reference store, real-client bootstrap revalidation plus immutable public-contract baseline, exact mounted shell, direct Fetch conformance, and Express/TanStack adapters.
 - One exact `main` origin is supported; preview-origin lifecycle and broad/edge portability are not claimed. Local logout keeps the dashboard identity session, every new Studio session still requires acknowledgement, and early previous-key removal deliberately signs out affected sessions.
-- Detailed confirmation/design and implementation remain unauthorized until M18A is accepted.
+- M18B is now the next design target. Revalidate its detailed design against accepted M18A before seeking separate implementation authorization.
 
 ### Milestone 19 — Studio content and localization
 
@@ -278,10 +278,10 @@ These entries stay concise because `milestone.md` owns detailed pending context.
 
 ## Current validation and release state
 
-- The accepted M17 implementation baseline remains commit `d6b506d` and the accepted-line documentation commit is current `HEAD` `23f3fda`; uncommitted M18A is `[R]`. Fresh post-remediation readiness passes 1,498 tests, 18 type tasks, 13 browser specifications, coverage, and nine builds.
+- M17 is accepted at `d6b506d`; M18A is accepted, committed, and pushed at `317a295`. Its readiness baseline passes 1,498 tests, 18 type tasks, 13 browser specifications, coverage, and nine builds.
 - Current source OpenAPI SHA-256 values are Authoring `d9500549cd95067857b87f494b77375e3d575c4832589478858e125ab3f31205`, remediation Control Plane `3dd7c890b7a0448bfb497db663fadfee7f3eeaf614a026e405da3638a595d59b`, and unreleased 30,112-byte Studio `e8daa1e9e8b2d16b966cb5f30a019eda73ead1846f8ab151265123a5ee540745`.
 - The live schema records 21 developer-applied migrations through reviewed migration `0020`, exact journal timestamp `1790399741342`; final catalog, plan, activity, and scoped residue evidence is clean.
-- Schema/SDK/CLI packages remain unpublished at `0.0.0`; M18A is not accepted or committed, and M18B, production OAuth/configuration/deployment, and Tier 2 production/default activation remain gated.
+- Schema/SDK/CLI packages remain unpublished at `0.0.0`; M18B design/implementation, production OAuth/configuration/deployment, and Tier 2 production/default activation remain gated.
 
 ## Database migration record
 
@@ -310,5 +310,5 @@ Agents did not generate or apply these migrations. Developer-generated/applied a
 ## Roadmap and next gate
 
 - `milestone.md` owns the approved sequence and preserved boundaries; M17 is accepted at `d6b506d`, M18A migrations `0019`–`0020` are developer-applied, and the worker remains stopped.
-- The developer approved the amended M18A platform-authority/M18B developer-runtime split; completed M18A is awaiting acceptance, while M18B and M19–M30 remain gated. Managed hosting, external data/backends, billing, analytics, and plugins remain unsequenced until the visual baseline is accepted.
+- The developer accepted the M18A platform-authority half of the split at `317a295`. M18B is the next design target but requires revalidation and separate implementation authorization; M19–M30 remain gated. Managed hosting, external data/backends, billing, analytics, and plugins remain unsequenced until the visual baseline is accepted.
 - Publication/versioning, production OAuth/domains/configuration, deployment, migrations, Tier 2 activation, milestone acceptance, and advancement remain developer-controlled.
