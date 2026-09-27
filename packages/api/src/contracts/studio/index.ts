@@ -116,6 +116,7 @@ export class StudioAccessTokenAuthority extends Schema.Class<StudioAccessTokenAu
   environmentId: EnvironmentId,
   userId: AuthUserId,
   grantId: StudioGrantId,
+  grantExpiresAtEpochSeconds: Schema.Number.pipe(Schema.int(), Schema.greaterThan(0)),
   clientId: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(255)),
   issuer: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(2_048)),
   audience: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(2_048)),

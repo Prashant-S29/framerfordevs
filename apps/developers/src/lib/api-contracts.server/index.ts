@@ -4,6 +4,7 @@ import authoringDocument from "@framerfordevs/public-contracts/artifacts/authori
 import controlPlaneDocument from "@framerfordevs/public-contracts/artifacts/control-plane/v1/openapi.json?raw";
 import deliveryDocument from "@framerfordevs/public-contracts/artifacts/delivery/v1/openapi.json?raw";
 import previewDocument from "@framerfordevs/public-contracts/artifacts/preview/v1/openapi.json?raw";
+import studioDocument from "@framerfordevs/public-contracts/artifacts/studio/v1/openapi.json?raw";
 import toolingDocument from "@framerfordevs/public-contracts/artifacts/tooling/v1/openapi.json?raw";
 import { loader } from "fumadocs-core/source";
 import type { OpenAPIV3_2 } from "fumadocs-openapi";
@@ -45,6 +46,7 @@ const controlPlane = createOpenAPI({
 });
 const delivery = createOpenAPI({ input: { delivery: decodeDocument(deliveryDocument) } });
 const preview = createOpenAPI({ input: { preview: decodeDocument(previewDocument) } });
+const studio = createOpenAPI({ input: { studio: decodeDocument(studioDocument) } });
 const tooling = createOpenAPI({ input: { tooling: decodeDocument(toolingDocument) } });
 
 /** Gives each family one stable version-root contract page. */
@@ -66,6 +68,7 @@ export const apiContractSource = loader(
     }),
     delivery: await delivery.staticSource({ ...familyPage, baseDir: "delivery/v1" }),
     preview: await preview.staticSource({ ...familyPage, baseDir: "preview/v1" }),
+    studio: await studio.staticSource({ ...familyPage, baseDir: "studio/v1" }),
     tooling: await tooling.staticSource({ ...familyPage, baseDir: "tooling/v1" }),
   },
   {

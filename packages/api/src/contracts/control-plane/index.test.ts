@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
+import { isPortableStudioMountPath as isAuthPortableStudioMountPath } from "@framerfordevs/auth";
 import { Effect, Exit, Schema } from "effect";
 
 import { projectPermissionActionValues, projectRoleValues } from "../access";
@@ -13,9 +14,11 @@ import {
   ControlPlaneMemberPageResponse,
   ControlPlanePutStudioRegistrationRequest,
   ControlPlaneSetStudioRuntimeRequest,
+  PortableStudioMountPath,
   StudioApplicationOrigin,
   StudioMountPath,
   controlPlaneLimits,
+  isPortableStudioMountPath,
 } from "./index";
 
 const commandId = "019fae8b-1234-7000-8000-000000000001";
@@ -77,6 +80,24 @@ describe("Control Plane contracts", () => {
 
       assert.isTrue(valid.every(Exit.isSuccess));
       assert.isTrue(invalid.every(Exit.isFailure));
+    }),
+  );
+
+  it.effect("narrows active mounts without changing the broader registration schema", () =>
+    Effect.gen(function* () {
+      const portable = ["/studio", "/admin/studio-v2", "/_internal/Studio_2"];
+      const broadOnly = ["/编辑器", "/admin/studio.v2", "/admin/studio~next"];
+      const portableExits = yield* decodeExits(PortableStudioMountPath, portable);
+      const broadOnlyRegistrationExits = yield* decodeExits(StudioMountPath, broadOnly);
+      const broadOnlyActiveExits = yield* decodeExits(PortableStudioMountPath, broadOnly);
+
+      assert.isTrue(portableExits.every(Exit.isSuccess));
+      assert.isTrue(broadOnlyRegistrationExits.every(Exit.isSuccess));
+      assert.isTrue(broadOnlyActiveExits.every(Exit.isFailure));
+      assert.isTrue(portable.every(isPortableStudioMountPath));
+      assert.isTrue(portable.every(isAuthPortableStudioMountPath));
+      assert.isTrue(broadOnly.every((value) => !isPortableStudioMountPath(value)));
+      assert.isTrue(broadOnly.every((value) => !isAuthPortableStudioMountPath(value)));
     }),
   );
 

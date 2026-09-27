@@ -104,6 +104,15 @@ function isCanonicalMountPath(value: string): boolean {
   return segments.every((segment) => segment !== "" && segment !== "." && segment !== "..");
 }
 
+const PORTABLE_STUDIO_MOUNT_PATH_PATTERN = /^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/u;
+
+export function isPortableStudioMountPath(value: string): boolean {
+  return (
+    utf8Length(value) <= controlPlaneLimits.maximumStudioMountPathBytes &&
+    PORTABLE_STUDIO_MOUNT_PATH_PATTERN.test(value)
+  );
+}
+
 export const controlPlaneLimits = {
   requestBytes: 65_536,
   responseBytes: 524_288,
@@ -173,6 +182,14 @@ export const StudioMountPath = Schema.String.pipe(
   Schema.brand("StudioMountPath"),
 );
 export type StudioMountPath = typeof StudioMountPath.Type;
+
+export const PortableStudioMountPath = StudioMountPath.pipe(
+  Schema.filter(isPortableStudioMountPath, {
+    message: () => "Use portable ASCII Studio mount segments.",
+  }),
+  Schema.brand("PortableStudioMountPath"),
+);
+export type PortableStudioMountPath = typeof PortableStudioMountPath.Type;
 
 export const ControlPlaneActor = ProjectActor.annotations({ identifier: "ControlPlaneActor" });
 export type ControlPlaneActor = typeof ControlPlaneActor.Type;

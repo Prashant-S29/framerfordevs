@@ -3,7 +3,10 @@ import { expect, test, type Page } from "@playwright/test";
 
 import type { StudioOAuthAttempt } from "@framerfordevs/studio-oauth-harness";
 
-import { createStudioBrowserFixture, type StudioBrowserFixture } from "../support/studio-fixture";
+import {
+  createStudioBrowserFixture,
+  type StudioBrowserFixture,
+} from "../../support/studio/oauth-fixture";
 
 async function signInThroughApi(page: Page, fixture: StudioBrowserFixture) {
   const response = await page.request.post("/api/auth/sign-in/email", {

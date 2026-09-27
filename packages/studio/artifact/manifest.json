@@ -1,0 +1,11 @@
+{
+  "src/app/index.tsx": {
+    "file": "assets/studio-Ck0khWBY.js",
+    "name": "index",
+    "src": "src/app/index.tsx",
+    "isEntry": true,
+    "css": [
+      "assets/studio-Dl1OSd-x.css"
+    ]
+  }
+}

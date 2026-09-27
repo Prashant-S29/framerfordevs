@@ -74,7 +74,24 @@ const OFFICIAL_CLI_RESOURCE_LINK_ROW_ID = "oauth-client-resource-framerfordevs-c
 const TOOLING_ACCESS_TOKEN_LIFETIME_SECONDS = 10 * 60;
 const CLI_REFRESH_TOKEN_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
 const STUDIO_ACCESS_TOKEN_LIFETIME_SECONDS = 5 * 60;
-const STUDIO_REFRESH_TOKEN_LIFETIME_SECONDS = 8 * 60 * 60;
+export const STUDIO_GRANT_LIFETIME_SECONDS = 8 * 60 * 60;
+const STUDIO_REFRESH_TOKEN_LIFETIME_SECONDS = STUDIO_GRANT_LIFETIME_SECONDS;
+const STUDIO_PORTABLE_MOUNT_PATH_PATTERN = /^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/u;
+
+export function isPortableStudioMountPath(value: string): boolean {
+  return value.length <= 240 && STUDIO_PORTABLE_MOUNT_PATH_PATTERN.test(value);
+}
+
+export function studioGrantExpiresAtEpochSeconds(establishedAt: Date): number {
+  return Math.floor(establishedAt.getTime() / 1_000) + STUDIO_GRANT_LIFETIME_SECONDS;
+}
+
+export function isStudioGrantActive(
+  expiresAtEpochSeconds: number,
+  now: Date = new Date(),
+): boolean {
+  return Number.isFinite(expiresAtEpochSeconds) && now.getTime() / 1_000 < expiresAtEpochSeconds;
+}
 
 export interface StudioOAuthPrincipal {
   readonly kind: "studio_oauth_user";
@@ -86,6 +103,7 @@ export interface StudioOAuthPrincipal {
   readonly environmentId: string;
   readonly grantId: string;
   readonly auditMarkerId: string;
+  readonly grantExpiresAtEpochSeconds: number;
   readonly scopes: ReadonlyArray<string>;
   readonly expiresAtEpochSeconds: number;
 }
@@ -128,6 +146,8 @@ interface CreateAuthOptions {
   readonly studioOAuthAccessTokenClaims?: (
     input: OAuthClaimExtensionInput,
   ) => Promise<Record<string, unknown>>;
+  /** Test clock for the immutable Studio grant deadline; production uses wall time. */
+  readonly studioOAuthNow?: () => Date;
   /** Exact shared OAuth quota adapter supplied by the server runtime. */
   readonly studioOAuthRateLimit?: (
     input: StudioOAuthRateLimitInput,
@@ -148,6 +168,7 @@ interface StudioOAuthAccessTokenVerifierOptions {
   readonly authInstance?: ReturnType<typeof createAuth>;
   readonly issuer?: string;
   readonly resource?: string;
+  readonly now?: () => Date;
 }
 
 interface ToolingOAuthAccessTokenVerifierOptions {
@@ -240,6 +261,7 @@ async function authorizationCodeAuthority(input: OAuthClaimExtensionInput) {
 async function persistStudioOAuthAccessTokenAuthority(
   input: OAuthClaimExtensionInput,
   studioResource: string,
+  now: () => Date,
 ): Promise<Record<string, unknown>> {
   const registrationId = input.client.referenceId;
   const userId = input.user?.id;
@@ -285,7 +307,9 @@ async function persistStudioOAuthAccessTokenAuthority(
         input.metadata.registrationVersion !== registration.version ||
         input.metadata.projectId !== registration.projectId ||
         input.metadata.environmentId !== registration.environmentId ||
-        input.metadata.applicationOrigin !== registration.applicationOrigin
+        input.metadata.applicationOrigin !== registration.applicationOrigin ||
+        input.metadata.mountPath !== registration.mountPath ||
+        !isPortableStudioMountPath(registration.mountPath)
       ) {
         throw studioOAuthProtocolError(
           "FORBIDDEN",
@@ -365,11 +389,22 @@ async function persistStudioOAuthAccessTokenAuthority(
       }
 
       const grantId = studioOAuthGrantId(codeAuthority.authorizationCodeId);
-      let auditMarkerId: string;
+      const authorityNow = now();
+      let auditMarker: Readonly<{ id: string; occurredAt: Date; requestId: string }>;
       if (codeAuthority.establish) {
-        auditMarkerId = randomUUID();
-        await transaction.insert(auditEvent).values({
+        const establishedAt = authorityNow;
+        const auditMarkerId = randomUUID();
+        auditMarker = {
           id: auditMarkerId,
+          occurredAt: establishedAt,
+          requestId: studioSessionAuditRequestId(
+            auditMarkerId,
+            registration.id,
+            registration.version,
+          ),
+        };
+        await transaction.insert(auditEvent).values({
+          id: auditMarker.id,
           workspaceId: registration.workspaceId,
           projectId: registration.projectId,
           environmentId: registration.environmentId,
@@ -378,16 +413,16 @@ async function persistStudioOAuthAccessTokenAuthority(
           action: "studio.session.established",
           resourceType: "studio_grant",
           resourceId: grantId,
-          requestId: studioSessionAuditRequestId(
-            auditMarkerId,
-            registration.id,
-            registration.version,
-          ),
-          occurredAt: new Date(),
+          requestId: auditMarker.requestId,
+          occurredAt: establishedAt,
         });
       } else {
-        const [auditMarker] = await transaction
-          .select({ id: auditEvent.id })
+        const [persistedAuditMarker] = await transaction
+          .select({
+            id: auditEvent.id,
+            occurredAt: auditEvent.occurredAt,
+            requestId: auditEvent.requestId,
+          })
           .from(auditEvent)
           .where(
             and(
@@ -402,19 +437,36 @@ async function persistStudioOAuthAccessTokenAuthority(
             ),
           )
           .limit(1);
-        if (!auditMarker) {
+        if (
+          !persistedAuditMarker ||
+          persistedAuditMarker.requestId !==
+            studioSessionAuditRequestId(
+              persistedAuditMarker.id,
+              registration.id,
+              registration.version,
+            )
+        ) {
           throw studioOAuthProtocolError(
             "FORBIDDEN",
             "access_denied",
             "Studio authorization is no longer available.",
           );
         }
-        auditMarkerId = auditMarker.id;
+        auditMarker = persistedAuditMarker;
+      }
+      const grantExpiresAtEpochSeconds = studioGrantExpiresAtEpochSeconds(auditMarker.occurredAt);
+      if (!isStudioGrantActive(grantExpiresAtEpochSeconds, authorityNow)) {
+        throw studioOAuthProtocolError(
+          "FORBIDDEN",
+          "access_denied",
+          "Studio authorization is no longer available.",
+        );
       }
       return {
         studio_client_kind: "studio_v1",
         studio_grant_id: grantId,
-        studio_audit_marker_id: auditMarkerId,
+        studio_audit_marker_id: auditMarker.id,
+        studio_grant_expires_at: grantExpiresAtEpochSeconds,
         studio_registration_id: registration.id,
         studio_registration_version: registration.version,
         studio_project_id: registration.projectId,
@@ -555,10 +607,11 @@ export function createAuth(options: CreateAuthOptions = {}) {
   const issuer = new URL("/api/auth", apiOrigin).toString();
   const oauthDeviceAuthorizationEnabled =
     options.oauthDeviceAuthorizationEnabled ?? env.OAUTH_DEVICE_AUTHORIZATION_ENABLED;
+  const studioOAuthNow = options.studioOAuthNow ?? (() => new Date());
   const studioOAuthAccessTokenClaims =
     options.studioOAuthAccessTokenClaims ??
     ((input: OAuthClaimExtensionInput) =>
-      persistStudioOAuthAccessTokenAuthority(input, studioResource));
+      persistStudioOAuthAccessTokenAuthority(input, studioResource, studioOAuthNow));
 
   return betterAuth({
     database: drizzleAdapter(db, {
@@ -842,6 +895,7 @@ export function makeStudioOAuthAccessTokenVerifier(
   const resource =
     options.resource ??
     new URL("/api/studio/v1", env.BETTER_AUTH_URL).toString().replace(/\/$/u, "");
+  const now = options.now ?? (() => new Date());
 
   return async (token: string): Promise<StudioOAuthPrincipal | null> => {
     if (token.length === 0 || token.length > 16_384) return null;
@@ -869,6 +923,7 @@ export function makeStudioOAuthAccessTokenVerifier(
       const clientId = payload.client_id;
       const registrationId = payload.studio_registration_id;
       const registrationVersion = payload.studio_registration_version;
+      const grantExpiresAtEpochSeconds = payload.studio_grant_expires_at;
       if (
         !audienceMatches ||
         typeof clientId !== "string" ||
@@ -889,6 +944,9 @@ export function makeStudioOAuthAccessTokenVerifier(
         !UUID_PATTERN.test(payload.studio_grant_id) ||
         typeof payload.studio_audit_marker_id !== "string" ||
         !UUID_PATTERN.test(payload.studio_audit_marker_id) ||
+        typeof grantExpiresAtEpochSeconds !== "number" ||
+        !Number.isSafeInteger(grantExpiresAtEpochSeconds) ||
+        !isStudioGrantActive(grantExpiresAtEpochSeconds, now()) ||
         typeof payload.sub !== "string" ||
         payload.sub.length === 0 ||
         payload.sub.length > 255 ||
@@ -907,6 +965,7 @@ export function makeStudioOAuthAccessTokenVerifier(
         environmentId: payload.studio_environment_id,
         grantId: payload.studio_grant_id,
         auditMarkerId: payload.studio_audit_marker_id,
+        grantExpiresAtEpochSeconds,
         scopes: [...scopes].sort(),
         expiresAtEpochSeconds: payload.exp,
       };

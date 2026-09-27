@@ -39,6 +39,7 @@ const principal: StudioOAuthPrincipal = {
   environmentId,
   grantId: "019fae8b-1234-7000-8000-000000000010",
   auditMarkerId: "019fae8b-1234-7000-8000-000000000011",
+  grantExpiresAtEpochSeconds: 1_800_000_000,
   scopes: ["studio:session", "offline_access"],
   expiresAtEpochSeconds: 1_800_000_000,
 };

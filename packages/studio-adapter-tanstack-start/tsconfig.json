@@ -1,0 +1,5 @@
+{
+  "extends": "@framerfordevs/config/tsconfig.base.json",
+  "compilerOptions": { "rootDir": ".", "types": ["vitest/globals"] },
+  "include": ["src", "test"]
+}

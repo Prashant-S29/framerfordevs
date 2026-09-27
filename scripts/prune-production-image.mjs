@@ -36,7 +36,7 @@ async function prune(path) {
     for (const entry of await readdir(path)) await prune(join(path, entry));
     return;
   }
-  if (removedFilePattern.test(name) || environmentFilePattern.test(name)) {
+  if (name.endsWith(".map") || removedFilePattern.test(name) || environmentFilePattern.test(name)) {
     await rm(path, { force: true });
   }
 }

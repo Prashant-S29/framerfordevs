@@ -1,0 +1,68 @@
+{
+  "name": "@framerfordevs/studio-server",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "dist",
+    "LICENSE",
+    "package.json"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./assets": "./src/assets.ts",
+    "./crypto": "./src/crypto/index.ts",
+    "./raw-target": "./src/raw-target.ts",
+    "./store": "./src/store.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs"
+      },
+      "./assets": {
+        "types": "./dist/assets.d.mts",
+        "import": "./dist/assets.mjs"
+      },
+      "./crypto": {
+        "types": "./dist/crypto/index.d.mts",
+        "import": "./dist/crypto/index.mjs"
+      },
+      "./raw-target": {
+        "types": "./dist/raw-target.d.mts",
+        "import": "./dist/raw-target.mjs"
+      },
+      "./store": {
+        "types": "./dist/store.d.mts",
+        "import": "./dist/store.mjs"
+      },
+      "./testing": {
+        "types": "./dist/testing.d.mts",
+        "import": "./dist/testing.mjs"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts src/assets.ts src/crypto/index.ts src/raw-target.ts src/store.ts src/testing.ts --format esm --dts --clean",
+    "prepack": "pnpm run build",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run src",
+    "test:integration": "vitest run test/integration",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@framerfordevs/studio": "workspace:*",
+    "effect": "3.22.0"
+  },
+  "devDependencies": {
+    "@framerfordevs/config": "workspace:*",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "^3.2.7",
+    "tsdown": "^0.22.14",
+    "typescript": "catalog:",
+    "vitest": "^3.2.7"
+  }
+}

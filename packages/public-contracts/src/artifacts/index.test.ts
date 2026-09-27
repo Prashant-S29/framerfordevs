@@ -14,12 +14,13 @@ function sha256(bytes: string): string {
 }
 
 describe("closed public contract registry", () => {
-  it("contains exactly the six approved v1 families", () => {
+  it("contains exactly the seven approved v1 families", () => {
     expect(publicContractRegistryKeys).toEqual([
       "authoring/v1",
       "control-plane/v1",
       "delivery/v1",
       "preview/v1",
+      "studio/v1",
       "tooling/v1",
       "webhooks/v1",
     ]);
@@ -28,11 +29,13 @@ describe("closed public contract registry", () => {
       "control-plane",
       "delivery",
       "preview",
+      "studio",
       "tooling",
       "webhooks",
     ]);
     expect(Object.keys(publicContractRegistry)).toEqual([...publicContractRegistryKeys]);
     expect(Object.values(publicContractRegistry).map((entry) => entry.kind)).toEqual([
+      "openapi",
       "openapi",
       "openapi",
       "openapi",

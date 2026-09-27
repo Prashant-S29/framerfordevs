@@ -75,7 +75,7 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ### Milestone 18B — Studio mount and security runtime
 
-**Status:** Next design target; the proposed split boundary requires detailed revalidation and separate developer authorization before implementation.
+**Status:** `[R]` Full migration-free implementation complete and awaiting developer review; all five runtime packages, mounted shell, immutable Studio v1 baseline, Redis/refresh security authority, adapter parity, and validation evidence are present, but acceptance/publication/production rollout remain gated.
 
 **Depends on:** accepted M18A.
 
@@ -83,10 +83,10 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 - Define a framework-neutral Studio SPA mounted at an exact configured path, with deterministic assets/base behavior and no framework-specific business authority.
 - Ship a Web Standards `Request → Response` BFF core, thin Express 5/TanStack Start adapters, direct Fetch conformance, and claims limited to the supported Node/Web Request baseline.
-- Keep OAuth tokens in encrypted server-side sessions behind opaque path-scoped browser cookies; encrypt PKCE attempts too and make local logout semantics explicit.
-- Ship a production-capable Redis store/limiter adapter plus the custom-store conformance contract; production requires a shared, process-restart-stable store and has no memory fallback.
-- Revalidate bootstrap through the real BFF before registering the canonical Studio artifact and immutable compatibility baseline.
-- Cover exact path/origin/proxy/CSRF/CSP behavior, refresh/expiry/revocation/outages, key-retirement forced logout, secret scanning, accessibility shell, and package boundaries.
+- Keep OAuth tokens in exact A256GCM server-side sessions behind opaque path-scoped browser cookies; encrypt PKCE attempts, fence refresh before provider dispatch, and make local logout/outage semantics explicit.
+- Ship a production-capable Redis store/limiter adapter plus the custom-store conformance contract; every non-loopback/production runtime requires an explicit shared, process-restart-stable store and has no memory fallback.
+- Preserve the absolute eight-hour platform grant/session bound, validate callback tokens through real bootstrap, then register the accepted Studio artifact bytes as the immutable compatibility baseline.
+- Cover the portable active mount/raw-target guard, exact origin/proxy/CSRF/CSP/cache/cookie behavior, refresh/expiry/revocation/outages/restore, key-retirement forced logout, secret scanning, accessible empty shell, package boundaries, and fixed local bounds.
 - Support one exact `main` origin only; wildcard/per-branch preview deployment lifecycle remains deferred.
 
 **Read before design:** accepted M18A implementation/contracts; M6, M10, M13, M14, and M17 decisions; local editor loopback/protocol/app; content-form package; supported framework request boundaries.

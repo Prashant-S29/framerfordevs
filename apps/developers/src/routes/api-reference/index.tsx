@@ -35,6 +35,11 @@ const families = [
     title: "Preview v1",
   },
   {
+    description: "Mounted Studio session bootstrap and effective authoring authority.",
+    family: "studio/v1",
+    title: "Studio v1",
+  },
+  {
     description: "CLI project discovery and immutable published-schema retrieval.",
     family: "tooling/v1",
     title: "Tooling v1",

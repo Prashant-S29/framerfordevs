@@ -4,7 +4,7 @@ import { createStudioOAuthHarness } from "@framerfordevs/studio-oauth-harness";
 import { config as loadEnv } from "dotenv";
 import { Effect, Schema } from "effect";
 
-import { browserTestOrigins } from "./preflight";
+import { browserTestOrigins } from "../preflight";
 
 const apiOrigin = "http://localhost:3000";
 const applicationOrigin = "http://127.0.0.1:43219";

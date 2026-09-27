@@ -1,8 +1,9 @@
 # Milestone 18 Studio mount and security runtime design
 
-**Status:** M18A design approved and implementation authorized; M18B implementation remains unauthorized
+**Status:** M18A accepted; M18B design approved; full M18B implementation complete and awaiting developer review
 
 **Date:** 2026-09-21
+**M18B revalidated:** 2026-09-26
 
 ## Approval amendment — 2026-09-21
 
@@ -12,14 +13,121 @@ The developer approved the amended M18A/M18B split and authorized M18A implement
 
 The provider compatibility slice, Studio platform contracts/pure kernels, deterministic OpenAPI source, shared quota registry, and approved Drizzle schema edits are complete. The developer generated and applied `0019_add_studio_runtime_authority`; full artifact review and read-only live-catalog verification confirm its snapshot chain, 61-table scope, two intended changed tables, contiguous journal/migration row, columns, constraints, indexes, and default-inactive registration authority. M18A database integration may resume; M18B and operational rollout remain gated.
 
+## M18B design confirmation — 2026-09-26
+
+M18A is accepted at `317a295`; developer-applied migrations `0019` and `0020`, current source, tests, and generated Studio OpenAPI are executable truth. This confirmation revalidates the developer-runtime half against that implementation and supersedes conflicting pre-M18A proposal wording below. It completes the M18B design for developer review but does not authorize implementation, package publication, production configuration, rollout, deployment, or M19.
+
+### Revalidated M18A contract and bounded correction
+
+- The compatibility correction adds the signed absolute grant deadline to the accepted 30,112-byte Studio OpenAPI source. M18B registers the resulting reviewed bytes at SHA-256 `f3a70dee4d72057a3df982a6b4a4ff5192daea850b57810cfeb7caa498ef5b03` as the `studio/v1` canonical artifact and first immutable baseline with `sdkSupported: false`; any later contract-byte change stops for amendment rather than silently moving the baseline.
+- The BFF treats access and refresh tokens as opaque. It does not decode a JWT as authority, import platform auth/environment internals, or implement a second JWKS verifier. Before issuing a local session and after every refresh, it calls the accepted bearer-only bootstrap endpoint, strictly decodes the standard envelope, and compares registration, version, project, environment, application origin, mount path, and user with local/session authority.
+- Accepted M18A currently configures each rotated provider refresh token for eight hours from that rotation, while the approved contract requires one absolute eight-hour Studio grant/session bound. M18B includes one bounded, migration-free compatibility correction before runtime packages: the immutable `studio.session.established` audit time anchors the platform deadline; refresh claim issuance and Studio-principal authorization (including bootstrap) deny at or after that time plus eight hours. Tests advance through multiple rotations and beyond the original deadline. The BFF uses the earlier of that authority and `attempt.createdAt + 8 hours`, and refresh, cookie renewal, key rotation, or record re-encryption never extends it.
+- Existing bootstrap `session.expiresAt` remains the current access-token expiry, not the local absolute-session deadline. M18B does not reinterpret or expose it as eight-hour authority.
+
+### Exact mount, raw request, and cookie representations
+
+- Inactive M14 registration metadata keeps its existing broad schema, but M18B runtime activation supports only a portable active mount profile: the case-sensitive ASCII wire pattern `^/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$`, with the existing 240-byte and non-root bounds. This makes the registration path, URL wire path, OAuth callback path, asset base, router base path, and cookie `Path` byte-identical. Activation fails closed for older metadata outside that profile; no row is mutated automatically, and the user must deactivate/update/reactivate it. This is a bounded M18A compatibility correction, not a migration.
+- The exact callback remains `${applicationOrigin}${mountPath}/auth/callback`; the BFF derives client ID, issuer, resource, authorize/token/revoke/bootstrap paths, and callback from decoded configuration rather than accepting endpoint overrides.
+- A standard `Request` can already have URL dot segments normalized. Express and TanStack Start adapters therefore run one exported dependency-free raw-target validator before constructing/delegating the canonical `Request`. It rejects malformed encoding, encoded or literal dot/separator ambiguity, backslashes, duplicate separators, credentials, fragments, and mount-prefix confusion. The Fetch core then matches only canonical decoded routes. A custom Fetch integration is supported only when its ingress supplies equivalent pre-normalization validation; raw-target portability or edge-runtime support is not claimed.
+- HTTPS cookie names are `__Secure-ffd-studio-s-<registrationDigest>` and `__Secure-ffd-studio-a-<registrationDigest>`, where the suffix is the first 128 SHA-256 bits of the canonical registration ID encoded base64url. Exact loopback HTTP uses `ffd-studio-loopback-s-...` and `ffd-studio-loopback-a-...`. Both cookies are host-only, `HttpOnly`, `SameSite=Lax`, and `Path=<exact portable mount>`; HTTPS adds `Secure`. Creation and deletion use identical attributes. `__Host-` is not used because it requires `Path=/`.
+- Duplicate/shadow values for either owned cookie are rejected; the BFF never chooses one. Cookie path and port are not authorization or origin isolation. The developer-owned application, every same-origin script, and any same-origin service worker are inside the trusted application boundary and can invoke/read Studio same-origin behavior even though they cannot read `HttpOnly` values. A sibling-controlled parent-domain cookie can cause fail-closed denial but cannot become authority; stronger isolation requires a dedicated origin and is outside M18B.
+
+### OAuth attempt, callback, and local-session protocol
+
+- `GET {mount}/auth/login` accepts no query/body/credential input, rejects prefetch, requires a top-level document navigation profile, and fixes return to the mount root. It creates a 10-minute encrypted attempt only after shared registration admission. The attempt stores configured scope, exact issuer/resource/client/callback, state, PKCE verifier, creation/deadline, and no registration version; authoritative version is learned from callback bootstrap.
+- One browser cookie names one current attempt. A newer login replaces the cookie; an older tab cannot redeem without its matching cookie and expires naturally. A wrong state/issuer does not consume or clear an otherwise valid attempt. A callback with matching cookie/state first validates an exact bounded query, then atomically consumes that attempt before exchange. Success permits exactly one `code`, `state`, and exact `iss`; error permits one closed provider error, one state, and only absent-or-exact issuer as proven by pinned-provider tests. Success and error fields are mutually exclusive, duplicates/extras fail, and descriptions are never reflected.
+- Token exchange uses exact form fields, `redirect: "error"`, fixed endpoints, abort propagation, and bounded time/body limits. The response requires bounded access/refresh tokens, `Bearer`, integer `expires_in` from 1 through 300, and exactly `studio:session offline_access` as a set. It is immediately bootstrap-validated before any cookie is issued.
+- Callback success atomically creates the encrypted session and, when replacing an existing local session, deletes the old session in the same store operation. If bootstrap or store creation fails after token issuance, no browser session is created and the new refresh authority is synchronously subjected to one bounded compensating revocation attempt.
+- Local logout requires exact same-origin `POST`, exact JSON `{}`, and committed local store deletion before reporting success or clearing the cookie. It always leaves the dashboard identity session intact. Remote revocation is bounded and best-effort after local invalidation; failure cannot restore the deleted local record. Store unavailability is distinct from record absence: absence clears the cookie successfully, while unavailability returns `503` and retains the cookie so logout can be retried honestly.
+- After callback, the browser-visible URL is the clean canonical mount root and application responses never contain codes, state, or tokens. M18B does not claim that every browser implementation erases redirect-chain history; security rests on one-use code/state/PKCE, no-referrer, bounded lifetime, and no secret reflection.
+
+### Store, encryption, refresh, and Redis semantics
+
+- The store contract adds atomic pre-refresh fencing, not post-exchange CAS alone: `claimRefresh` changes one expected generation to an in-flight owner before any provider request; contenders wait/reload for at most one second without issuing. A claim released before dispatch may be retried. Once dispatch begins, that generation is never submitted again. Ambiguous timeout, lost reply, owner death, or expired in-flight lease makes the session terminal and requires fresh acknowledgement; lease expiry is not evidence that redemption failed.
+- `commitRefresh` requires the exact owner/generation and replaces ciphertext once; logout/delete prevents a late commit from resurrecting a session. If a successful token response cannot be committed because the record was deleted or superseded, the winner performs one bounded compensating revocation. Separate grants for the same user/client remain separate records; multi-process tests prove one session's refresh handling does not replay or invalidate another.
+- Attempts and sessions use envelope version 1 with `A256GCM`, a cryptographically random 96-bit nonce, 256-bit key, and 128-bit tag. Canonical authenticated data binds envelope version, key ID, record kind, digest store key, registration digest, absolute expiry, and refresh generation. Plaintext is strictly decoded and bounded. Unknown keys, malformed envelopes/plaintext, tag failure, record swapping, or unsupported versions fail closed without raw crypto errors.
+- The keyring has one current write key and at most three previous decrypt keys; IDs are unique bounded non-secret ASCII labels and every decoded key is exactly 32 bytes. Only the current key writes. Operators keep an old key for at least eight hours after the final old-key writer drains; mixed fleets must agree on the current writer. Re-encryption preserves authority, generation, and expiry. Early retirement deliberately invalidates affected records.
+- Production and every non-loopback origin require an explicitly supplied store declaring shared and process-restart-stable topology. The declaration is trusted deployer configuration, not a claim that arbitrary custom infrastructure can be introspected. Only exact loopback development may use the package memory store. No BFF path uses the platform rate limiter's degraded-memory behavior.
+- The Redis reference adapter uses caller-supplied configuration/connection, primary reads, namespaced digest-only keys, server TTLs plus application expiry checks, and Lua operations for admission/consume/replace/refresh fencing/delete. Multi-key scripts use one registration hash tag and therefore one Redis Cluster slot. Commands have bounded queues and deadlines; only explicit `NOSCRIPT` recovery is retried. Timeout, connection loss, or failover ambiguity after a write fails closed and never causes a second OAuth exchange. Redis asynchronous failover is not represented as linearizable authority.
+- A deployment namespace epoch is part of every key. Normal restart/deploy keeps it stable; restore from an older Redis snapshot requires rotation, intentionally signing out all local Studio sessions so deleted records cannot resurrect. Cleanup is capped and never scans an unbounded keyspace.
+
+### Source-controlled local bounds
+
+These are package constants, not caller-tunable bypasses; lowering deployment-level limits is allowed outside the package, while raising them requires a design amendment and evidence.
+
+| Boundary                                                          |                                 M18B limit |
+| ----------------------------------------------------------------- | -----------------------------------------: |
+| Authorization starts per registration                             |                        30/minute, burst 10 |
+| Callback exchanges per registration                               |                        60/minute, burst 10 |
+| Authenticated app-local requests per registration                 |                      600/minute, burst 100 |
+| Authenticated app-local requests per session                      |                       120/minute, burst 20 |
+| Outstanding attempts per registration                             |                                         20 |
+| Active sessions per registration                                  |                                      1,024 |
+| Concurrent callback exchanges per registration                    |                                         10 |
+| Concurrent refresh waiters per session                            |                                         16 |
+| Raw request target / total accepted headers / owned Cookie header |                     8 KiB / 32 KiB / 4 KiB |
+| Logout body / OAuth response / bootstrap response                 |           1 KiB / 32 KiB / accepted 64 KiB |
+| Encrypted attempt / encrypted session record                      |                            16 KiB / 64 KiB |
+| Asset count / one asset / total assets                            |                         64 / 2 MiB / 8 MiB |
+| Initial executable JS (entry + eager chunks)                      |                 600 KiB raw / 200 KiB gzip |
+| Initial CSS                                                       |                  128 KiB raw / 40 KiB gzip |
+| One cleanup operation                                             |                                100 records |
+| Store / platform request deadline                                 |                     2 seconds / 10 seconds |
+| Refresh threshold / absolute local session                        | 60 seconds / 8 hours from attempt creation |
+
+M18B has no trusted-source bucket because M23 has not proven customer ingress/header replacement. Registration-wide isolation accepts that one source can temporarily deny one registration without letting spoofed forwarding data create false fairness. `429` includes bounded retry guidance; store/platform outage is `503`, never an in-memory fallback.
+
+### Route and response policy
+
+- Owned methods stay closed: shell, login, callback, and bootstrap are `GET`; logout is `POST`; assets are `GET` from the finite manifest. Known-route wrong methods return bounded `405`; unknown or noncanonical paths return bounded `404`; the handler never becomes a fallback SPA or arbitrary proxy in M18B.
+- Shell HTML is public but `no-store` and contains only escaped non-secret mount and dashboard-recovery-origin metadata. The server builds it from a generated manifest, emits exact absolute mount asset URLs without `<base>` or executable inline configuration, and the browser router uses the same mount base. The package artifact is built once. Only successful content-hashed assets receive `public, max-age=31536000, immutable`; errors, redirects, HTML, auth, logout, and bootstrap are `no-store`. Range requests and unmanifested files fail closed.
+- The exact shell policy is `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; manifest-src 'none'; worker-src 'none'; child-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`. Responses also set no-referrer, nosniff, same-origin opener/resource policies, `X-Frame-Options: DENY`, and a deny-by-default Permissions Policy. No inline script/style is required. Origin-wide HSTS remains the hosting application's responsibility.
+- Login requires navigation metadata and rejects prefetch. Callback permits the expected cross-site top-level provider navigation but requires cookie/state/issuer/PKCE. Bootstrap requires exact same-origin browser evidence (`Origin` when present and `Sec-Fetch-Site: same-origin`) and rejects cross-site/same-site sibling contexts; logout additionally requires exact Origin and JSON. No owned route emits credentialed CORS headers. Framework/APM/proxy logs before the handler are explicitly outside package redaction and must be configured not to log raw callback URLs, Cookie, Authorization, or response headers.
+
+### Package and framework contract
+
+- The five approved `0.0.0` workspaces remain the boundary. `@framerfordevs/studio` owns the standalone client-only SPA, dependency-light `./contracts`, and generated finite asset manifest/files. It bundles one React/UI runtime into the artifact and exports no server/auth/store code. `@framerfordevs/studio-server` depends only on declared `studio` contract/artifact exports and owns Effect workflows, one process-level `ManagedRuntime`, configuration decoding, asset loading, OAuth/bootstrap adaptation, encryption, and the store/conformance contracts. Handler construction returns the canonical Fetch function plus explicit disposal; it never creates a runtime per request.
+- `@framerfordevs/studio-store-redis` implements only the server store port and receives ciphertext/envelope metadata, never token/state/verifier plaintext. Express and TanStack Start adapters depend on declared server exports, run raw-target/external-origin checks at the earliest Node request boundary, preserve cancellation and bounded streaming, delegate outside the exact canonical mount, and contain no auth/policy/store logic.
+- The Studio is a client-rendered document, not host-framework SSR. The TanStack Start adapter mounts the same Fetch core at the server boundary and cannot put bootstrap/user data in SSR loaders, hydration, server-function caches, or host query caches. Clean built fixtures must prove both adapters retain manifest assets and exact parity at nested non-default mounts.
+- App-local browser contracts are closed and exported from `@framerfordevs/studio/contracts`. Bootstrap reuses the accepted platform success DTO after strict server validation; local session/unavailable errors use a separate bounded app-local code set and never masquerade as platform authority. Query keys contain no session/token/cookie/attempt value, browser persistence is disabled, retries are off for auth failures, and logout removes all in-memory bootstrap/user projection.
+- Package manifests declare every workspace dependency and package-owned build/type/test/coverage task; root orchestration remains Turborepo-only. Tarballs include only expected ESM/types/assets/licenses/readmes. The private OAuth harness stays a development-only dependency and cannot enter production graphs or artifacts.
+
+### M18B acceptance boundary
+
+M18B requires no Drizzle schema change or migration. The developer approved this confirmation and authorized implementation in the stated sequence: first the absolute-eight-hour and portable-active-mount compatibility corrections with focused accepted-M18A regressions, then the five runtime packages after checkpoint review. Complete evidence includes direct Fetch plus raw-target conformance, Express/TanStack parity, multi-client Redis refresh fencing and outage/restore tests, exact package/tarball/browser-bundle inspection, baseline registration, noninteractive browser/accessibility coverage, load/bound evidence for the constants above, and full readiness. M19 remains unauthorized until M18B implementation is accepted.
+
+## M18B approval and compatibility checkpoint — 2026-09-26
+
+The developer approved the confirmed design, explicitly accepted the portable-active-mount narrowing and unchanged no-trusted-source-bucket risk through M23, and authorized M18B implementation under the documented gates. Migration generation/application, package publication, production OAuth/configuration, rollout, deployment, commit, milestone acceptance, and M19 remain developer-controlled.
+
+The first implementation checkpoint is complete:
+
+- M14's broader `StudioMountPath` registration schema remains unchanged. A separate portable active schema/predicate enforces `^/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$` at activation. Existing inactive rows outside it remain byte-for-byte unchanged and fail activation; preexisting active rows outside it fail OAuth authorization, claim issuance/refresh, and bootstrap without automatic mutation, while deactivation remains available for recovery.
+- `studio.session.established.occurredAt` now anchors an immutable grant deadline carried in signed Studio access-token claims. Refresh preserves that deadline, refresh claim issuance denies at/after it even when the rotated provider row expires later, the Studio verifier rejects otherwise-live access tokens beyond it, and bootstrap requires the exact unexpired audit-derived deadline.
+- Five focused regressions cover schema narrowing/parity, runtime transition and recovery, no-mutation denial for inactive and preexisting active rows, two refresh rotations beyond the provider's original expiry shape, access-token denial after the original deadline, refresh denial after the deadline, and audit-derived bootstrap denial. Full `pnpm run ready` passes 1,490 tests, coverage, contract drift, 18 type tasks, and nine builds; all 13 committed noninteractive browser specifications also pass. No migration or runtime package was created.
+
+Per the approved sequence, work stopped at this checkpoint until the developer authorized uninterrupted completion of the five runtime packages.
+
+## M18B implementation completion — 2026-09-27
+
+The authorized runtime work is complete without a migration:
+
+- Added the five private `0.0.0` packages owned by this design: the browser-only Studio shell/contracts/artifact, framework-neutral Effect/Fetch BFF, restart-stable shared Redis adapter, and thin Express 5 and TanStack Start adapters.
+- Added exact external-origin and raw-target guards, strict asset/route/method allowlists, platform-compatible auth routes, exact secure/loopback cookies, expiry/generation-bound A256GCM attempts/sessions with key-ID rotation and read re-encryption, bounded callback/token/bootstrap decoding, exact registration/session rate limits, strict CSP/cache/security headers, and redacted bounded telemetry.
+- Added atomic shared attempt/session quotas and reauthentication replacement, one-shot callback consumption, registration-slot-safe Redis keys, distributed callback/waiter permits, refresh generations/leases acquired before provider dispatch, terminal invalidation after post-dispatch failure or abandoned dispatched ownership, process-restart/multi-client evidence, and fail-closed logout/Redis outage recovery without production memory fallback.
+- Added the accessible responsive mounted empty shell with explicit loading/login/session/denial/outage/logout and canonical dashboard recovery, shared UI primitives, TanStack Router/Query, browser forbidden-import coverage, a 127,924-byte gzip initial-transfer budget, finite tarball allowlists, adapter parity, and a retry-free Chromium mount/sign-in/bootstrap/sign-out/accessibility specification.
+- Registered and baseline-locked Studio v1 at 30,112 bytes and SHA-256 `f3a70dee4d72057a3df982a6b4a4ff5192daea850b57810cfeb7caa498ef5b03`; exposed it through the public-contract package and developer portal without adding SDK support.
+
+M18B now awaits final developer review. Package publication, production OAuth/configuration, rollout, deployment, commit, milestone acceptance, and M19 remain developer-controlled.
+
 ## Decision summary
 
-The original proposal combined a new platform OAuth/resource authority, a migration and Control Plane lifecycle, four developer-runtime packages, two framework adapters, and a browser shell. That approaches the M13 upper bound and crosses the repository's platform/runtime seam. The approved M18 roadmap therefore uses two sequential review and acceptance units:
+The original proposal combined a new platform OAuth/resource authority, a migration and Control Plane lifecycle, five developer-runtime packages (including two framework adapters), and a browser shell. That approaches the M13 upper bound and crosses the repository's platform/runtime seam. The approved M18 roadmap therefore uses two sequential review and acceptance units:
 
 - **M18A — Studio platform authority:** explicit registration activation, deterministic Studio OAuth clients, per-session user acknowledgement, shared abuse controls, token verification, security audit, one bounded server-to-server bootstrap API, and a private end-to-end OAuth conformance client.
 - **M18B — Studio mount and security runtime:** the developer-owned BFF, a production Redis store adapter, exact mounted assets/routes/cookies, Fetch core, Express and TanStack Start adapters, and the authenticated empty shell.
 
-M18A must be accepted before M18B implementation can be authorized. This approval authorizes M18A implementation only; after M18A acceptance, the developer must approve or amend the M18B details against implemented provider contracts. M19 remains blocked on M18B acceptance.
+M18A is accepted. The approved M18B implementation is complete and awaits final developer review. M19 remains blocked on M18B acceptance.
 
 The parent design makes four load-bearing choices:
 
@@ -28,7 +136,7 @@ The parent design makes four load-bearing choices:
 3. A canonical Web Standards `Request -> Response` BFF core owns routing, auth exchange, session refresh, bootstrap, assets, headers, and upstream adaptation. Thin Express 5 and TanStack Start adapters translate framework requests only. This proves framework independence within the supported Node/Web Request baseline, not edge-runtime portability.
 4. Separate staged packages keep browser and server authority physically distinct: `@framerfordevs/studio`, `@framerfordevs/studio-server`, `@framerfordevs/studio-store-redis`, `@framerfordevs/studio-adapter-express`, and `@framerfordevs/studio-adapter-tanstack-start`.
 
-Existing M14 Studio registrations remain inert after migration. A user with exact project authority must explicitly activate one before it becomes redirect or OAuth-client authority. Registration changes and deactivation immediately invalidate that authority.
+Existing M14 Studio registrations began inactive when M18A was applied. A user with exact project authority must explicitly activate one before it becomes redirect or OAuth-client authority. Registration changes and deactivation immediately invalidate that authority.
 
 ## Developer decisions fixed during design
 
@@ -52,9 +160,9 @@ The generated client therefore uses `skipConsent: false`, and every new BFF auth
 
 A prior consent or live dashboard session may avoid another credential prompt, but it never bypasses this per-session Studio acknowledgement. Local Studio logout does not terminate the dashboard identity session; a subsequent Studio login may identify the user silently, but still requires a fresh Studio acknowledgement. A dashboard recovery link remains available for global account-session management.
 
-Users should expect acknowledgement at least once per new eight-hour local session and again after safe session loss caused by store outage, deployment, or registration drift. The screen presents ordinary continuation—not an error or alarm—while still naming the project, origin, and delegated authority accurately.
+Users should expect acknowledgement at least once per new eight-hour local session and again after safe session loss caused by confirmed record loss, namespace rotation, or registration drift. The screen presents ordinary continuation—not an error or alarm—while still naming the project, origin, and delegated authority accurately.
 
-Before acknowledgement and code issuance, the platform must resolve the exact active registration and current user, require an active project with CMS enabled and current `project.read`, and preserve foreign/nonexistent non-enumeration. Registration metadata/version changes revoke prior consents. If Better Auth 1.7.1 cannot enforce the current-policy check, forced acknowledgement, version-bound consent invalidation, and fail-closed issuance without weakening the split-host boundary, M18A stops for a design amendment.
+Before acknowledgement and code issuance, the platform resolves the exact active registration and current user, requires an active project with CMS enabled and current `project.read`, and preserves foreign/nonexistent non-enumeration. Registration metadata/version changes revoke prior consents. Accepted M18A evidence proves pinned Better Auth 1.7.1 enforces current policy, forced acknowledgement, version-bound consent invalidation, and fail-closed issuance without weakening the split-host boundary; a regression stops M18B.
 
 ### Session ownership
 
@@ -81,25 +189,24 @@ This design consumes and preserves:
 
 M18 supersedes only the inert-runtime treatment of an explicitly activated Studio registration. It does not turn ordinary registration metadata into trust retroactively and does not change dashboard-cookie scope.
 
-## Current implementation truth and gaps
+## Current implementation truth and M18B gaps
 
-The repository currently has:
+Accepted M18A now provides:
 
-- One versioned M14 Studio registration per exact project/environment with canonical `applicationOrigin` and non-root `mountPath`.
-- Stable Control Plane GET/PUT operations, CLI commands, dashboard controls, receipts, actor attribution, and audit behavior for that inert metadata.
-- Better Auth 1.7.1 with one fixed official CLI OAuth client, exact resources, JWT verification, refresh rotation, dashboard-hosted login/consent, and API-host protocol endpoints.
-- A host-only dashboard session and exhaustive M17 host/auth/CSRF route matrices.
-- A secure M13 loopback editor whose Node process owns hosted credentials while its browser receives only a local challenge.
-- A private browser-safe `@framerfordevs/content-form` package and shared UI primitives.
+- One versioned registration per exact project/environment with active/inactive runtime authority, user-only activation/metadata change, and exact management-credential `active -> inactive` recovery.
+- Deterministic registration-derived public OAuth clients, Code + S256 PKCE, forced per-session acknowledgement, exact Studio resource/scopes/claims, five-minute stateless JWT access tokens, persisted rotating refresh authority, and current grant/audit-marker checks.
+- Canonical Control Plane HTTP, CLI, and dashboard lifecycle controls with transactional receipts/audits/revocation and developer-applied migrations `0019`–`0020`.
+- A bounded bearer-only Studio v1 bootstrap operation and deterministic OpenAPI source, plus private provider compatibility and browser harness evidence.
+- A host-only dashboard identity session, exact M17 host/auth/CSRF route matrices, the secure M13 loopback editor precedent, browser-safe content-form/UI packages, and shared Redis rate-limit infrastructure.
 
-The missing M18 authority is:
+M18B still must add:
 
-1. No registration activation lifecycle or deterministic Studio OAuth client.
-2. No Studio-specific resource/scope/verifier or project-bound token claims.
-3. No developer-owned BFF/session-store contract.
-4. No configurable-path Studio artifact or framework adapters.
-5. No authenticated, role-projected bootstrap operation.
-6. No exact route, cookie, CSP, origin, traversal, expiry, revocation, or outage contract for the mounted Studio.
+1. The migration-free absolute-eight-hour and portable-active-mount compatibility corrections fixed in the confirmation above.
+2. The developer-owned BFF, encrypted attempt/session store contract, production Redis reference adapter, refresh fencing, and exact local abuse bounds.
+3. The built-once configurable-path Studio artifact, safe browser contracts, and authenticated empty shell.
+4. Raw-target plus canonical Fetch handling and parity-proven Express 5/TanStack Start adapters.
+5. Real-client bootstrap consumption and `studio/v1` immutable public-contract registry/baseline registration.
+6. Exact route/cookie/CSP/origin/CSRF/cache/expiry/revocation/outage/package evidence without M19 content operations.
 
 ## Goals
 
@@ -166,13 +273,13 @@ Protected assets are dashboard identity/session authority, OAuth codes/tokens, B
 | Login CSRF or mix-up              | Issuer/resource/client/state binding, signed provider continuation, exact callback and redirect validation           |
 | Cross-tenant token use            | Token registration claims plus current composite scope resolution and policy on every Studio API call                |
 | Stale membership/role             | Current server-side project/policy evaluation for bootstrap and all later operations                                 |
-| Registration origin/path change   | Atomic client disable, token/consent revocation, registration-version mismatch, and forced local session eviction    |
+| Registration origin/path change   | Atomic platform revocation/version mismatch; next local protected request deletes the denied BFF session             |
 | Browser token theft               | Tokens encrypted only in BFF store; opaque `HttpOnly` cookie; no browser API receives tokens                         |
 | CSRF against BFF                  | Host/origin/Fetch Metadata checks, `SameSite=Lax`, JSON-only mutations, state, and no permissive CORS                |
 | Host/proxy confusion              | Configured external origin is authority; adapters reject mismatched effective host/protocol and untrusted forwarding |
 | Path traversal/route capture      | Canonical decoded path matching, no percent/backslash/dot ambiguity, finite asset manifest, closed methods           |
 | XSS/clickjacking                  | No unsafe HTML, self-only CSP, `frame-ancestors 'none'`, `nosniff`, shared React escaping                            |
-| Store replay/race                 | Digest-only opaque IDs, atomic consume/CAS, one refresh winner, bounded expiry, deletion on terminal auth failure    |
+| Store replay/race                 | Digest-only opaque IDs, consume-once attempts, pre-dispatch fencing, bounded expiry, deletion on terminal failure    |
 | Process-local production sessions | Store capability reports sharing and restart survival; production rejects process-local or restart-volatile stores   |
 | Token/content leakage             | No bodies/tokens/cookies/raw URLs in errors, logs, traces, metrics, reports, or browser artifacts                    |
 | Studio outage blocks recovery     | Dashboard direct login, registration deactivation, project recovery, and CLI remain independent                      |
@@ -188,7 +295,7 @@ A registration has runtime status `inactive | active` in addition to existing me
 - A user-authorized origin or mount-path change on an active registration atomically disables the derived OAuth client, revokes outstanding Studio OAuth rows, increments registration authority, records the user actor, and leaves the new registration inactive.
 - Activation is user-only, requires active project + CMS + exact environment, `project.update`, current expected version, and an OAuth user grant. Management, Delivery, and Preview credentials cannot activate or repoint runtime trust.
 - Deactivation remains available as a recovery operation for an archived project. A project/environment-bound management credential with existing `project.update` authority may invoke only the fail-closed `active -> inactive` kill switch; its actor is persisted through the registration's existing user-or-credential change attribution and audit/receipt authority, while user-only runtime confirmation fields are cleared rather than implying human confirmation.
-- Both user metadata invalidation and the management credential kill switch revoke current OAuth authority in the same transaction. M18A has no BFF session store; M18B must consume the changed registration version/status through its already-approved revoke-on-registration-change hook so no session can continue trusting an old origin or mount path.
+- Both user metadata invalidation and the management credential kill switch revoke current OAuth authority in the same transaction. There is no platform-to-BFF session callback in M18. Current bootstrap/refresh denies immediately; the BFF consumes that denial and atomically deletes its local record/cookie on the next protected request. Dormant encrypted records may remain until bounded expiry but grant no operation.
 - Archive denies Studio authorization/bootstrap immediately. Restore does not resurrect a deleted BFF session; the user signs in again under current authority.
 
 The Control Plane runtime mutation is:
@@ -205,7 +312,7 @@ PUT /api/control-plane/v1/projects/{projectId}/environments/{environmentId}/stud
 }
 ```
 
-It is receipt-idempotent and returns the bounded registration, effective runtime status, `replayed`, and `noOp`. Same command/same fingerprint replays; changed intent conflicts; stale version fails. Activation/deactivation, OAuth client/link changes, token revocation, audit, receipt, actor-union registration attribution, and registration version/status mutation are one database transaction. Supporting credential-attributed kill-switch receipts requires a post-0019 constraint-only migration that removes the obsolete user-only actor predicate from `control_plane_command_receipt_scope_result_valid`; migration 0019 remains immutable.
+It is receipt-idempotent and returns the bounded registration, effective runtime status, `replayed`, and `noOp`. Same command/same fingerprint replays; changed intent conflicts; stale version fails. Activation/deactivation, OAuth client/link changes, token revocation, audit, receipt, actor-union registration attribution, and registration version/status mutation are one database transaction. Developer-applied migration `0020_allow_studio_credential_kill_switch` removed the obsolete user-only actor predicate from `control_plane_command_receipt_scope_result_valid`; migration 0019 remains immutable.
 
 ### Deterministic OAuth client
 
@@ -262,14 +369,14 @@ The harness uses only loopback test registrations, keeps codes/tokens/verifiers 
 
 1. `GET {mountPath}/auth/login` validates the exact external URL and creates a server-side authorization attempt.
 2. The core generates at least 256 bits each for opaque attempt ID and OAuth state plus a standards-compliant PKCE verifier; only the challenge leaves the BFF.
-3. The attempt store contains state, verifier, registration/project/environment/version, issuer, resource, return path, creation/expiry, and one-use state. The browser receives only the opaque attempt cookie.
+3. The attempt store contains state, verifier, configured registration/project/environment/origin/mount, issuer, resource, fixed mount-root return, creation/expiry, and one-use state. It does not guess a registration version; callback bootstrap establishes that authority. The browser receives only the opaque attempt cookie.
 4. The BFF redirects to the API-host authorization endpoint with exact client, callback, state, S256 challenge, resource, scopes, and forced Studio acknowledgement. No arbitrary return URL is accepted.
 5. Better Auth sends unauthenticated users to dashboard login through its signed continuation. Dashboard remains the only credential form/session host.
 6. Before authorization completes, the platform verifies active registration and current project access and renders the dashboard-hosted Studio acknowledgement with resolved project/origin context. Every new local session requires Allow; Deny issues no code.
-7. The provider redirects only to the exact BFF callback with code and state.
-8. The BFF atomically consumes the attempt, compares state in constant time where applicable, and exchanges code + verifier server-to-server with redirects disabled and bounded time/body limits.
-9. The BFF validates the token response, encrypts it into its shared restart-stable store under a new opaque session ID, clears the attempt cookie, sets the Studio session cookie, and redirects to the canonical mount root with no auth parameters.
-10. Callback replay, state mismatch, expired attempt, provider error, malformed response, or registration drift clears transient state and renders bounded recovery without reflecting raw input.
+7. The provider redirects only to the exact BFF callback with code, state, and its exact issuer identifier.
+8. The BFF strictly validates the bounded callback query and compares state/issuer in constant time where applicable, atomically consumes the matching attempt, and exchanges code + verifier server-to-server with redirects disabled and bounded time/body limits.
+9. The BFF strictly validates the token response, calls real bootstrap, verifies exact returned scope/user/registration authority, and only then atomically stores the encrypted token record under a new opaque session ID, replacing any prior local session. It clears the attempt cookie, sets the Studio session cookie, and redirects to the canonical mount root with no auth parameters.
+10. Wrong state or issuer neither consumes nor clears an otherwise valid attempt. A matching provider denial, malformed matching callback, expired/consumed attempt, replay, malformed response, or registration drift renders bounded recovery without reflecting raw input; consumed/expired transient state is cleared.
 
 Loopback HTTP follows the same flow and PKCE checks. Only exact `localhost`, `127.0.0.1`, or `[::1]` registrations may disable the cookie `Secure` attribute; production/non-loopback HTTP remains impossible.
 
@@ -286,9 +393,9 @@ POST /studio/auth/logout         revoke/delete local Studio session; dashboard s
 GET  /studio/api/bootstrap       authenticated safe bootstrap
 ```
 
-A canonical trailing-slash redirect may be used only when required by deterministic asset behavior and must remain under the exact mount. Unknown paths/methods, encoded separators, dot segments, duplicate separators, backslashes, credential/query pollution, and oversized URLs fail closed. The handler never acts as an arbitrary platform proxy.
+The shell is served at the exact mount with no trailing-slash canonicalization redirect; absolute manifest asset URLs remove that need. Unknown paths/methods, encoded separators, dot segments, duplicate separators, backslashes, credential/query pollution, and oversized URLs fail closed. The handler never acts as an arbitrary platform proxy.
 
-The Fetch core accepts a validated configuration and one standard `Request`, then always returns a standard `Response` for a request already matched to the mount. Adapters perform exact mount matching and delegate requests outside the mount to the host framework. They do not implement auth, cookies, CSP, path normalization, token refresh, platform calls, or policy.
+The Fetch core accepts a validated configuration and one canonical standard `Request`, then always returns a standard `Response`. Adapters first apply the shared raw-target/external-origin guard, perform exact mount matching, and delegate only canonical outside-mount requests to the host framework. They do not implement auth, cookies, CSP, token refresh, platform calls, or policy.
 
 The configured public application origin—not arbitrary `Host`, `Forwarded`, or `X-Forwarded-*` input—is canonical. An adapter may honor forwarding only through explicit framework/server trusted-proxy configuration and must compare the resulting external URL to the configured origin before entering the core.
 
@@ -296,7 +403,7 @@ The configured public application origin—not arbitrary `Host`, `Forwarded`, or
 
 `@framerfordevs/studio` owns the React shell, TanStack Router base-path behavior, browser-safe DTOs, and shared UI composition. It owns no OAuth client, token, cookie parser, store, environment reader, platform bearer client, SQL, or Effect runtime.
 
-The artifact is built once and served at any validated mount. The server renders only a bounded escaped mount/config meta projection; no token, user, content, arbitrary HTML, or executable inline configuration enters the document. Assets use a generated finite manifest, content hashes, exact MIME types, byte/count caps, and immutable cache headers. HTML/bootstrap/auth responses are `no-store`.
+The artifact is built once and served at any validated portable active mount. The server constructs bounded HTML from the generated finite manifest, emits exact absolute mount asset URLs, and renders only escaped non-secret mount and canonical dashboard-recovery-origin metadata; it uses no `<base>`, token, user, content, arbitrary HTML, or executable inline configuration. Relative chunk imports resolve from manifest-listed assets. Assets use content hashes, exact MIME types, byte/count caps, and immutable cache headers. HTML/bootstrap/auth responses are `no-store`.
 
 The M18 shell provides:
 
@@ -321,32 +428,31 @@ The store contract supports:
 - Atomic consume-once of an authorization attempt.
 - Atomic create of one encrypted session record under a digest key.
 - Read of session ciphertext + version + expiry.
-- Compare-and-swap replacement after token refresh.
-- Delete one session.
-- Atomic shared abuse-limit evaluation for authorization start, callback/token exchange admission, and authenticated session routes.
-- Bounded cleanup by expiry and, where supported, registration identifier.
+- Atomic pre-dispatch refresh claim with owner/fencing generation, bounded waiter observation, exact-owner commit, safe pre-dispatch release, and terminal invalidation after ambiguous dispatch.
+- Atomic replacement of an existing browser session after reauthentication.
+- Delete one session without permitting a late refresh commit to recreate it.
+- Atomic shared abuse-limit evaluation for authorization start, callback/token exchange admission, registration routes, and authenticated session routes.
+- Atomic registration-scoped attempt/session count admission under the source-controlled maxima.
+- Bounded cleanup by expiry and opaque registration digest.
 - Declared `scope: "shared" | "process_local"` and `survivesProcessRestart: boolean` capabilities. Production requires `shared` plus `true`; these fields describe application-process topology only and do not claim Redis AOF/RDB or disaster durability.
 
-The core generates raw opaque IDs with at least 256 bits and stores only their SHA-256 digest. It encrypts authorization-attempt payloads—including state and PKCE verifier—and OAuth token records before calling the store using a configured versioned server keyring and authenticated encryption. Store implementations never receive plaintext state, verifier, access token, or refresh token. Current and previous decryption keys permit bounded rotation; only the current key encrypts.
+The core generates raw opaque IDs with at least 256 bits and stores only their SHA-256 digest. It encrypts authorization-attempt payloads—including state and PKCE verifier—and OAuth token records before calling the store using the confirmed version-1 A256GCM envelope and server keyring. Store implementations never receive plaintext state, verifier, access token, or refresh token. One current and at most three previous decryption keys permit bounded rotation; only the current key encrypts.
 
 Removing a previous key is an intentional forced-logout boundary for any record still encrypted by it. Operators must keep each retired decrypt key available for at least the maximum eight-hour session lifetime after the last process capable of writing with that key is drained; the ten-minute attempt lifetime is contained by that bound. Mixed-version fleets may not disagree about the current write key. Early removal must be surfaced as session invalidation, never corruption or a fallback to plaintext.
 
-The encrypted record contains only exact registration/project/environment/version, OAuth token values/types/scopes/expiries, refresh generation/version, and safe timestamps. It contains no content, schema, labels, email, arbitrary request, or return URL.
+The encrypted record contains only exact registration/project/environment/version, application origin/mount, user ID, immutable absolute deadline, OAuth token values/types/scopes/expiries, refresh generation/version, and safe timestamps. It contains no content, schema, labels, email, arbitrary request, or return URL.
 
 ### Refresh and concurrency
 
-The core refreshes before a bounded expiry threshold. One compare-and-swap winner persists rotated OAuth tokens; losers reload the winner rather than issuing parallel refreshes. Refresh-token reuse remains zero. A terminal refresh or authorization failure deletes the record and cookie; transient upstream failure preserves an unexpired access token only when it is still valid and otherwise returns a bounded unavailable response.
+The core refreshes at the confirmed 60-second threshold. One atomic pre-dispatch claim winner may submit a refresh generation; losers wait/reload without issuing. Refresh-token reuse remains zero. Once dispatch begins, every ambiguous transport/provider/store outcome makes that generation terminal rather than retrying it. A successful response is bootstrap-validated before exact-owner commit; failed or stale commit triggers bounded compensation. The cookie clears only after confirmed record absence/terminal invalidation, while store unavailability remains a retryable `503` rather than false logout.
 
 The opaque browser session ID remains stable across ordinary OAuth refresh to avoid multi-tab invalidation races. It is always newly generated after callback/re-authentication, cannot be caller-selected, and is deleted on logout, absolute expiry, terminal auth failure, or detected registration drift. M18 has no privilege-elevation operation; current platform policy prevents a stable local session ID from preserving removed authority.
 
 ### Production enforcement and reference store
 
-The server package has no implicit store. A separately exported test/development memory store reports `scope: "process_local"` and `survivesProcessRestart: false`. Startup rejects any store that is not shared and restart-stable when either:
+The server package has no implicit store. A separately exported test/development memory store reports `scope: "process_local"` and `survivesProcessRestart: false`. Startup rejects it for every non-loopback origin and whenever production mode is selected, including production loopback fixtures. Shared/restart-stable capability is an explicit trusted deployer declaration backed by conformance, not runtime proof of arbitrary infrastructure.
 
-- the configured origin is non-loopback and runtime mode is production, or
-- production mode is selected explicitly.
-
-M18B ships `@framerfordevs/studio-store-redis` as the production-capable reference adapter. It uses a caller-supplied Redis connection, namespaced digest-only keys, server-side TTLs, atomic Lua operations for consume/CAS/admission, bounded commands/replies/timeouts, TLS/auth-compatible client configuration, and no degraded-memory fallback. Session availability—not permanent business data durability—is its purpose; losing the store safely signs users out. Production guidance requires shared persistence across application instances and deploys and documents Redis persistence/HA as an operator availability choice.
+M18B ships `@framerfordevs/studio-store-redis` as the production-capable reference adapter. It uses a caller-supplied Redis connection, namespaced digest-only keys, server-side TTLs, atomic Lua operations for admission/consume/replacement/refresh fencing/delete, bounded commands/replies/timeouts, TLS/auth-compatible client configuration, and no degraded-memory fallback. Session availability—not permanent business data durability—is its purpose; confirmed record loss signs users out, while a transient outage returns bounded unavailability without pretending records are absent. Production guidance requires shared persistence across application instances/deploys and documents Redis persistence/HA plus namespace rotation after restore as operator availability choices.
 
 Adapters cannot suppress the production-store check. Tests prove production cannot start through omitted, implicit, process-local, restart-volatile, or falsely selected default configuration. Custom production stores remain supported but must satisfy the same atomicity, admission, expiry, encryption-envelope preservation, cleanup, outage, and concurrency conformance suite.
 
@@ -365,18 +471,18 @@ Domain absent
 Max-Age <= remaining 8-hour absolute session lifetime
 ```
 
-The cookie name is deterministic per registration, bounded, and uses an appropriate secure prefix when browser prefix rules permit. Exact loopback HTTP uses a separate unprefixed name and omits `Secure`; this exception cannot activate for non-loopback hosts.
+Cookie names, registration digest suffixes, loopback variants, attributes, duplicate rejection, and deletion behavior are exact as fixed in the M18B confirmation. HTTPS uses `__Secure-`, never `__Host-`, because the required non-root mount path is the cookie path. Exact loopback HTTP uses only the separate unprefixed names and omits `Secure`; this exception cannot activate for non-loopback hosts.
 
-The authorization-attempt cookie has the same host/path isolation, at most 10-minute lifetime, and contains only an opaque attempt ID. Callback consumes and clears it.
+The authorization-attempt cookie has the same host/path isolation, an exact 10-minute lifetime, and contains only an opaque attempt ID. Creation sets `Max-Age=600` and `Expires=<attempt deadline>`. Session creation sets `Max-Age=max(0, floor(absolute deadline - now))` and `Expires=<the same immutable deadline>`; no refresh or response moves that deadline. Deletion uses the same name, host-only scope, Path, SameSite, HttpOnly, and Secure profile with `Max-Age=0` plus a past `Expires`. Callback consumes and clears the attempt cookie.
 
 Studio writes no auth value to `localStorage`, `sessionStorage`, IndexedDB, Cache Storage, service workers, route/search/hash state, HTML, React Query keys, or clipboard. Non-sensitive user preferences remain out of M18 unless separately justified.
 
 ### Origin and CSRF
 
-- Browser API/logout mutations require exact configured origin, same-origin Fetch Metadata where supplied, and exact allowed content type/body.
-- Login and callback are top-level GET protocol routes with state/PKCE protections and no mutation of project data.
-- BFF routes emit no credentialed CORS policy; cross-origin browser requests are denied.
-- Cookies are not authorization by themselves: the BFF resolves the store record and the platform reauthorizes current project scope.
+- Bootstrap requires exact same-origin browser evidence and reauthorizes current platform scope; logout additionally requires exact Origin, same-origin Fetch Metadata, `application/json`, and exact `{}`.
+- Login is a top-level non-prefetch document navigation with no query/body; callback permits the expected cross-site top-level provider navigation but requires the exact browser-bound attempt, state, callback, and issuer rules fixed above.
+- BFF routes emit no credentialed CORS policy; cross-origin/same-site sibling API requests and `Origin: null` are denied.
+- Cookies are not authorization by themselves: the BFF resolves the encrypted store record and bootstrap reauthorizes current project scope.
 
 ## Platform Studio v1 bootstrap
 
@@ -428,12 +534,12 @@ The operation requires active registration, exact origin/path/client/version, ac
 
 ## Security headers and cache policy
 
-Shell/auth/bootstrap responses set, as applicable:
+Shell/auth/bootstrap responses follow the exact route/response matrix in the M18B confirmation and set:
 
-- `Content-Security-Policy` with self-only scripts/styles/connect/images, `object-src 'none'`, `base-uri 'none'`, `frame-ancestors 'none'`, and bounded form/navigation destinations.
+- `Content-Security-Policy` with the confirmed no-inline, no-worker, self-only script/style/connect/image profile, `object-src 'none'`, `base-uri 'none'`, `form-action 'self'`, and `frame-ancestors 'none'`.
 - `Referrer-Policy: no-referrer`.
 - `X-Content-Type-Options: nosniff`.
-- `Cross-Origin-Opener-Policy: same-origin` where compatible with OAuth navigation.
+- `Cross-Origin-Opener-Policy: same-origin`; required top-level OAuth navigation must pass without opener communication.
 - `Cross-Origin-Resource-Policy: same-origin`.
 - `Permissions-Policy` denying unused capabilities.
 - `Cache-Control: no-store` for HTML, auth, errors, and bootstrap.
@@ -446,7 +552,7 @@ The design must test the exact COOP behavior through OAuth popup/top-level navig
 ### Platform
 
 - `packages/api/src/contracts/studio/`: Studio token/bootstrap schemas and public Studio OpenAPI source.
-- `packages/api/src/operations/studio/`: named current-user bootstrap and authorization workflows.
+- `packages/api/src/operations/studio-public/`: named current-user bootstrap, authorization, and quota workflows.
 - `packages/api/src/services/studio/`: registration-bound principal verification and repository adapters.
 - `packages/auth`: deterministic client/resource configuration, claims, and installed-provider compatibility boundary.
 - `packages/db`: registration runtime state and immutable migration authority; existing OAuth tables remain Better Auth authority.
@@ -458,10 +564,10 @@ Business workflows use named `Effect.fn`, typed expected errors, services/Layers
 ### Developer-owned runtime packages
 
 - `packages/studio`: browser-only SPA, router, safe contracts, UI composition, and built asset manifest.
-- `packages/studio-server`: Fetch core, config decoder, OAuth client, token validation, session encryption/refresh, store contract/conformance suite, assets, and safe responses.
+- `packages/studio-server`: Fetch core, raw-target/config decoders, OAuth client, real-bootstrap token-response validation, session encryption/fenced refresh, store contract/conformance suite, assets, and safe responses.
 - `packages/studio-store-redis`: production-capable shared Redis store and limiter adapter over the server contract; it receives ciphertext/envelopes only.
-- `packages/studio-adapter-express`: only Express Request/Response/next translation and trusted external URL projection.
-- `packages/studio-adapter-tanstack-start`: only TanStack Start route integration around native Web Requests.
+- `packages/studio-adapter-express`: only earliest-node raw-target/external-origin validation plus Express Request/Response/next translation.
+- `packages/studio-adapter-tanstack-start`: only earliest supported Node/Nitro raw-target validation and TanStack Start integration around native Web Requests.
 
 The server package never imports app source. Adapter packages depend on declared server exports. Browser bundle forbidden-import tests reject server/auth/env/Node/database/token/store modules. Packages are staged at `0.0.0` and remain unpublished until a separate developer gate.
 
@@ -469,15 +575,16 @@ The server package never imports app source. Adapter packages depend on declared
 
 The BFF receives one strictly decoded configuration:
 
-- canonical platform API/OAuth issuer origin;
+- one canonical platform origin from which issuer, resource, authorize/token/revoke, and bootstrap endpoints are derived;
+- one canonical dashboard origin used only for direct browser recovery navigation;
 - registration, project, and environment IDs;
-- canonical application origin and mount path matching registration;
-- runtime mode;
-- bounded timeout/body settings within package maxima;
-- explicit shared, process-restart-stable session store;
-- current and bounded previous session-encryption keys by non-secret key ID.
+- canonical application origin and confirmed portable active mount path matching registration;
+- runtime mode and stable deployment namespace epoch;
+- optional lower deployment deadlines within the fixed package maxima, never raised limits;
+- explicit shared, process-restart-stable session store except exact loopback development;
+- one current and at most three previous exact-32-byte session-encryption keys by non-secret key ID.
 
-No package reads an ambient management/OAuth token. Server-only configuration never enters Vite/browser variables. The handler fails startup on mismatched IDs/origin/path, unknown fields, insecure non-loopback HTTP, weak/missing encryption material, missing store, process-local or restart-volatile production store, or unsupported adapter/runtime.
+No package reads an ambient management/OAuth token. Server-only configuration never enters Vite/browser variables. The handler fails startup on locally inconsistent IDs/origin/path, unknown fields, insecure non-loopback HTTP, weak/missing encryption material, missing store, disallowed process-local/restart-volatile topology, or unsupported adapter/runtime. Startup does not claim unauthenticated remote registration validation; authorize plus callback bootstrap establishes the current active registration/version before a local session exists.
 
 The platform does not fetch, health-check, or SSRF-probe the registered customer origin. Dashboard launch links use the validated canonical origin/path directly; ordinary browser/network failure is reported honestly.
 
@@ -508,7 +615,7 @@ Before bounded parsing and client/session resolution, current M18A has only the 
 
 After bounded client/user verification, the exact client/user policy limits the narrower identity. Native OAuth errors remain protocol-shaped. Better Auth's route limiter remains enabled as defense in depth but must use shared production storage and be configured not to become an undocumented per-process or single-BFF-IP bottleneck. The compatibility slice must prove hook/order/body handling before relying on it. M23 may add a trusted-source bucket only after ingress replacement/source restrictions are proven; M18A must not pre-authorize that identity.
 
-M18B additionally enforces shared per-registration authorization-start limits through the store contract before allocating attempts. A per-trusted-source BFF limit is enabled only where the hosting adapter has an independently configured and proven proxy boundary; otherwise the shared registration limit is the safe fallback. Exact local thresholds are fixed in the M18B confirmation after M18A evidence, not caller-tunable bypasses.
+M18B enforces the confirmed source-controlled registration/session rates, count admission, concurrency, byte, deadline, and cleanup bounds through the store before allocation or expensive work. It has no source-address bucket before M23 proves ingress/header replacement; forwarding data never becomes local quota authority.
 
 Domain audits are added for:
 
@@ -518,7 +625,7 @@ Domain audits are added for:
 
 All contain actor, exact stable scope/registration ID, registration version, request ID, action, and time. The session-establishment event additionally uses the non-secret Studio grant ID as its resource identity so bootstrap can verify the marker. They exclude origin, mount path, client ID, code/token values, user email, cookies, BFF store IDs, encryption IDs, and request bodies. `studio.session.established` is a security-category event emitted once for a grant whose token response may be released, not for refresh, bootstrap retry, or a failed local store write. Under the synchronous fallback, an audit may exist even if transport delivery later fails; this bounded false-positive is preferable to releasing an unaudited grant.
 
-Named spans cover activation/deactivation, authorization preflight, Studio-token verification, bootstrap, BFF authorization attempt, callback exchange, store lookup/CAS/delete, refresh, logout, asset/shell response, and adapter translation.
+Named spans cover activation/deactivation, authorization preflight, Studio-token verification, bootstrap, BFF authorization attempt, callback exchange, store lookup/fence/commit/delete, refresh, logout, asset/shell response, and adapter translation.
 
 Safe attributes use closed operation/adapter/runtime/auth/outcome/status/size/duration buckets and stable scope IDs only where current telemetry rules permit. Metrics never label tenant, registration, user, origin, path, session, state, client, token, or error text. Logs never include raw URL query, callback code/state, Authorization, Set-Cookie, token response, ciphertext, content, or PII.
 
@@ -526,32 +633,21 @@ Safe attributes use closed operation/adapter/runtime/auth/outcome/status/size/du
 
 - Shell assets are finite, content-hashed, bounded, and code-split; M18 has no content-list waterfall.
 - Bootstrap performs one registration/project/environment/current-policy path without N+1 queries.
-- Store calls and platform fetches have explicit timeouts, abort propagation, response byte limits, and no hidden retry.
-- Refresh uses one atomic winner and never retries a rotated refresh token.
+- Store calls and platform fetches have the confirmed deadlines, abort propagation, response byte limits, bounded queues, and no hidden retry after ambiguous work.
+- Refresh claims one generation before dispatch; contenders never submit it, and any post-dispatch ambiguity requires reauthentication rather than replay.
 - OAuth/browser requests never follow unexpected redirects.
 - Handler and adapters do not buffer unbounded request/response bodies.
 - Browser shell has no duplicate React/UI copies and records raw/gzip package and route budgets before review.
 - No service worker or offline authority is introduced.
 
-## Database impact and migration gate
+## Database impact and migration record
 
-M18 is expected to require a developer-controlled migration named:
+M18A's developer-generated/applied migrations are complete and immutable:
 
-```text
-add_studio_runtime_authority
-```
+- `0019_add_studio_runtime_authority` added registration runtime state/actor/time authority, receipt support, and active lookup indexes.
+- `0020_allow_studio_credential_kill_switch` corrected only the receipt constraint so an exact management credential may record `active -> inactive` recovery.
 
-The proposed Drizzle change adds:
-
-- registration runtime status defaulting to `inactive` for every existing row;
-- runtime change timestamp and exact user actor authority;
-- constraints tying active state to required runtime actor/time fields;
-- Control Plane command-receipt operation/result support for runtime set;
-- indexes required by active registration/client verification.
-
-OAuth client/resource/token/consent rows already exist from M12 and are used as companion authority; no general OAuth schema expansion or dynamic-registration table is added.
-
-After approved implementation reaches the schema slice, the agent updates Drizzle schema/tests and stops. The developer generates the migration. The agent fully inspects SQL, snapshot, and journal; the developer applies it; only then may database integration continue. Existing migrations remain immutable.
+M18B requires no Drizzle schema change or migration. It uses existing OAuth/audit authority plus developer-owned encrypted store state. If implementation discovers a need for persisted platform session, key, adapter, or handoff state, work stops for a design amendment and the developer-controlled migration process; it is not added opportunistically.
 
 ## Test and evidence plan
 
@@ -560,14 +656,14 @@ After approved implementation reaches the schema slice, the agent updates Drizzl
 - Deterministic client IDs and exact callback composition.
 - Canonical origin/mount matching, loopback exceptions, ports, IPv6, Unicode, byte bounds, traversal, encoded separators, duplicate separators, and route prefix confusion.
 - Exact OAuth client metadata/resource/scope/grant matrix and dynamic-registration exclusions.
-- Store opaque ID entropy/encoding/digest, encrypted attempt/token envelopes, key rotation and deliberate early-retirement logout, expiry, atomic consume/CAS/admission, and production shared/restart-stable topology guard.
+- Store opaque ID entropy/encoding/digest, encrypted attempt/token envelopes and authenticated-data swapping denial, key rotation/deliberate early-retirement logout, immutable expiry, atomic admission/consume/replacement/refresh fencing/delete, and the production shared/restart-stable topology guard.
 - Cookie names/attributes/path matching for multiple registrations and non-root mounts.
 - Bootstrap schema/action projection and standard envelope/error mapping.
 - Studio OpenAPI deterministic exact bytes and forbidden control-plane/content/protocol surfaces; immutable public-contract registry/baseline registration waits for M18B consumption.
 
-### Better Auth compatibility gate
+### Provider compatibility and M18B correction gate
 
-Before broad implementation, prove pinned Better Auth 1.7.1 supports:
+Before broad M18B runtime implementation, preserve the accepted pinned Better Auth 1.7.1 evidence and prove the bounded compatibility correction supports:
 
 - deterministic database-managed public clients without enabling RFC 7591;
 - API-host authorize/token with dashboard-hosted login continuation and host-only dashboard cookie;
@@ -576,9 +672,10 @@ Before broad implementation, prove pinned Better Auth 1.7.1 supports:
 - shared authorization/token rate-limit hooks and preferred atomic or approved synchronous-gated `studio.session.established` audit ordering;
 - registration/version claims or an equally strict verifier binding;
 - disabled-client and revoked-token behavior for pending code, access, and refresh paths;
-- loopback callback behavior without weakening production HTTPS.
+- loopback callback behavior without weakening production HTTPS;
+- absolute eight-hour denial before token release after multiple rotations, denial of pre-deadline access tokens after the original deadline, and bootstrap-marker enforcement without extending the provider refresh row.
 
-Failure of deterministic client resolution, exact redirect/resource/scope, mandatory PKCE/state, pre-issuance current policy, consent/version invalidation, or token binding stops M18A for amendment. Lack of a shared provider transaction for audit does not stop M18A if—and only if—the synchronous response-gating, no-token-release, bootstrap-marker, and compensating-revocation fallback passes. If neither audit path is enforceable, implementation stops. No custom handoff or parent-domain cookie is an automatic fallback.
+A regression in deterministic client resolution, exact redirect/resource/scope, mandatory PKCE/state, pre-issuance current policy, consent/version invalidation, token binding, audit gating, or the new absolute deadline stops M18B for remediation or design amendment. The accepted synchronous response-gating, no-token-release, bootstrap-marker, and compensating-revocation fallback remains valid; no custom handoff or parent-domain cookie is an automatic fallback.
 
 ### Effect/service tests
 
@@ -594,7 +691,7 @@ Failure of deterministic client resolution, exact redirect/resource/scope, manda
 - Atomic activate/deactivate + derived OAuth client/resource link + audit + receipt.
 - Same-command replay, changed-fingerprint conflict, stale version, concurrent activate/deactivate/update, and no-op behavior.
 - Active metadata update disables client, revokes access/refresh/consent, increments authority, and remains inactive.
-- User-only activation; management/Delivery/Preview credential denial.
+- User-only activation and metadata changes; exact management-credential deactivation-only recovery; Delivery/Preview and broader credential denial.
 - Cross-workspace/project/environment isolation and actor constraints.
 - Failure injection after every registration/client/link/token/audit/receipt stage leaves no partial activation authority; token-audit failure proves no token bytes are released, bootstrap denies the grant marker, and compensating revocation is attempted.
 - Indexed active-registration/client/token paths and zero test residue.
@@ -610,12 +707,12 @@ Failure of deterministic client resolution, exact redirect/resource/scope, manda
 
 ### M18B store conformance and adapters
 
-- Shared conformance suite runs against the memory test store and the shipped Redis reference adapter, including real Redis atomicity/outage/recovery integration.
-- Production startup cannot use a missing, implicit, process-local, or restart-volatile store; the Redis adapter has no memory degradation path.
-- Direct frameworkless Fetch-core conformance plus Express and TanStack Start parity for every owned route, status, header, cookie, body, error, cancellation, streaming/byte bound, outside-mount delegation, and trusted external URL decision.
-- Static import/runtime checks substantiate only Node/Web Request framework independence; no evidence or documentation claims edge/unknown-runtime portability.
-- Reverse-proxy hostile forwarded-host/protocol cases fail closed.
-- Package import/exports prevent browser-to-server dependency leakage.
+- Shared conformance runs against the memory test store and shipped Redis adapter, including real Redis atomic admission/consume/replacement, pre-dispatch refresh fencing, owner death before/after dispatch, late commit, logout race, count/byte limits, namespace restore rotation, outage/recovery, and no memory degradation.
+- Production and non-loopback startup cannot use a missing, implicit, process-local, or restart-volatile store; custom topology declarations remain trusted configuration and must pass the same suite.
+- Two independent BFF processes cover concurrent tabs, one refresh winner, bounded waiters, ambiguous/lost replies, two grants for the same user/client, and proof that no generation is submitted twice.
+- Direct frameworkless canonical Fetch conformance plus the separate raw-target guard and Express/TanStack parity cover every owned route, status, header, cookie, body, error, cancellation, streaming/byte bound, outside-mount delegation, and external-origin decision.
+- Static import/runtime checks substantiate only Node/Web Request behavior with a pre-normalization Node ingress guard; no evidence or documentation claims edge/unknown-runtime portability.
+- Reverse-proxy hostile forwarded-host/protocol cases fail closed, and package import/exports prevent browser-to-server dependency leakage.
 
 ### M18A dashboard acknowledgement browser/accessibility
 
@@ -627,7 +724,7 @@ Committed headless, retry-free specifications cover:
 
 - Direct configured-path load, nested path, sign-in redirect/explicit Studio acknowledgement/callback cleanup, refresh, local-only logout, expiry, revocation, and recovery.
 - A live dashboard cookie never bypasses the next Studio acknowledgement after local logout.
-- Cookie host/path isolation, absent browser token/storage authority, no callback secret in history, and no cross-origin request.
+- Cookie host/path behavior, duplicate/shadow denial, absent browser token/storage authority, clean post-callback application URL with one-use code protections, and no cross-origin API request.
 - Inactive/changed registration, unauthorized role, archive, platform/store/customer-app outage states.
 - Keyboard/focus/landmarks/status, sign-in and recovery links, 375 px and 200% reflow through component/accessibility coverage, and automated WCAG A/AA checks.
 
@@ -635,7 +732,7 @@ Browser tests do not retain cookies/tokens or capture screenshots/traces/video. 
 
 ### Package/build/readiness
 
-- Clean fixture installs staged packages and mounts both adapters at non-default nested paths.
+- Clean fixture installs staged packages and mounts both adapters at non-default nested paths; the production artifact stays within the fixed initial-JS/CSS budgets, measured from manifest reachability with gzip level 9.
 - Package tarballs contain only expected builds/assets/types/licenses and no environment/test/coverage files; forbidden-import and archive checks keep `tools/studio-oauth-harness` out of all production graphs and artifacts.
 - Browser bundle contains no Node, Better Auth server, token/store/encryption, env, database, Control Plane, or management modules.
 - Format, lint, structure, contract drift, types, unit/integration/contract/accessibility/browser/coverage, audit, build, Docker, database invariants, package inspection, and `git diff --check` pass.
@@ -651,16 +748,17 @@ Browser tests do not retain cookies/tokens or capture screenshots/traces/video. 
 4. **Database schema gate:** edit approved Drizzle schema/tests, then stop for developer migration generation/application and full artifact review.
 5. **Activation and delegation authority:** implement atomic runtime state, deterministic clients, revocation, receipts, activation/session audits, HTTP, CLI, dashboard activation controls, and Studio-specific acknowledgement.
 6. **Studio resource authority:** implement token verification, bootstrap, route profile, deterministic OpenAPI generation/tests, shared quotas, and non-enumeration; defer registry/artifact baseline commitment to M18B.
-7. **M18A evidence and review:** run complete applicable gates, update KB, provide one Conventional Commit proposal, and stop for developer review. M18B remains unauthorized.
+7. **M18A evidence and review (completed):** run complete applicable gates, update KB, provide one Conventional Commit proposal, and stop for developer review. M18B remained unauthorized at that gate.
 
 ### M18B — Studio mount and security runtime
 
-After M18A is accepted, revalidate and obtain developer approval for the M18B runtime details before implementation:
+The detailed M18B design is approved. The developer authorized continuation after Step 1's required checkpoint, and all five steps are now complete:
 
-1. Revalidate the M18A bootstrap shape through the real BFF, then register the Studio v1 canonical artifact and immutable compatibility baseline; create staged browser/server/Redis-store/adapter workspaces and forbidden-import/build tests without content features.
-2. Implement exact mount/assets, OAuth flow, encrypted attempt/session contract, production Redis adapter, cookies, refresh/local logout, headers, local abuse controls, and failures.
-3. Complete direct Fetch conformance, Express/TanStack parity, and the accessible authenticated empty shell.
-4. Run complete applicable evidence, update KB, provide a separate Conventional Commit proposal, and stop for developer review. M19 remains unauthorized until M18B acceptance.
+1. Land the migration-free absolute-eight-hour and portable-active-mount compatibility corrections with focused M18A regressions; no runtime package work proceeds if either accepted authority cannot be preserved.
+2. Register the accepted Studio v1 bytes as the canonical artifact/immutable baseline; create the five staged browser/server/Redis-store/adapter workspaces and forbidden-import/build/package tests without content features.
+3. Implement the confirmed raw-target/mount/assets, OAuth/bootstrap flow, A256GCM attempt/session contract, pre-dispatch refresh fencing, Redis adapter, exact cookies/routes/headers/bounds, local logout, and failures.
+4. Complete canonical Fetch plus Express/TanStack parity, the accessible authenticated empty shell, two-process Redis/concurrency/outage evidence, package inspection, and load/bound evidence.
+5. Run complete applicable readiness, update KB, provide a separate Conventional Commit proposal, and stop for developer review. M19 remains unauthorized until M18B acceptance.
 
 Any need for a custom handoff, dynamic registration, browser token storage, platform Studio-session service, parent-domain cookie, arbitrary proxy, additional framework/core dependency, broader scope, unplanned migration authority, or M19 content operation stops for explicit amendment.
 
@@ -718,7 +816,7 @@ The design gives developers a portable mount and clients one role-projected Stud
 
 ### Correctness
 
-Exact registration identity, deterministic OAuth clients, PKCE/state, optimistic/idempotent activation, registration-version binding, current policy, and atomic store refresh prevent ambiguous or stale authority.
+Exact registration identity, deterministic OAuth clients, PKCE/state, optimistic/idempotent activation, registration-version binding, current policy, and pre-dispatch fenced refresh prevent ambiguous or stale authority.
 
 ### Security
 
@@ -726,7 +824,7 @@ No dynamic registration, client secret, browser token, wildcard origin, parent c
 
 ### Reliability
 
-Durable BFF sessions, CAS refresh, bounded failures, no browser fallback, and independent dashboard recovery make outages and redeploy behavior explicit.
+Restart-stable bounded BFF sessions, pre-dispatch fenced refresh, explicit ambiguous-outcome sign-in recovery, no browser fallback, and independent dashboard recovery make outages and redeploy behavior explicit.
 
 ### Performance
 
@@ -748,15 +846,15 @@ Closed spans/metrics and exact activation audits diagnose the new trust boundary
 
 Separate browser/server/adapter packages, one narrow Studio resource, current policy evaluation, and no M19 content routes leave a stable foundation for content/localization and later visual Studio work without migrating identity.
 
-## Approved M18A scope
+## Accepted M18A scope
 
-The developer approved the M18A/M18B roadmap split and authorized **M18A implementation only** under this design:
+The developer approved the M18A/M18B roadmap split and has accepted **M18A** under this design:
 
 1. Explicit inactive/active Studio registration runtime state and user-only activation.
 2. One deterministic registration-derived public OAuth client with Authorization Code + S256 PKCE, `studio:session`, current server-side pre-authorization, forced per-session Studio acknowledgement, shared abuse controls, and no general dynamic registration.
 3. Fail-closed `studio.session.established` security audit using preferred transaction atomicity or the approved synchronous response-gating/bootstrap-marker fallback.
 4. A private test-only public OAuth client that proves authorize through bootstrap and cannot enter shipped dependency graphs or artifacts.
 5. Studio v1 bootstrap and deterministic OpenAPI source only; immutable `packages/public-contracts` baseline registration, BFF packages, mounted shell, and M19 content/editorial operations wait for M18B.
-6. The explicit pre-M23 installation-wide OAuth safety-valve tradeoff and developer-controlled `add_studio_runtime_authority` migration gate.
+6. The explicit pre-M23 installation-wide OAuth safety-valve tradeoff and developer-applied migrations `0019_add_studio_runtime_authority` and `0020_allow_studio_credential_kill_switch`.
 
-M18B remains a separate later approval gate. Its bounded direction is BFF-only encrypted OAuth token storage, opaque path-scoped browser sessions, a shipped production Redis adapter with no memory fallback, direct Fetch conformance, Express 5/TanStack Start adapters, and the empty authenticated shell. Approval here does not authorize M18B implementation.
+M18B's approved design remains: BFF-only A256GCM OAuth storage, exact opaque path-scoped sessions, pre-dispatch refresh fencing, a production Redis adapter with no memory fallback, raw-target plus canonical Fetch conformance, Express 5/TanStack Start adapters, accepted Studio baseline registration, and the empty authenticated shell. The compatibility corrections and runtime packages are complete; final acceptance remains developer-controlled.

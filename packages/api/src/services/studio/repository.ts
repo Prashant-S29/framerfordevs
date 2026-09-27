@@ -2,6 +2,8 @@
 
 import {
   STUDIO_SESSION_SCOPE,
+  isStudioGrantActive,
+  studioGrantExpiresAtEpochSeconds,
   studioSessionAuditRequestId,
   type StudioOAuthPrincipal,
 } from "@framerfordevs/auth";
@@ -31,6 +33,7 @@ import {
   StudioApplicationOrigin,
   StudioMountPath,
   StudioRegistrationId,
+  isPortableStudioMountPath,
 } from "../../contracts/control-plane";
 import {
   AuthUserId,
@@ -124,7 +127,13 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
                 ),
               )
               .limit(1);
-            if (!registration || !metadataMatches(client.metadata, registration)) return false;
+            if (
+              !registration ||
+              !isPortableStudioMountPath(registration.mountPath) ||
+              !metadataMatches(client.metadata, registration)
+            ) {
+              return false;
+            }
             const [currentProject] = await transaction
               .select({ archivedAt: project.archivedAt })
               .from(project)
@@ -209,10 +218,14 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
             if (registration.runtimeStatus !== "active") {
               return { kind: "inactive" as const };
             }
-            if (registration.version !== input.principal.registrationVersion) {
+            if (
+              !isPortableStudioMountPath(registration.mountPath) ||
+              registration.version !== input.principal.registrationVersion
+            ) {
               return { kind: "authority_changed" as const };
             }
 
+            const now = new Date();
             const [currentProject] = await transaction
               .select({
                 id: project.id,
@@ -321,7 +334,7 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
                   eq(oauthRefreshToken.clientId, input.principal.clientId),
                   eq(oauthRefreshToken.userId, input.principal.userId),
                   isNull(oauthRefreshToken.revoked),
-                  gt(oauthRefreshToken.expiresAt, new Date()),
+                  gt(oauthRefreshToken.expiresAt, now),
                   sql<boolean>`(
                     substring(encode(sha256(convert_to('studio-grant:' || ${oauthRefreshToken.authorizationCodeId}, 'UTF8')), 'hex') from 1 for 12)
                     || '5'
@@ -333,7 +346,7 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
               )
               .limit(1);
             const [auditMarker] = await transaction
-              .select({ id: auditEvent.id })
+              .select({ id: auditEvent.id, occurredAt: auditEvent.occurredAt })
               .from(auditEvent)
               .where(
                 and(
@@ -381,7 +394,12 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
               consentScopes.has("offline_access") &&
               consentResources.size === 1 &&
               consentResources.has(audience);
-            if (!exactConsent || !currentGrant || !auditMarker) {
+            const exactGrantDeadline =
+              auditMarker !== undefined &&
+              input.principal.grantExpiresAtEpochSeconds ===
+                studioGrantExpiresAtEpochSeconds(auditMarker.occurredAt) &&
+              isStudioGrantActive(input.principal.grantExpiresAtEpochSeconds, now);
+            if (!exactConsent || !currentGrant || !exactGrantDeadline) {
               return { kind: "grant_invalid" as const };
             }
             return {

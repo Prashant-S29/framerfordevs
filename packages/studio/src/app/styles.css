@@ -1,0 +1,109 @@
+@import "@framerfordevs/ui/globals.css";
+@import "tailwindcss";
+
+:root {
+  color-scheme: light dark;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#studio-root {
+  min-height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+}
+button,
+a {
+  min-height: 24px;
+}
+.studio-layout {
+  min-height: 100vh;
+}
+.studio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 4rem;
+  padding: 0.75rem clamp(1rem, 4vw, 3rem);
+  border-bottom: 1px solid var(--border);
+}
+.studio-header nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.studio-header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+.studio-eyebrow {
+  margin: 0 0 0.15rem;
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.studio-main {
+  width: min(100% - 2rem, 62rem);
+  margin: 0 auto;
+  padding: clamp(1rem, 5vw, 4rem) 0;
+}
+.studio-center {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  gap: 1rem;
+  padding: 1rem;
+  text-align: center;
+}
+.studio-alert {
+  width: min(100%, 34rem);
+}
+.studio-alert-title {
+  grid-column-start: 2;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.studio-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.studio-muted {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+.studio-loader {
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: auto;
+  border: 2px solid var(--border);
+  border-top-color: var(--foreground);
+  animation: studio-spin 0.8s linear infinite;
+}
+@keyframes studio-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-loader {
+    animation: none;
+  }
+}
+@media (max-width: 30rem) {
+  .studio-header {
+    align-items: flex-start;
+  }
+}

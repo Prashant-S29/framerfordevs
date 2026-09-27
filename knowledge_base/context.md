@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-09-26
-**Current phase:** M18A remediation migration `0020_allow_studio_credential_kill_switch` is developer-generated and independently verified as a constraint-only 0019 successor; it is not applied and the worker remains stopped
-**Next gate:** Developer-apply migration 0020, then verify its live catalog and rerun full M18A readiness/residue evidence; M18B and all rollout remain gated
+**Last updated:** 2026-09-27
+**Current phase:** M18B implementation is complete and awaiting developer review; the migration-free compatibility corrections, five runtime packages, mounted shell, immutable Studio contract baseline, security/concurrency evidence, and repository gates are complete, and the worker remains stopped
+**Next gate:** Developer review and accept or amend M18B; package publication, production configuration, rollout, deployment, commit, milestone acceptance, and M19 remain gated
 
 ## Start here
 
@@ -20,7 +20,7 @@ Read relevant sections of `product.md` and `prd/cms.md` for behavioral work. Do 
 - Explicit current developer instruction, product/PRD, relevant rules/active criteria/approved decisions, then status documents govern intent in that order.
 - Committed source, tests, configuration, migrations, and generated artifacts describe executable truth; Git describes repository state.
 - Report drift instead of silently choosing an authority.
-- Work only on an approved active milestone or explicitly authorized workstream. M18A is awaiting independent developer review after implementation and readiness validation; M18B and M19+ remain unauthorized.
+- Work only on an approved active milestone or explicitly authorized workstream. M18A is accepted; M18B implementation is complete but not developer-accepted, and M19+ remains gated.
 
 ## Product direction
 
@@ -58,6 +58,11 @@ packages/db              Drizzle schema and immutable migration history
 packages/public-contracts canonical public artifact registry
 packages/schema          declarative code-schema contract/validator
 packages/sdk             scoped content/runtime Promise/Effect clients and helpers
+packages/studio          browser-only mounted shell, safe BFF contracts, and immutable browser artifact
+packages/studio-server   framework-neutral Fetch BFF, encrypted OAuth sessions, assets, and store port
+packages/studio-store-redis production shared restart-stable Studio session/refresh authority
+packages/studio-adapter-express thin Express 5 request/response and raw-target bridge
+packages/studio-adapter-tanstack-start thin TanStack Start native Request/Response bridge
 packages/ui              shared UI primitives
 ```
 
@@ -128,7 +133,9 @@ The subsequent repository-normalization workstream also passed the complete read
 
 The accepted M17 baseline passes 1,422 tests, coverage, contract drift, formatting/lint/structure, 17 type tasks, and nine builds. Separate retry-free headless evidence passes ten browser specifications plus exhaustive 57-mapping dashboard transport and 52-route host/auth/CSRF matrices. Fresh Compose images are healthy, the worker remains stopped, and production ingress source restriction/DNS/TLS remains an M23 deployment gate rather than local acceptance evidence.
 
+The completed M18B candidate adds the five private `0.0.0` Studio runtime packages, immutable Studio v1 public-contract baseline, exact raw-target/origin/cookie/CSP authority, encrypted A256GCM attempts/sessions, restart-stable Redis quotas and pre-dispatch refresh fencing, Express/TanStack parity, an accessible responsive empty shell, bundle/package and fresh production-image inspection, 1,559 tests plus coverage, and 14 retry-free browser specifications. The production audit has no high/critical finding; four reviewed moderate findings are transitive Vitest dev-server tooling metadata through Better Auth. No migration, publication, production configuration, rollout, deployment, or commit occurred.
+
 ## Current work and next gate
 
-- **Current — M18A `[A]`:** developer accepted, committed, and pushed `317a295`; migration 0020 is catalog-verified, readiness passes 1,498 tests plus 13 browser specifications, and scoped residue is clean with the worker stopped.
-- **Next — M18B design gate:** revalidate the developer-owned BFF/mount/security-runtime design before separate implementation authorization. Do not implement M18B, publish, configure production, or deploy yet.
+- **Current — M18B `[R]`:** the full migration-free Studio mount/security runtime is implemented and validated, including all five packages, immutable public contract, mounted shell, shared Redis authority, adapter parity, package inspection, and security/accessibility/concurrency evidence.
+- **Next — developer final review:** accept or amend M18B. Do not publish packages, configure production, roll out, deploy, commit, accept the milestone, or begin M19 for the developer.

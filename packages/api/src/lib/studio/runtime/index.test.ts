@@ -23,6 +23,7 @@ function transitionInput() {
     environmentMatches: true,
     projectUpdateAllowed: true,
     oauthUserGrant: true,
+    mountPathPortable: true,
     now,
   };
 }
@@ -113,6 +114,7 @@ describe("Studio registration runtime kernel", () => {
       ["project_inactive", { projectActive: false }],
       ["cms_disabled", { cmsEnabled: false }],
       ["oauth_user_grant_required", { oauthUserGrant: false }],
+      ["mount_path_not_portable", { mountPathPortable: false }],
     ] as const;
     for (const [reason, change] of failures) {
       expect(decideStudioRuntimeTransition({ ...transitionInput(), ...change })).toEqual({
@@ -120,6 +122,25 @@ describe("Studio registration runtime kernel", () => {
         reason,
       });
     }
+  });
+
+  it("allows a legacy nonportable active mount to deactivate for recovery", () => {
+    expect(
+      decideStudioRuntimeTransition({
+        ...transitionInput(),
+        currentStatus: "active",
+        enabled: false,
+        mountPathPortable: false,
+      }),
+    ).toEqual({
+      allowed: true,
+      status: "inactive",
+      version: 4,
+      changedAt: now,
+      changedByUserId: actorUserId,
+      noOp: false,
+      disableOAuthAuthority: true,
+    });
   });
 
   it("invalidates active OAuth authority on origin or mount metadata changes", () => {

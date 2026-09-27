@@ -96,6 +96,7 @@ describe("Studio contracts", () => {
         environmentId: ids.environment,
         userId: "studio-user",
         grantId: ids.grant,
+        grantExpiresAtEpochSeconds: 1_795_028_800,
         clientId: `ffd-studio-v1-${ids.registration}`,
         issuer: "https://api.example.test/api/auth",
         audience: "https://api.example.test/api/studio/v1",

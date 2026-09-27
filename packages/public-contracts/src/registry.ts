@@ -4,6 +4,7 @@ import { authoringOpenApiDocument } from "@framerfordevs/api/contracts/authoring
 import { controlPlaneOpenApiDocument } from "@framerfordevs/api/contracts/control-plane/openapi/index";
 import { deliveryOpenApiDocument } from "@framerfordevs/api/contracts/delivery/openapi/index";
 import { previewOpenApiDocument } from "@framerfordevs/api/contracts/preview/openapi/index";
+import { studioOpenApiDocument } from "@framerfordevs/api/contracts/studio/openapi/index";
 import { toolingOpenApiDocument } from "@framerfordevs/api/contracts/tooling/openapi/index";
 import { PublicationWebhookEvent } from "@framerfordevs/api/contracts/webhook/index";
 import { JSONSchema } from "effect";
@@ -56,6 +57,10 @@ export const publicContractRegistry = {
   "preview/v1": {
     ...publicContractMetadata["preview/v1"],
     source: () => previewOpenApiDocument,
+  },
+  "studio/v1": {
+    ...publicContractMetadata["studio/v1"],
+    source: () => studioOpenApiDocument,
   },
   "tooling/v1": {
     ...publicContractMetadata["tooling/v1"],

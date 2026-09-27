@@ -1,10 +1,12 @@
 // Proves real registration-derived OAuth claims, audit gating, refresh continuity, and bootstrap authority.
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import {
+  STUDIO_GRANT_LIFETIME_SECONDS,
   createAuth,
   makeStudioOAuthAccessTokenVerifier,
+  studioGrantExpiresAtEpochSeconds,
   type StudioOAuthPrincipal,
 } from "@framerfordevs/auth";
 import {
@@ -65,12 +67,14 @@ const email = `m18-studio-runtime-${suffix}@example.test`;
 const password = "M18-Studio-Runtime-Authority-123!";
 const platform = makePlatformRepository({ studioApiOrigin: apiOrigin });
 const studio = makeStudioRepository({ apiOrigin });
+let studioAuthorityNow: Date | null = null;
 const runtimeAuth = createAuth({
   apiOrigin,
   dashboardOrigin,
   hostRoutingEnabled: true,
   nodeEnv: "production",
   oauthDeviceAuthorizationEnabled: true,
+  studioOAuthNow: () => studioAuthorityNow ?? new Date(),
   oauthRateLimitStorage: {
     consume: () => Promise.resolve({ allowed: true, retryAfter: null }),
   },
@@ -254,6 +258,72 @@ async function approveAuthorization() {
 }
 
 describe.sequential("M18A Studio runtime authority", () => {
+  it("fails closed without mutating a preexisting active nonportable mount", async () => {
+    const metadata = {
+      kind: "studio_v1",
+      registrationId,
+      registrationVersion,
+      projectId,
+      environmentId,
+      applicationOrigin,
+      mountPath: "/studio.v2",
+    };
+    await db
+      .update(studioRegistration)
+      .set({ mountPath: "/studio.v2" })
+      .where(eq(studioRegistration.id, registrationId));
+    await db.update(oauthClient).set({ metadata }).where(eq(oauthClient.clientId, clientId));
+
+    try {
+      const authorization = await Effect.runPromiseExit(studio.authorizeOAuth(clientId, userId));
+      expect(Exit.isFailure(authorization)).toBe(true);
+      if (Exit.isFailure(authorization)) {
+        expect(String(authorization.cause)).toContain("ForbiddenFailure");
+      }
+
+      const activation = await Effect.runPromiseExit(
+        platform.setStudioRuntime(
+          { kind: "user", id: AuthUserId.make(userId) },
+          ProjectId.make(projectId),
+          EnvironmentId.make(environmentId),
+          Schema.decodeUnknownSync(ControlPlaneSetStudioRuntimeRequest)({
+            commandId: randomUUID(),
+            expectedVersion: registrationVersion,
+            enabled: true,
+          }),
+          `m18b-runtime-nonportable-${suffix}`,
+        ),
+      );
+      expect(Exit.isFailure(activation)).toBe(true);
+      if (Exit.isFailure(activation)) {
+        expect(String(activation.cause)).toContain("InvalidStateTransitionFailure");
+      }
+      const [persisted] = await db
+        .select({
+          mountPath: studioRegistration.mountPath,
+          runtimeStatus: studioRegistration.runtimeStatus,
+          version: studioRegistration.version,
+        })
+        .from(studioRegistration)
+        .where(eq(studioRegistration.id, registrationId))
+        .limit(1);
+      expect(persisted).toEqual({
+        mountPath: "/studio.v2",
+        runtimeStatus: "active",
+        version: registrationVersion,
+      });
+    } finally {
+      await db
+        .update(studioRegistration)
+        .set({ mountPath: "/studio" })
+        .where(eq(studioRegistration.id, registrationId));
+      await db
+        .update(oauthClient)
+        .set({ metadata: { ...metadata, mountPath: "/studio" } })
+        .where(eq(oauthClient.clientId, clientId));
+    }
+  });
+
   it("gates real token claims on current authority and serves the bounded bootstrap", async () => {
     const { attempt, callback } = await approveAuthorization();
     const token = await request(app)
@@ -384,6 +454,120 @@ describe.sequential("M18A Studio runtime authority", () => {
     ).resolves.toEqual(expect.objectContaining({ formatVersion: 1 }));
   });
 
+  it("keeps the original eight-hour grant deadline across rotation", async () => {
+    const establishedAt = new Date(Date.now() - (STUDIO_GRANT_LIFETIME_SECONDS - 120) * 1_000);
+    studioAuthorityNow = establishedAt;
+    try {
+      const { attempt, callback } = await approveAuthorization();
+      const token = await request(app)
+        .post("/api/auth/oauth2/token")
+        .set("Host", "runtime-api.example.test")
+        .type("form")
+        .send(Object.fromEntries(harness.tokenBody(callback, attempt)));
+      expect(token.status, JSON.stringify(token.body)).toBe(200);
+      const tokenSet = harness.decodeTokenResponse(token.body);
+      const initialPrincipal = await verifyStudioToken(tokenSet.accessToken);
+      if (initialPrincipal === null) throw new Error("Expected deadline-bound Studio principal.");
+      const expectedDeadline = studioGrantExpiresAtEpochSeconds(establishedAt);
+      expect(initialPrincipal.grantExpiresAtEpochSeconds).toBe(expectedDeadline);
+
+      studioAuthorityNow = new Date();
+      const firstRefresh = await request(app)
+        .post("/api/auth/oauth2/token")
+        .set("Host", "runtime-api.example.test")
+        .type("form")
+        .send({
+          grant_type: "refresh_token",
+          refresh_token: tokenSet.refreshToken,
+          client_id: clientId,
+          resource,
+        });
+      expect(firstRefresh.status, JSON.stringify(firstRefresh.body)).toBe(200);
+      const firstRefreshed = harness.decodeTokenResponse(firstRefresh.body);
+      const firstRefreshedPrincipal = await verifyStudioToken(firstRefreshed.accessToken);
+      expect(firstRefreshedPrincipal?.grantExpiresAtEpochSeconds).toBe(expectedDeadline);
+
+      studioAuthorityNow = new Date(Date.now() + 30_000);
+      const secondRefresh = await request(app)
+        .post("/api/auth/oauth2/token")
+        .set("Host", "runtime-api.example.test")
+        .type("form")
+        .send({
+          grant_type: "refresh_token",
+          refresh_token: firstRefreshed.refreshToken,
+          client_id: clientId,
+          resource,
+        });
+      expect(secondRefresh.status, JSON.stringify(secondRefresh.body)).toBe(200);
+      const secondRefreshed = harness.decodeTokenResponse(secondRefresh.body);
+      const secondRefreshedPrincipal = await verifyStudioToken(secondRefreshed.accessToken);
+      expect(secondRefreshedPrincipal?.grantExpiresAtEpochSeconds).toBe(expectedDeadline);
+      const refreshedVerification = await runtimeAuth.api.verifyJWT({
+        body: { token: secondRefreshed.accessToken, issuer },
+        headers: new Headers({ host: "runtime-api.example.test" }),
+      });
+      expect(Number(refreshedVerification.payload?.exp)).toBeGreaterThan(expectedDeadline);
+      const [rotatedAuthority] = await db
+        .select({ expiresAt: oauthRefreshToken.expiresAt })
+        .from(oauthRefreshToken)
+        .where(
+          eq(
+            oauthRefreshToken.token,
+            createHash("sha256").update(secondRefreshed.refreshToken).digest("base64url"),
+          ),
+        )
+        .limit(1);
+      expect(rotatedAuthority?.expiresAt.getTime()).toBeGreaterThan(expectedDeadline * 1_000);
+
+      const afterOriginalDeadline = new Date((expectedDeadline + 1) * 1_000);
+      const verifyAfterDeadline = makeStudioOAuthAccessTokenVerifier({
+        authInstance: runtimeAuth,
+        issuer,
+        resource,
+        now: () => afterOriginalDeadline,
+      });
+      expect(await verifyAfterDeadline(secondRefreshed.accessToken)).toBeNull();
+
+      studioAuthorityNow = afterOriginalDeadline;
+      const deniedRefresh = await request(app)
+        .post("/api/auth/oauth2/token")
+        .set("Host", "runtime-api.example.test")
+        .type("form")
+        .send({
+          grant_type: "refresh_token",
+          refresh_token: secondRefreshed.refreshToken,
+          client_id: clientId,
+          resource,
+        });
+      expect(deniedRefresh.status).toBe(403);
+      expect(deniedRefresh.body).toEqual(expect.objectContaining({ error: "access_denied" }));
+      expect(deniedRefresh.body).not.toHaveProperty("access_token");
+      expect(deniedRefresh.body).not.toHaveProperty("refresh_token");
+
+      const expiredEstablishedAt = new Date(Date.now() - STUDIO_GRANT_LIFETIME_SECONDS * 1_000 - 1);
+      await db
+        .update(auditEvent)
+        .set({ occurredAt: expiredEstablishedAt })
+        .where(eq(auditEvent.id, initialPrincipal.auditMarkerId));
+      const deniedBootstrap = await Effect.runPromiseExit(
+        studio.getBootstrap({
+          principal: {
+            ...(secondRefreshedPrincipal ?? initialPrincipal),
+            grantExpiresAtEpochSeconds: studioGrantExpiresAtEpochSeconds(expiredEstablishedAt),
+          },
+          projectId: ProjectId.make(projectId),
+          environmentId: EnvironmentId.make(environmentId),
+        }),
+      );
+      expect(Exit.isFailure(deniedBootstrap)).toBe(true);
+      if (Exit.isFailure(deniedBootstrap)) {
+        expect(String(deniedBootstrap.cause)).toContain("StudioGrantInvalidFailure");
+      }
+    } finally {
+      studioAuthorityNow = null;
+    }
+  });
+
   it("revokes refresh and denies bootstrap immediately after user deactivation", async () => {
     const actorId = AuthUserId.make(userId);
     const deactivated = await Effect.runPromise(
@@ -429,6 +613,7 @@ describe.sequential("M18A Studio runtime authority", () => {
       environmentId,
       grantId: "00000000-0000-5000-8000-000000000001",
       auditMarkerId: "00000000-0000-5000-8000-000000000002",
+      grantExpiresAtEpochSeconds: Math.floor(Date.now() / 1_000) + 60,
       scopes: ["offline_access", "studio:session"],
       expiresAtEpochSeconds: Math.floor(Date.now() / 1_000) + 60,
     };

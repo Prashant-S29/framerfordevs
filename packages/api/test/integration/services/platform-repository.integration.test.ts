@@ -742,6 +742,80 @@ describe.sequential("platform repository PostgreSQL integration", () => {
     }),
   );
 
+  it.effect("rejects nonportable legacy mounts at activation without mutating the row", () =>
+    Effect.gen(function* () {
+      const ownerWorkspace = required(firstWorkspace, "first workspace");
+      const created = yield* repository.createProject(
+        firstActor,
+        yield* Schema.decodeUnknown(CreateProjectInput)({
+          workspaceId: ownerWorkspace.id,
+          name: "Legacy Studio Mount Project",
+          key: `legacy-studio-mount-${suffix}`,
+          description: null,
+        }),
+        "request-m18b-legacy-studio-mount-project",
+      );
+      yield* repository.enableCapability(
+        firstActor,
+        yield* Schema.decodeUnknown(EnableCapabilityInput)({
+          projectId: created.id,
+          capability: "cms",
+        }),
+        "request-m18b-legacy-studio-mount-cms",
+      );
+      const registered = yield* repository.putStudioRegistration(
+        { kind: "user", id: firstActor },
+        created.id,
+        created.environment.id,
+        yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+          commandId: randomUUID(),
+          expectedVersion: null,
+          applicationOrigin: "https://legacy-runtime.example.test",
+          mountPath: "/studio.v2",
+        }),
+        "request-m18b-legacy-studio-mount-register",
+      );
+      const activation = yield* Effect.exit(
+        repository.setStudioRuntime(
+          { kind: "user", id: firstActor },
+          created.id,
+          created.environment.id,
+          yield* Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+            commandId: randomUUID(),
+            expectedVersion: registered.registration.version,
+            enabled: true,
+          }),
+          "request-m18b-legacy-studio-mount-activate",
+        ),
+      );
+      const [persisted] = yield* Effect.promise(() =>
+        db
+          .select({
+            mountPath: studioRegistration.mountPath,
+            runtimeStatus: studioRegistration.runtimeStatus,
+            version: studioRegistration.version,
+          })
+          .from(studioRegistration)
+          .where(eq(studioRegistration.id, registered.registration.id))
+          .limit(1),
+      );
+      const derivedClients = yield* Effect.promise(() =>
+        db
+          .select({ id: oauthClient.id })
+          .from(oauthClient)
+          .where(eq(oauthClient.clientId, studioClientId(registered.registration.id))),
+      );
+
+      assert.strictEqual(failureTag(activation), "InvalidStateTransitionFailure");
+      assert.deepEqual(persisted, {
+        mountPath: "/studio.v2",
+        runtimeStatus: "inactive",
+        version: registered.registration.version,
+      });
+      assert.isEmpty(derivedClients);
+    }),
+  );
+
   it.effect(
     "atomically activates, invalidates, and revokes registration-derived Studio OAuth authority",
     () =>

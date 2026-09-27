@@ -10,7 +10,8 @@ export type StudioRuntimeTransitionFailureReason =
   | "cms_disabled"
   | "environment_mismatch"
   | "policy_denied"
-  | "oauth_user_grant_required";
+  | "oauth_user_grant_required"
+  | "mount_path_not_portable";
 
 export interface StudioRuntimeTransitionInput {
   readonly currentStatus: StudioRuntimeStatus;
@@ -26,6 +27,7 @@ export interface StudioRuntimeTransitionInput {
   readonly environmentMatches: boolean;
   readonly projectUpdateAllowed: boolean;
   readonly oauthUserGrant: boolean;
+  readonly mountPathPortable: boolean;
   readonly now: IsoDateTime;
 }
 
@@ -57,6 +59,7 @@ export function decideStudioRuntimeTransition(
   if (input.currentVersion !== input.expectedVersion) return denied("version_conflict");
   if (!input.environmentMatches) return denied("environment_mismatch");
   if (!input.projectUpdateAllowed) return denied("policy_denied");
+  if (input.enabled && !input.mountPathPortable) return denied("mount_path_not_portable");
 
   const status: StudioRuntimeStatus = input.enabled ? "active" : "inactive";
   if (status === input.currentStatus) {

@@ -59,6 +59,7 @@ import {
   StudioMountPath,
   StudioRegistration,
   StudioRegistrationId,
+  isPortableStudioMountPath,
 } from "../contracts/control-plane";
 import {
   type ArchiveProjectInput,
@@ -2197,6 +2198,7 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
               environmentMatches: true,
               projectUpdateAllowed: true,
               oauthUserGrant: actor.kind === "user",
+              mountPathPortable: isPortableStudioMountPath(current.mountPath),
               now: IsoDateTime.make(toIso(now)),
             });
             if (!decision.allowed) {

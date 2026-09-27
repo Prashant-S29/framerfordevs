@@ -65,6 +65,7 @@ function tokenAuthority() {
     environmentId,
     userId,
     grantId,
+    grantExpiresAtEpochSeconds: 28_800,
     clientId: `ffd-studio-v1-${registrationId}`,
     issuer: "https://api.example.test/api/auth",
     audience: "https://api.example.test/api/studio/v1",

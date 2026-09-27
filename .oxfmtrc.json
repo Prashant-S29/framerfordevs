@@ -5,6 +5,7 @@
     "apps/*/src/routeTree.gen.ts",
     "packages/db/src/migrations/**",
     "packages/public-contracts/artifacts/**",
-    "packages/public-contracts/baselines/**"
+    "packages/public-contracts/baselines/**",
+    "packages/studio/artifact/**"
   ]
 }
