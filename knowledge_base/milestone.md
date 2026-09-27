@@ -75,7 +75,7 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ### Milestone 18B — Studio mount and security runtime
 
-**Status:** `[R]` Full migration-free implementation complete and awaiting developer review; all five runtime packages, mounted shell, immutable Studio v1 baseline, Redis/refresh security authority, adapter parity, and validation evidence are present, but acceptance/publication/production rollout remain gated.
+**Status:** `[A]` Developer accepted, committed, and pushed `c38b7db`; the migration-free five-package runtime, mounted shell, immutable Studio v1 baseline, Redis/refresh security authority, adapter parity, and validation evidence passed with 1,559 tests plus 14 browser specifications. Publication, production configuration, rollout, and deployment remain gated.
 
 **Depends on:** accepted M18A.
 
@@ -93,7 +93,7 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ### Milestone 19 — Studio content and localization
 
-**Status:** Planned; design not started.
+**Status:** `[D]` Next design target; design not started.
 
 **Depends on:** M18B.
 

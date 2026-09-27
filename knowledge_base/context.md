@@ -1,8 +1,8 @@
 # Agent Session Context
 
 **Last updated:** 2026-09-27
-**Current phase:** M18B implementation is complete and awaiting developer review; the migration-free compatibility corrections, five runtime packages, mounted shell, immutable Studio contract baseline, security/concurrency evidence, and repository gates are complete, and the worker remains stopped
-**Next gate:** Developer review and accept or amend M18B; package publication, production configuration, rollout, deployment, commit, milestone acceptance, and M19 remain gated
+**Current phase:** M18B is developer-accepted, committed, and pushed at `c38b7db`; the migration-free compatibility corrections, five runtime packages, mounted shell, immutable Studio contract baseline, security/concurrency evidence, and repository gates are accepted, and the worker remains stopped
+**Next gate:** Design M19 Studio content and localization only; implementation, package publication, production configuration, rollout, and deployment remain separately gated
 
 ## Start here
 
@@ -20,7 +20,7 @@ Read relevant sections of `product.md` and `prd/cms.md` for behavioral work. Do 
 - Explicit current developer instruction, product/PRD, relevant rules/active criteria/approved decisions, then status documents govern intent in that order.
 - Committed source, tests, configuration, migrations, and generated artifacts describe executable truth; Git describes repository state.
 - Report drift instead of silently choosing an authority.
-- Work only on an approved active milestone or explicitly authorized workstream. M18A is accepted; M18B implementation is complete but not developer-accepted, and M19+ remains gated.
+- Work only on an approved active milestone or explicitly authorized workstream. M18A and M18B are accepted; M19 is the next design target, and M20+ remains gated.
 
 ## Product direction
 
@@ -133,9 +133,9 @@ The subsequent repository-normalization workstream also passed the complete read
 
 The accepted M17 baseline passes 1,422 tests, coverage, contract drift, formatting/lint/structure, 17 type tasks, and nine builds. Separate retry-free headless evidence passes ten browser specifications plus exhaustive 57-mapping dashboard transport and 52-route host/auth/CSRF matrices. Fresh Compose images are healthy, the worker remains stopped, and production ingress source restriction/DNS/TLS remains an M23 deployment gate rather than local acceptance evidence.
 
-The completed M18B candidate adds the five private `0.0.0` Studio runtime packages, immutable Studio v1 public-contract baseline, exact raw-target/origin/cookie/CSP authority, encrypted A256GCM attempts/sessions, restart-stable Redis quotas and pre-dispatch refresh fencing, Express/TanStack parity, an accessible responsive empty shell, bundle/package and fresh production-image inspection, 1,559 tests plus coverage, and 14 retry-free browser specifications. The production audit has no high/critical finding; four reviewed moderate findings are transitive Vitest dev-server tooling metadata through Better Auth. No migration, publication, production configuration, rollout, deployment, or commit occurred.
+The accepted M18B baseline at `c38b7db` adds the five private `0.0.0` Studio runtime packages, immutable Studio v1 public-contract baseline, exact raw-target/origin/cookie/CSP authority, encrypted A256GCM attempts/sessions, restart-stable Redis quotas and pre-dispatch refresh fencing, Express/TanStack parity, an accessible responsive empty shell, bundle/package and fresh production-image inspection, 1,559 tests plus coverage, and 14 retry-free browser specifications. The production audit has no high/critical finding; four reviewed moderate findings are transitive Vitest dev-server tooling metadata through Better Auth. No migration, publication, production configuration, rollout, or deployment occurred.
 
 ## Current work and next gate
 
-- **Current — M18B `[R]`:** the full migration-free Studio mount/security runtime is implemented and validated, including all five packages, immutable public contract, mounted shell, shared Redis authority, adapter parity, package inspection, and security/accessibility/concurrency evidence.
-- **Next — developer final review:** accept or amend M18B. Do not publish packages, configure production, roll out, deploy, commit, accept the milestone, or begin M19 for the developer.
+- **Current — M18B `[A]`:** the developer accepted, committed, and pushed the complete migration-free Studio mount/security runtime at `c38b7db`; package publication, production configuration, rollout, and deployment did not occur.
+- **Next — M19 design:** design Studio content and localization against the accepted M18 authority/runtime baseline; do not begin implementation, publish packages, configure production, roll out, or deploy without developer approval.

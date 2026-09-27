@@ -1,6 +1,6 @@
 # Milestone 18 Studio mount and security runtime design
 
-**Status:** M18A accepted; M18B design approved; full M18B implementation complete and awaiting developer review
+**Status:** M18A and M18B accepted; M18B committed and pushed at `c38b7db`
 
 **Date:** 2026-09-21
 **M18B revalidated:** 2026-09-26
@@ -118,7 +118,11 @@ The authorized runtime work is complete without a migration:
 - Added the accessible responsive mounted empty shell with explicit loading/login/session/denial/outage/logout and canonical dashboard recovery, shared UI primitives, TanStack Router/Query, browser forbidden-import coverage, a 127,924-byte gzip initial-transfer budget, finite tarball allowlists, adapter parity, and a retry-free Chromium mount/sign-in/bootstrap/sign-out/accessibility specification.
 - Registered and baseline-locked Studio v1 at 30,112 bytes and SHA-256 `f3a70dee4d72057a3df982a6b4a4ff5192daea850b57810cfeb7caa498ef5b03`; exposed it through the public-contract package and developer portal without adding SDK support.
 
-M18B now awaits final developer review. Package publication, production OAuth/configuration, rollout, deployment, commit, milestone acceptance, and M19 remain developer-controlled.
+## M18B acceptance — 2026-09-27
+
+Independent review found no unresolved correctness, security, reliability, performance, accessibility, DX, observability, or maintainability issue. The final evidence passed formatting/lint and 24-workspace structure, contract drift, 23 type tasks, 1,559 tests plus coverage, all 14 committed browser specifications, 14 production builds, bundle/package inspection, fresh production-image inspection, and the high/critical audit gate. The developer explicitly accepted M18B and committed and pushed it at `c38b7db`. No migration, package publication, production OAuth/configuration, rollout, or deployment occurred.
+
+M19 Studio content and localization is now the next design target; implementation remains separately gated.
 
 ## Decision summary
 
@@ -127,7 +131,7 @@ The original proposal combined a new platform OAuth/resource authority, a migrat
 - **M18A — Studio platform authority:** explicit registration activation, deterministic Studio OAuth clients, per-session user acknowledgement, shared abuse controls, token verification, security audit, one bounded server-to-server bootstrap API, and a private end-to-end OAuth conformance client.
 - **M18B — Studio mount and security runtime:** the developer-owned BFF, a production Redis store adapter, exact mounted assets/routes/cookies, Fetch core, Express and TanStack Start adapters, and the authenticated empty shell.
 
-M18A is accepted. The approved M18B implementation is complete and awaits final developer review. M19 remains blocked on M18B acceptance.
+M18A and M18B are accepted at `317a295` and `c38b7db`, respectively. M19 design is now unblocked; implementation remains developer-gated.
 
 The parent design makes four load-bearing choices:
 
