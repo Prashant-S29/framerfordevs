@@ -1,8 +1,8 @@
 # Agent Session Context
 
 **Last updated:** 2026-09-29
-**Current phase:** M19A Studio platform/content-protocol implementation and validation are complete and awaiting independent review; accepted implementation remains M18B at `c38b7db`, and the worker remains stopped
-**Next gate:** Independent M19A review; M19B and every release action remain gated
+**Current phase:** M19A Studio platform/content-protocol is developer-accepted, committed, and pushed at `788b782`; the worker remains stopped
+**Next gate:** Explicit M19B mounted Studio-experience implementation authorization; every release action remains gated
 
 ## Start here
 
@@ -20,7 +20,7 @@ Read relevant sections of `product.md` and `prd/cms.md` for behavioral work. Do 
 - Explicit current developer instruction, product/PRD, relevant rules/active criteria/approved decisions, then status documents govern intent in that order.
 - Committed source, tests, configuration, migrations, and generated artifacts describe executable truth; Git describes repository state.
 - Report drift instead of silently choosing an authority.
-- Work only on an approved active milestone or explicitly authorized workstream. M18A/M18B are accepted, the M19 design is approved, and M19A implementation is explicitly authorized; M19B and M20+ remain gated.
+- Work only on an approved active milestone or explicitly authorized workstream. M18A/M18B and M19A are accepted, the M19 design is approved, and M19B implementation plus M20+ remain gated.
 
 ## Product direction
 
@@ -107,8 +107,10 @@ Packages never import application source. Cross-package imports use declared exp
 | M14–M15    | Portable Control Plane bootstrap and governance automation parity                              |
 | M16        | Operational credentials/webhooks/audits/archive recovery across HTTP, CLI, and hosted controls |
 | M17        | Independent marketing/docs/dashboard surfaces and dashboard-session Control Plane ingress      |
+| M18A–M18B  | Studio delegation, secure framework-neutral mount, encrypted sessions, and empty shell         |
+| M19A       | Exact-locale Studio Content protocol, projection/search authority, and finite token-hiding BFF |
 
-M0–M17 are developer-approved and committed; M13 is `9c68942`, M14 `6ba124a`, M15 `5460c2b`, M16 `c3f9430`, and M17 `d6b506d`. Post-M13 repository/context normalization is `cd31102`, roadmap sequencing `2d0705a`, the public SDK/CLI boundary correction `d63f215`, and retired dashboard schema-route removal `5f6480d`. See `progress.md` for ordered outcomes, migrations, validation, roadmap status, and release state.
+M0–M19A are developer-approved and committed; M13 is `9c68942`, M14 `6ba124a`, M15 `5460c2b`, M16 `c3f9430`, M17 `d6b506d`, M18A `317a295`, M18B `c38b7db`, and M19A `788b782`. Post-M13 repository/context normalization is `cd31102`, roadmap sequencing `2d0705a`, the public SDK/CLI boundary correction `d63f215`, and retired dashboard schema-route removal `5f6480d`. See `progress.md` for ordered outcomes, migrations, validation, roadmap status, and release state.
 
 ## Architecture landmarks
 
@@ -135,7 +137,9 @@ The accepted M17 baseline passes 1,422 tests, coverage, contract drift, formatti
 
 The accepted M18B baseline at `c38b7db` adds the five private `0.0.0` Studio runtime packages, immutable Studio v1 public-contract baseline, exact raw-target/origin/cookie/CSP authority, encrypted A256GCM attempts/sessions, restart-stable Redis quotas and pre-dispatch refresh fencing, Express/TanStack parity, an accessible responsive empty shell, bundle/package and fresh production-image inspection, 1,559 tests plus coverage, and 14 retry-free browser specifications. The production audit has no high/critical finding; four reviewed moderate findings are transitive Vitest dev-server tooling metadata through Better Auth. No migration, publication, production configuration, rollout, or deployment occurred.
 
+The accepted M19A baseline at `788b782` adds immutable Studio Content v1, exact-locale projection/search/workspace and stable-ID mutation authority, a finite token-hiding BFF, durable projection-anomaly auditing, and developer-applied migration `0021`. Final evidence passes 1,642 tests, coverage, 23 type tasks, 14 browser specifications, 14 builds, load/query-plan gates, package/image inspection, and database invariants; no publication, production configuration, rollout, or deployment occurred.
+
 ## Current work and next gate
 
-- **Current — M19A review candidate:** Studio Content protocol/BFF authority, strict operation-specific response decoding, sidebar-only projection correctness, exhaustive transaction rollback/draft-isolation evidence, durable anomaly auditing, immutable artifact, developer-applied/catalog-verified migration `0021_add_studio_entry_name_search_index`, bounded load evidence, full readiness, browser, audit, package, changed-image, and final database-invariant gates pass.
-- **Next — independent M19A review:** stop for developer review; M19B, package publication, production configuration, rollout, deployment, commit, acceptance, and M20 remain gated.
+- **Current — M19A accepted:** Studio Content protocol/BFF authority, migration `0021_add_studio_entry_name_search_index`, immutable artifact, exhaustive validation, and final operational evidence are committed and pushed at `788b782`.
+- **Next — M19B authorization:** explicitly authorize the mounted Studio content experience before implementation; package publication, production configuration, rollout, deployment, M19 acceptance, and M20 remain gated.

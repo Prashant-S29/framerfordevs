@@ -93,7 +93,7 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ### Milestone 19 — Studio content and localization
 
-**Status:** `[R]` The authorized M19A Studio Content protocol, BFF, immutable artifact, developer-applied/catalog-verified migration `0021_add_studio_entry_name_search_index`, and final validation evidence are complete and awaiting independent review; M19B remains gated.
+**Status:** `[R]` M19A is developer-accepted, committed, and pushed at `788b782` with the Studio Content protocol, BFF, immutable artifact, developer-applied/catalog-verified migration `0021_add_studio_entry_name_search_index`, and final validation evidence. M19B mounted Studio-experience implementation awaits explicit developer authorization.
 
 **Depends on:** M18B.
 

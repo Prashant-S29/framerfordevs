@@ -1,6 +1,6 @@
 # Milestone 19 Studio content and localization design
 
-**Status:** Developer-approved design; the authorized M19A platform/content-protocol implementation is complete and awaiting independent review, while M19B remains gated
+**Status:** Developer-approved design; M19A platform/content protocol is accepted at `788b782`, while M19B implementation awaits explicit authorization
 
 **Date:** 2026-09-27
 
@@ -633,7 +633,7 @@ If implementation evidence shows a table/column, extension, backfill, persisted 
 
 Applicable format, lint, structure, contract drift, all type tasks, unit/integration/security/accessibility tests, coverage, audit, production builds/images, package inspection, bundle budgets, database invariants/query plans, and `git diff --check` must pass. Committed browser specifications run noninteractively through `pnpm test:browser`. The worker stays stopped during shared-database integration/coverage and is only restored if the developer directs it.
 
-The completed M19A review candidate passes format/lint/structure, contract drift, 23 type tasks, 1,642 tests plus coverage, all 14 retry-free browser specifications, and 14 builds. Rollback-isolated 100,000-entry evidence enforces the approved database p95 and index-plan targets, while separate 20-sample platform and BFF checks enforce the approved browse/search/workspace p95 targets. Exhaustive create/save failpoints leave no entry/revision/head/audit/receipt residue; draft operations create no publication, snapshot, publication-head, or outbox state. The finite BFF strictly decodes each operation-specific success DTO and rejects nested drift, status-incoherent failures, unsafe keys, redirects, cancellation leaks, and excessive payloads. The production audit has no high/critical finding; five moderate findings are unchanged test-tool dependency paths with no built-runtime references. Fresh changed server/developer images and the Studio-server tarball pass their applicable startup, residue, and allowlist checks. Final database invariants are clean and the worker remains stopped.
+The completed M19A review candidate passes format/lint/structure, contract drift, 23 type tasks, 1,642 tests plus coverage, all 14 retry-free browser specifications, and 14 builds. Rollback-isolated 100,000-entry evidence enforces the approved database p95 and index-plan targets, while separate 20-sample platform and BFF checks enforce the approved browse/search/workspace p95 targets. Exhaustive create/save failpoints leave no entry/revision/head/audit/receipt residue; draft operations create no publication, snapshot, publication-head, or outbox state. The finite BFF strictly decodes each operation-specific success DTO and rejects nested drift, status-incoherent failures, unsafe keys, redirects, cancellation leaks, and excessive payloads. The production audit has no high/critical finding; five moderate findings are unchanged test-tool dependency paths with no built-runtime references. Fresh changed server/developer images and the Studio-server tarball pass their applicable startup, residue, and allowlist checks. Final database invariants are clean and the worker remains stopped. The developer accepted, committed, and pushed this M19A baseline at `788b782`; no package publication, production configuration, rollout, or deployment occurred.
 
 ## Expected risks and pre-use confirmation
 
@@ -657,7 +657,7 @@ These are expected gates, not design blockers:
 
 ### M19B — mounted Studio experience
 
-1. Developer accepts M19A and authorizes M19B.
+1. M19A is accepted; the developer explicitly authorizes M19B implementation.
 2. Add lazy finite content routes and strict dependency-free browser decoders.
 3. Generalize `@content-form` minimally and add the first-party reference picker plus rebase kernel/UI composition.
 4. Implement context/list/search/new/workspace/create/rename/save, dirty guards, conflict/retry/drift recovery, and responsive accessibility states.
@@ -737,7 +737,7 @@ The separate API family preserves immutable baselines and keeps browser/BFF/plat
 
 ## Approved design decisions
 
-The developer approved these decisions, including the owner/developer zero-projection amendment above; implementation remains separately gated:
+The developer approved these decisions, including the owner/developer zero-projection amendment above; M19A is accepted and M19B implementation remains separately gated:
 
 1. New Studio Content v1 companion API; Studio v1 and Authoring v1 remain byte-identical.
 2. Existing Studio OAuth audience/scope/client/grant/session authority remains unchanged.
