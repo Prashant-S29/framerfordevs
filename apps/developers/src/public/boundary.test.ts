@@ -21,6 +21,7 @@ const apiReferenceUrls = new Set([
   "/api-reference/delivery/v1",
   "/api-reference/preview/v1",
   "/api-reference/studio/v1",
+  "/api-reference/studio-content/v1",
   "/api-reference/tooling/v1",
   "/api-reference/webhooks/v1",
 ]);
@@ -43,6 +44,7 @@ describe("developer portal public boundary", () => {
       "delivery/v1",
       "preview/v1",
       "studio/v1",
+      "studio-content/v1",
       "tooling/v1",
       "webhooks/v1",
     ]);

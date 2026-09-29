@@ -26,12 +26,22 @@ const absoluteGrantLifetimeMs = 8 * 60 * 60 * 1_000;
 const refreshWindowMs = 60 * 1_000;
 const maximumOAuthResponseBytes = 32 * 1_024;
 const maximumBootstrapResponseBytes = 64 * 1_024;
+const maximumContentRequestBytes = 1 * 1_024 * 1_024;
+const maximumContentSearchRequestBytes = 2 * 1_024;
+const maximumContentResponseBytes = 4 * 1_024 * 1_024;
 const maximumCookieHeaderBytes = 4 * 1_024;
 const csp =
   "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; manifest-src 'none'; worker-src 'none'; child-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
 export interface StudioServerTelemetryEvent {
-  readonly operation: "login" | "callback" | "bootstrap" | "refresh" | "logout" | "asset";
+  readonly operation:
+    | "login"
+    | "callback"
+    | "bootstrap"
+    | "content"
+    | "refresh"
+    | "logout"
+    | "asset";
   readonly outcome: "success" | "rejected" | "upstream_failure" | "store_failure";
   readonly status: number;
   readonly durationMs: number;
@@ -102,6 +112,7 @@ interface ValidatedConfig extends Omit<
   readonly revocationUrl: string;
   readonly resource: string;
   readonly bootstrapUrl: string;
+  readonly studioContentBaseUrl: string;
   readonly redirectUri: string;
   readonly clientId: string;
   readonly registrationDigest: string;
@@ -292,6 +303,7 @@ function validateConfig(input: StudioServerConfig): ValidatedConfig {
     revocationUrl: `${platformOrigin}/api/auth/oauth2/revoke`,
     resource: `${platformOrigin}/api/studio/v1`,
     bootstrapUrl: `${platformOrigin}/api/studio/v1/projects/${input.projectId}/environments/${input.environmentId}/bootstrap`,
+    studioContentBaseUrl: `${platformOrigin}/api/studio-content/v1/projects/${input.projectId}/environments/${input.environmentId}`,
     redirectUri: `${applicationOrigin}${input.mountPath}/auth/callback`,
     clientId: `ffd-studio-v1-${input.registrationId}`,
     registrationDigest,
@@ -605,12 +617,17 @@ function upstreamFetch(
   init: RequestInit,
 ): Effect.Effect<Response, StudioHttpFailure> {
   return Effect.tryPromise({
-    try: () =>
-      config.fetch(url, {
+    try: () => {
+      const timeoutSignal = AbortSignal.timeout(config.upstreamTimeoutMs);
+      return config.fetch(url, {
         ...init,
         redirect: "error",
-        signal: AbortSignal.timeout(config.upstreamTimeoutMs),
-      }),
+        signal:
+          init.signal === undefined || init.signal === null
+            ? timeoutSignal
+            : AbortSignal.any([init.signal, timeoutSignal]),
+      });
+    },
     catch: () =>
       new StudioHttpFailure({
         status: 503,
@@ -1457,10 +1474,1210 @@ function refreshSession(
   );
 }
 
+function loadContentSession(config: ValidatedConfig, request: Request) {
+  return Effect.gen(function* () {
+    const cookies = parseCookies(request.headers.get("cookie"));
+    const sessionKey = cookies?.get(config.sessionCookie);
+    if (sessionKey === undefined || !/^[A-Za-z0-9_-]{43}$/u.test(sessionKey)) {
+      return yield* new StudioHttpFailure({
+        status: 401,
+        code: "STUDIO_AUTH_REQUIRED",
+        message: "Studio authentication is required.",
+        outcome: "rejected",
+      });
+    }
+    const now = config.now();
+    const sessionDigest = digest(sessionKey);
+    yield* enforceRateLimit(
+      config,
+      `authenticated:${config.registrationDigest}`,
+      100,
+      10_000,
+      "Too many Studio requests.",
+    );
+    yield* enforceRateLimit(
+      config,
+      `session:${config.registrationDigest}:${sessionDigest}`,
+      20,
+      10_000,
+      "Too many Studio requests.",
+    );
+    const record = yield* config.store
+      .readSession(sessionDigest, config.registrationDigest, now)
+      .pipe(
+        Effect.mapError(
+          () =>
+            new StudioHttpFailure({
+              status: 503,
+              code: "STUDIO_UPSTREAM_UNAVAILABLE",
+              message: "Studio session storage is unavailable.",
+              outcome: "store_failure",
+            }),
+        ),
+      );
+    if (record === null) {
+      return yield* new StudioHttpFailure({
+        status: 401,
+        code: "STUDIO_SESSION_INVALID",
+        message: "The Studio session is no longer valid.",
+        outcome: "rejected",
+      });
+    }
+    let active = {
+      key: sessionKey,
+      record,
+      session: yield* Effect.try({
+        try: () => sessionFromRecord(config, record),
+        catch: () =>
+          new StudioHttpFailure({
+            status: 401,
+            code: "STUDIO_SESSION_INVALID",
+            message: "The Studio session is invalid.",
+            outcome: "rejected",
+          }),
+      }).pipe(
+        Effect.tapError(() =>
+          config.store
+            .deleteSession(record.sessionDigest, config.registrationDigest)
+            .pipe(Effect.catchAll(() => Effect.void)),
+        ),
+      ),
+      rotated: false,
+    };
+    if (active.session.grantExpiresAtEpochMs <= now) {
+      yield* config.store
+        .deleteSession(sessionDigest, config.registrationDigest)
+        .pipe(Effect.catchAll(() => Effect.void));
+      return yield* new StudioHttpFailure({
+        status: 401,
+        code: "STUDIO_SESSION_INVALID",
+        message: "The Studio session has expired.",
+        outcome: "rejected",
+      });
+    }
+    if (active.record.envelope.keyId !== config.keyRing.activeKeyId) {
+      const rotatedEnvelope = encryptStudioRecord(
+        config.keyRing,
+        {
+          kind: "session",
+          registrationDigest: config.registrationDigest,
+          recordDigest: active.record.sessionDigest,
+          expiresAtEpochMs: active.record.expiresAtEpochMs,
+          generation: active.record.generation,
+        },
+        active.session,
+      );
+      const reencrypted = yield* config.store
+        .reencryptSession(
+          active.record.sessionDigest,
+          config.registrationDigest,
+          active.record.generation,
+          rotatedEnvelope,
+        )
+        .pipe(
+          Effect.mapError(
+            () =>
+              new StudioHttpFailure({
+                status: 503,
+                code: "STUDIO_UPSTREAM_UNAVAILABLE",
+                message: "Studio session storage is unavailable.",
+                outcome: "store_failure",
+              }),
+          ),
+        );
+      if (reencrypted)
+        active = { ...active, record: { ...active.record, envelope: rotatedEnvelope } };
+    }
+    if (active.session.accessExpiresAtEpochMs <= now + refreshWindowMs) {
+      active = yield* refreshSession(config, active.record, sessionKey, now);
+    }
+    return active;
+  });
+}
+
+function studioContentErrorStatus(code: unknown): number | null {
+  switch (code) {
+    case "VALIDATION_ERROR":
+    case "INVALID_CURSOR":
+      return 400;
+    case "UNAUTHORIZED":
+      return 401;
+    case "FORBIDDEN":
+    case "STUDIO_REGISTRATION_INACTIVE":
+    case "STUDIO_AUTHORITY_CHANGED":
+    case "STUDIO_GRANT_INVALID":
+      return 403;
+    case "NOT_FOUND":
+    case "LOCALE_UNAVAILABLE":
+      return 404;
+    case "STUDIO_COLLECTION_CONFIGURATION_INVALID":
+    case "CMS_CAPABILITY_REQUIRED":
+    case "STALE_SCHEMA":
+    case "DRAFT_VERSION_CONFLICT":
+    case "NAME_VERSION_CONFLICT":
+    case "COMMAND_CONFLICT":
+    case "STALE_CURSOR":
+      return 409;
+    case "REQUEST_TOO_LARGE":
+    case "STUDIO_RESPONSE_TOO_LARGE":
+      return 413;
+    case "RATE_LIMITED":
+      return 429;
+    case "INTERNAL_ERROR":
+      return 500;
+    case "SERVICE_UNAVAILABLE":
+      return 503;
+    default:
+      return null;
+  }
+}
+const forbiddenStudioContentResponseKeys = new Set([
+  "accesstoken",
+  "refreshtoken",
+  "authorization",
+  "cookie",
+  "secret",
+  "sourcekey",
+  "apikey",
+  "visibletoroles",
+  "editablebyroles",
+  "roles",
+  "roleauthority",
+  "effectiveactions",
+  "membershipmetadata",
+  "rawactions",
+]);
+
+function safeStudioContentResponseValue(value: unknown): boolean {
+  const stack: Array<{ readonly value: unknown; readonly depth: number }> = [{ value, depth: 0 }];
+  let nodes = 0;
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === undefined) break;
+    nodes += 1;
+    if (nodes > 100_000 || current.depth > 32) return false;
+    if (typeof current.value === "string" && current.value.length > 1_000_000) return false;
+    if (typeof current.value !== "object" || current.value === null) continue;
+    if (Array.isArray(current.value)) {
+      for (const item of current.value) stack.push({ value: item, depth: current.depth + 1 });
+      continue;
+    }
+    for (const [key, item] of Object.entries(current.value)) {
+      const normalizedKey = key.toLocaleLowerCase("en-US").replaceAll(/[^a-z0-9]/gu, "");
+      if (forbiddenStudioContentResponseKeys.has(normalizedKey)) return false;
+      stack.push({ value: item, depth: current.depth + 1 });
+    }
+  }
+  return true;
+}
+
+function boundedStudioContentString(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+): value is string {
+  return typeof value === "string" && value.length >= minimum && value.length <= maximum;
+}
+
+function exactStudioContentKeys(
+  value: Readonly<Record<string, unknown>>,
+  keys: ReadonlyArray<string>,
+): boolean {
+  return Object.keys(value).toSorted().join(",") === [...keys].toSorted().join(",");
+}
+
+function validStudioContentCapabilities(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, [
+      "canCreate",
+      "canRename",
+      "canSaveLocalized",
+      "canSaveShared",
+    ]) &&
+    Object.values(value).every((entry) => typeof entry === "boolean")
+  );
+}
+
+function validStudioContentIsoDateTime(value: unknown): boolean {
+  return (
+    boundedStudioContentString(value, 20, 35) &&
+    typeof value === "string" &&
+    Number.isFinite(Date.parse(value))
+  );
+}
+
+function validStudioContentEntry(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, ["id", "displayName", "nameVersion", "createdAt", "updatedAt"]) &&
+    typeof value.id === "string" &&
+    uuid.test(value.id) &&
+    boundedStudioContentString(value.displayName, 1, 100) &&
+    Number.isSafeInteger(value.nameVersion) &&
+    Number(value.nameVersion) >= 1 &&
+    validStudioContentIsoDateTime(value.createdAt) &&
+    validStudioContentIsoDateTime(value.updatedAt)
+  );
+}
+
+function validStudioContentValidation(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    !exactStudioContentKeys(value, ["status", "issues", "capped"]) ||
+    (value.status !== "valid" &&
+      value.status !== "invalid" &&
+      value.status !== "restricted_issues") ||
+    !Array.isArray(value.issues) ||
+    value.issues.length > 50 ||
+    typeof value.capped !== "boolean"
+  ) {
+    return false;
+  }
+  return value.issues.every(
+    (issue) =>
+      isRecord(issue) &&
+      exactStudioContentKeys(issue, [
+        "fieldId",
+        "path",
+        "scope",
+        "localeId",
+        "locale",
+        "code",
+        "message",
+      ]) &&
+      typeof issue.fieldId === "string" &&
+      uuid.test(issue.fieldId) &&
+      boundedStudioContentString(issue.path, 1, 256) &&
+      (issue.scope === "shared" || issue.scope === "localized") &&
+      (issue.localeId === null ||
+        (typeof issue.localeId === "string" && uuid.test(issue.localeId))) &&
+      (issue.locale === null || boundedStudioContentString(issue.locale, 2, 35)) &&
+      boundedStudioContentString(issue.code, 1, 64) &&
+      typeof issue.code === "string" &&
+      /^[a-z][a-z0-9_]{0,63}$/u.test(issue.code) &&
+      boundedStudioContentString(issue.message, 1, 512),
+  );
+}
+
+const studioFieldConfigurationKeys: Readonly<Record<string, ReadonlyArray<string>>> = {
+  short_text: ["minLength", "maxLength", "pattern", "default"],
+  long_text: ["minLength", "maxLength", "pattern", "default"],
+  rich_text: ["styles", "decorators", "links", "lists", "minLength", "maxLength", "default"],
+  number: ["mode", "minimum", "maximum", "default"],
+  decimal: ["precision", "scale", "minimum", "maximum", "default"],
+  money: ["currencies", "allowNegative", "default"],
+  boolean: ["default"],
+  date: ["minimum", "maximum", "default"],
+  date_time: ["minimum", "maximum", "default"],
+  enum: ["options", "default"],
+  url: ["default"],
+  email: ["default"],
+  slug: ["minLength", "maxLength", "pattern", "default"],
+  json: ["maxBytes", "maxDepth", "default"],
+  object: ["default"],
+  list: ["minItems", "maxItems", "uniqueItems", "default"],
+  reference: ["targetCollectionId"],
+  external_asset: ["default"],
+};
+
+function optionalFiniteNumber(value: unknown): boolean {
+  return value === undefined || (typeof value === "number" && Number.isFinite(value));
+}
+
+function optionalInteger(value: unknown): boolean {
+  return value === undefined || Number.isSafeInteger(value);
+}
+
+function optionalBoundedString(value: unknown, maximum: number): boolean {
+  return value === undefined || boundedStudioContentString(value, 0, maximum);
+}
+
+const exactDecimal = /^(?:0|-[1-9][0-9]*|[1-9][0-9]*)(?:\.[0-9]*[1-9])?$/u;
+const exactDate = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/u;
+const enumOptionValue = /^[a-z][a-z0-9_]{0,62}$/u;
+const portableTextKey = /^[A-Za-z0-9_-]+$/u;
+
+function optionalPatternString(value: unknown, pattern: RegExp, maximum: number): boolean {
+  return (
+    value === undefined ||
+    (boundedStudioContentString(value, 1, maximum) &&
+      typeof value === "string" &&
+      pattern.test(value))
+  );
+}
+
+function onlyStudioContentKeys(
+  value: Readonly<Record<string, unknown>>,
+  keys: ReadonlyArray<string>,
+): boolean {
+  return Object.keys(value).every((key) => keys.includes(key));
+}
+
+function validPortableTextSpan(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, ["_key", "_type", "text", "marks"]) &&
+    boundedStudioContentString(value._key, 1, 64) &&
+    portableTextKey.test(value._key) &&
+    value._type === "span" &&
+    boundedStudioContentString(value.text, 0, 100_000) &&
+    Array.isArray(value.marks) &&
+    value.marks.length <= 32 &&
+    value.marks.every((mark) => boundedStudioContentString(mark, 1, 64))
+  );
+}
+
+function validPortableTextLink(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, ["_key", "_type", "href"]) &&
+    boundedStudioContentString(value._key, 1, 64) &&
+    portableTextKey.test(value._key) &&
+    value._type === "link" &&
+    boundedStudioContentString(value.href, 1, 2_048)
+  );
+}
+
+function validPortableTextDocument(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    !exactStudioContentKeys(value, ["version", "profile", "blocks"]) ||
+    value.version !== 1 ||
+    value.profile !== "ffd-portable-text" ||
+    !Array.isArray(value.blocks) ||
+    value.blocks.length > 500
+  ) {
+    return false;
+  }
+  return value.blocks.every(
+    (block) =>
+      isRecord(block) &&
+      onlyStudioContentKeys(block, [
+        "_key",
+        "_type",
+        "style",
+        "listItem",
+        "level",
+        "children",
+        "markDefs",
+      ]) &&
+      ["_key", "_type", "style", "children", "markDefs"].every((key) => key in block) &&
+      boundedStudioContentString(block._key, 1, 64) &&
+      portableTextKey.test(block._key) &&
+      block._type === "block" &&
+      (block.style === "normal" ||
+        block.style === "h2" ||
+        block.style === "h3" ||
+        block.style === "h4" ||
+        block.style === "h5" ||
+        block.style === "h6" ||
+        block.style === "blockquote") &&
+      (block.listItem === undefined ||
+        block.listItem === "bullet" ||
+        block.listItem === "number") &&
+      (block.level === undefined || block.level === 1 || block.level === 2 || block.level === 3) &&
+      Array.isArray(block.children) &&
+      block.children.length <= 5_000 &&
+      block.children.every(validPortableTextSpan) &&
+      Array.isArray(block.markDefs) &&
+      block.markDefs.length <= 1_000 &&
+      block.markDefs.every(validPortableTextLink),
+  );
+}
+
+function validExternalAsset(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, ["source", "url", "kind", "title", "alt", "width", "height"]) &&
+    value.source === "external" &&
+    boundedStudioContentString(value.url, 1, 2_048) &&
+    (value.kind === "image" ||
+      value.kind === "video" ||
+      value.kind === "audio" ||
+      value.kind === "document" ||
+      value.kind === "archive" ||
+      value.kind === "other") &&
+    (value.title === null || boundedStudioContentString(value.title, 0, 500)) &&
+    (value.alt === null || boundedStudioContentString(value.alt, 0, 500)) &&
+    (value.width === null ||
+      (Number.isInteger(value.width) &&
+        Number(value.width) >= 1 &&
+        Number(value.width) <= 100_000)) &&
+    (value.height === null ||
+      (Number.isInteger(value.height) &&
+        Number(value.height) >= 1 &&
+        Number(value.height) <= 100_000))
+  );
+}
+
+function validStudioContentFieldConfiguration(kind: unknown, value: unknown): boolean {
+  if (typeof kind !== "string" || !isRecord(value)) return false;
+  const allowed = studioFieldConfigurationKeys[kind];
+  if (allowed === undefined || Object.keys(value).some((key) => !allowed.includes(key)))
+    return false;
+  switch (kind) {
+    case "short_text":
+    case "long_text":
+    case "slug":
+      return (
+        optionalInteger(value.minLength) &&
+        optionalInteger(value.maxLength) &&
+        optionalBoundedString(value.pattern, 256) &&
+        optionalBoundedString(
+          value.default,
+          kind === "long_text" ? 50_000 : kind === "slug" ? 200 : 500,
+        )
+      );
+    case "rich_text":
+      return (
+        (value.styles === undefined ||
+          (Array.isArray(value.styles) &&
+            value.styles.every(
+              (item) =>
+                item === "normal" ||
+                item === "h2" ||
+                item === "h3" ||
+                item === "h4" ||
+                item === "h5" ||
+                item === "h6" ||
+                item === "blockquote",
+            ))) &&
+        (value.decorators === undefined ||
+          (Array.isArray(value.decorators) &&
+            value.decorators.every(
+              (item) =>
+                item === "strong" ||
+                item === "em" ||
+                item === "underline" ||
+                item === "strike-through" ||
+                item === "code",
+            ))) &&
+        (value.links === undefined || typeof value.links === "boolean") &&
+        (value.lists === undefined ||
+          (Array.isArray(value.lists) &&
+            value.lists.every((item) => item === "bullet" || item === "number"))) &&
+        optionalInteger(value.minLength) &&
+        optionalInteger(value.maxLength) &&
+        (value.default === undefined || validPortableTextDocument(value.default))
+      );
+    case "number":
+      return (
+        (value.mode === undefined || value.mode === "integer" || value.mode === "floating_point") &&
+        optionalFiniteNumber(value.minimum) &&
+        optionalFiniteNumber(value.maximum) &&
+        optionalFiniteNumber(value.default)
+      );
+    case "decimal":
+      return (
+        (value.precision === undefined ||
+          (Number.isInteger(value.precision) &&
+            Number(value.precision) >= 1 &&
+            Number(value.precision) <= 38)) &&
+        (value.scale === undefined ||
+          (Number.isInteger(value.scale) &&
+            Number(value.scale) >= 0 &&
+            Number(value.scale) <= 18)) &&
+        optionalPatternString(value.minimum, exactDecimal, 58) &&
+        optionalPatternString(value.maximum, exactDecimal, 58) &&
+        optionalPatternString(value.default, exactDecimal, 58)
+      );
+    case "money":
+      return (
+        Array.isArray(value.currencies) &&
+        value.currencies.length >= 1 &&
+        value.currencies.length <= 50 &&
+        value.currencies.every(
+          (currency) => typeof currency === "string" && /^[A-Z]{3}$/u.test(currency),
+        ) &&
+        new Set(value.currencies).size === value.currencies.length &&
+        (value.allowNegative === undefined || typeof value.allowNegative === "boolean") &&
+        (value.default === undefined ||
+          (isRecord(value.default) &&
+            exactStudioContentKeys(value.default, ["amount", "currency"]) &&
+            boundedStudioContentString(value.default.amount, 1, 58) &&
+            typeof value.default.amount === "string" &&
+            exactDecimal.test(value.default.amount) &&
+            typeof value.default.currency === "string" &&
+            /^[A-Z]{3}$/u.test(value.default.currency)))
+      );
+    case "boolean":
+      return value.default === undefined || typeof value.default === "boolean";
+    case "date":
+      return (
+        optionalPatternString(value.minimum, exactDate, 10) &&
+        optionalPatternString(value.maximum, exactDate, 10) &&
+        optionalPatternString(value.default, exactDate, 10)
+      );
+    case "date_time":
+      return (
+        optionalBoundedString(value.minimum, 35) &&
+        optionalBoundedString(value.maximum, 35) &&
+        optionalBoundedString(value.default, 35)
+      );
+    case "enum":
+      return (
+        Array.isArray(value.options) &&
+        value.options.length >= 1 &&
+        value.options.length <= 100 &&
+        value.options.every(
+          (option) =>
+            isRecord(option) &&
+            exactStudioContentKeys(option, ["id", "value", "label", "position"]) &&
+            typeof option.id === "string" &&
+            uuid.test(option.id) &&
+            boundedStudioContentString(option.value, 1, 63) &&
+            typeof option.value === "string" &&
+            enumOptionValue.test(option.value) &&
+            boundedStudioContentString(option.label, 1, 100) &&
+            Number.isInteger(option.position) &&
+            Number(option.position) >= 0 &&
+            Number(option.position) <= 99,
+        ) &&
+        optionalPatternString(value.default, enumOptionValue, 63)
+      );
+    case "url":
+      return optionalBoundedString(value.default, 2_048);
+    case "email":
+      return optionalBoundedString(value.default, 254);
+    case "json":
+      return optionalInteger(value.maxBytes) && optionalInteger(value.maxDepth);
+    case "object":
+      return true;
+    case "list":
+      return (
+        optionalInteger(value.minItems) &&
+        optionalInteger(value.maxItems) &&
+        (value.uniqueItems === undefined || typeof value.uniqueItems === "boolean")
+      );
+    case "reference":
+      return typeof value.targetCollectionId === "string" && uuid.test(value.targetCollectionId);
+    case "external_asset":
+      return value.default === undefined || validExternalAsset(value.default);
+    default:
+      return false;
+  }
+}
+
+function validStudioContentFormField(value: unknown, depth = 0): boolean {
+  if (
+    depth > 24 ||
+    !isRecord(value) ||
+    !exactStudioContentKeys(value, [
+      "id",
+      "parentFieldId",
+      "nodeRole",
+      "displayLabel",
+      "kind",
+      "required",
+      "localization",
+      "position",
+      "helpText",
+      "placeholder",
+      "configuration",
+      "children",
+    ]) ||
+    typeof value.id !== "string" ||
+    !uuid.test(value.id) ||
+    !(
+      value.parentFieldId === null ||
+      (typeof value.parentFieldId === "string" && uuid.test(value.parentFieldId))
+    ) ||
+    (value.nodeRole !== "root" &&
+      value.nodeRole !== "object_property" &&
+      value.nodeRole !== "list_item") ||
+    !(value.displayLabel === null || boundedStudioContentString(value.displayLabel, 1, 100)) ||
+    typeof value.kind !== "string" ||
+    !(value.kind in studioFieldConfigurationKeys) ||
+    !(value.required === null || typeof value.required === "boolean") ||
+    !(
+      value.localization === null ||
+      value.localization === "shared" ||
+      value.localization === "localized" ||
+      value.localization === "mixed"
+    ) ||
+    !Number.isInteger(value.position) ||
+    Number(value.position) < 0 ||
+    Number(value.position) > 99 ||
+    !(value.helpText === null || boundedStudioContentString(value.helpText, 0, 500)) ||
+    !(value.placeholder === null || boundedStudioContentString(value.placeholder, 0, 200)) ||
+    !validStudioContentFieldConfiguration(value.kind, value.configuration) ||
+    !Array.isArray(value.children) ||
+    value.children.length > 100
+  ) {
+    return false;
+  }
+  return value.children.every((child) => validStudioContentFormField(child, depth + 1));
+}
+
+function validStudioContentPlacement(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, ["id", "fieldId", "position", "helpTextOverride"]) &&
+    typeof value.id === "string" &&
+    uuid.test(value.id) &&
+    typeof value.fieldId === "string" &&
+    uuid.test(value.fieldId) &&
+    Number.isInteger(value.position) &&
+    Number(value.position) >= 0 &&
+    Number(value.position) <= 99 &&
+    (value.helpTextOverride === null || boundedStudioContentString(value.helpTextOverride, 0, 500))
+  );
+}
+
+function validStudioContentGroup(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, [
+      "id",
+      "title",
+      "description",
+      "position",
+      "columns",
+      "fields",
+    ]) &&
+    typeof value.id === "string" &&
+    uuid.test(value.id) &&
+    boundedStudioContentString(value.title, 1, 100) &&
+    (value.description === null || boundedStudioContentString(value.description, 0, 500)) &&
+    Number.isInteger(value.position) &&
+    Number(value.position) >= 0 &&
+    Number(value.position) <= 19 &&
+    (value.columns === 1 || value.columns === 2) &&
+    Array.isArray(value.fields) &&
+    value.fields.length <= 100 &&
+    value.fields.every(validStudioContentPlacement)
+  );
+}
+
+function validStudioContentForm(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    !exactStudioContentKeys(value, [
+      "collectionId",
+      "schemaRevisionId",
+      "contractHash",
+      "canEdit",
+      "fields",
+      "editableFieldIds",
+      "tabs",
+      "sidebarGroups",
+      "currencyMinorUnits",
+    ]) ||
+    typeof value.collectionId !== "string" ||
+    !uuid.test(value.collectionId) ||
+    typeof value.schemaRevisionId !== "string" ||
+    !uuid.test(value.schemaRevisionId) ||
+    typeof value.contractHash !== "string" ||
+    !/^[0-9a-f]{64}$/u.test(value.contractHash) ||
+    typeof value.canEdit !== "boolean" ||
+    !Array.isArray(value.fields) ||
+    value.fields.length > 100 ||
+    !value.fields.every((field) => validStudioContentFormField(field)) ||
+    !Array.isArray(value.editableFieldIds) ||
+    value.editableFieldIds.length > 100 ||
+    value.editableFieldIds.some((id) => typeof id !== "string" || !uuid.test(id)) ||
+    !Array.isArray(value.tabs) ||
+    value.tabs.length > 10 ||
+    !Array.isArray(value.sidebarGroups) ||
+    value.sidebarGroups.length > 10 ||
+    (value.tabs.length === 0 && value.sidebarGroups.length === 0) ||
+    !value.sidebarGroups.every(validStudioContentGroup) ||
+    !isRecord(value.currencyMinorUnits) ||
+    Object.entries(value.currencyMinorUnits).some(
+      ([currency, units]) =>
+        !/^[A-Z]{3}$/u.test(currency) ||
+        !Number.isInteger(units) ||
+        Number(units) < 0 ||
+        Number(units) > 3,
+    )
+  ) {
+    return false;
+  }
+  return value.tabs.every(
+    (tab) =>
+      isRecord(tab) &&
+      exactStudioContentKeys(tab, ["id", "title", "description", "position", "groups"]) &&
+      typeof tab.id === "string" &&
+      uuid.test(tab.id) &&
+      boundedStudioContentString(tab.title, 1, 100) &&
+      (tab.description === null || boundedStudioContentString(tab.description, 0, 500)) &&
+      Number.isInteger(tab.position) &&
+      Number(tab.position) >= 0 &&
+      Number(tab.position) <= 9 &&
+      Array.isArray(tab.groups) &&
+      tab.groups.length >= 1 &&
+      tab.groups.length <= 20 &&
+      tab.groups.every(validStudioContentGroup),
+  );
+}
+
+function validStudioContentPage(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, ["items", "hasMore", "nextCursor", "count"]) &&
+    Array.isArray(value.items) &&
+    value.items.length <= 50 &&
+    value.items.every(validStudioContentEntry) &&
+    typeof value.hasMore === "boolean" &&
+    (value.nextCursor === null || boundedStudioContentString(value.nextCursor, 1, 1_024)) &&
+    isRecord(value.count) &&
+    exactStudioContentKeys(value.count, ["value", "relation"]) &&
+    Number.isInteger(value.count.value) &&
+    Number(value.count.value) >= 0 &&
+    Number(value.count.value) <= 1_000 &&
+    (value.count.relation === "exact" ||
+      (value.count.relation === "at_least" && value.count.value === 1_000))
+  );
+}
+
+type StudioContentSuccessKind =
+  | "context"
+  | "page"
+  | "new_workspace"
+  | "entry_workspace"
+  | "create"
+  | "rename"
+  | "save";
+
+function validStudioContentEntryValues(value: unknown): boolean {
+  return isRecord(value) && Object.keys(value).every((key) => uuid.test(key));
+}
+
+function validStudioContentSuccessData(kind: StudioContentSuccessKind, value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (kind === "page") return validStudioContentPage(value);
+  if (kind === "rename") return validStudioContentEntry(value);
+  if (kind === "context") {
+    return (
+      exactStudioContentKeys(value, ["locales", "collections", "configurationNotices"]) &&
+      Array.isArray(value.locales) &&
+      value.locales.length <= 100 &&
+      value.locales.every(
+        (locale) =>
+          isRecord(locale) &&
+          exactStudioContentKeys(locale, ["id", "tag", "displayName", "canRead", "canWrite"]) &&
+          typeof locale.id === "string" &&
+          uuid.test(locale.id) &&
+          boundedStudioContentString(locale.tag, 2, 35) &&
+          boundedStudioContentString(locale.displayName, 1, 100) &&
+          locale.canRead === true &&
+          typeof locale.canWrite === "boolean",
+      ) &&
+      Array.isArray(value.collections) &&
+      value.collections.length <= 50 &&
+      value.collections.every(
+        (collection) =>
+          isRecord(collection) &&
+          exactStudioContentKeys(collection, ["id", "displayName", "capabilities"]) &&
+          typeof collection.id === "string" &&
+          uuid.test(collection.id) &&
+          boundedStudioContentString(collection.displayName, 1, 100) &&
+          validStudioContentCapabilities(collection.capabilities),
+      ) &&
+      Array.isArray(value.configurationNotices) &&
+      value.configurationNotices.length <= 50 &&
+      value.configurationNotices.every(
+        (notice) =>
+          isRecord(notice) &&
+          exactStudioContentKeys(notice, ["collectionId", "displayName", "reason"]) &&
+          typeof notice.collectionId === "string" &&
+          uuid.test(notice.collectionId) &&
+          boundedStudioContentString(notice.displayName, 1, 100) &&
+          (notice.reason === "empty_schema" || notice.reason === "projection_invalid"),
+      )
+    );
+  }
+  if (kind === "new_workspace" || kind === "entry_workspace") {
+    const expected =
+      kind === "new_workspace"
+        ? ["localeId", "locale", "form", "capabilities"]
+        : ["localeId", "locale", "form", "capabilities", "draft"];
+    if (
+      !exactStudioContentKeys(value, expected) ||
+      typeof value.localeId !== "string" ||
+      !uuid.test(value.localeId) ||
+      !boundedStudioContentString(value.locale, 2, 35) ||
+      !validStudioContentForm(value.form) ||
+      !validStudioContentCapabilities(value.capabilities)
+    ) {
+      return false;
+    }
+    if (kind === "new_workspace") return true;
+    const draft = value.draft;
+    return (
+      isRecord(draft) &&
+      exactStudioContentKeys(draft, [
+        "entry",
+        "schemaRevisionId",
+        "contractHash",
+        "sharedVersion",
+        "sharedRevisionId",
+        "sharedValues",
+        "localizedVersion",
+        "localizedRevisionId",
+        "localizedValues",
+        "validation",
+      ]) &&
+      validStudioContentEntry(draft.entry) &&
+      typeof draft.schemaRevisionId === "string" &&
+      uuid.test(draft.schemaRevisionId) &&
+      typeof draft.contractHash === "string" &&
+      /^[0-9a-f]{64}$/u.test(draft.contractHash) &&
+      Number.isSafeInteger(draft.sharedVersion) &&
+      Number(draft.sharedVersion) >= 0 &&
+      (draft.sharedRevisionId === null ||
+        (typeof draft.sharedRevisionId === "string" && uuid.test(draft.sharedRevisionId))) &&
+      validStudioContentEntryValues(draft.sharedValues) &&
+      Number.isSafeInteger(draft.localizedVersion) &&
+      Number(draft.localizedVersion) >= 0 &&
+      (draft.localizedRevisionId === null ||
+        (typeof draft.localizedRevisionId === "string" && uuid.test(draft.localizedRevisionId))) &&
+      validStudioContentEntryValues(draft.localizedValues) &&
+      validStudioContentValidation(draft.validation)
+    );
+  }
+  if (kind === "create") {
+    return (
+      exactStudioContentKeys(value, [
+        "entry",
+        "commandId",
+        "sharedVersion",
+        "sharedRevisionId",
+        "localizedVersion",
+        "localizedRevisionId",
+        "validation",
+      ]) &&
+      validStudioContentEntry(value.entry) &&
+      typeof value.commandId === "string" &&
+      uuid.test(value.commandId) &&
+      Number.isSafeInteger(value.sharedVersion) &&
+      Number(value.sharedVersion) >= 0 &&
+      (value.sharedRevisionId === null ||
+        (typeof value.sharedRevisionId === "string" && uuid.test(value.sharedRevisionId))) &&
+      Number.isSafeInteger(value.localizedVersion) &&
+      Number(value.localizedVersion) >= 0 &&
+      (value.localizedRevisionId === null ||
+        (typeof value.localizedRevisionId === "string" && uuid.test(value.localizedRevisionId))) &&
+      validStudioContentValidation(value.validation)
+    );
+  }
+  return (
+    exactStudioContentKeys(value, [
+      "entryId",
+      "commandId",
+      "sharedChanged",
+      "sharedVersion",
+      "sharedRevisionId",
+      "localizedChanged",
+      "localizedVersion",
+      "localizedRevisionId",
+      "validation",
+    ]) &&
+    typeof value.entryId === "string" &&
+    uuid.test(value.entryId) &&
+    typeof value.commandId === "string" &&
+    uuid.test(value.commandId) &&
+    typeof value.sharedChanged === "boolean" &&
+    Number.isSafeInteger(value.sharedVersion) &&
+    Number(value.sharedVersion) >= 0 &&
+    (value.sharedRevisionId === null ||
+      (typeof value.sharedRevisionId === "string" && uuid.test(value.sharedRevisionId))) &&
+    typeof value.localizedChanged === "boolean" &&
+    Number.isSafeInteger(value.localizedVersion) &&
+    Number(value.localizedVersion) >= 0 &&
+    (value.localizedRevisionId === null ||
+      (typeof value.localizedRevisionId === "string" && uuid.test(value.localizedRevisionId))) &&
+    validStudioContentValidation(value.validation)
+  );
+}
+
+function validStudioContentErrorDetail(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const allowed = new Set([
+    "path",
+    "code",
+    "message",
+    "scope",
+    "expectedVersion",
+    "currentVersion",
+    "currentRevisionId",
+  ]);
+  return (
+    Object.keys(value).every((key) => allowed.has(key)) &&
+    boundedStudioContentString(value.code, 1, 64) &&
+    boundedStudioContentString(value.message, 1, 512) &&
+    (value.path === undefined || boundedStudioContentString(value.path, 0, 256)) &&
+    (value.scope === undefined || value.scope === "shared" || value.scope === "localized") &&
+    (value.expectedVersion === undefined ||
+      (Number.isSafeInteger(value.expectedVersion) && Number(value.expectedVersion) >= 0)) &&
+    (value.currentVersion === undefined ||
+      (Number.isSafeInteger(value.currentVersion) && Number(value.currentVersion) >= 0)) &&
+    (value.currentRevisionId === undefined ||
+      value.currentRevisionId === null ||
+      (typeof value.currentRevisionId === "string" && uuid.test(value.currentRevisionId)))
+  );
+}
+
+function validStudioContentEnvelope(
+  value: unknown,
+  status: number,
+  successKind: StudioContentSuccessKind,
+): value is Readonly<Record<string, unknown>> {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).sort().join(",") !== "data,error,message,ok" ||
+    !boundedStudioContentString(value.message, 1, 512) ||
+    !safeStudioContentResponseValue(value)
+  ) {
+    return false;
+  }
+  if (value.ok === true) {
+    return (
+      status === 200 &&
+      value.error === null &&
+      validStudioContentSuccessData(successKind, value.data)
+    );
+  }
+  if (value.ok !== false || status < 400 || status > 599 || value.data !== null) return false;
+  const error = value.error;
+  if (!isRecord(error)) return false;
+  const allowed = new Set([
+    "code",
+    "message",
+    "details",
+    "configurationReason",
+    "retryable",
+    "requestId",
+  ]);
+  const expectedStatus = studioContentErrorStatus(error.code);
+  const configurationReasonIsCoherent =
+    error.code === "STUDIO_COLLECTION_CONFIGURATION_INVALID"
+      ? error.configurationReason === "empty_schema" ||
+        error.configurationReason === "projection_invalid"
+      : error.configurationReason === undefined;
+  return (
+    Object.keys(error).every((key) => allowed.has(key)) &&
+    expectedStatus !== null &&
+    status === expectedStatus &&
+    boundedStudioContentString(error.message, 1, 512) &&
+    typeof error.retryable === "boolean" &&
+    boundedStudioContentString(error.requestId, 1, 128) &&
+    configurationReasonIsCoherent &&
+    (error.details === undefined ||
+      (Array.isArray(error.details) &&
+        error.details.length >= 1 &&
+        error.details.length <= 20 &&
+        error.details.every(validStudioContentErrorDetail)))
+  );
+}
+
+interface StudioContentTarget {
+  readonly upstreamPath: string;
+  readonly bodyAllowed: boolean;
+  readonly successKind: StudioContentSuccessKind;
+}
+
+function studioContentTarget(
+  route: string,
+  query: string,
+  method: string,
+): StudioContentTarget | null {
+  if (route === "/api/content/context" && method === "GET" && query === "") {
+    return { upstreamPath: "/context", bodyAllowed: false, successKind: "context" };
+  }
+  const match =
+    /^\/api\/content\/collections\/([^/]+)\/locales\/([^/]+)\/entries(?:\/(.*))?$/u.exec(route);
+  if (match === null || !uuid.test(match[1] ?? "")) return null;
+  const collectionId = match[1] as string;
+  const locale = match[2] ?? "";
+  if (!/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/u.test(locale) || locale.length > 35) return null;
+  const suffix = match[3];
+  const base = `/collections/${collectionId}/locales/${locale}/entries`;
+  if (suffix === undefined && method === "GET") {
+    const parameters = new URLSearchParams(query);
+    const keys = [...parameters.keys()];
+    if (
+      keys.some((key) => key !== "cursor" && key !== "limit") ||
+      new Set(keys).size !== keys.length
+    ) {
+      return null;
+    }
+    const cursor = parameters.get("cursor");
+    const limit = parameters.get("limit");
+    if (
+      (cursor !== null && !/^[A-Za-z0-9_-]{1,1024}$/u.test(cursor)) ||
+      (limit !== null && !/^(?:[1-4][0-9]|50)$/u.test(limit))
+    ) {
+      return null;
+    }
+    return {
+      upstreamPath: `${base}${query === "" ? "" : `?${query}`}`,
+      bodyAllowed: false,
+      successKind: "page",
+    };
+  }
+  if (query !== "") return null;
+  if (suffix === "search" && method === "POST") {
+    return { upstreamPath: `${base}/search`, bodyAllowed: true, successKind: "page" };
+  }
+  if (suffix === "new" && method === "GET") {
+    return {
+      upstreamPath: `${base}/new`,
+      bodyAllowed: false,
+      successKind: "new_workspace",
+    };
+  }
+  if (suffix === undefined && method === "POST") {
+    return { upstreamPath: base, bodyAllowed: true, successKind: "create" };
+  }
+  const nested = /^([0-9a-f-]+)\/(name|draft)$/iu.exec(suffix ?? "");
+  if (nested !== null && uuid.test(nested[1] ?? "") && method === "PATCH") {
+    return {
+      upstreamPath: `${base}/${nested[1]}/${nested[2]}`,
+      bodyAllowed: true,
+      successKind: nested[2] === "name" ? "rename" : "save",
+    };
+  }
+  if (suffix !== undefined && uuid.test(suffix) && method === "GET") {
+    return {
+      upstreamPath: `${base}/${suffix}`,
+      bodyAllowed: false,
+      successKind: "entry_workspace",
+    };
+  }
+  return null;
+}
+
+function boundedStudioMutationValue(value: unknown): boolean {
+  const stack: Array<{ readonly value: unknown; readonly depth: number }> = [{ value, depth: 0 }];
+  let nodes = 0;
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === undefined) break;
+    nodes += 1;
+    if (nodes > 10_000 || current.depth > 24) return false;
+    if (typeof current.value !== "object" || current.value === null) continue;
+    const nested = Array.isArray(current.value) ? current.value : Object.values(current.value);
+    for (const item of nested) stack.push({ value: item, depth: current.depth + 1 });
+  }
+  return true;
+}
+
+function validStudioMutation(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.operation !== "string" || !Array.isArray(value.path)) {
+    return false;
+  }
+  if (
+    value.path.length < 1 ||
+    value.path.length > 16 ||
+    value.path.some(
+      (segment) =>
+        !(
+          (typeof segment === "string" && uuid.test(segment)) ||
+          (typeof segment === "number" &&
+            Number.isSafeInteger(segment) &&
+            segment >= 0 &&
+            segment <= 100)
+        ),
+    )
+  ) {
+    return false;
+  }
+  if (value.operation === "set") {
+    return (
+      Object.keys(value).sort().join(",") === "operation,path,value" &&
+      boundedStudioMutationValue(value.value)
+    );
+  }
+  if (value.operation === "unset") {
+    return Object.keys(value).sort().join(",") === "operation,path";
+  }
+  if (value.operation === "list_insert") {
+    return (
+      Object.keys(value).sort().join(",") === "index,operation,path,value" &&
+      typeof value.index === "number" &&
+      Number.isSafeInteger(value.index) &&
+      value.index >= 0 &&
+      value.index <= 100 &&
+      boundedStudioMutationValue(value.value)
+    );
+  }
+  if (value.operation === "list_remove") {
+    return (
+      Object.keys(value).sort().join(",") === "index,operation,path" &&
+      typeof value.index === "number" &&
+      Number.isSafeInteger(value.index) &&
+      value.index >= 0 &&
+      value.index <= 99
+    );
+  }
+  return false;
+}
+
+function validStudioMutations(value: unknown): boolean {
+  return Array.isArray(value) && value.length <= 500 && value.every(validStudioMutation);
+}
+
+function validStudioContentBody(route: string, value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (route.endsWith("/search")) {
+    return (
+      Object.keys(value).sort().join(",") === "cursor,limit,query" &&
+      typeof value.query === "string" &&
+      value.query.trim().length >= 2 &&
+      value.query.trim().length <= 100 &&
+      (value.cursor === null ||
+        (typeof value.cursor === "string" && /^[A-Za-z0-9_-]{1,1024}$/u.test(value.cursor))) &&
+      typeof value.limit === "number" &&
+      Number.isSafeInteger(value.limit) &&
+      value.limit >= 10 &&
+      value.limit <= 50
+    );
+  }
+  if (route.endsWith("/name")) {
+    return (
+      Object.keys(value).sort().join(",") === "displayName,expectedNameVersion" &&
+      typeof value.displayName === "string" &&
+      value.displayName.trim().length >= 1 &&
+      value.displayName.trim().length <= 100 &&
+      typeof value.expectedNameVersion === "number" &&
+      Number.isSafeInteger(value.expectedNameVersion) &&
+      value.expectedNameVersion >= 1
+    );
+  }
+  const isDraft = route.endsWith("/draft");
+  const expectedKeys = isDraft
+    ? "commandId,contractHash,expectedLocalizedVersion,expectedSharedVersion,localizedMutations,schemaRevisionId,sharedMutations"
+    : "commandId,contractHash,displayName,localizedMutations,schemaRevisionId,sharedMutations";
+  if (Object.keys(value).sort().join(",") !== expectedKeys) return false;
+  return (
+    typeof value.commandId === "string" &&
+    uuid.test(value.commandId) &&
+    typeof value.schemaRevisionId === "string" &&
+    uuid.test(value.schemaRevisionId) &&
+    typeof value.contractHash === "string" &&
+    /^[0-9a-f]{64}$/u.test(value.contractHash) &&
+    validStudioMutations(value.sharedMutations) &&
+    validStudioMutations(value.localizedMutations) &&
+    (isDraft
+      ? typeof value.expectedSharedVersion === "number" &&
+        Number.isSafeInteger(value.expectedSharedVersion) &&
+        value.expectedSharedVersion >= 0 &&
+        typeof value.expectedLocalizedVersion === "number" &&
+        Number.isSafeInteger(value.expectedLocalizedVersion) &&
+        value.expectedLocalizedVersion >= 0
+      : typeof value.displayName === "string" &&
+        value.displayName.trim().length >= 1 &&
+        value.displayName.trim().length <= 100)
+  );
+}
+
 function routeRequest(
   config: ValidatedConfig,
   request: Request,
   rawTarget: string,
+  requestId: string,
 ): Effect.Effect<Response, StudioHttpFailure> {
   return Effect.gen(function* () {
     let requestOrigin: string;
@@ -1536,6 +2753,145 @@ function routeRequest(
       const body = new Uint8Array(asset.body.byteLength);
       body.set(asset.body);
       return new Response(method === "HEAD" ? null : body.buffer, { status: 200, headers });
+    }
+    if (parsed.route.startsWith("/api/content/")) {
+      yield* requireSameOrigin(request, config);
+      const target = studioContentTarget(parsed.route, parsed.query, method);
+      if (target === null) {
+        return yield* new StudioHttpFailure({
+          status: 404,
+          code: "STUDIO_ROUTE_NOT_FOUND",
+          message: "The Studio route was not found.",
+          outcome: "rejected",
+        });
+      }
+      let requestBody: string | undefined;
+      if (target.bodyAllowed) {
+        if (request.headers.get("content-type") !== "application/json") {
+          return yield* new StudioHttpFailure({
+            status: 415,
+            code: "STUDIO_REQUEST_INVALID",
+            message: "The Studio Content request must contain JSON.",
+            outcome: "rejected",
+          });
+        }
+        const maximumRequestBytes = parsed.route.endsWith("/search")
+          ? maximumContentSearchRequestBytes
+          : maximumContentRequestBytes;
+        requestBody = yield* Effect.tryPromise({
+          try: () => boundedRequestText(request, maximumRequestBytes),
+          catch: () =>
+            new StudioHttpFailure({
+              status: 413,
+              code: "STUDIO_REQUEST_INVALID",
+              message: "The Studio Content request is too large or malformed.",
+              outcome: "rejected",
+            }),
+        });
+        const body = yield* Effect.try({
+          try: () => parseJson(requestBody as string),
+          catch: () =>
+            new StudioHttpFailure({
+              status: 400,
+              code: "STUDIO_REQUEST_INVALID",
+              message: "The Studio Content request is invalid.",
+              outcome: "rejected",
+            }),
+        });
+        if (!validStudioContentBody(parsed.route, body)) {
+          return yield* new StudioHttpFailure({
+            status: 400,
+            code: "STUDIO_REQUEST_INVALID",
+            message: "The Studio Content request is invalid.",
+            outcome: "rejected",
+          });
+        }
+      } else if (
+        request.headers.has("content-length") &&
+        request.headers.get("content-length") !== "0"
+      ) {
+        return yield* new StudioHttpFailure({
+          status: 400,
+          code: "STUDIO_REQUEST_INVALID",
+          message: "The Studio Content request must not contain a body.",
+          outcome: "rejected",
+        });
+      }
+      const active = yield* loadContentSession(config, request);
+      const upstream = yield* upstreamFetch(
+        config,
+        `${config.studioContentBaseUrl}${target.upstreamPath}`,
+        {
+          method,
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${active.session.accessToken}`,
+            "X-Request-Id": requestId,
+            ...(requestBody === undefined ? {} : { "Content-Type": "application/json" }),
+          },
+          signal: request.signal,
+          ...(requestBody === undefined ? {} : { body: requestBody }),
+        },
+      );
+      const text = yield* Effect.tryPromise({
+        try: () => boundedText(upstream, maximumContentResponseBytes),
+        catch: () =>
+          new StudioHttpFailure({
+            status: 502,
+            code: "STUDIO_UPSTREAM_UNAVAILABLE",
+            message: "The Studio Content service returned an invalid response.",
+            outcome: "upstream_failure",
+          }),
+      });
+      const body = yield* Effect.try({
+        try: () => parseJson(text),
+        catch: () =>
+          new StudioHttpFailure({
+            status: 502,
+            code: "STUDIO_UPSTREAM_UNAVAILABLE",
+            message: "The Studio Content service returned an invalid response.",
+            outcome: "upstream_failure",
+          }),
+      });
+      if (
+        !isJsonResponse(upstream) ||
+        !validStudioContentEnvelope(body, upstream.status, target.successKind)
+      ) {
+        return yield* new StudioHttpFailure({
+          status: 502,
+          code: "STUDIO_UPSTREAM_UNAVAILABLE",
+          message: "The Studio Content service returned an invalid response.",
+          outcome: "upstream_failure",
+        });
+      }
+      const upstreamCode = !body.ok && isRecord(body.error) ? body.error.code : undefined;
+      if (
+        upstream.status === 401 ||
+        upstreamCode === "STUDIO_GRANT_INVALID" ||
+        upstreamCode === "STUDIO_AUTHORITY_CHANGED" ||
+        upstreamCode === "STUDIO_REGISTRATION_INACTIVE"
+      ) {
+        yield* config.store
+          .deleteSession(active.record.sessionDigest, config.registrationDigest)
+          .pipe(Effect.catchAll(() => Effect.void));
+        yield* revoke(config, active.session.refreshToken);
+      }
+      const headers = securityHeaders("application/json; charset=utf-8");
+      const retryAfter = upstream.headers.get("retry-after");
+      if (retryAfter !== null && /^\d{1,6}$/u.test(retryAfter))
+        headers.set("Retry-After", retryAfter);
+      if (active.rotated) {
+        headers.append(
+          "Set-Cookie",
+          cookie(
+            config,
+            config.sessionCookie,
+            active.key,
+            (active.session.grantExpiresAtEpochMs - config.now()) / 1_000,
+          ),
+        );
+      }
+      return new Response(text, { status: upstream.status, headers });
     }
     if (method === "GET" && parsed.route === "/auth/login" && parsed.query === "") {
       yield* requireLoginNavigation(request);
@@ -2214,8 +3570,12 @@ export function createStudioFetchHandler(input: StudioServerConfig): StudioFetch
             ? "callback"
             : parsed?.route === "/auth/logout"
               ? "logout"
-              : "bootstrap";
-      const exit = await runtime.runPromiseExit(routeRequest(config, request, context.rawTarget));
+              : parsed?.route.startsWith("/api/content/")
+                ? "content"
+                : "bootstrap";
+      const exit = await runtime.runPromiseExit(
+        routeRequest(config, request, context.rawTarget, requestId),
+      );
       let response: Response;
       let outcome: StudioServerTelemetryEvent["outcome"] = "success";
       if (exit._tag === "Success") response = exit.value;
@@ -2233,7 +3593,7 @@ export function createStudioFetchHandler(input: StudioServerConfig): StudioFetch
         if (parsed?.route === "/auth/callback" && failure.clearAttempt === true)
           response.headers.append("Set-Cookie", clearCookie(config, config.attemptCookie));
         if (
-          parsed?.route === "/api/bootstrap" &&
+          (parsed?.route === "/api/bootstrap" || parsed?.route.startsWith("/api/content/")) &&
           (failure.code === "STUDIO_AUTH_REQUIRED" ||
             failure.code === "STUDIO_SESSION_INVALID" ||
             failure.code === "STUDIO_FORBIDDEN" ||

@@ -1,8 +1,8 @@
 # CMS Development Progress
 
-**Overall status:** Milestones 0–18B and post-M13 repository/context normalization are developer-approved, committed, and pushed. M18A is accepted at `317a295` with migrations through 0020 applied and verified; M18B is accepted at `c38b7db`.
-**Next gate:** Design M19 Studio content and localization only; implementation, package publication, rollout, production configuration, and deployment remain gated.
-**Last updated:** 2026-09-27
+**Overall status:** Milestones 0–18B and post-M13 repository/context normalization are developer-approved, committed, and pushed. The approved M19A Studio platform/content-protocol implementation has completed its validation candidate and awaits independent review.
+**Next gate:** Independent M19A review. M19B and every release action remain gated.
+**Last updated:** 2026-09-29
 
 ## Status legend
 
@@ -11,7 +11,7 @@
 - `[x]` Complete
 - `[D]` Design pending
 - `[P]` Planned and sequenced; design not started
-- `[R]` Awaiting developer review
+- `[R]` Awaiting developer review or a separately required implementation authorization
 - `[A]` Developer approved
 - `[!]` Blocked
 
@@ -40,7 +40,7 @@
 | 18  | Studio authority/runtime parent         | `[A]`  |          1,559 | `c38b7db` |
 | 18A | Studio platform authority               | `[A]`  |          1,498 | `317a295` |
 | 18B | Studio mount and security runtime       | `[A]`  |          1,559 | `c38b7db` |
-| 19  | Studio content and localization         | `[D]`  |              — | —         |
+| 19  | Studio content and localization         | `[R]`  |              — | —         |
 | 20  | Studio editorial lifecycle              | `[P]`  |              — | —         |
 | 21  | Client handover and editorial safety    | `[P]`  |              — | —         |
 | 22  | Data durability and portability         | `[P]`  |              — | —         |
@@ -53,7 +53,7 @@
 | 29  | Visual publication and dependencies     | `[P]`  |              — | —         |
 | 30  | Renderer SDK and framework adapters     | `[P]`  |              — | —         |
 
-M17 is accepted at `d6b506d`; M18A is accepted and pushed at `317a295`; M18B is accepted and pushed at `c38b7db`; migrations `0017`–`0020` are developer-applied/catalog-verified and the independent worker remains stopped. M19 is the next design target; M20–M30 remain gated.
+M17 is accepted at `d6b506d`; M18A is accepted and pushed at `317a295`; M18B is accepted and pushed at `c38b7db`; migrations `0017`–`0021` are developer-applied/catalog-verified and the independent worker remains stopped. M19A awaits independent review; M19B and M20–M30 remain gated.
 
 ## Post-M13 repository/context normalization
 
@@ -236,7 +236,13 @@ These entries stay concise because `milestone.md` owns detailed pending context.
 
 ### Milestone 19 — Studio content and localization
 
-- Move role-projected browsing, generated forms, shared/exact-locale drafts, validation, save/conflict handling, and large-collection UX into Studio.
+- `[A]` Developer approved `decisions/m19-studio-content-and-localization-design.md` and authorized M19A: valid M6/M13 Presentation cannot hide a non-empty collection from owners/developers; bounded owner/developer-only `empty_schema | projection_invalid` notices and a typed closed-reason route error cover residual states, while every other role/foreign scope retains identical `NOT_FOUND`.
+- Implemented the separate Studio Content v1 companion protocol without changing accepted Studio/Authoring/Control Plane v1 bytes: exact-locale context, bounded browse/literal-prefix search, purpose-bound signed cursors, role-projected workspaces, stable-ID create/rename/save, explicit stale schema/draft/name/command conflicts, and finite token-hiding BFF routes. M6’s historical `{}` editor metadata expands to owner/developer-visible/editable defaults and is regression-locked.
+- All seven nested operation families share the same projection/configuration gate and deterministic `STUDIO_COLLECTION_CONFIGURATION_INVALID` behavior. `projection_invalid` emits safe telemetry plus one response-gating `cms.schema.projection_invalid_detected` audit per immutable revision through deterministic primary-key conflict handling and exact prior-row verification; `empty_schema`, other roles, and foreign scopes remain unaudited/non-enumerating.
+- The developer generated and applied `0021_add_studio_entry_name_search_index`; SQL/snapshot/journal inspection and read-only catalog verification passed. A rollback-isolated 100,000-entry fixture proves browse, prefix search, continuation, and capped-count index plans without sort; concurrent create/rename continuation and wildcard escaping pass.
+- Registered immutable `studio-content/v1` at SHA-256 `c9226fdcc767d704a41e100a5440560afbb7f64977209f82d42dad20bc48a9fc` with `sdkSupported: false`, public host ownership, and developer-reference routing after the developer-authorized final-review correction for valid sidebar-only role projections. Accepted Authoring, Control Plane, and Studio v1 digests remain unchanged.
+- M19A final readiness passes format/lint/structure, contract drift, 23 type tasks, 1,642 tests plus coverage, all 14 retry-free browser specifications, and 14 builds. The 100,000-entry fixture also enforces database p95 below 150 ms for browse/search and below 300 ms for search plus capped count; separate 20-sample platform and BFF checks enforce browse/search below 500 ms and workspace assembly below one second. Final hardening adds strict operation-specific BFF success decoding, browser-abort/platform-deadline interruption, exhaustive create/save transaction failpoints, explicit zero-publication/snapshot/outbox draft invariants, safe closed-field anomaly logging, sidebar-only projection preservation, the real closed configuration reason, the BFF 2 KiB search cap, and database-authoritative Unicode query folding.
+- The production audit remains clear of high/critical findings. Five moderate findings are reviewed as unchanged, non-runtime-referenced test-tool dependency paths: four Vitest/mocker findings and one Undici finding through Better Auth → Vitest → jsdom; `pnpm-lock.yaml` is unchanged. Fresh changed server/developer images build with production-only environment metadata, start healthy without the worker, and contain no project test, environment, coverage, source-map, OAuth-harness, or browser-result residue; the Studio-server tarball contains only its declared dist/license/manifest allowlist. Final catalog/residue checks find the search index valid/ready, zero M19 rows/anomaly audits/orphans/incoherent registrations, zero non-idle clients or lock waiters, and the worker stopped. M19A now awaits independent review. M19B, package publication, production configuration, rollout, deployment, acceptance, commit, and M20 remain developer-controlled.
 
 ### Milestone 20 — Studio editorial lifecycle
 
@@ -284,9 +290,9 @@ These entries stay concise because `milestone.md` owns detailed pending context.
 
 ## Current validation and release state
 
-- M17 is accepted at `d6b506d`; M18A is accepted at `317a295`; M18B is accepted at `c38b7db`. The current accepted readiness baseline passes 1,559 tests, 23 type tasks, 14 browser specifications, coverage, and 14 builds.
-- Current source OpenAPI SHA-256 values are Authoring `d9500549cd95067857b87f494b77375e3d575c4832589478858e125ab3f31205`, remediation Control Plane `3dd7c890b7a0448bfb497db663fadfee7f3eeaf614a026e405da3638a595d59b`, and immutable 30,112-byte Studio `f3a70dee4d72057a3df982a6b4a4ff5192daea850b57810cfeb7caa498ef5b03`.
-- The live schema records 21 developer-applied migrations through reviewed migration `0020`, exact journal timestamp `1790399741342`; final catalog, plan, activity, and scoped residue evidence is clean.
+- M17 is accepted at `d6b506d`; M18A is accepted at `317a295`; M18B is accepted at `c38b7db`. The accepted baseline remains M18B; the unaccepted M19A review candidate passes 1,642 tests, 23 type tasks, 14 browser specifications, coverage, and 14 builds.
+- Current source OpenAPI SHA-256 values are Authoring `d9500549cd95067857b87f494b77375e3d575c4832589478858e125ab3f31205`, remediation Control Plane `3dd7c890b7a0448bfb497db663fadfee7f3eeaf614a026e405da3638a595d59b`, immutable 30,112-byte Studio `f3a70dee4d72057a3df982a6b4a4ff5192daea850b57810cfeb7caa498ef5b03`, and Studio Content `c9226fdcc767d704a41e100a5440560afbb7f64977209f82d42dad20bc48a9fc`.
+- The live schema records 22 developer-applied migrations through reviewed migration `0021`, exact journal timestamp `1790569128095`; its intended partial prefix index is ready and valid, and final query-plan/activity evidence is clean.
 - Schema/SDK/CLI and all five Studio runtime packages remain unpublished at `0.0.0`; production OAuth/configuration/deployment and Tier 2 production/default activation remain gated.
 
 ## Database migration record
@@ -312,9 +318,10 @@ Agents did not generate or apply these migrations. Developer-generated/applied a
 | `0018`        | M16           | Archive-safe zero-attempt delivery outcome invariant                                |
 | `0019`        | M18A          | Studio runtime authority, actors, receipts, and active lookup indexes               |
 | `0020`        | M18A          | Management-credential Studio deactivation receipt authority                         |
+| `0021`        | M19A          | Tenant-qualified Studio entry-name prefix-search index                              |
 
 ## Roadmap and next gate
 
-- `milestone.md` owns the approved sequence and preserved boundaries; M17 is accepted at `d6b506d`, M18A migrations `0019`–`0020` are developer-applied, M18B is accepted at `c38b7db`, and the worker remains stopped.
-- M19 Studio content and localization is the next design target; its implementation and M20–M30 remain gated. Managed hosting, external data/backends, billing, analytics, and plugins remain unsequenced until the visual baseline is accepted.
+- `milestone.md` owns the approved sequence and preserved boundaries; M17 is accepted at `d6b506d`, M18A migrations `0019`–`0020` are developer-applied, M18B is accepted at `c38b7db`, M19A migration `0021` is developer-applied, and the worker remains stopped.
+- M19A Studio platform/content-protocol implementation awaits independent review; M19B and M20–M30 remain gated. Managed hosting, external data/backends, billing, analytics, and plugins remain unsequenced until the visual baseline is accepted.
 - Publication/versioning, production OAuth/domains/configuration, deployment, migrations, Tier 2 activation, milestone acceptance, and advancement remain developer-controlled.

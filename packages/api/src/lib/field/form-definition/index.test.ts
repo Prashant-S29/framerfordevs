@@ -1,15 +1,17 @@
 import { assert, describe, it } from "@effect/vitest";
 import { Schema } from "effect";
 
+import { ProjectRole } from "../../../contracts/access";
 import { EditorLayout } from "../../../contracts/field";
 import { CollectionFieldDefinition, ContractHash } from "../../../contracts/schema";
+import { projectStudioForm } from "../../studio-content/form-projection";
 import { generatedFormDefinition } from "./index";
 
 const visibleId = "019fae8b-1234-7000-8000-000000000001";
 const hiddenId = "019fae8b-1234-7000-8000-000000000002";
 const visibleRoles = ["owner", "developer"] as const;
 
-function field(id: string, apiKey: string, roles: ReadonlyArray<"owner" | "developer">) {
+function field(id: string, apiKey: string, roles: ReadonlyArray<typeof ProjectRole.Type>) {
   return Schema.decodeUnknownSync(CollectionFieldDefinition)({
     id,
     parentFieldId: null,
@@ -108,5 +110,58 @@ describe("generated form definition", () => {
     assert.strictEqual(form.editorLayout.tabs[0]?.groups[0]?.fields[0]?.fieldId, visibleId);
     assert.deepStrictEqual(form.editorLayout.sidebarGroups[0]?.fields, []);
     assert.notInclude(JSON.stringify(form), "secret");
+  });
+
+  it("preserves a visible sidebar when the role has no visible tab placements", () => {
+    const sidebarOnlyLayout = Schema.decodeUnknownSync(EditorLayout)({
+      version: 1,
+      tabs: layout.tabs,
+      sidebarGroups: [
+        {
+          id: "019fae8b-1234-7000-8000-000000000006",
+          title: "Sidebar",
+          description: null,
+          position: 0,
+          columns: 1,
+          visibleToRoles: ["owner", "developer", "editor"],
+          fields: [
+            {
+              id: "019fae8b-1234-7000-8000-000000000007",
+              fieldId: hiddenId,
+              position: 0,
+              helpTextOverride: null,
+              visibleToRoles: ["owner", "developer", "editor"],
+            },
+          ],
+        },
+      ],
+    });
+    const form = generatedFormDefinition({
+      source: "published",
+      collectionId: "019fae8b-1234-7000-8000-000000000010",
+      revisionId: "019fae8b-1234-7000-8000-000000000011",
+      formatVersion: 2,
+      validationProfile: "ffd-fields@1",
+      currencyRegistryProfile: null,
+      contractHash: ContractHash.make("a".repeat(64)),
+      role: "editor",
+      canEdit: true,
+      fields: [
+        field(visibleId, "title", visibleRoles),
+        field(hiddenId, "sidebar", ["owner", "developer", "editor"]),
+      ],
+      editorLayout: sidebarOnlyLayout,
+    });
+
+    assert.deepStrictEqual(
+      form.fields.map((item) => item.id),
+      [hiddenId],
+    );
+    assert.deepStrictEqual(form.editorLayout.tabs[0]?.groups[0]?.fields, []);
+    assert.strictEqual(form.editorLayout.sidebarGroups[0]?.fields[0]?.fieldId, hiddenId);
+    const studioForm = projectStudioForm(form);
+    assert.deepStrictEqual(studioForm.tabs, []);
+    assert.strictEqual(studioForm.sidebarGroups[0]?.fields[0]?.fieldId, hiddenId);
+    assert.strictEqual(studioForm.fields[0]?.id, hiddenId);
   });
 });

@@ -1336,6 +1336,16 @@ export const cmsEntry = pgTable(
       table.createdAt.desc(),
       table.id.desc(),
     ),
+    index("cms_entry_studio_name_search_idx")
+      .on(
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+        table.collectionId,
+        sql`lower(${table.displayName}) collate "C" text_pattern_ops`,
+        table.id,
+      )
+      .where(sql`${table.displayName} is not null`),
     index("cms_entry_created_by_user_idx").on(table.createdByUserId),
     index("cms_entry_changed_by_user_idx").on(table.changedByUserId),
     index("cms_entry_created_by_credential_idx")

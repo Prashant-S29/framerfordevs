@@ -1,4 +1,5 @@
-import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
+import { SQL } from "drizzle-orm";
+import { getTableConfig, PgDialect, type PgTable } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -42,6 +43,32 @@ const actorTables = [
   ["publication head", cmsEntryLocalePublicationHead, ["actor"]],
   ["publication command", cmsEntryPublicationCommand, ["actor"]],
 ] as const;
+
+describe("M19 Studio entry search authority", () => {
+  it("declares the exact tenant-qualified partial prefix index", () => {
+    const searchIndex = config(cmsEntry).indexes.find(
+      (value) => value.config.name === "cms_entry_studio_name_search_idx",
+    );
+    if (searchIndex === undefined) throw new Error("Missing Studio entry search index.");
+
+    expect(searchIndex.config.columns.map((column) => Reflect.get(column, "name") ?? null)).toEqual(
+      ["workspace_id", "project_id", "environment_id", "collection_id", null, "id"],
+    );
+    const expression = searchIndex.config.columns[4];
+    if (!(expression instanceof SQL)) throw new Error("Missing Studio name index expression.");
+    const dialect = new PgDialect();
+    expect(dialect.sqlToQuery(expression).sql).toBe(
+      'lower("cms_entry"."display_name") collate "C" text_pattern_ops',
+    );
+    expect(searchIndex.config.where).toBeInstanceOf(SQL);
+    if (!(searchIndex.config.where instanceof SQL)) {
+      throw new Error("Missing Studio search partial-index predicate.");
+    }
+    expect(dialect.sqlToQuery(searchIndex.config.where).sql).toBe(
+      '"cms_entry"."display_name" is not null',
+    );
+  });
+});
 
 describe("M13 CMS persistence authority", () => {
   it("persists non-null source keys and immutable per-revision structure authority", () => {

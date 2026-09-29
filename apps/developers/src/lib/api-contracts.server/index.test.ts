@@ -5,6 +5,7 @@ import controlPlaneDocument from "@framerfordevs/public-contracts/artifacts/cont
 import deliveryDocument from "@framerfordevs/public-contracts/artifacts/delivery/v1/openapi.json";
 import previewDocument from "@framerfordevs/public-contracts/artifacts/preview/v1/openapi.json";
 import studioDocument from "@framerfordevs/public-contracts/artifacts/studio/v1/openapi.json";
+import studioContentDocument from "@framerfordevs/public-contracts/artifacts/studio-content/v1/openapi.json";
 import toolingDocument from "@framerfordevs/public-contracts/artifacts/tooling/v1/openapi.json";
 import { describe, expect, it } from "vitest";
 
@@ -16,11 +17,12 @@ const references = [
   { document: deliveryDocument, slugs: ["delivery", "v1"] },
   { document: previewDocument, slugs: ["preview", "v1"] },
   { document: studioDocument, slugs: ["studio", "v1"] },
+  { document: studioContentDocument, slugs: ["studio-content", "v1"] },
   { document: toolingDocument, slugs: ["tooling", "v1"] },
 ];
 
 describe("canonical API contract source", () => {
-  it("contains exactly the six public OpenAPI families", () => {
+  it("contains exactly the seven public OpenAPI families", () => {
     expect(
       apiContractSource
         .getPages()
@@ -31,6 +33,7 @@ describe("canonical API contract source", () => {
       "/api-reference/control-plane/v1",
       "/api-reference/delivery/v1",
       "/api-reference/preview/v1",
+      "/api-reference/studio-content/v1",
       "/api-reference/studio/v1",
       "/api-reference/tooling/v1",
     ]);

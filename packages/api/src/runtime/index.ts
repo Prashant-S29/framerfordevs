@@ -104,6 +104,14 @@ import {
   StudioOAuthTokenVerifier,
   StudioOAuthTokenVerifierLive,
 } from "../services/studio/principal-authenticator";
+import {
+  StudioContentCursorSigner,
+  makeStudioContentCursorSignerLive,
+} from "../services/studio-content/cursor-signer";
+import {
+  StudioContentRepository,
+  StudioContentRepositoryLive,
+} from "../services/studio-content/repository";
 import { StudioRepository, StudioRepositoryLive } from "../services/studio/repository";
 import {
   WebhookCrypto,
@@ -154,6 +162,8 @@ export type ApplicationServices =
   | ToolingRepository
   | StudioOAuthTokenVerifier
   | StudioRepository
+  | StudioContentCursorSigner
+  | StudioContentRepository
   | WebhookCrypto
   | WebhookDestinationValidator
   | WebhookRepository;
@@ -190,6 +200,12 @@ const DeliveryCursorSignerLive = makeDeliveryCursorSignerLive({
   ...(env.DELIVERY_CURSOR_PREVIOUS_SECRET === undefined
     ? {}
     : { previousSecret: env.DELIVERY_CURSOR_PREVIOUS_SECRET }),
+});
+const StudioContentCursorSignerLive = makeStudioContentCursorSignerLive({
+  activeSecret: controlPlaneCursorSecret,
+  ...(env.CONTROL_PLANE_CURSOR_PREVIOUS_SECRET === undefined
+    ? {}
+    : { previousSecret: env.CONTROL_PLANE_CURSOR_PREVIOUS_SECRET }),
 });
 const ToolingCursorSignerLive = makeToolingCursorSignerLive({
   activeSecret: deliveryCursorSecret,
@@ -254,6 +270,8 @@ const InfrastructureLive = Layer.mergeAll(
   ToolingPrincipalAuthenticatorLive,
   StudioOAuthTokenVerifierLive,
   StudioRepositoryLive,
+  StudioContentCursorSignerLive,
+  StudioContentRepositoryLive,
   WebhookCryptoLive,
   WebhookDestinationValidatorLive,
   WebhookRepositoryLive,

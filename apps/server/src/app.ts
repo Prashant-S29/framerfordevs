@@ -13,6 +13,7 @@ import {
   type ApiData,
   type ApiResponse,
 } from "@framerfordevs/api/contracts/response/api/index";
+import { DatabaseFailure } from "@framerfordevs/api/contracts/response/errors/index";
 import { authoringLimits } from "@framerfordevs/api/contracts/authoring/index";
 import type {
   AuthoringCreateEntryRequest,
@@ -31,6 +32,8 @@ import type {
 import type { DeliveryAccessPrincipal } from "@framerfordevs/api/contracts/delivery/index";
 import { toolingLimits } from "@framerfordevs/api/contracts/tooling/index";
 import { studioLimits } from "@framerfordevs/api/contracts/studio/index";
+import { studioContentLimits } from "@framerfordevs/api/contracts/studio-content/index";
+import { studioContentOpenApiJson } from "@framerfordevs/api/contracts/studio-content/openapi/index";
 import { studioOpenApiJson } from "@framerfordevs/api/contracts/studio/openapi/index";
 import {
   generatePublicArtifacts,
@@ -78,6 +81,24 @@ import {
   unpublishAuthoringEntry,
   validateAuthoringPublication,
 } from "@framerfordevs/api/operations/authoring/public/index";
+import {
+  browseStudioEntries,
+  createStudioEntry,
+  decodeStudioCollectionLocaleScope,
+  decodeStudioContentScope,
+  decodeStudioCreateEntryRequest,
+  decodeStudioEntryId,
+  decodeStudioListEntriesQuery,
+  decodeStudioRenameEntryRequest,
+  decodeStudioSaveEntryDraftRequest,
+  decodeStudioSearchEntriesRequest,
+  getStudioContentContext,
+  getStudioEntryWorkspace,
+  getStudioNewEntryWorkspace,
+  renameStudioEntry,
+  saveStudioEntryDraft,
+  searchStudioEntries,
+} from "@framerfordevs/api/operations/studio-content-public/index";
 import {
   authenticateStudioRequest,
   decodeStudioBootstrapScope,
@@ -159,6 +180,7 @@ import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { apiReference } from "@scalar/express-api-reference";
 import { toNodeHandler } from "better-auth/node";
 import cors from "cors";
+import { Effect } from "effect";
 import express, {
   type Express,
   type NextFunction,
@@ -1059,6 +1081,17 @@ function sendStudioResponse(
   if (status === 401) {
     res.setHeader("WWW-Authenticate", 'Bearer realm="studio", error="invalid_token"');
   }
+  if (!response.ok && response.error.code === "STUDIO_COLLECTION_CONFIGURATION_INVALID") {
+    const reason = response.error.details?.[0]?.code;
+    if (reason === "empty_schema" || reason === "projection_invalid") {
+      const studioContentResponse = {
+        ...response,
+        error: { ...response.error, configurationReason: reason },
+      };
+      sendApplicationResponse(req, res, status, studioContentResponse);
+      return;
+    }
+  }
   sendApplicationResponse(req, res, status, response);
 }
 
@@ -1284,6 +1317,516 @@ function createStudioRouter(transformEffect?: ApplicationEffectTransform): Route
         message: "An unexpected error occurred.",
         requestId: context.requestId,
         retryable: true,
+      }),
+    );
+  });
+  return router;
+}
+
+export function encodeStudioContentResponse(response: unknown): Buffer | null {
+  const body = Buffer.from(JSON.stringify(response), "utf8");
+  return body.byteLength <= studioContentLimits.responseBytes ? body : null;
+}
+
+function sendStudioContentSuccess(
+  req: Request,
+  res: Response,
+  response: ApiResponse<ApiData>,
+): void {
+  const body = encodeStudioContentResponse(response);
+  if (body === null) {
+    sendStudioResponse(
+      req,
+      res,
+      413,
+      apiFailure({
+        code: "STUDIO_RESPONSE_TOO_LARGE",
+        message: "The Studio Content response is too large.",
+        requestId: requestContext(req).requestId,
+        retryable: false,
+      }),
+    );
+    return;
+  }
+  setStudioHeaders(res);
+  res.status(200).type("application/json").setHeader("Content-Length", String(body.byteLength));
+  res.end(body);
+}
+
+function createStudioContentRouter(transformEffect?: ApplicationEffectTransform): Router {
+  const router = express.Router({ caseSensitive: true, strict: true });
+  router.use((req, res, next) => {
+    setStudioHeaders(res);
+    const specificationRoute = req.path === "/openapi.json" || req.path === "/docs";
+    if (specificationRoute) {
+      next();
+      return;
+    }
+    if (
+      req.headers.origin !== undefined ||
+      req.method === "OPTIONS" ||
+      req.headers.cookie !== undefined ||
+      studioAuthorizationHeaderCount(req) !== 1
+    ) {
+      sendStudioResponse(
+        req,
+        res,
+        req.headers.origin !== undefined || req.method === "OPTIONS" ? 403 : 401,
+        apiFailure({
+          code:
+            req.headers.origin !== undefined || req.method === "OPTIONS"
+              ? "FORBIDDEN"
+              : "UNAUTHORIZED",
+          message: "Studio Content requests require one bearer token and no browser credentials.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    const rawQuery = req.originalUrl.split("?", 2)[1] ?? "";
+    const browseQueryRoute =
+      req.method === "GET" &&
+      /^\/projects\/[^/]+\/environments\/[^/]+\/collections\/[^/]+\/locales\/[^/]+\/entries$/u.test(
+        req.path,
+      );
+    if (rawQuery !== "" && !browseQueryRoute) {
+      sendStudioResponse(
+        req,
+        res,
+        400,
+        apiFailure({
+          code: "VALIDATION_ERROR",
+          message: "This Studio Content operation does not accept query parameters.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    if (
+      (req.method === "POST" || req.method === "PATCH") &&
+      req.headers["content-type"] !== "application/json"
+    ) {
+      sendStudioResponse(
+        req,
+        res,
+        400,
+        apiFailure({
+          code: "VALIDATION_ERROR",
+          message: "Studio Content mutations require application/json.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    const contentLength = req.headers["content-length"];
+    const maximumRequestBytes = req.path.endsWith("/entries/search")
+      ? studioContentLimits.searchRequestBytes
+      : studioContentLimits.requestBytes;
+    if (
+      req.headers["transfer-encoding"] !== undefined ||
+      (typeof contentLength === "string" &&
+        (!/^[0-9]+$/u.test(contentLength) || Number(contentLength) > maximumRequestBytes))
+    ) {
+      sendStudioResponse(
+        req,
+        res,
+        413,
+        apiFailure({
+          code: "REQUEST_TOO_LARGE",
+          message: "The Studio Content request exceeds the maximum size.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    if (
+      (req.method === "GET" || req.method === "HEAD") &&
+      contentLength !== undefined &&
+      contentLength !== "0"
+    ) {
+      sendStudioResponse(
+        req,
+        res,
+        400,
+        apiFailure({
+          code: "VALIDATION_ERROR",
+          message: "Studio Content read requests must not include a body.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    next();
+  });
+
+  router.get("/openapi.json", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.type("application/json").send(studioContentOpenApiJson);
+  });
+  router.get(
+    "/docs",
+    (_req, res, next) => {
+      res.setHeader("Cache-Control", "public, max-age=300");
+      next();
+    },
+    apiReference({
+      pageTitle: "Framer for Devs Studio Content API",
+      url: "/api/studio-content/v1/openapi.json",
+    }),
+  );
+
+  const makeContext = (req: Request) => {
+    const deadlineEpochMs = Date.now() + 10_000;
+    const boundedTransform: ApplicationEffectTransform = (effect) => {
+      const transformed = transformEffect === undefined ? effect : transformEffect(effect);
+      const requestAborted = () =>
+        DatabaseFailure.make({
+          operation: "studio_content.request_aborted",
+          cause: new Error("Studio Content request aborted."),
+        });
+      const abortEffect = Effect.async<never, DatabaseFailure>((resume) => {
+        const abort = () => resume(Effect.fail(requestAborted()));
+        if (req.aborted || req.socket.destroyed) abort();
+        else {
+          req.once("aborted", abort);
+          req.socket.once("close", abort);
+        }
+        return Effect.sync(() => {
+          req.off("aborted", abort);
+          req.socket.off("close", abort);
+        });
+      });
+      return Effect.raceFirst(transformed, abortEffect).pipe(
+        Effect.timeoutFail({
+          duration: Math.max(1, deadlineEpochMs - Date.now()),
+          onTimeout: () =>
+            DatabaseFailure.make({
+              operation: "studio_content.deadline",
+              cause: new Error("Studio Content request deadline exceeded."),
+            }),
+        }),
+      );
+    };
+    return createContext({ req, transformEffect: boundedTransform });
+  };
+  const authenticate = async (req: Request, res: Response, context: Context) => {
+    if (!(await enforceStudioQuota(req, res, context, null))) return null;
+    const result = await context.execute(
+      "api.studio_content.authenticate",
+      authenticateStudioRequest(req.headers.authorization ?? null),
+      "Studio Content principal authenticated.",
+    );
+    if (!result.response.ok) {
+      sendStudioResponse(req, res, result.status, result.response);
+      return null;
+    }
+    return result.response.data;
+  };
+  const decodeScope = async (req: Request, res: Response, context: Context) => {
+    const result = await context.execute(
+      "api.studio_content.scope",
+      decodeStudioCollectionLocaleScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+        routeParameter(req, "collectionId"),
+        routeParameter(req, "locale"),
+      ),
+      "Studio Content collection scope decoded.",
+    );
+    if (!result.response.ok) {
+      sendStudioResponse(req, res, result.status, result.response);
+      return null;
+    }
+    return result.response.data;
+  };
+
+  router.get("/projects/:projectId/environments/:environmentId/context", async (req, res) => {
+    const context = makeContext(req);
+    const principal = await authenticate(req, res, context);
+    if (principal === null) return;
+    const scopeResult = await context.execute(
+      "api.studio_content.context.scope",
+      decodeStudioContentScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Studio Content scope decoded.",
+    );
+    if (!scopeResult.response.ok) {
+      sendStudioResponse(req, res, scopeResult.status, scopeResult.response);
+      return;
+    }
+    const result = await context.execute(
+      "api.studio_content.context.get",
+      getStudioContentContext(principal, scopeResult.response.data, new Date()),
+      "Studio Content context loaded.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  const entriesPath =
+    "/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries";
+  router.get(entriesPath, async (req, res) => {
+    const context = makeContext(req);
+    const principal = await authenticate(req, res, context);
+    if (principal === null) return;
+    const scope = await decodeScope(req, res, context);
+    if (scope === null) return;
+    const query = await context.execute(
+      "api.studio_content.entries.query",
+      decodeStudioListEntriesQuery(req.query),
+      "Studio Content entry query decoded.",
+    );
+    if (!query.response.ok) {
+      sendStudioResponse(req, res, query.status, query.response);
+      return;
+    }
+    const result = await context.execute(
+      "api.studio_content.entries.browse",
+      browseStudioEntries(principal, scope, query.response.data, new Date()),
+      "Studio Content entries loaded.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.post(
+    `${entriesPath}/search`,
+    express.json({
+      limit: studioContentLimits.searchRequestBytes,
+      strict: true,
+      type: "application/json",
+    }),
+    async (req, res) => {
+      const context = makeContext(req);
+      const principal = await authenticate(req, res, context);
+      if (principal === null) return;
+      const scope = await decodeScope(req, res, context);
+      if (scope === null) return;
+      const request = await context.execute(
+        "api.studio_content.entries.search.request",
+        decodeStudioSearchEntriesRequest(req.body),
+        "Studio Content search request decoded.",
+      );
+      if (!request.response.ok) {
+        sendStudioResponse(req, res, request.status, request.response);
+        return;
+      }
+      const result = await context.execute(
+        "api.studio_content.entries.search",
+        searchStudioEntries(principal, scope, request.response.data, new Date()),
+        "Studio Content entries searched.",
+      );
+      if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+      else sendStudioContentSuccess(req, res, result.response);
+    },
+  );
+
+  router.get(`${entriesPath}/new`, async (req, res) => {
+    const context = makeContext(req);
+    const principal = await authenticate(req, res, context);
+    if (principal === null) return;
+    const scope = await decodeScope(req, res, context);
+    if (scope === null) return;
+    const result = await context.execute(
+      "api.studio_content.workspace.new",
+      getStudioNewEntryWorkspace(principal, scope, new Date()),
+      "Studio Content new-entry workspace loaded.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.get(`${entriesPath}/:entryId`, async (req, res) => {
+    const context = makeContext(req);
+    const principal = await authenticate(req, res, context);
+    if (principal === null) return;
+    const scope = await decodeScope(req, res, context);
+    if (scope === null) return;
+    const entryId = await context.execute(
+      "api.studio_content.entry.id",
+      decodeStudioEntryId(routeParameter(req, "entryId")),
+      "Studio Content entry ID decoded.",
+    );
+    if (!entryId.response.ok) {
+      sendStudioResponse(req, res, entryId.status, entryId.response);
+      return;
+    }
+    const result = await context.execute(
+      "api.studio_content.workspace.entry",
+      getStudioEntryWorkspace(principal, scope, entryId.response.data, new Date()),
+      "Studio Content entry workspace loaded.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  const jsonBody = express.json({
+    limit: studioContentLimits.requestBytes,
+    strict: true,
+    type: "application/json",
+  });
+
+  router.post(entriesPath, jsonBody, async (req, res) => {
+    const context = makeContext(req);
+    const principal = await authenticate(req, res, context);
+    if (principal === null) return;
+    const scope = await decodeScope(req, res, context);
+    if (scope === null) return;
+    const request = await context.execute(
+      "api.studio_content.entry.create.request",
+      decodeStudioCreateEntryRequest(req.body),
+      "Studio Content create request decoded.",
+    );
+    if (!request.response.ok) {
+      sendStudioResponse(req, res, request.status, request.response);
+      return;
+    }
+    const result = await context.execute(
+      "api.studio_content.entry.create",
+      createStudioEntry(
+        principal,
+        scope,
+        request.response.data,
+        new Date(),
+        context.request.requestId,
+      ),
+      "Studio Content entry created.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.patch(`${entriesPath}/:entryId/name`, jsonBody, async (req, res) => {
+    const context = makeContext(req);
+    const principal = await authenticate(req, res, context);
+    if (principal === null) return;
+    const scope = await decodeScope(req, res, context);
+    if (scope === null) return;
+    const entryId = await context.execute(
+      "api.studio_content.entry.id",
+      decodeStudioEntryId(routeParameter(req, "entryId")),
+      "Studio Content entry ID decoded.",
+    );
+    const request = await context.execute(
+      "api.studio_content.entry.rename.request",
+      decodeStudioRenameEntryRequest(req.body),
+      "Studio Content rename request decoded.",
+    );
+    if (!entryId.response.ok || !request.response.ok) {
+      const failure = !entryId.response.ok ? entryId : request;
+      sendStudioResponse(req, res, failure.status, failure.response);
+      return;
+    }
+    const result = await context.execute(
+      "api.studio_content.entry.rename",
+      renameStudioEntry(
+        principal,
+        scope,
+        entryId.response.data,
+        request.response.data,
+        new Date(),
+        context.request.requestId,
+      ),
+      "Studio Content entry renamed.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.patch(`${entriesPath}/:entryId/draft`, jsonBody, async (req, res) => {
+    const context = makeContext(req);
+    const principal = await authenticate(req, res, context);
+    if (principal === null) return;
+    const scope = await decodeScope(req, res, context);
+    if (scope === null) return;
+    const entryId = await context.execute(
+      "api.studio_content.entry.id",
+      decodeStudioEntryId(routeParameter(req, "entryId")),
+      "Studio Content entry ID decoded.",
+    );
+    const request = await context.execute(
+      "api.studio_content.entry.save.request",
+      decodeStudioSaveEntryDraftRequest(req.body),
+      "Studio Content save request decoded.",
+    );
+    if (!entryId.response.ok || !request.response.ok) {
+      const failure = !entryId.response.ok ? entryId : request;
+      sendStudioResponse(req, res, failure.status, failure.response);
+      return;
+    }
+    const result = await context.execute(
+      "api.studio_content.entry.save",
+      saveStudioEntryDraft(
+        principal,
+        scope,
+        entryId.response.data,
+        request.response.data,
+        new Date(),
+        context.request.requestId,
+      ),
+      "Studio Content entry draft saved.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.use((req, res) => {
+    sendStudioResponse(
+      req,
+      res,
+      404,
+      apiFailure({
+        code: "NOT_FOUND",
+        message: "The requested Studio Content resource was not found.",
+        requestId: requestContext(req).requestId,
+        retryable: false,
+      }),
+    );
+  });
+  router.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      next(error);
+      return;
+    }
+    const type =
+      typeof error === "object" && error !== null && "type" in error
+        ? Reflect.get(error, "type")
+        : undefined;
+    if (type === "entity.too.large" || type === "entity.parse.failed") {
+      sendStudioResponse(
+        req,
+        res,
+        type === "entity.too.large" ? 413 : 400,
+        apiFailure({
+          code: type === "entity.too.large" ? "REQUEST_TOO_LARGE" : "VALIDATION_ERROR",
+          message:
+            type === "entity.too.large"
+              ? "The Studio Content request exceeds the maximum size."
+              : "The Studio Content request body is invalid JSON.",
+          requestId: requestContext(req).requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    const context = requestContext(req);
+    void reportBoundaryDefect(context, error).catch(() => undefined);
+    sendStudioResponse(
+      req,
+      res,
+      500,
+      apiFailure({
+        code: "INTERNAL_ERROR",
+        message: "An unexpected error occurred.",
+        requestId: context.requestId,
+        retryable: false,
       }),
     );
   });
@@ -2706,6 +3249,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use("/api/preview/v1", createPreviewRouter(previewApiEnabled));
   app.use("/api/tooling/v1", createToolingRouter());
   app.use("/api/studio/v1", createStudioRouter(options.studioEffectTransform));
+  app.use("/api/studio-content/v1", createStudioContentRouter(options.studioEffectTransform));
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;

@@ -67,6 +67,11 @@ import {
   applicationFailure,
 } from "../errors";
 import { SchemaValidationIssue } from "../../schema";
+import {
+  StudioCommandConflictFailure,
+  StudioDraftVersionConflictFailure,
+  StudioNameVersionConflictFailure,
+} from "../../studio-content";
 
 const requestId = "request.contract-1";
 const TestData = Schema.Struct({ value: Schema.Number });
@@ -636,6 +641,29 @@ describe("application error mapping", () => {
     );
   });
 
+  it("maps Studio draft, name, and command conflicts to finite companion codes", () => {
+    const details = [
+      ApiErrorDetail.make({
+        code: "shared_version_conflict",
+        message: "The shared draft changed.",
+        scope: "shared",
+        expectedVersion: 1,
+        currentVersion: 2,
+      }),
+    ];
+    const draft = applicationFailure(
+      StudioDraftVersionConflictFailure.make({ details }),
+      requestId,
+    );
+    const name = applicationFailure(StudioNameVersionConflictFailure.make(), requestId);
+    const command = applicationFailure(StudioCommandConflictFailure.make(), requestId);
+
+    expect(draft.error.code).toBe("DRAFT_VERSION_CONFLICT");
+    expect(draft.error.details).toEqual(details);
+    expect(name.error.code).toBe("NAME_VERSION_CONFLICT");
+    expect(command.error.code).toBe("COMMAND_CONFLICT");
+  });
+
   it("returns safe locale dependency counts and draft lockout guidance", () => {
     const failure = applicationFailure(
       LocaleDependenciesExistFailure.make({
@@ -702,6 +730,7 @@ describe("application error mapping", () => {
           "false:null:DELIVERY_QUERY_INVALID:400",
           "false:null:DELIVERY_RESPONSE_TOO_LARGE:413",
           "false:null:DRAFT_CONFLICT:409",
+          "false:null:DRAFT_VERSION_CONFLICT:409",
           "false:null:ENTRY_COMMAND_CONFLICT:409",
           "false:null:ENTRY_DRAFT_CONFLICT:409",
           "false:null:ENTRY_PUBLICATION_CONFLICT:409",
@@ -709,6 +738,7 @@ describe("application error mapping", () => {
           "false:null:ENTRY_REVISION_INCOMPATIBLE:409",
           "false:null:FORBIDDEN:403",
           "false:null:INTERNAL_ERROR:500",
+          "false:null:INVALID_CURSOR:400",
           "false:null:INVALID_STATE_TRANSITION:409",
           "false:null:INVITATION_CONFLICT:409",
           "false:null:INVITATION_INVALID:404",
@@ -716,6 +746,7 @@ describe("application error mapping", () => {
           "false:null:LOCALE_CONFLICT:409",
           "false:null:LOCALE_DEPENDENCIES_EXIST:409",
           "false:null:LOCALE_UNAVAILABLE:404",
+          "false:null:NAME_VERSION_CONFLICT:409",
           "false:null:NOT_FOUND:404",
           "false:null:PREVIEW_QUERY_INVALID:400",
           "false:null:PREVIEW_RESPONSE_TOO_LARGE:413",
@@ -732,8 +763,10 @@ describe("application error mapping", () => {
           "false:null:SCHEMA_INVALID:422",
           "false:null:SERVICE_UNAVAILABLE:503",
           "false:null:SOURCE_IDENTITY_CONFLICT:409",
+          "false:null:STALE_CURSOR:409",
           "false:null:STALE_SCHEMA:409",
           "false:null:STUDIO_AUTHORITY_CHANGED:403",
+          "false:null:STUDIO_COLLECTION_CONFIGURATION_INVALID:409",
           "false:null:STUDIO_GRANT_INVALID:403",
           "false:null:STUDIO_REGISTRATION_INACTIVE:403",
           "false:null:STUDIO_RESPONSE_TOO_LARGE:413",
@@ -775,6 +808,7 @@ describe("application error mapping", () => {
       "DELIVERY_QUERY_INVALID",
       "DELIVERY_RESPONSE_TOO_LARGE",
       "DRAFT_CONFLICT",
+      "DRAFT_VERSION_CONFLICT",
       "ENTRY_COMMAND_CONFLICT",
       "ENTRY_DRAFT_CONFLICT",
       "ENTRY_PUBLICATION_CONFLICT",
@@ -782,6 +816,7 @@ describe("application error mapping", () => {
       "ENTRY_REVISION_INCOMPATIBLE",
       "FORBIDDEN",
       "INTERNAL_ERROR",
+      "INVALID_CURSOR",
       "INVALID_STATE_TRANSITION",
       "INVITATION_CONFLICT",
       "INVITATION_INVALID",
@@ -789,6 +824,7 @@ describe("application error mapping", () => {
       "LOCALE_CONFLICT",
       "LOCALE_DEPENDENCIES_EXIST",
       "LOCALE_UNAVAILABLE",
+      "NAME_VERSION_CONFLICT",
       "NOT_FOUND",
       "PREVIEW_QUERY_INVALID",
       "PREVIEW_RESPONSE_TOO_LARGE",
@@ -805,8 +841,10 @@ describe("application error mapping", () => {
       "SCHEMA_INVALID",
       "SERVICE_UNAVAILABLE",
       "SOURCE_IDENTITY_CONFLICT",
+      "STALE_CURSOR",
       "STALE_SCHEMA",
       "STUDIO_AUTHORITY_CHANGED",
+      "STUDIO_COLLECTION_CONFIGURATION_INVALID",
       "STUDIO_GRANT_INVALID",
       "STUDIO_REGISTRATION_INACTIVE",
       "STUDIO_RESPONSE_TOO_LARGE",

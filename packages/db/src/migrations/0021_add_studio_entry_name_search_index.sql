@@ -1,0 +1,1 @@
+CREATE INDEX "cms_entry_studio_name_search_idx" ON "cms_entry" USING btree ("workspace_id","project_id","environment_id","collection_id",lower("display_name") collate "C" text_pattern_ops,"id") WHERE "cms_entry"."display_name" is not null;

@@ -6,6 +6,14 @@ import { ApiErrorDetail, type ApiErrorCode, type ApiFailure, apiFailure } from "
 import { LocaleDependencySummary } from "../../locale";
 import { EntryPublicationValidationIssue } from "../../publication";
 import { SchemaChanges, SchemaValidationIssues } from "../../schema";
+import type {
+  StudioCollectionConfigurationInvalidFailure,
+  StudioCommandConflictFailure,
+  StudioContentCursorInvalidFailure,
+  StudioContentCursorStaleFailure,
+  StudioDraftVersionConflictFailure,
+  StudioNameVersionConflictFailure,
+} from "../../studio-content";
 
 const ValidationDetailsSchema = Schema.Array(ApiErrorDetail).pipe(
   Schema.minItems(1),
@@ -343,6 +351,12 @@ export type ApplicationError =
   | StudioAuthorityChangedFailure
   | StudioGrantInvalidFailure
   | StudioResponseTooLargeFailure
+  | StudioCollectionConfigurationInvalidFailure
+  | StudioContentCursorInvalidFailure
+  | StudioContentCursorStaleFailure
+  | StudioDraftVersionConflictFailure
+  | StudioNameVersionConflictFailure
+  | StudioCommandConflictFailure
   | ControlPlaneCommandConflictFailure
   | ControlPlaneCursorInvalidFailure
   | ControlPlaneRequestTooLargeFailure
@@ -406,6 +420,11 @@ export const apiErrorHttpStatus = {
   STUDIO_AUTHORITY_CHANGED: 403,
   STUDIO_GRANT_INVALID: 403,
   STUDIO_RESPONSE_TOO_LARGE: 413,
+  STUDIO_COLLECTION_CONFIGURATION_INVALID: 409,
+  INVALID_CURSOR: 400,
+  STALE_CURSOR: 409,
+  DRAFT_VERSION_CONFLICT: 409,
+  NAME_VERSION_CONFLICT: 409,
   CONTROL_PLANE_CURSOR_INVALID: 400,
   CONTROL_PLANE_REQUEST_TOO_LARGE: 413,
   CONTROL_PLANE_RESPONSE_TOO_LARGE: 413,
@@ -741,6 +760,49 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
       return {
         code: "STUDIO_RESPONSE_TOO_LARGE",
         message: "The Studio response exceeds the maximum size.",
+        retryable: false,
+      };
+    case "StudioCollectionConfigurationInvalidFailure":
+      return {
+        code: "STUDIO_COLLECTION_CONFIGURATION_INVALID",
+        message: "The Studio collection configuration is invalid.",
+        retryable: false,
+        details: [
+          ApiErrorDetail.make({
+            code: error.reason,
+            message: "Repair this collection schema in the dashboard before continuing.",
+          }),
+        ],
+      };
+    case "StudioContentCursorInvalidFailure":
+      return {
+        code: "INVALID_CURSOR",
+        message: "The Studio Content cursor is invalid.",
+        retryable: false,
+      };
+    case "StudioContentCursorStaleFailure":
+      return {
+        code: "STALE_CURSOR",
+        message: "The Studio Content cursor is stale. Restart the listing.",
+        retryable: false,
+      };
+    case "StudioDraftVersionConflictFailure":
+      return {
+        code: "DRAFT_VERSION_CONFLICT",
+        message: "The Studio draft changed since it was loaded. Review the latest draft.",
+        retryable: false,
+        details: error.details,
+      };
+    case "StudioNameVersionConflictFailure":
+      return {
+        code: "NAME_VERSION_CONFLICT",
+        message: "The entry name changed since it was loaded. Review the latest name.",
+        retryable: false,
+      };
+    case "StudioCommandConflictFailure":
+      return {
+        code: "COMMAND_CONFLICT",
+        message: "The Studio command identifier was already used for different input.",
         retryable: false,
       };
     case "ControlPlaneCommandConflictFailure":

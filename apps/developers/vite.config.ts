@@ -71,6 +71,7 @@ export default defineConfig(({ mode }) => ({
               { path: "/api-reference/delivery/v1" },
               { path: "/api-reference/preview/v1" },
               { path: "/api-reference/studio/v1" },
+              { path: "/api-reference/studio-content/v1" },
               { path: "/api-reference/tooling/v1" },
               { path: "/api-reference/webhooks/v1" },
             ],

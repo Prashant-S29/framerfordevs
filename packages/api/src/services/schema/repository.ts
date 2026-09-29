@@ -62,7 +62,7 @@ import {
   type GetPublishedGeneratedFormInput,
   type ValidateCollectionSchemaInput,
 } from "../../contracts/schema";
-import { EditorLayout } from "../../contracts/field";
+import { EditorLayout, FieldEditorMetadata } from "../../contracts/field";
 import {
   classifyCollectionSchemaChanges,
   fingerprintSchemaPublication,
@@ -384,12 +384,20 @@ async function selectCollection(
   return row;
 }
 
+/** Expands the M6 `{}` sentinel shared by historical current and revision field rows. */
+export function decodePersistedFieldEditorMetadataSync(
+  editorMetadata: Readonly<Record<string, unknown>>,
+): FieldEditorMetadata {
+  return Object.keys(editorMetadata).length === 0
+    ? defaultFieldEditorMetadata
+    : Schema.decodeUnknownSync(FieldEditorMetadata)(editorMetadata);
+}
+
 function fieldValue(
   row: typeof cmsCollectionField.$inferSelect | typeof cmsSchemaRevisionField.$inferSelect,
 ) {
   const id = "fieldId" in row ? row.fieldId : row.id;
-  const editor =
-    Object.keys(row.editorMetadata).length === 0 ? defaultFieldEditorMetadata : row.editorMetadata;
+  const editor = decodePersistedFieldEditorMetadataSync(row.editorMetadata);
   return Schema.decodeUnknownSync(CollectionFieldDefinition)({
     id,
     parentFieldId: row.parentFieldId,

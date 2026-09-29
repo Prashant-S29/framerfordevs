@@ -148,6 +148,13 @@
       "when": 1790399741342,
       "tag": "0020_allow_studio_credential_kill_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790569128095,
+      "tag": "0021_add_studio_entry_name_search_index",
+      "breakpoints": true
     }
   ]
 }

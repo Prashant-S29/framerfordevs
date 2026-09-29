@@ -1,8 +1,8 @@
 # Agent Session Context
 
-**Last updated:** 2026-09-27
-**Current phase:** M18B is developer-accepted, committed, and pushed at `c38b7db`; the migration-free compatibility corrections, five runtime packages, mounted shell, immutable Studio contract baseline, security/concurrency evidence, and repository gates are accepted, and the worker remains stopped
-**Next gate:** Design M19 Studio content and localization only; implementation, package publication, production configuration, rollout, and deployment remain separately gated
+**Last updated:** 2026-09-29
+**Current phase:** M19A Studio platform/content-protocol implementation and validation are complete and awaiting independent review; accepted implementation remains M18B at `c38b7db`, and the worker remains stopped
+**Next gate:** Independent M19A review; M19B and every release action remain gated
 
 ## Start here
 
@@ -20,7 +20,7 @@ Read relevant sections of `product.md` and `prd/cms.md` for behavioral work. Do 
 - Explicit current developer instruction, product/PRD, relevant rules/active criteria/approved decisions, then status documents govern intent in that order.
 - Committed source, tests, configuration, migrations, and generated artifacts describe executable truth; Git describes repository state.
 - Report drift instead of silently choosing an authority.
-- Work only on an approved active milestone or explicitly authorized workstream. M18A and M18B are accepted; M19 is the next design target, and M20+ remains gated.
+- Work only on an approved active milestone or explicitly authorized workstream. M18A/M18B are accepted, the M19 design is approved, and M19A implementation is explicitly authorized; M19B and M20+ remain gated.
 
 ## Product direction
 
@@ -137,5 +137,5 @@ The accepted M18B baseline at `c38b7db` adds the five private `0.0.0` Studio run
 
 ## Current work and next gate
 
-- **Current — M18B `[A]`:** the developer accepted, committed, and pushed the complete migration-free Studio mount/security runtime at `c38b7db`; package publication, production configuration, rollout, and deployment did not occur.
-- **Next — M19 design:** design Studio content and localization against the accepted M18 authority/runtime baseline; do not begin implementation, publish packages, configure production, roll out, or deploy without developer approval.
+- **Current — M19A review candidate:** Studio Content protocol/BFF authority, strict operation-specific response decoding, sidebar-only projection correctness, exhaustive transaction rollback/draft-isolation evidence, durable anomaly auditing, immutable artifact, developer-applied/catalog-verified migration `0021_add_studio_entry_name_search_index`, bounded load evidence, full readiness, browser, audit, package, changed-image, and final database-invariant gates pass.
+- **Next — independent M19A review:** stop for developer review; M19B, package publication, production configuration, rollout, deployment, commit, acceptance, and M20 remain gated.

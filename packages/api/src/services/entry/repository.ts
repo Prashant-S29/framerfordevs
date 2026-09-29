@@ -928,7 +928,7 @@ function makeAuditValues(options: {
   return { ...values, ...cmsAuditActor(actorId) };
 }
 
-type EntryFailureStage = "revision" | "head" | "audit" | "receipt";
+type EntryFailureStage = "entry" | "revision" | "head" | "audit" | "receipt";
 
 interface RepositoryOptions {
   readonly database?: ApplicationDb;
@@ -1202,6 +1202,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
               })
               .returning();
             if (!row) throw new Error("Entry insert returned no row.");
+            failAfter("entry");
             let sharedRevisionId: string | null = null;
             let localizedRevisionId: string | null = null;
             const sharedVersion = sharedResult.changed ? 1 : 0;
@@ -1231,6 +1232,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                 })
                 .returning();
               if (!revision) throw new Error("Initial shared revision insert returned no row.");
+              failAfter("revision");
               sharedRevisionId = revision.id;
               await transaction.insert(cmsEntrySharedDraft).values({
                 entryId: row.id,
@@ -1244,6 +1246,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                 changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 updatedAt: now,
               });
+              failAfter("head");
               await transaction.insert(auditEvent).values(
                 makeAuditValues({
                   workspaceId: row.workspaceId,
@@ -1256,6 +1259,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   requestId,
                 }),
               );
+              failAfter("audit");
             }
             if (localizedResult.changed) {
               const [revision] = await transaction
@@ -1283,6 +1287,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                 })
                 .returning();
               if (!revision) throw new Error("Initial localized revision insert returned no row.");
+              failAfter("revision");
               localizedRevisionId = revision.id;
               await transaction.insert(cmsEntryLocaleDraft).values({
                 entryId: row.id,
@@ -1297,6 +1302,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                 changedByCredentialId: cmsActorReferences(actorId).credentialId,
                 updatedAt: now,
               });
+              failAfter("head");
               await transaction.insert(auditEvent).values(
                 makeAuditValues({
                   workspaceId: row.workspaceId,
@@ -1309,6 +1315,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                   requestId,
                 }),
               );
+              failAfter("audit");
             }
             await transaction.insert(auditEvent).values(
               makeAuditValues({

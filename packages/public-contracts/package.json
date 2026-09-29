@@ -12,6 +12,7 @@
     "./artifacts/delivery/v1/openapi.json": "./artifacts/delivery/v1/openapi.json",
     "./artifacts/preview/v1/openapi.json": "./artifacts/preview/v1/openapi.json",
     "./artifacts/studio/v1/openapi.json": "./artifacts/studio/v1/openapi.json",
+    "./artifacts/studio-content/v1/openapi.json": "./artifacts/studio-content/v1/openapi.json",
     "./artifacts/tooling/v1/openapi.json": "./artifacts/tooling/v1/openapi.json",
     "./artifacts/webhooks/v1/events.schema.json": "./artifacts/webhooks/v1/events.schema.json"
   },

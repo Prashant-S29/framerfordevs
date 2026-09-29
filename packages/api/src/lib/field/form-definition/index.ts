@@ -111,7 +111,10 @@ function projectLayoutForRole(
         )
         .map((placement, fieldPosition) => ({ ...placement, position: fieldPosition })),
     }));
-  if (tabs.length === 0) return syntheticEditorLayout([]);
+  if (tabs.length === 0) {
+    const synthetic = syntheticEditorLayout([]);
+    return Schema.decodeUnknownSync(EditorLayout)({ ...synthetic, sidebarGroups });
+  }
   return Schema.decodeUnknownSync(EditorLayout)({ version: 1, tabs, sidebarGroups });
 }
 

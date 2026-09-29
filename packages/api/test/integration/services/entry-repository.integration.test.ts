@@ -64,16 +64,24 @@ import {
   CreateCollectionInput,
   defaultFieldEditorMetadata,
   PublishCollectionSchemaInput,
+  SchemaRevisionId,
   ValidateCollectionSchemaInput,
   type CmsCollection,
   type PublishedSchemaRevision,
 } from "../../../src/contracts/schema";
+import {
+  StudioCollectionLocaleScope,
+  StudioContentPageLimit,
+  StudioContentScope,
+} from "../../../src/contracts/studio-content";
 import { resolveAuthoringMutations } from "../../../src/lib/authoring/mutations";
+import { studioSearchAuthority } from "../../../src/lib/studio-content/search";
 import { makeAuthoringContentRepository } from "../../../src/services/authoring/content-repository";
 import { makeEntryRepository } from "../../../src/services/entry/repository";
 import { makeLocaleRepository } from "../../../src/services/locale/repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 import { makeSchemaRepository } from "../../../src/services/schema/repository";
+import { makeStudioContentRepository } from "../../../src/services/studio-content/repository";
 
 const suffix = randomUUID();
 const ownerId = `m7-entry-owner-${suffix}`;
@@ -90,6 +98,7 @@ const platform = makePlatformRepository();
 const schemas = makeSchemaRepository();
 const entries = makeEntryRepository();
 const localeRepository = makeLocaleRepository();
+const studioContent = makeStudioContentRepository();
 
 let workspaceModel: WorkspaceModel | undefined;
 let projectModel: ProjectModel | undefined;
@@ -510,17 +519,27 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           `m7-unpublished-${suffix}`,
         ),
         (collection) =>
-          entries.listEntries(
-            ownerActor,
-            Schema.decodeUnknownSync(ListEntriesInput)({
-              projectId: project.id,
-              environmentId: project.environment.id,
-              collectionId: collection.id,
-              locale: "en",
-              cursor: null,
-              limit: 25,
-            }),
-          ),
+          Effect.all({
+            page: entries.listEntries(
+              ownerActor,
+              Schema.decodeUnknownSync(ListEntriesInput)({
+                projectId: project.id,
+                environmentId: project.environment.id,
+                collectionId: collection.id,
+                locale: "en",
+                cursor: null,
+                limit: 25,
+              }),
+            ),
+            context: studioContent.getContext(
+              ownerActor,
+              Schema.decodeUnknownSync(StudioContentScope)({
+                projectId: project.id,
+                environmentId: project.environment.id,
+              }),
+              new Date(),
+            ),
+          }),
         (collection) =>
           Effect.promise(async () => {
             await db
@@ -532,10 +551,536 @@ describe.sequential("entry repository PostgreSQL integration", () => {
             await db.delete(cmsCollection).where(eq(cmsCollection.id, collection.id));
           }),
       );
-      assert.deepStrictEqual(page.items, []);
-      assert.strictEqual(page.nextCursor, null);
+      assert.deepStrictEqual(page.page.items, []);
+      assert.strictEqual(page.page.nextCursor, null);
+      assert.isFalse(
+        page.context.collections.some(({ displayName }) => displayName === "Unpublished entries"),
+      );
+      assert.isFalse(
+        page.context.configurationNotices.some(
+          ({ displayName }) => displayName === "Unpublished entries",
+        ),
+      );
     }),
   );
+
+  it.effect("projects Studio context and exact-locale shared-write authority", () =>
+    Effect.gen(function* () {
+      const project = required(projectModel, "project");
+      const collection = required(collectionModel, "collection");
+      const published = required(publishedModel, "published schema");
+      const contextScope = Schema.decodeUnknownSync(StudioContentScope)({
+        projectId: project.id,
+        environmentId: project.environment.id,
+      });
+      const englishScope = Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+        ...contextScope,
+        collectionId: collection.id,
+        locale: "en",
+      });
+      const hindiScope = Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+        ...contextScope,
+        collectionId: collection.id,
+        locale: "hi",
+      });
+
+      const ownerContext = yield* studioContent.getContext(ownerActor, contextScope, new Date());
+      const editorContext = yield* studioContent.getContext(editorActor, contextScope, new Date());
+      const ownerAuthority = yield* studioContent.authorizeCollection(
+        ownerActor,
+        englishScope,
+        new Date(),
+      );
+      const editorAuthority = yield* studioContent.authorizeCollection(
+        editorActor,
+        englishScope,
+        new Date(),
+      );
+      const hiddenLocale = yield* Effect.exit(
+        studioContent.authorizeCollection(editorActor, hindiScope, new Date()),
+      );
+      const foreignEnvironment = yield* Effect.exit(
+        studioContent.authorizeCollection(
+          ownerActor,
+          Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+            ...englishScope,
+            environmentId: randomUUID(),
+          }),
+          new Date(),
+        ),
+      );
+      const foreignCollection = yield* Effect.exit(
+        studioContent.authorizeCollection(
+          ownerActor,
+          Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+            ...englishScope,
+            collectionId: randomUUID(),
+          }),
+          new Date(),
+        ),
+      );
+      const foreignProject = yield* Effect.exit(
+        studioContent.authorizeCollection(
+          ownerActor,
+          Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+            ...englishScope,
+            projectId: randomUUID(),
+            environmentId: randomUUID(),
+          }),
+          new Date(),
+        ),
+      );
+      const staleSchema = yield* Effect.exit(
+        studioContent.listEntries(
+          ownerActor,
+          {
+            scope: englishScope,
+            expectedSchemaRevisionId: Schema.decodeUnknownSync(SchemaRevisionId)(randomUUID()),
+            limit: Schema.decodeUnknownSync(StudioContentPageLimit)(25),
+            search: null,
+            browseOrder: null,
+            searchOrder: null,
+          },
+          new Date(),
+        ),
+      );
+
+      assert.deepStrictEqual(
+        ownerContext.locales.map(({ tag }) => tag),
+        ["en", "hi"],
+      );
+      assert.deepStrictEqual(
+        editorContext.locales.map(({ tag }) => tag),
+        ["en"],
+      );
+      assert.strictEqual(ownerContext.collections[0]?.capabilities.canSaveShared, true);
+      assert.strictEqual(editorContext.collections[0]?.capabilities.canSaveShared, false);
+      assert.strictEqual(ownerAuthority.schemaRevisionId, published.id);
+      assert.strictEqual(ownerAuthority.canWriteShared, true);
+      assert.strictEqual(editorAuthority.canWriteLocalized, true);
+      assert.strictEqual(editorAuthority.canWriteShared, false);
+      assert.strictEqual(failureTag(hiddenLocale), "NotFoundFailure");
+      assert.strictEqual(failureTag(foreignEnvironment), "NotFoundFailure");
+      assert.strictEqual(failureTag(foreignCollection), "NotFoundFailure");
+      assert.strictEqual(failureTag(foreignProject), "NotFoundFailure");
+      assert.strictEqual(failureTag(staleSchema), "StudioContentCursorStaleFailure");
+    }),
+  );
+
+  it("enforces the Studio fixed-role and locale-access capability matrix", async () => {
+    const currentProject = required(projectModel, "project");
+    const currentCollection = required(collectionModel, "collection");
+    const scope = Schema.decodeUnknownSync(StudioContentScope)({
+      projectId: currentProject.id,
+      environmentId: currentProject.environment.id,
+    });
+    const localeScope = Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+      ...scope,
+      collectionId: currentCollection.id,
+      locale: "en",
+    });
+    const rollback = new Error("rollback Studio role matrix");
+
+    try {
+      await db.transaction(async (transaction) => {
+        const repository = makeStudioContentRepository({
+          database: { transaction: (callback) => callback(transaction) },
+        });
+        for (const [role, canWrite] of [
+          ["developer", true],
+          ["content_admin", true],
+          ["editor", true],
+          ["reviewer", false],
+          ["client_editor", true],
+          ["read_only", false],
+        ] as const) {
+          await transaction
+            .update(projectMembership)
+            .set({ role, localeAccessMode: "all" })
+            .where(eq(projectMembership.userId, editorId));
+          const context = await Effect.runPromise(
+            repository.getContext(editorActor, scope, new Date()),
+          );
+          const authority = await Effect.runPromise(
+            repository.authorizeCollection(editorActor, localeScope, new Date()),
+          );
+          assert.strictEqual(context.locales[0]?.canWrite, canWrite, role);
+          assert.strictEqual(context.collections[0]?.capabilities.canCreate, canWrite, role);
+          assert.strictEqual(context.collections[0]?.capabilities.canRename, canWrite, role);
+          assert.strictEqual(context.collections[0]?.capabilities.canSaveLocalized, canWrite, role);
+          assert.strictEqual(context.collections[0]?.capabilities.canSaveShared, canWrite, role);
+          assert.strictEqual(authority.canWriteLocalized, canWrite, role);
+          assert.strictEqual(authority.canWriteShared, canWrite, role);
+        }
+
+        await transaction
+          .update(projectMembership)
+          .set({ role: "editor", localeAccessMode: "selected" })
+          .where(eq(projectMembership.userId, editorId));
+        const selected = await Effect.runPromise(
+          repository.authorizeCollection(editorActor, localeScope, new Date()),
+        );
+        assert.strictEqual(selected.canWriteLocalized, true);
+        assert.strictEqual(selected.canWriteShared, false);
+
+        await transaction
+          .update(projectMembership)
+          .set({ localeAccessMode: "none" })
+          .where(eq(projectMembership.userId, editorId));
+        const noneContext = await Effect.runPromise(
+          repository.getContext(editorActor, scope, new Date()),
+        );
+        const noneDirect = await Effect.runPromiseExit(
+          repository.authorizeCollection(editorActor, localeScope, new Date()),
+        );
+        assert.deepStrictEqual(noneContext.locales, []);
+        assert.deepStrictEqual(noneContext.collections, []);
+        assert.strictEqual(failureTag(noneDirect), "NotFoundFailure");
+
+        for (const status of ["disabled", "removed"] as const) {
+          await transaction
+            .update(projectLocale)
+            .set({ status, position: status === "removed" ? null : 1 })
+            .where(
+              and(eq(projectLocale.projectId, currentProject.id), eq(projectLocale.tag, "hi")),
+            );
+          const lifecycleContext = await Effect.runPromise(
+            repository.getContext(ownerActor, scope, new Date()),
+          );
+          assert.deepStrictEqual(
+            lifecycleContext.locales.map(({ tag }) => tag),
+            ["en"],
+            status,
+          );
+        }
+        throw rollback;
+      });
+    } catch (error) {
+      if (error !== rollback) throw error;
+    }
+
+    const ownerAuthority = await Effect.runPromise(
+      studioContent.authorizeCollection(ownerActor, localeScope, new Date()),
+    );
+    assert.strictEqual(ownerAuthority.role, "owner");
+    assert.strictEqual(ownerAuthority.canWriteLocalized, true);
+    assert.strictEqual(ownerAuthority.canWriteShared, true);
+  });
+
+  it("keeps Studio anomaly diagnostics support-only and response-gated", async () => {
+    const currentProject = required(projectModel, "project");
+    const currentCollection = required(collectionModel, "collection");
+    const published = required(publishedModel, "published schema");
+    const scope = Schema.decodeUnknownSync(StudioContentScope)({
+      projectId: currentProject.id,
+      environmentId: currentProject.environment.id,
+    });
+    const localeScope = Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+      ...scope,
+      collectionId: currentCollection.id,
+      locale: "en",
+    });
+    const rollback = new Error("rollback Studio anomaly fixture");
+
+    try {
+      await db.transaction(async (transaction) => {
+        const repository = makeStudioContentRepository({
+          database: { transaction: (callback) => callback(transaction) },
+        });
+        await transaction
+          .delete(cmsSchemaRevisionField)
+          .where(eq(cmsSchemaRevisionField.revisionId, published.id));
+
+        const ownerContext = await Effect.runPromise(
+          repository.getContext(ownerActor, scope, new Date()),
+        );
+        const ownerDirect = await Effect.runPromiseExit(
+          repository.authorizeCollection(ownerActor, localeScope, new Date()),
+        );
+        await transaction
+          .update(projectMembership)
+          .set({ role: "developer", localeAccessMode: "all" })
+          .where(eq(projectMembership.userId, editorId));
+        const developerContext = await Effect.runPromise(
+          repository.getContext(editorActor, scope, new Date()),
+        );
+        const developerDirect = await Effect.runPromiseExit(
+          repository.authorizeCollection(editorActor, localeScope, new Date()),
+        );
+        await transaction
+          .update(projectMembership)
+          .set({ role: "editor", localeAccessMode: "selected" })
+          .where(eq(projectMembership.userId, editorId));
+        const editorContext = await Effect.runPromise(
+          repository.getContext(editorActor, scope, new Date()),
+        );
+        const editorDirect = await Effect.runPromiseExit(
+          repository.authorizeCollection(editorActor, localeScope, new Date()),
+        );
+        const audits = await transaction
+          .select({ count: sql<number>`count(*)::int` })
+          .from(auditEvent)
+          .where(
+            and(
+              eq(auditEvent.resourceId, published.id),
+              eq(auditEvent.action, "cms.schema.projection_invalid_detected"),
+            ),
+          );
+
+        assert.deepStrictEqual(ownerContext.configurationNotices, [
+          {
+            collectionId: currentCollection.id,
+            displayName: currentCollection.displayName,
+            reason: "empty_schema",
+          },
+        ]);
+        assert.deepStrictEqual(
+          developerContext.configurationNotices,
+          ownerContext.configurationNotices,
+        );
+        assert.deepStrictEqual(editorContext.configurationNotices, []);
+        assert.strictEqual(failureTag(ownerDirect), "StudioCollectionConfigurationInvalidFailure");
+        assert.strictEqual(
+          failureTag(developerDirect),
+          "StudioCollectionConfigurationInvalidFailure",
+        );
+        assert.strictEqual(failureTag(editorDirect), "NotFoundFailure");
+        assert.strictEqual(audits[0]?.count, 0);
+        throw rollback;
+      });
+    } catch (error) {
+      if (error !== rollback) throw error;
+    }
+
+    try {
+      await db.transaction(async (transaction) => {
+        const repository = makeStudioContentRepository({
+          database: { transaction: (callback) => callback(transaction) },
+        });
+        await transaction
+          .update(cmsSchemaRevisionField)
+          .set({
+            editorMetadata: {
+              helpText: null,
+              placeholder: null,
+              visibleToRoles: ["editor"],
+              editableByRoles: ["editor"],
+            },
+          })
+          .where(eq(cmsSchemaRevisionField.revisionId, published.id));
+
+        const editorBeforeSupport = await Effect.runPromise(
+          repository.getContext(editorActor, scope, new Date()),
+        );
+        const editorDirectBeforeSupport = await Effect.runPromiseExit(
+          repository.authorizeCollection(editorActor, localeScope, new Date()),
+        );
+        const [beforeSupportAudit] = await transaction
+          .select({ count: sql<number>`count(*)::int` })
+          .from(auditEvent)
+          .where(
+            and(
+              eq(auditEvent.resourceId, published.id),
+              eq(auditEvent.action, "cms.schema.projection_invalid_detected"),
+            ),
+          );
+        const ownerContext = await Effect.runPromise(
+          repository.getContext(ownerActor, scope, new Date()),
+        );
+        const repeatedOwnerContext = await Effect.runPromise(
+          repository.getContext(ownerActor, scope, new Date()),
+        );
+        const ownerDetections = [];
+        for (let index = 0; index < 7; index += 1) {
+          ownerDetections.push(
+            await Effect.runPromiseExit(
+              repository.authorizeCollection(ownerActor, localeScope, new Date()),
+            ),
+          );
+        }
+        await transaction
+          .update(projectMembership)
+          .set({ role: "developer", localeAccessMode: "all" })
+          .where(eq(projectMembership.userId, editorId));
+        const developerContext = await Effect.runPromise(
+          repository.getContext(editorActor, scope, new Date()),
+        );
+        const developerDirect = await Effect.runPromiseExit(
+          repository.authorizeCollection(editorActor, localeScope, new Date()),
+        );
+        await transaction
+          .update(projectMembership)
+          .set({ role: "editor", localeAccessMode: "selected" })
+          .where(eq(projectMembership.userId, editorId));
+        const editorContext = await Effect.runPromise(
+          repository.getContext(editorActor, scope, new Date()),
+        );
+        const editorDirect = await Effect.runPromiseExit(
+          repository.authorizeCollection(editorActor, localeScope, new Date()),
+        );
+        const audits = await transaction
+          .select({ actorId: auditEvent.actorId })
+          .from(auditEvent)
+          .where(
+            and(
+              eq(auditEvent.resourceId, published.id),
+              eq(auditEvent.action, "cms.schema.projection_invalid_detected"),
+            ),
+          );
+
+        assert.deepStrictEqual(editorBeforeSupport.configurationNotices, []);
+        assert.isFalse(
+          editorBeforeSupport.collections.some(({ id }) => id === currentCollection.id),
+        );
+        assert.strictEqual(failureTag(editorDirectBeforeSupport), "NotFoundFailure");
+        assert.strictEqual(beforeSupportAudit?.count, 0);
+        assert.deepStrictEqual(ownerContext.configurationNotices, [
+          {
+            collectionId: currentCollection.id,
+            displayName: currentCollection.displayName,
+            reason: "projection_invalid",
+          },
+        ]);
+        assert.deepStrictEqual(
+          repeatedOwnerContext.configurationNotices,
+          ownerContext.configurationNotices,
+        );
+        assert.deepStrictEqual(
+          developerContext.configurationNotices,
+          ownerContext.configurationNotices,
+        );
+        assert.deepStrictEqual(editorContext.configurationNotices, []);
+        assert.strictEqual(ownerDetections.length, 7);
+        assert.isTrue(
+          ownerDetections.every(
+            (detection) => failureTag(detection) === "StudioCollectionConfigurationInvalidFailure",
+          ),
+        );
+        assert.strictEqual(
+          failureTag(developerDirect),
+          "StudioCollectionConfigurationInvalidFailure",
+        );
+        assert.strictEqual(failureTag(editorDirect), "NotFoundFailure");
+        assert.deepStrictEqual(audits, [{ actorId: ownerId }]);
+        throw rollback;
+      });
+    } catch (error) {
+      if (error !== rollback) throw error;
+    }
+
+    try {
+      await db.transaction(async (transaction) => {
+        await transaction
+          .update(cmsSchemaRevisionField)
+          .set({
+            editorMetadata: {
+              helpText: null,
+              placeholder: null,
+              visibleToRoles: ["editor"],
+              editableByRoles: ["editor"],
+            },
+          })
+          .where(eq(cmsSchemaRevisionField.revisionId, published.id));
+        const failingTransaction = new Proxy(transaction, {
+          get(target, property, receiver) {
+            if (property === "insert") {
+              return () => {
+                throw new Error("injected projection audit persistence failure");
+              };
+            }
+            return Reflect.get(target, property, receiver);
+          },
+        });
+        const repository = makeStudioContentRepository({
+          database: { transaction: (callback) => callback(failingTransaction) },
+        });
+        const failed = await Effect.runPromiseExit(
+          repository.getContext(ownerActor, scope, new Date()),
+        );
+        const audits = await transaction
+          .select({ count: sql<number>`count(*)::int` })
+          .from(auditEvent)
+          .where(
+            and(
+              eq(auditEvent.resourceId, published.id),
+              eq(auditEvent.action, "cms.schema.projection_invalid_detected"),
+            ),
+          );
+        assert.strictEqual(failureTag(failed), "DatabaseFailure");
+        assert.strictEqual(audits[0]?.count, 0);
+        throw rollback;
+      });
+    } catch (error) {
+      if (error !== rollback) throw error;
+    }
+
+    const originalFields = await db
+      .select({
+        fieldId: cmsSchemaRevisionField.fieldId,
+        editorMetadata: cmsSchemaRevisionField.editorMetadata,
+      })
+      .from(cmsSchemaRevisionField)
+      .where(eq(cmsSchemaRevisionField.revisionId, published.id));
+    try {
+      await db
+        .update(cmsSchemaRevisionField)
+        .set({
+          editorMetadata: {
+            helpText: null,
+            placeholder: null,
+            visibleToRoles: ["editor"],
+            editableByRoles: ["editor"],
+          },
+        })
+        .where(eq(cmsSchemaRevisionField.revisionId, published.id));
+      const [concurrentContext, concurrentDetections] = await Promise.all([
+        Effect.runPromise(studioContent.getContext(ownerActor, scope, new Date())),
+        Promise.all(
+          Array.from({ length: 7 }, () =>
+            Effect.runPromiseExit(
+              studioContent.authorizeCollection(ownerActor, localeScope, new Date()),
+            ),
+          ),
+        ),
+      ]);
+      const concurrentAudits = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(auditEvent)
+        .where(
+          and(
+            eq(auditEvent.resourceId, published.id),
+            eq(auditEvent.action, "cms.schema.projection_invalid_detected"),
+          ),
+        );
+      assert.strictEqual(concurrentContext.configurationNotices[0]?.reason, "projection_invalid");
+      assert.isTrue(
+        concurrentDetections.every(
+          (detection) => failureTag(detection) === "StudioCollectionConfigurationInvalidFailure",
+        ),
+      );
+      assert.strictEqual(concurrentAudits[0]?.count, 1);
+    } finally {
+      for (const field of originalFields) {
+        await db
+          .update(cmsSchemaRevisionField)
+          .set({ editorMetadata: field.editorMetadata })
+          .where(
+            and(
+              eq(cmsSchemaRevisionField.revisionId, published.id),
+              eq(cmsSchemaRevisionField.fieldId, field.fieldId),
+            ),
+          );
+      }
+      await db
+        .delete(auditEvent)
+        .where(
+          and(
+            eq(auditEvent.resourceId, published.id),
+            eq(auditEvent.action, "cms.schema.projection_invalid_detected"),
+          ),
+        );
+    }
+  });
 
   it.effect("creates one stable entry idempotently and lists it only in scope", () =>
     Effect.gen(function* () {
@@ -798,17 +1343,22 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           },
         ],
       });
-      const created = yield* entries.createEntryWithDraft(
-        managementActor,
-        input,
-        new Date("2026-08-08T10:59:00.000Z"),
-        `m13-create-with-draft-${suffix}`,
-      );
-      const replay = yield* entries.createEntryWithDraft(
-        managementActor,
-        input,
-        new Date("2026-08-08T10:59:30.000Z"),
-        `m13-create-with-draft-replay-${suffix}`,
+      const [created, replay] = yield* Effect.all(
+        [
+          entries.createEntryWithDraft(
+            managementActor,
+            input,
+            new Date("2026-08-08T10:59:00.000Z"),
+            `m13-create-with-draft-${suffix}`,
+          ),
+          entries.createEntryWithDraft(
+            managementActor,
+            input,
+            new Date("2026-08-08T10:59:30.000Z"),
+            `m13-create-with-draft-replay-${suffix}`,
+          ),
+        ],
+        { concurrency: "unbounded" },
       );
       const draft = yield* entries.getDraft(
         managementActor,
@@ -819,6 +1369,38 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           entryId: created.entry.id,
           locale: "en",
         }),
+      );
+      const conflictingCommandId = randomUUID();
+      const conflictingInputs = [
+        yield* Schema.decodeUnknown(CreateEntryWithDraftInput)({
+          ...input,
+          commandId: conflictingCommandId,
+          displayName: "Concurrent conflict A",
+        }),
+        yield* Schema.decodeUnknown(CreateEntryWithDraftInput)({
+          ...input,
+          commandId: conflictingCommandId,
+          displayName: "Concurrent conflict B",
+        }),
+      ] as const;
+      const conflictingResults = yield* Effect.all(
+        conflictingInputs.map((conflictingInput, index) =>
+          Effect.exit(
+            entries.createEntryWithDraft(
+              managementActor,
+              conflictingInput,
+              new Date(`2026-08-08T10:59:4${index}.000Z`),
+              `m13-create-with-draft-conflict-${index}-${suffix}`,
+            ),
+          ),
+        ),
+        { concurrency: "unbounded" },
+      );
+      const [conflictingRows] = yield* Effect.promise(() =>
+        db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(cmsEntry)
+          .where(eq(cmsEntry.createCommandId, conflictingCommandId)),
       );
       const failedCommandId = randomUUID();
       const failed = yield* Effect.exit(
@@ -846,29 +1428,46 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           .from(cmsEntry)
           .where(eq(cmsEntry.createCommandId, failedCommandId)),
       );
-      const rollbackCommandId = randomUUID();
-      const rolledBack = yield* Effect.exit(
-        makeEntryRepository({ failAfter: "audit" }).createEntryWithDraft(
-          managementActor,
-          yield* Schema.decodeUnknown(CreateEntryWithDraftInput)({
-            ...input,
-            commandId: rollbackCommandId,
-            displayName: "Injected rollback",
-          }),
-          new Date("2026-08-08T10:59:50.000Z"),
-          `m13-create-with-draft-rollback-${suffix}`,
-        ),
-      );
-      const [rollbackRows] = yield* Effect.promise(() =>
-        db
-          .select({
-            entries: sql<number>`(select count(*)::int from cms_entry where create_command_id = ${rollbackCommandId})`,
-            shared: sql<number>`(select count(*)::int from cms_entry_shared_revision where command_id = ${rollbackCommandId})`,
-            localized: sql<number>`(select count(*)::int from cms_entry_locale_revision where command_id = ${rollbackCommandId})`,
-          })
-          .from(cmsCollection)
-          .limit(1),
-      );
+      const rollbackResults: Array<{
+        readonly tag: string | undefined;
+        readonly rows: {
+          readonly entries: number;
+          readonly shared: number;
+          readonly localized: number;
+          readonly audits: number;
+        };
+      }> = [];
+      for (const stage of ["entry", "revision", "head", "audit"] as const) {
+        const rollbackCommandId = randomUUID();
+        const rollbackRequestId = `m13-create-with-draft-rollback-${stage}-${suffix}`;
+        const rolledBack = yield* Effect.exit(
+          makeEntryRepository({ failAfter: stage }).createEntryWithDraft(
+            managementActor,
+            yield* Schema.decodeUnknown(CreateEntryWithDraftInput)({
+              ...input,
+              commandId: rollbackCommandId,
+              displayName: `Injected ${stage} rollback`,
+            }),
+            new Date("2026-08-08T10:59:50.000Z"),
+            rollbackRequestId,
+          ),
+        );
+        const [rows] = yield* Effect.promise(() =>
+          db
+            .select({
+              entries: sql<number>`(select count(*)::int from cms_entry where create_command_id = ${rollbackCommandId})`,
+              shared: sql<number>`(select count(*)::int from cms_entry_shared_revision where command_id = ${rollbackCommandId})`,
+              localized: sql<number>`(select count(*)::int from cms_entry_locale_revision where command_id = ${rollbackCommandId})`,
+              audits: sql<number>`(select count(*)::int from audit_event where request_id = ${rollbackRequestId})`,
+            })
+            .from(cmsCollection)
+            .limit(1),
+        );
+        rollbackResults.push({
+          tag: failureTag(rolledBack),
+          rows: required(rows, `${stage} rollback rows`),
+        });
+      }
 
       assert.strictEqual(replay.entry.id, created.entry.id);
       assert.strictEqual(created.entry.createdByUserId, null);
@@ -885,10 +1484,20 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         Reflect.get(draft.localizedValues, required(localizedFieldId, "localized field")),
         "Initial title",
       );
+      assert.strictEqual(conflictingResults.filter(Exit.isSuccess).length, 1);
+      assert.deepStrictEqual(conflictingResults.filter(Exit.isFailure).map(failureTag), [
+        "EntryCommandConflictFailure",
+      ]);
+      assert.strictEqual(conflictingRows?.count, 1);
       assert.strictEqual(failureTag(failed), "ValidationFailure");
       assert.strictEqual(failedRows?.count, 0);
-      assert.strictEqual(failureTag(rolledBack), "DatabaseFailure");
-      assert.deepStrictEqual(rollbackRows, { entries: 0, shared: 0, localized: 0 });
+      assert.deepStrictEqual(
+        rollbackResults,
+        Array.from({ length: 4 }, () => ({
+          tag: "DatabaseFailure",
+          rows: { entries: 0, shared: 0, localized: 0, audits: 0 },
+        })),
+      );
     }),
   );
 
@@ -991,28 +1600,45 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           ),
         );
         assert.strictEqual(failureTag(malformed), "ValidationFailure");
-        const rollback = yield* Effect.exit(
-          makeEntryRepository({ failAfter: "revision" }).saveDraft(
-            ownerActor,
-            yield* Schema.decodeUnknown(SaveEntryDraftInput)({
-              projectId: project.id,
-              environmentId: project.environment.id,
-              collectionId: collection.id,
-              entryId: entry.id,
-              locale: "en",
-              schemaRevisionId: published.id,
-              contractHash: published.contractHash,
-              commandId: randomUUID(),
-              expectedSharedVersion: 1,
-              expectedLocalizedVersion: 1,
-              sharedMutations: [],
-              localizedMutations: [{ operation: "set", path: [localizedId], value: "Rolled back" }],
-            }),
-            new Date("2026-08-08T11:03:45.000Z"),
-            `m7-rollback-${suffix}`,
-          ),
-        );
-        assert.strictEqual(failureTag(rollback), "DatabaseFailure");
+        for (const stage of ["revision", "head", "audit", "receipt"] as const) {
+          const rollbackCommandId = randomUUID();
+          const rollbackRequestId = `m7-rollback-${stage}-${suffix}`;
+          const rollback = yield* Effect.exit(
+            makeEntryRepository({ failAfter: stage }).saveDraft(
+              ownerActor,
+              yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+                projectId: project.id,
+                environmentId: project.environment.id,
+                collectionId: collection.id,
+                entryId: entry.id,
+                locale: "en",
+                schemaRevisionId: published.id,
+                contractHash: published.contractHash,
+                commandId: rollbackCommandId,
+                expectedSharedVersion: 1,
+                expectedLocalizedVersion: 1,
+                sharedMutations: [],
+                localizedMutations: [
+                  { operation: "set", path: [localizedId], value: `Rolled back ${stage}` },
+                ],
+              }),
+              new Date("2026-08-08T11:03:45.000Z"),
+              rollbackRequestId,
+            ),
+          );
+          assert.strictEqual(failureTag(rollback), "DatabaseFailure");
+          const [rollbackRows] = yield* Effect.promise(() =>
+            db
+              .select({
+                revisions: sql<number>`(select count(*)::int from cms_entry_locale_revision where command_id = ${rollbackCommandId})`,
+                receipts: sql<number>`(select count(*)::int from cms_entry_draft_command where command_id = ${rollbackCommandId})`,
+                audits: sql<number>`(select count(*)::int from audit_event where request_id = ${rollbackRequestId})`,
+              })
+              .from(cmsCollection)
+              .limit(1),
+          );
+          assert.deepStrictEqual(rollbackRows, { revisions: 0, receipts: 0, audits: 0 });
+        }
         const afterRollback = yield* entries.getDraft(
           ownerActor,
           yield* Schema.decodeUnknown(GetEntryDraftInput)({
@@ -1042,8 +1668,8 @@ describe.sequential("entry repository PostgreSQL integration", () => {
             : undefined,
           "English heading",
         );
-        const noOpCommand = randomUUID();
-        const noOpInput = yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+        const replayCommand = randomUUID();
+        const replayInput = yield* Schema.decodeUnknown(SaveEntryDraftInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1051,31 +1677,50 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           locale: "en",
           schemaRevisionId: published.id,
           contractHash: published.contractHash,
-          commandId: noOpCommand,
+          commandId: replayCommand,
           expectedSharedVersion: 1,
           expectedLocalizedVersion: 1,
-          sharedMutations: [{ operation: "set", path: [sharedId], value: "Alpha" }],
+          sharedMutations: [{ operation: "set", path: [sharedId], value: "Concurrent replay" }],
           localizedMutations: [],
         });
+        const [saved, replay] = yield* Effect.all(
+          [
+            entries.saveDraft(
+              ownerActor,
+              replayInput,
+              new Date("2026-08-08T11:04:00.000Z"),
+              `m7-replay-${suffix}`,
+            ),
+            entries.saveDraft(
+              ownerActor,
+              replayInput,
+              new Date("2026-08-08T11:05:00.000Z"),
+              `m7-replay-concurrent-${suffix}`,
+            ),
+          ],
+          { concurrency: "unbounded" },
+        );
+        assert.isTrue(saved.sharedChanged);
+        assert.strictEqual(saved.sharedVersion, 2);
+        assert.strictEqual(replay.sharedVersion, 2);
+        assert.strictEqual(replay.sharedRevisionId, saved.sharedRevisionId);
         const noOp = yield* entries.saveDraft(
           ownerActor,
-          noOpInput,
-          new Date("2026-08-08T11:04:00.000Z"),
+          yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+            ...replayInput,
+            commandId: randomUUID(),
+            expectedSharedVersion: 2,
+          }),
+          new Date("2026-08-08T11:05:30.000Z"),
           `m7-noop-${suffix}`,
         );
-        const replay = yield* entries.saveDraft(
-          ownerActor,
-          noOpInput,
-          new Date("2026-08-08T11:05:00.000Z"),
-          `m7-noop-replay-${suffix}`,
-        );
         assert.isFalse(noOp.sharedChanged);
-        assert.strictEqual(replay.sharedVersion, 1);
+        assert.strictEqual(noOp.sharedVersion, 2);
         const commandConflict = yield* Effect.exit(
           entries.saveDraft(
             ownerActor,
             yield* Schema.decodeUnknown(SaveEntryDraftInput)({
-              ...noOpInput,
+              ...replayInput,
               sharedMutations: [{ operation: "set", path: [sharedId], value: "Different" }],
             }),
             new Date(),
@@ -1087,7 +1732,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           entries.saveDraft(
             ownerActor,
             yield* Schema.decodeUnknown(SaveEntryDraftInput)({
-              ...noOpInput,
+              ...replayInput,
               commandId: randomUUID(),
               expectedSharedVersion: 0,
               sharedMutations: [{ operation: "set", path: [sharedId], value: "Beta" }],
@@ -1391,12 +2036,21 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         );
         assert.strictEqual(revisions.items[0]?.restoredFromRevisionId, target.id);
         assert.strictEqual(revisions.items.length, 3);
-        const outboxResult = yield* Effect.promise(() =>
-          db.execute(
-            sql`select count(*)::int as count from outbox_event where subject_id = ${entry.id} or payload::text like ${`%${entry.id}%`}`,
-          ),
+        const draftIsolation = yield* Effect.promise(() =>
+          db.execute(sql`
+            select
+              (select count(*)::int from cms_entry_locale_publication where entry_id = ${entry.id}) as publications,
+              (select count(*)::int from cms_entry_locale_delivery_snapshot where entry_id = ${entry.id}) as snapshots,
+              (select count(*)::int from cms_entry_locale_publication_head where entry_id = ${entry.id}) as publication_heads,
+              (select count(*)::int from outbox_event where subject_id = ${entry.id} or payload::text like ${`%${entry.id}%`}) as outbox
+          `),
         );
-        assert.strictEqual(Number(outboxResult.rows[0]?.count), 0);
+        assert.deepStrictEqual(draftIsolation.rows[0], {
+          publications: 0,
+          snapshots: 0,
+          publication_heads: 0,
+          outbox: 0,
+        });
       }),
   );
 
@@ -1453,6 +2107,358 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         actorType: "credential",
         actorId: managementCredentialId,
       });
+    }),
+  );
+
+  it.effect("pages Studio browse and escaped case-insensitive prefix search", () =>
+    Effect.gen(function* () {
+      const project = required(projectModel, "project");
+      const collection = required(collectionModel, "collection");
+      const published = required(publishedModel, "published schema");
+      const alphaNames = Array.from(
+        { length: 12 },
+        (_, index) => `${index % 2 === 0 ? "Alpha" : "alpha"} ${String(index).padStart(2, "0")}`,
+      );
+      const entryIdsByName = new Map<string, string>();
+      for (const displayName of [
+        ...alphaNames,
+        "%_literal",
+        String.raw`\slash literal`,
+        "İstanbul unicode",
+        "Beta target",
+      ]) {
+        const created = yield* entries.createEntry(
+          ownerActor,
+          yield* Schema.decodeUnknown(CreateEntryInput)({
+            projectId: project.id,
+            environmentId: project.environment.id,
+            collectionId: collection.id,
+            locale: "en",
+            displayName,
+            schemaRevisionId: published.id,
+            contractHash: published.contractHash,
+            commandId: randomUUID(),
+          }),
+          new Date(),
+          `m19-list-${randomUUID()}`,
+        );
+        entryIdsByName.set(displayName, created.id);
+      }
+      const scope = Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+        projectId: project.id,
+        environmentId: project.environment.id,
+        collectionId: collection.id,
+        locale: "en",
+      });
+      const limit = Schema.decodeUnknownSync(StudioContentPageLimit)(10);
+      const firstBrowse = yield* studioContent.listEntries(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          limit,
+          search: null,
+          browseOrder: null,
+          searchOrder: null,
+        },
+        new Date(),
+      );
+      yield* entries.createEntry(
+        ownerActor,
+        yield* Schema.decodeUnknown(CreateEntryInput)({
+          projectId: project.id,
+          environmentId: project.environment.id,
+          collectionId: collection.id,
+          locale: "en",
+          displayName: "Browse concurrent",
+          schemaRevisionId: published.id,
+          contractHash: published.contractHash,
+          commandId: randomUUID(),
+        }),
+        new Date(),
+        `m19-list-concurrent-browse-create-${randomUUID()}`,
+      );
+      const secondBrowse = yield* studioContent.listEntries(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          limit,
+          search: null,
+          browseOrder: firstBrowse.finalBrowseOrder,
+          searchOrder: null,
+        },
+        new Date(),
+      );
+      const alpha = studioSearchAuthority("ALPHA");
+      const firstSearch = yield* studioContent.listEntries(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          limit,
+          search: alpha,
+          browseOrder: null,
+          searchOrder: null,
+        },
+        new Date(),
+      );
+      yield* entries.createEntry(
+        ownerActor,
+        yield* Schema.decodeUnknown(CreateEntryInput)({
+          projectId: project.id,
+          environmentId: project.environment.id,
+          collectionId: collection.id,
+          locale: "en",
+          displayName: "Alpha 10a",
+          schemaRevisionId: published.id,
+          contractHash: published.contractHash,
+          commandId: randomUUID(),
+        }),
+        new Date(),
+        `m19-list-concurrent-create-${randomUUID()}`,
+      );
+      yield* entries.renameEntry(
+        ownerActor,
+        yield* Schema.decodeUnknown(RenameEntryInput)({
+          projectId: project.id,
+          environmentId: project.environment.id,
+          collectionId: collection.id,
+          entryId: required(entryIdsByName.get("alpha 11"), "concurrent rename-out entry"),
+          locale: "en",
+          displayName: "Beta moved",
+          expectedNameVersion: 1,
+        }),
+        new Date(),
+        `m19-list-concurrent-rename-out-${randomUUID()}`,
+      );
+      yield* entries.renameEntry(
+        ownerActor,
+        yield* Schema.decodeUnknown(RenameEntryInput)({
+          projectId: project.id,
+          environmentId: project.environment.id,
+          collectionId: collection.id,
+          entryId: required(entryIdsByName.get("Beta target"), "concurrent rename-in entry"),
+          locale: "en",
+          displayName: "Alpha 13",
+          expectedNameVersion: 1,
+        }),
+        new Date(),
+        `m19-list-concurrent-rename-in-${randomUUID()}`,
+      );
+      const secondSearch = yield* studioContent.listEntries(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          limit,
+          search: alpha,
+          browseOrder: null,
+          searchOrder: firstSearch.finalSearchOrder,
+        },
+        new Date(),
+      );
+      const literalSearch = yield* studioContent.listEntries(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          limit,
+          search: studioSearchAuthority("%_"),
+          browseOrder: null,
+          searchOrder: null,
+        },
+        new Date(),
+      );
+      const escapeSearch = yield* studioContent.listEntries(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          limit,
+          search: studioSearchAuthority(String.raw`\s`),
+          browseOrder: null,
+          searchOrder: null,
+        },
+        new Date(),
+      );
+      const unicodeCaseSearch = yield* studioContent.listEntries(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          limit,
+          search: studioSearchAuthority("İS"),
+          browseOrder: null,
+          searchOrder: null,
+        },
+        new Date(),
+      );
+      const emptySearch = yield* studioContent.listEntries(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          limit,
+          search: studioSearchAuthority(`missing-${suffix}`),
+          browseOrder: null,
+          searchOrder: null,
+        },
+        new Date(),
+      );
+      const exactSearch = yield* studioContent.listEntries(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          limit: Schema.decodeUnknownSync(StudioContentPageLimit)(13),
+          search: alpha,
+          browseOrder: null,
+          searchOrder: null,
+        },
+        new Date(),
+      );
+      const fullBrowse = yield* studioContent.listEntries(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          limit: Schema.decodeUnknownSync(StudioContentPageLimit)(50),
+          search: null,
+          browseOrder: null,
+          searchOrder: null,
+        },
+        new Date(),
+      );
+      yield* Effect.promise(() =>
+        db
+          .update(cmsEntry)
+          .set({ displayName: null })
+          .where(
+            eq(cmsEntry.id, required(entryIdsByName.get("alpha 11"), "null display-name entry")),
+          ),
+      );
+      const nullDisplayNameSearch = yield* studioContent.listEntries(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          limit,
+          search: studioSearchAuthority("Beta moved"),
+          browseOrder: null,
+          searchOrder: null,
+        },
+        new Date(),
+      );
+
+      assert.strictEqual(firstBrowse.page.hasMore, true);
+      assert.strictEqual(firstBrowse.page.items.length, 10);
+      assert.isFalse(
+        secondBrowse.page.items.some(({ id }) =>
+          firstBrowse.page.items.some((first) => first.id === id),
+        ),
+      );
+      assert.strictEqual(firstSearch.page.hasMore, true);
+      assert.deepStrictEqual(firstSearch.page.count, { value: 12, relation: "exact" });
+      assert.strictEqual(firstSearch.page.items.length, 10);
+      assert.strictEqual(secondSearch.page.items.length, 3);
+      assert.deepStrictEqual(secondSearch.page.count, { value: 13, relation: "exact" });
+      assert.deepStrictEqual(
+        [...firstSearch.page.items, ...secondSearch.page.items].map(({ displayName }) =>
+          displayName.toLocaleLowerCase("en-US"),
+        ),
+        [
+          ...alphaNames.slice(0, 11).map((displayName) => displayName.toLocaleLowerCase("en-US")),
+          "alpha 10a",
+          "alpha 13",
+        ],
+      );
+      assert.strictEqual(literalSearch.page.items[0]?.displayName, "%_literal");
+      assert.strictEqual(escapeSearch.page.items[0]?.displayName, String.raw`\slash literal`);
+      assert.strictEqual(unicodeCaseSearch.page.items[0]?.displayName, "İstanbul unicode");
+      assert.deepStrictEqual(emptySearch.page, {
+        items: [],
+        hasMore: false,
+        nextCursor: null,
+        count: { value: 0, relation: "exact" },
+      });
+      assert.strictEqual(exactSearch.page.items.length, 13);
+      assert.strictEqual(exactSearch.page.hasMore, false);
+      assert.isNull(exactSearch.page.nextCursor);
+      assert.strictEqual(fullBrowse.page.hasMore, false);
+      assert.isNull(fullBrowse.page.nextCursor);
+      assert.isAtMost(fullBrowse.page.items.length, 50);
+      assert.deepStrictEqual(nullDisplayNameSearch.page, {
+        items: [],
+        hasMore: false,
+        nextCursor: null,
+        count: { value: 0, relation: "exact" },
+      });
+    }),
+  );
+
+  it.effect("uses stable entry IDs to continue equal-name Studio search rows", () =>
+    Effect.gen(function* () {
+      const project = required(projectModel, "project");
+      const collection = required(collectionModel, "collection");
+      const published = required(publishedModel, "published schema");
+      const displayName = `Tie ${suffix.slice(0, 8)}`;
+      const createdIds: Array<string> = [];
+      for (let index = 0; index < 12; index += 1) {
+        const created = yield* entries.createEntry(
+          ownerActor,
+          yield* Schema.decodeUnknown(CreateEntryInput)({
+            projectId: project.id,
+            environmentId: project.environment.id,
+            collectionId: collection.id,
+            locale: "en",
+            displayName,
+            schemaRevisionId: published.id,
+            contractHash: published.contractHash,
+            commandId: randomUUID(),
+          }),
+          new Date(),
+          `m19-list-tie-${randomUUID()}`,
+        );
+        createdIds.push(created.id);
+      }
+      const scope = Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+        projectId: project.id,
+        environmentId: project.environment.id,
+        collectionId: collection.id,
+        locale: "en",
+      });
+      const search = studioSearchAuthority(displayName);
+      const first = yield* studioContent.listEntries(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          limit: Schema.decodeUnknownSync(StudioContentPageLimit)(10),
+          search,
+          browseOrder: null,
+          searchOrder: null,
+        },
+        new Date(),
+      );
+      const second = yield* studioContent.listEntries(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          limit: Schema.decodeUnknownSync(StudioContentPageLimit)(10),
+          search,
+          browseOrder: null,
+          searchOrder: first.finalSearchOrder,
+        },
+        new Date(),
+      );
+      const pagedIds = [...first.page.items, ...second.page.items].map(({ id }) => String(id));
+      assert.deepStrictEqual(pagedIds, createdIds.toSorted());
+      assert.strictEqual(new Set(pagedIds).size, 12);
+      assert.deepStrictEqual(first.page.count, { value: 12, relation: "exact" });
+      assert.strictEqual(first.page.hasMore, true);
+      assert.strictEqual(second.page.hasMore, false);
     }),
   );
 
@@ -1527,4 +2533,118 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       assert.include(plans, "cms_entry_draft_command_completed_by_credential_idx");
     }),
   );
+
+  it("uses the Studio browse, prefix-search, continuation, and capped-count indexes at 100,000 entries", async () => {
+    const currentWorkspace = required(workspaceModel, "workspace");
+    const currentProject = required(projectModel, "project");
+    const currentCollection = required(collectionModel, "collection");
+    const prefix = `m19plan${suffix.slice(0, 8)}`;
+    const pattern = `${prefix}%`;
+    const rollback = new Error("rollback M19 query-plan fixture");
+    const timings = {
+      browse: [] as Array<number>,
+      search: [] as Array<number>,
+      searchWithCappedCount: [] as Array<number>,
+    };
+    const executionTime = (rows: unknown) => {
+      const match = /"Execution Time":([0-9.]+)/u.exec(JSON.stringify(rows));
+      if (match?.[1] === undefined) throw new Error("PostgreSQL execution time was unavailable.");
+      return Number(match[1]);
+    };
+    const percentile95 = (values: ReadonlyArray<number>) => {
+      const sorted = values.toSorted((left, right) => left - right);
+      const index = Math.max(0, Math.ceil(sorted.length * 0.95) - 1);
+      const value = sorted[index];
+      if (value === undefined) throw new Error("Performance sample was unavailable.");
+      return value;
+    };
+    let plans = "";
+
+    try {
+      await db.transaction(async (transaction) => {
+        await transaction.execute(sql`
+          insert into cms_entry (
+            id,
+            workspace_id,
+            project_id,
+            environment_id,
+            collection_id,
+            display_name,
+            create_command_id,
+            create_command_fingerprint,
+            created_by_user_id,
+            changed_by_user_id
+          )
+          select
+            uuidv7(),
+            ${currentWorkspace.id},
+            ${currentProject.id},
+            ${currentProject.environment.id},
+            ${currentCollection.id},
+            ${prefix} || lpad(value::text, 6, '0'),
+            uuidv7(),
+            repeat('a', 64),
+            ${ownerId},
+            ${ownerId}
+          from generate_series(1, 100000) as fixture(value)
+        `);
+        await transaction.execute(sql`analyze cms_entry`);
+
+        const browseQuery = sql`select id, display_name from cms_entry where collection_id = ${currentCollection.id} order by created_at desc nulls last, id desc nulls last limit 51`;
+        const searchQuery = sql`select id, display_name from cms_entry where workspace_id = ${currentWorkspace.id} and project_id = ${currentProject.id} and environment_id = ${currentProject.environment.id} and collection_id = ${currentCollection.id} and display_name is not null and lower(display_name) collate "C" like ${pattern} escape '\\' order by lower(display_name) collate "C" using ~<~, id limit 51`;
+        const continuationQuery = sql`select id, display_name from cms_entry where workspace_id = ${currentWorkspace.id} and project_id = ${currentProject.id} and environment_id = ${currentProject.environment.id} and collection_id = ${currentCollection.id} and display_name is not null and lower(display_name) collate "C" like ${pattern} escape '\\' and (lower(display_name) collate "C" ~>~ ${`${prefix}050000`} or (lower(display_name) collate "C" = ${`${prefix}050000`} and id > ${randomUUID()})) order by lower(display_name) collate "C" using ~<~, id limit 51`;
+        const cappedCountQuery = sql`select id from cms_entry where workspace_id = ${currentWorkspace.id} and project_id = ${currentProject.id} and environment_id = ${currentProject.environment.id} and collection_id = ${currentCollection.id} and display_name is not null and lower(display_name) collate "C" like ${pattern} escape '\\' limit 1001`;
+
+        await transaction.execute(sql`set local enable_seqscan = off`);
+        const browse = await transaction.execute(sql`explain (format json) ${browseQuery}`);
+        await transaction.execute(sql`set local enable_seqscan = on`);
+        const search = await transaction.execute(sql`explain (format json) ${searchQuery}`);
+        const continuation = await transaction.execute(
+          sql`explain (format json) ${continuationQuery}`,
+        );
+        const cappedCount = await transaction.execute(
+          sql`explain (format json) ${cappedCountQuery}`,
+        );
+        plans = JSON.stringify([browse.rows, search.rows, continuation.rows, cappedCount.rows]);
+
+        for (let sample = 0; sample < 20; sample += 1) {
+          const browseTiming = await transaction.execute(
+            sql`explain (analyze, format json, timing off) ${browseQuery}`,
+          );
+          const searchTiming = await transaction.execute(
+            sql`explain (analyze, format json, timing off) ${searchQuery}`,
+          );
+          const cappedCountTiming = await transaction.execute(
+            sql`explain (analyze, format json, timing off) ${cappedCountQuery}`,
+          );
+          const searchMilliseconds = executionTime(searchTiming.rows);
+          timings.browse.push(executionTime(browseTiming.rows));
+          timings.search.push(searchMilliseconds);
+          timings.searchWithCappedCount.push(
+            searchMilliseconds + executionTime(cappedCountTiming.rows),
+          );
+        }
+        throw rollback;
+      });
+    } catch (error) {
+      if (error !== rollback) throw error;
+    }
+
+    const [residue] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(cmsEntry)
+      .where(sql`${cmsEntry.displayName} like ${`${prefix}%`}`);
+    assert.strictEqual(residue?.count, 0);
+    assert.include(plans, "cms_entry_collection_created_id_idx");
+    assert.strictEqual(plans.match(/cms_entry_studio_name_search_idx/gu)?.length, 3, plans);
+    assert.notInclude(plans, '"Node Type":"Sort"');
+    assert.notInclude(plans, '"Node Type":"Seq Scan"');
+    assert.isBelow(percentile95(timings.browse), 150, "browse database p95 exceeded 150 ms");
+    assert.isBelow(percentile95(timings.search), 150, "search database p95 exceeded 150 ms");
+    assert.isBelow(
+      percentile95(timings.searchWithCappedCount),
+      300,
+      "search plus capped-count database p95 exceeded 300 ms",
+    );
+  }, 30_000);
 });
