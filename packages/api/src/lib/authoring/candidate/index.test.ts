@@ -1,5 +1,4 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import type { ProjectSchema } from "@framerfordevs/schema";
 
@@ -29,9 +28,10 @@ import { compileCodeCollectionFields } from "./index";
 import { validateDefinitionTree } from "../../field/validation";
 import type { StructureIdentityMap } from "../hash";
 
-const decodeCollectionId = Schema.decodeUnknownSync(CollectionId);
-const decodeFieldId = Schema.decodeUnknownSync(CollectionFieldId);
-const decodeOptionId = Schema.decodeUnknownSync(EnumOptionId);
+import * as SchemaStrict from "../../schema-strict";
+const decodeCollectionId = SchemaStrict.decodeUnknownSync(CollectionId);
+const decodeFieldId = SchemaStrict.decodeUnknownSync(CollectionFieldId);
+const decodeOptionId = SchemaStrict.decodeUnknownSync(EnumOptionId);
 const postsId = decodeCollectionId("019fae8b-1234-7000-8000-000000000401");
 const authorsId = decodeCollectionId("019fae8b-1234-7000-8000-000000000402");
 const authorId = decodeFieldId("019fae8b-1234-7000-8000-000000000403");
@@ -133,7 +133,7 @@ function requireCompiled(includeSummary = false, published: PublishedSchemaRevis
 }
 
 function publishedRevision(fields: ReadonlyArray<CollectionFieldDefinition>) {
-  const layout = Schema.decodeUnknownSync(EditorLayout)({
+  const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
     version: 1,
     tabs: [
       {
@@ -223,13 +223,13 @@ describe("code schema collection candidate", () => {
     const presented = initial
       .map((field) => {
         if (field.id === titleId)
-          return Schema.decodeUnknownSync(CollectionFieldDefinition)({
+          return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
             ...field,
             displayLabel: CollectionFieldDisplayLabel.make("Headline"),
             position: 0,
           });
         if (field.id === statusId && field.kind === "enum")
-          return Schema.decodeUnknownSync(CollectionFieldDefinition)({
+          return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
             ...field,
             displayLabel: CollectionFieldDisplayLabel.make("Workflow"),
             position: 1,
@@ -242,7 +242,7 @@ describe("code schema collection candidate", () => {
               })),
             },
           });
-        return Schema.decodeUnknownSync(CollectionFieldDefinition)({ ...field, position: 2 });
+        return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({ ...field, position: 2 });
       })
       .sort((left, right) => left.position - right.position);
     const candidate = requireCompiled(true, publishedRevision(presented));

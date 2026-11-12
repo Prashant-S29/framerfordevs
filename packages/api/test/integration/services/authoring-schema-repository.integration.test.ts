@@ -30,7 +30,7 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import { ApiCredentialId } from "../../../src/contracts/access";
 import { CmsActor } from "../../../src/contracts/authoring";
@@ -55,12 +55,13 @@ import { makeAuthoringPresentationRepository } from "../../../src/services/autho
 import { makeAuthoringSchemaRepository } from "../../../src/services/authoring/schema/repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 
+import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ownerId = `m13-apply-owner-${suffix}`;
-const ownerUserId = Schema.decodeUnknownSync(AuthUserId)(ownerId);
-const ownerActor = Schema.decodeUnknownSync(CmsActor)({ kind: "user", id: ownerUserId });
-const managementCredentialId = Schema.decodeUnknownSync(ApiCredentialId)(randomUUID());
-const managementActor = Schema.decodeUnknownSync(CmsActor)({
+const ownerUserId = SchemaStrict.decodeUnknownSync(AuthUserId)(ownerId);
+const ownerActor = SchemaStrict.decodeUnknownSync(CmsActor)({ kind: "user", id: ownerUserId });
+const managementCredentialId = SchemaStrict.decodeUnknownSync(ApiCredentialId)(randomUUID());
+const managementActor = SchemaStrict.decodeUnknownSync(CmsActor)({
   kind: "credential",
   id: managementCredentialId,
 });
@@ -149,14 +150,14 @@ beforeAll(async () => {
   workspaceModel = await Effect.runPromise(
     platform.createWorkspace(
       ownerUserId,
-      Schema.decodeUnknownSync(CreateWorkspaceInput)({ name: "M13 Apply Workspace" }),
+      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M13 Apply Workspace" }),
       `m13-apply-workspace-${suffix}`,
     ),
   );
   projectModel = await Effect.runPromise(
     platform.createProject(
       ownerUserId,
-      Schema.decodeUnknownSync(CreateProjectInput)({
+      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
         workspaceId: required(workspaceModel, "workspace").id,
         name: "M13 Apply Project",
         key: `m13-apply-${suffix.slice(0, 8)}`,
@@ -168,7 +169,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     platform.enableCapability(
       ownerUserId,
-      Schema.decodeUnknownSync(EnableCapabilityInput)({
+      SchemaStrict.decodeUnknownSync(EnableCapabilityInput)({
         projectId: required(projectModel, "project").id,
         capability: "cms",
       }),
@@ -250,7 +251,7 @@ afterAll(async () => {
   await db.delete(user).where(eq(user.id, ownerId));
 });
 
-describe.sequential("Authoring schema repository PostgreSQL integration", () => {
+describe("Authoring schema repository PostgreSQL integration", () => {
   it("atomically allocates mutual references, publishes revisions, replays, and records no-ops", async () => {
     const currentProject = required(projectModel, "project");
     const scope = {
@@ -260,7 +261,10 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     const plan = await Effect.runPromise(
       authoring.plan(
         ownerActor,
-        Schema.decodeUnknownSync(AuthoringSchemaPlanInput)({ scope, project: projectDocument }),
+        SchemaStrict.decodeUnknownSync(AuthoringSchemaPlanInput)({
+          scope,
+          project: projectDocument,
+        }),
       ),
     );
     assert.isTrue(plan.valid);
@@ -268,7 +272,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     assert.isTrue(plan.candidates.every((candidate) => candidate.containsUnallocatedIdentities));
 
     const commandId = randomUUID();
-    const input = Schema.decodeUnknownSync(AuthoringSchemaApplyInput)({
+    const input = SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
       scope,
       project: projectDocument,
       commandId,
@@ -315,7 +319,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     const exported = await Effect.runPromise(
       authoring.exportSchema(
         ownerActor,
-        Schema.decodeUnknownSync(AuthoringSchemaExportInput)({ scope }),
+        SchemaStrict.decodeUnknownSync(AuthoringSchemaExportInput)({ scope }),
       ),
     );
     assert.deepStrictEqual(
@@ -372,7 +376,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     const commandConflict = await Effect.runPromise(
       authoring.apply(
         ownerActor,
-        Schema.decodeUnknownSync(AuthoringSchemaApplyInput)({
+        SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
           ...input,
           project: {
             ...projectDocument,
@@ -390,7 +394,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     const stale = await Effect.runPromise(
       authoring.apply(
         ownerActor,
-        Schema.decodeUnknownSync(AuthoringSchemaApplyInput)({
+        SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
           ...input,
           commandId: randomUUID(),
         }),
@@ -403,7 +407,10 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     const currentPlan = await Effect.runPromise(
       authoring.plan(
         ownerActor,
-        Schema.decodeUnknownSync(AuthoringSchemaPlanInput)({ scope, project: projectDocument }),
+        SchemaStrict.decodeUnknownSync(AuthoringSchemaPlanInput)({
+          scope,
+          project: projectDocument,
+        }),
       ),
     );
     assert.isTrue(currentPlan.valid);
@@ -411,7 +418,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     const noOp = await Effect.runPromise(
       authoring.apply(
         ownerActor,
-        Schema.decodeUnknownSync(AuthoringSchemaApplyInput)({
+        SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
           scope,
           project: projectDocument,
           commandId: randomUUID(),
@@ -462,7 +469,10 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     const stalePlan = await Effect.runPromise(
       authoring.plan(
         ownerActor,
-        Schema.decodeUnknownSync(AuthoringSchemaPlanInput)({ scope, project: projectDocument }),
+        SchemaStrict.decodeUnknownSync(AuthoringSchemaPlanInput)({
+          scope,
+          project: projectDocument,
+        }),
       ),
     );
     assert.isTrue(stalePlan.valid);
@@ -471,7 +481,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     const title = current.presentation.fields[0];
     const status = current.presentation.fields[2];
     if (!title || !status) throw new Error("Expected complete posts presentation fields.");
-    const changed = Schema.decodeUnknownSync(AuthoringCollectionPresentation)({
+    const changed = SchemaStrict.decodeUnknownSync(AuthoringCollectionPresentation)({
       ...current.presentation,
       displayName: "Editorial Posts",
       description: "Presentation-only metadata",
@@ -489,7 +499,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
       })),
     });
     const commandId = randomUUID();
-    const request = Schema.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+    const request = SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
       commandId,
       expectedRevisionId: current.revision.revisionId,
       expectedSequence: current.revision.sequence,
@@ -532,7 +542,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     const staleApply = await Effect.runPromise(
       authoring.apply(
         ownerActor,
-        Schema.decodeUnknownSync(AuthoringSchemaApplyInput)({
+        SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
           scope,
           project: projectDocument,
           commandId: randomUUID(),
@@ -546,7 +556,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     );
     assert.strictEqual(staleApply.kind, "stale_schema_authority");
 
-    const noOpRequest = Schema.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+    const noOpRequest = SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
       commandId: randomUUID(),
       expectedRevisionId: published.revision.revisionId,
       expectedSequence: published.revision.sequence,
@@ -570,7 +580,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
         managementActor,
         scope,
         "posts",
-        Schema.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+        SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
           ...noOpRequest,
           commandId: randomUUID(),
           expectedRevisionId: current.revision.revisionId,
@@ -587,7 +597,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
         managementActor,
         scope,
         "posts",
-        Schema.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+        SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
           ...request,
           presentation: { ...request.presentation, displayName: "Conflicting reuse" },
         }),
@@ -722,7 +732,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
           managementActor,
           scope,
           "posts",
-          Schema.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+          SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
             commandId,
             expectedRevisionId: baseline.revision.revisionId,
             expectedSequence: baseline.revision.sequence,
@@ -801,7 +811,10 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     const plan = await Effect.runPromise(
       authoring.plan(
         ownerActor,
-        Schema.decodeUnknownSync(AuthoringSchemaPlanInput)({ scope, project: renamedProject }),
+        SchemaStrict.decodeUnknownSync(AuthoringSchemaPlanInput)({
+          scope,
+          project: renamedProject,
+        }),
       ),
     );
     assert.isTrue(plan.valid);
@@ -828,7 +841,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
       const failed = await Effect.runPromiseExit(
         makeAuthoringSchemaRepository({ testFailApplyAfter: stage }).apply(
           ownerActor,
-          Schema.decodeUnknownSync(AuthoringSchemaApplyInput)({
+          SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
             scope,
             project: renamedProject,
             commandId,
@@ -888,7 +901,10 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     const unchanged = await Effect.runPromise(
       authoring.plan(
         ownerActor,
-        Schema.decodeUnknownSync(AuthoringSchemaPlanInput)({ scope, project: projectDocument }),
+        SchemaStrict.decodeUnknownSync(AuthoringSchemaPlanInput)({
+          scope,
+          project: projectDocument,
+        }),
       ),
     );
     assert.isTrue(unchanged.valid);
@@ -915,7 +931,10 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     const plan = await Effect.runPromise(
       authoring.plan(
         ownerActor,
-        Schema.decodeUnknownSync(AuthoringSchemaPlanInput)({ scope, project: swappedProject }),
+        SchemaStrict.decodeUnknownSync(AuthoringSchemaPlanInput)({
+          scope,
+          project: swappedProject,
+        }),
       ),
     );
     assert.isTrue(plan.valid);
@@ -925,7 +944,7 @@ describe.sequential("Authoring schema repository PostgreSQL integration", () => 
     const decision = await Effect.runPromise(
       authoring.apply(
         managementActor,
-        Schema.decodeUnknownSync(AuthoringSchemaApplyInput)({
+        SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
           scope,
           project: swappedProject,
           commandId,

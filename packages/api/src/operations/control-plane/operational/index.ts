@@ -31,8 +31,11 @@ import {
 import { CredentialRepository } from "../../../services/credential/repository";
 import { ApiCredentialId, ApiCredentialRotationId } from "../../../contracts/access";
 
-const decode = <A, I>(schema: Schema.Schema<A, I, never>, value: unknown) =>
-  Schema.decodeUnknown(schema)(value).pipe(Effect.mapError(() => UnauthorizedFailure.make()));
+import * as SchemaStrict from "../../../lib/schema-strict";
+const decode = <A, I>(schema: Schema.Codec<A, I, never>, value: unknown) =>
+  SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
+    Effect.mapError(() => UnauthorizedFailure.make()),
+  );
 
 function credentialProjection(
   credential: ApiCredential,

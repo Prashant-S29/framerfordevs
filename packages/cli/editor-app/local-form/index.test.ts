@@ -1,10 +1,11 @@
 import type { ProjectSchema } from "@framerfordevs/schema";
 import { AuthoringGeneratedForm } from "@framerfordevs/sdk/authoring";
-import { Schema } from "effect";
+
 import { describe, expect, it } from "vitest";
 
 import { projectLocalContentForm } from "./index";
 
+import * as SchemaStrict from "../../src/schema-strict";
 const titleId = "019fae8b-1234-7000-8000-000000000001";
 const statusId = "019fae8b-1234-7000-8000-000000000002";
 const optionId = "019fae8b-1234-7000-8000-000000000003";
@@ -93,7 +94,7 @@ const localProject: ProjectSchema = {
   ],
 };
 
-const hostedForm = Schema.decodeUnknownSync(AuthoringGeneratedForm)({
+const hostedForm = SchemaStrict.decodeUnknownSync(AuthoringGeneratedForm)({
   source: "published",
   collectionId: layoutId,
   revisionId: layoutId,

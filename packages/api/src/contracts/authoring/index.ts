@@ -15,6 +15,7 @@ import {
   SchemaRevisionId,
 } from "../schema";
 
+import { UuidValue } from "../uuid";
 const digestPattern = /^[0-9a-f]{64}$/u;
 const sourceKeyPattern = /^[a-z][a-z0-9_-]{0,62}$/u;
 const reservedSourceKeys = new Set([
@@ -34,18 +35,18 @@ const reservedSourceKeys = new Set([
   "constructor",
 ]);
 
-const SourceKey = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(63),
-  Schema.pattern(sourceKeyPattern),
-  Schema.filter(
+const SourceKey = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(63),
+  Schema.isPattern(sourceKeyPattern),
+  Schema.makeFilter(
     (value) =>
       !value.includes("--") &&
       !value.includes("__") &&
       !value.endsWith("-") &&
       !value.endsWith("_") &&
       !reservedSourceKeys.has(value),
-    { message: () => "Use a canonical, non-reserved source key." },
+    { message: "Use a canonical, non-reserved source key." },
   ),
 );
 
@@ -58,38 +59,34 @@ export type FieldSourceKey = typeof FieldSourceKey.Type;
 export const EnumOptionSourceKey = SourceKey.pipe(Schema.brand("EnumOptionSourceKey"));
 export type EnumOptionSourceKey = typeof EnumOptionSourceKey.Type;
 
-export const StructureHash = Schema.String.pipe(
-  Schema.length(64),
-  Schema.pattern(digestPattern),
-  Schema.brand("StructureHash"),
-);
+export const StructureHash = Schema.String.check(
+  Schema.isBetweenLength(64, 64),
+  Schema.isPattern(digestPattern),
+).pipe(Schema.brand("StructureHash"));
 export type StructureHash = typeof StructureHash.Type;
 
-export const ProjectStructureManifestHash = Schema.String.pipe(
-  Schema.length(64),
-  Schema.pattern(digestPattern),
-  Schema.brand("ProjectStructureManifestHash"),
-);
+export const ProjectStructureManifestHash = Schema.String.check(
+  Schema.isBetweenLength(64, 64),
+  Schema.isPattern(digestPattern),
+).pipe(Schema.brand("ProjectStructureManifestHash"));
 export type ProjectStructureManifestHash = typeof ProjectStructureManifestHash.Type;
 
-export const SchemaPlanHash = Schema.String.pipe(
-  Schema.length(64),
-  Schema.pattern(digestPattern),
-  Schema.brand("SchemaPlanHash"),
-);
+export const SchemaPlanHash = Schema.String.check(
+  Schema.isBetweenLength(64, 64),
+  Schema.isPattern(digestPattern),
+).pipe(Schema.brand("SchemaPlanHash"));
 export type SchemaPlanHash = typeof SchemaPlanHash.Type;
 
-export const SchemaApplyCommandId = Schema.UUID.pipe(Schema.brand("SchemaApplyCommandId"));
+export const SchemaApplyCommandId = UuidValue.pipe(Schema.brand("SchemaApplyCommandId"));
 export type SchemaApplyCommandId = typeof SchemaApplyCommandId.Type;
 
-export const SchemaApplyFingerprint = Schema.String.pipe(
-  Schema.length(64),
-  Schema.pattern(digestPattern),
-  Schema.brand("SchemaApplyFingerprint"),
-);
+export const SchemaApplyFingerprint = Schema.String.check(
+  Schema.isBetweenLength(64, 64),
+  Schema.isPattern(digestPattern),
+).pipe(Schema.brand("SchemaApplyFingerprint"));
 export type SchemaApplyFingerprint = typeof SchemaApplyFingerprint.Type;
 
-export const CmsActor = ProjectActor.annotations({ identifier: "CmsActor" });
+export const CmsActor = ProjectActor.annotate({ identifier: "CmsActor" });
 export type CmsActor = typeof CmsActor.Type;
 
 export class CollectionSourceIdentity extends Schema.Class<CollectionSourceIdentity>(
@@ -118,12 +115,12 @@ export class AuthoringProjectScope extends Schema.Class<AuthoringProjectScope>(
   environmentId: EnvironmentId,
 }) {}
 
-export const AuthoringMutationScope = Schema.Literal("shared", "localized");
+export const AuthoringMutationScope = Schema.Literals(["shared", "localized"]);
 export type AuthoringMutationScope = typeof AuthoringMutationScope.Type;
 
-export const AuthoringValuePath = Schema.Array(CollectionFieldApiKey).pipe(
-  Schema.minItems(1),
-  Schema.maxItems(16),
+export const AuthoringValuePath = Schema.Array(CollectionFieldApiKey).check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(16),
 );
 export type AuthoringValuePath = typeof AuthoringValuePath.Type;
 
@@ -138,16 +135,16 @@ export type AuthoringJsonValue =
   | ReadonlyArray<AuthoringJsonValue>
   | AuthoringJsonObject;
 
-export const AuthoringJsonValue: Schema.Schema<AuthoringJsonValue> = Schema.suspend(() =>
-  Schema.Union(
+export const AuthoringJsonValue: Schema.Codec<AuthoringJsonValue> = Schema.suspend(() =>
+  Schema.Union([
     Schema.Null,
     Schema.Boolean,
-    Schema.Number.pipe(Schema.finite()),
+    Schema.Number.check(Schema.isFinite()),
     Schema.String,
     Schema.Array(AuthoringJsonValue),
-    Schema.Record({ key: Schema.String, value: AuthoringJsonValue }),
-  ),
-).annotations({ identifier: "AuthoringJsonValue" });
+    Schema.Record(Schema.String, AuthoringJsonValue),
+  ]),
+).annotate({ identifier: "AuthoringJsonValue" });
 
 export class SetAuthoringValueMutation extends Schema.Class<SetAuthoringValueMutation>(
   "SetAuthoringValueMutation",
@@ -166,10 +163,10 @@ export class UnsetAuthoringValueMutation extends Schema.Class<UnsetAuthoringValu
   path: AuthoringValuePath,
 }) {}
 
-export const AuthoringValueMutation = Schema.Union(
+export const AuthoringValueMutation = Schema.Union([
   SetAuthoringValueMutation,
   UnsetAuthoringValueMutation,
-).annotations({ identifier: "AuthoringValueMutation" });
+]).annotate({ identifier: "AuthoringValueMutation" });
 export type AuthoringValueMutation = typeof AuthoringValueMutation.Type;
 
 export const authoringLimits = {
@@ -180,13 +177,13 @@ export const authoringLimits = {
   errorDetails: 50,
 } as const;
 
-export const AuthoringValueMutations = Schema.Array(AuthoringValueMutation).pipe(
-  Schema.minItems(1),
-  Schema.maxItems(authoringLimits.mutationCount),
+export const AuthoringValueMutations = Schema.Array(AuthoringValueMutation).check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(authoringLimits.mutationCount),
 );
 export type AuthoringValueMutations = typeof AuthoringValueMutations.Type;
 
-export const AuthoringApiErrorCode = Schema.Literal(
+export const AuthoringApiErrorCode = Schema.Literals([
   "VALIDATION_ERROR",
   "UNAUTHORIZED",
   "FORBIDDEN",
@@ -206,18 +203,17 @@ export const AuthoringApiErrorCode = Schema.Literal(
   "RATE_LIMITED",
   "SERVICE_UNAVAILABLE",
   "INTERNAL_ERROR",
-);
+]);
 export type AuthoringApiErrorCode = typeof AuthoringApiErrorCode.Type;
 
 export class AuthoringApiError extends Schema.Class<AuthoringApiError>("AuthoringApiError")({
   code: AuthoringApiErrorCode,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
-  details: Schema.optionalWith(
-    Schema.Array(ApiErrorDetail).pipe(
-      Schema.minItems(1),
-      Schema.maxItems(authoringLimits.errorDetails),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  details: Schema.optionalKey(
+    Schema.Array(ApiErrorDetail).check(
+      Schema.isMinLength(1),
+      Schema.isMaxLength(authoringLimits.errorDetails),
     ),
-    { exact: true },
   ),
   retryable: Schema.Boolean,
   requestId: RequestIdSchema,
@@ -227,14 +223,14 @@ export class AuthoringApiFailure extends Schema.Class<AuthoringApiFailure>("Auth
   ok: Schema.Literal(false),
   data: Schema.Null,
   error: AuthoringApiError,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
 export class AuthoringSchemaAuthority extends Schema.Class<AuthoringSchemaAuthority>(
   "AuthoringSchemaAuthority",
 )({
   projectManifestHash: ProjectStructureManifestHash,
-  revisionIds: Schema.Record({ key: CollectionSourceKey, value: SchemaRevisionId }),
+  revisionIds: Schema.Record(CollectionSourceKey, SchemaRevisionId),
 }) {}
 
 export class AuthoringSchemaPlanAuthority extends Schema.Class<AuthoringSchemaPlanAuthority>(
@@ -242,5 +238,5 @@ export class AuthoringSchemaPlanAuthority extends Schema.Class<AuthoringSchemaPl
 )({
   current: AuthoringSchemaAuthority,
   planHash: SchemaPlanHash,
-  acknowledgedChangeIds: Schema.Array(SchemaChangeId).pipe(Schema.maxItems(701)),
+  acknowledgedChangeIds: Schema.Array(SchemaChangeId).check(Schema.isMaxLength(701)),
 }) {}

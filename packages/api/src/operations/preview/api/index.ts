@@ -1,6 +1,6 @@
 // Defines authenticated dashboard Preview workflows at the Effect boundary.
 
-import { Clock, Effect, Schema } from "effect";
+import { Clock, Effect } from "effect";
 
 import type {
   GetCurrentUserPreviewInput,
@@ -12,10 +12,13 @@ import { PreviewRepository } from "../../../services/preview/repository";
 import { RateLimitManager } from "../../../services/rate-limit/manager";
 import { observePreviewRead } from "../observation";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const currentDate = Effect.map(Clock.currentTimeMillis, (millis) => new Date(millis));
 
 const decodeActorId = (actorId: string) =>
-  Schema.decodeUnknown(AuthUserId)(actorId).pipe(Effect.mapError(() => UnauthorizedFailure.make()));
+  SchemaStrict.decodeUnknownEffect(AuthUserId)(actorId).pipe(
+    Effect.mapError(() => UnauthorizedFailure.make()),
+  );
 
 export const evaluatePreviewUserRateLimit = Effect.fn("preview.user.rate_limit")(function* (
   actorUserId: string,

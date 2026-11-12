@@ -7,20 +7,20 @@ import type {
   RateLimitPolicyConfiguration,
 } from "../../contracts/rate-limit";
 
-export const RateLimitStoreFailureReason = Schema.Literal(
+export const RateLimitStoreFailureReason = Schema.Literals([
   "connection",
   "timeout",
   "command",
   "invalid_response",
-);
+]);
 export type RateLimitStoreFailureReason = typeof RateLimitStoreFailureReason.Type;
 
 export class RateLimitStoreFailure extends Schema.TaggedError<RateLimitStoreFailure>(
   "RateLimitStoreFailure",
 )("RateLimitStoreFailure", {
-  operation: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128)),
+  operation: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
   reason: RateLimitStoreFailureReason,
-  cause: Schema.Defect,
+  cause: Schema.Defect(),
 }) {}
 
 export interface RateLimitStoreRequest {
@@ -46,15 +46,14 @@ export interface RateLimitStoreService {
   readonly retainedEntryCount: Effect.Effect<number, RateLimitStoreFailure>;
 }
 
-export class RateLimitStore extends Context.Tag("RateLimitStore")<
-  RateLimitStore,
-  RateLimitStoreService
->() {}
+export class RateLimitStore extends Context.Service<RateLimitStore, RateLimitStoreService>()(
+  "RateLimitStore",
+) {}
 
-export class RateLimitFallbackStore extends Context.Tag("RateLimitFallbackStore")<
+export class RateLimitFallbackStore extends Context.Service<
   RateLimitFallbackStore,
   RateLimitStoreService
->() {}
+>()("RateLimitFallbackStore") {}
 
 interface MemoryRateLimitEntry {
   readonly tokens: number;

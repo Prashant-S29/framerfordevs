@@ -5,10 +5,11 @@ import { controlPlaneOpenApiDocument } from "@framerfordevs/api/contracts/contro
 import { deliveryOpenApiDocument } from "@framerfordevs/api/contracts/delivery/openapi/index";
 import { previewOpenApiDocument } from "@framerfordevs/api/contracts/preview/openapi/index";
 import { studioContentOpenApiDocument } from "@framerfordevs/api/contracts/studio-content/openapi/index";
+import { studioContentV2OpenApiDocument } from "@framerfordevs/api/contracts/studio-content/openapi/v2";
 import { studioOpenApiDocument } from "@framerfordevs/api/contracts/studio/openapi/index";
 import { toolingOpenApiDocument } from "@framerfordevs/api/contracts/tooling/openapi/index";
 import { PublicationWebhookEvent } from "@framerfordevs/api/contracts/webhook/index";
-import { JSONSchema } from "effect";
+import { make as makeJsonSchema } from "@framerfordevs/api/contracts/response/json-schema/index";
 
 import {
   publicContractMetadata,
@@ -24,7 +25,7 @@ export interface PublicContractRegistryEntry extends PublicContractMetadataEntry
 
 function webhookEventSchema(): unknown {
   return {
-    ...JSONSchema.make(PublicationWebhookEvent),
+    ...makeJsonSchema(PublicationWebhookEvent),
     $schema: "https://json-schema.org/draft/2020-12/schema",
     $id: "https://developers.framerfordevs.example/specs/webhooks/v1/events.schema.json",
     title: "Framer for Developers publication webhook event",
@@ -66,6 +67,10 @@ export const publicContractRegistry = {
   "studio-content/v1": {
     ...publicContractMetadata["studio-content/v1"],
     source: () => studioContentOpenApiDocument,
+  },
+  "studio-content/v2": {
+    ...publicContractMetadata["studio-content/v2"],
+    source: () => studioContentV2OpenApiDocument,
   },
   "tooling/v1": {
     ...publicContractMetadata["tooling/v1"],

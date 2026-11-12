@@ -1,5 +1,4 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import {
   AuthoringCollectionPresentation,
@@ -19,6 +18,7 @@ import {
   publishedPresentation,
 } from "./index";
 
+import * as SchemaStrict from "../../schema-strict";
 const collectionId = "019fae8b-1234-7000-8000-000000000101";
 const revisionId = "019fae8b-1234-7000-8000-000000000102";
 const titleId = "019fae8b-1234-7000-8000-000000000103";
@@ -28,7 +28,7 @@ const liveId = "019fae8b-1234-7000-8000-000000000106";
 const roles = ["owner", "developer"] as const;
 
 function field(value: unknown) {
-  return Schema.decodeUnknownSync(CollectionFieldDefinition)(value);
+  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)(value);
 }
 
 const fields = [
@@ -79,7 +79,7 @@ const fields = [
   }),
 ];
 
-const layout = Schema.decodeUnknownSync(EditorLayout)({
+const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
   version: 1,
   tabs: [
     {
@@ -124,7 +124,7 @@ function currentRevision() {
     formatVersion: 2 as const,
     validationProfile: "ffd-fields@1" as const,
     currencyRegistryProfile: null,
-    collection: Schema.decodeUnknownSync(CmsCollection)({
+    collection: SchemaStrict.decodeUnknownSync(CmsCollection)({
       id: collectionId,
       workspaceId: "019fae8b-1234-7000-8000-000000000120",
       projectId: "019fae8b-1234-7000-8000-000000000121",
@@ -143,7 +143,7 @@ function currentRevision() {
     fields,
     editorLayout: layout,
   };
-  return Schema.decodeUnknownSync(PublishedSchemaRevision)({
+  return SchemaStrict.decodeUnknownSync(PublishedSchemaRevision)({
     id: revisionId,
     workspaceId: draft.collection.workspaceId,
     projectId: draft.collection.projectId,
@@ -173,7 +173,7 @@ function currentRevision() {
 
 function changedPresentation() {
   const current = publishedPresentation(currentRevision());
-  return Schema.decodeUnknownSync(AuthoringCollectionPresentation)({
+  return SchemaStrict.decodeUnknownSync(AuthoringCollectionPresentation)({
     ...current,
     displayName: "Stories",
     description: "Editorial stories",
@@ -201,16 +201,16 @@ describe("Authoring presentation publication", () => {
       presentation: changedPresentation(),
     };
     assert.doesNotThrow(() =>
-      Schema.decodeUnknownSync(AuthoringPublishPresentationRequest)(request),
+      SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)(request),
     );
     assert.throws(() =>
-      Schema.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+      SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
         ...request,
         presentation: { ...request.presentation, apiKey: "forbidden" },
       }),
     );
     assert.throws(() =>
-      Schema.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+      SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
         ...request,
         presentation: {
           ...request.presentation,

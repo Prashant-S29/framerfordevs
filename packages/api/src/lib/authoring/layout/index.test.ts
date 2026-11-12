@@ -1,5 +1,4 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import { EditorLayout, EditorLayoutNodeId } from "../../../contracts/field";
 import {
@@ -11,6 +10,7 @@ import {
 } from "../../../contracts/schema";
 import { reconcileCodeEditorLayout } from "./index";
 
+import * as SchemaStrict from "../../schema-strict";
 const titleId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000501");
 const obsoleteId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000502");
 const summaryId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000503");
@@ -21,7 +21,7 @@ const obsoletePlacementId = EditorLayoutNodeId.make("019fae8b-1234-7000-8000-000
 const summaryPlacementId = EditorLayoutNodeId.make("019fae8b-1234-7000-8000-000000000508");
 
 function field(id: CollectionFieldId, apiKey: string, position: number) {
-  return Schema.decodeUnknownSync(CollectionFieldDefinition)({
+  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
     id,
     parentFieldId: null,
     nodeRole: "root",
@@ -42,7 +42,7 @@ const title = field(titleId, "title", 0);
 const summary = field(summaryId, "summary", 1);
 
 function currentLayout() {
-  return Schema.decodeUnknownSync(EditorLayout)({
+  return SchemaStrict.decodeUnknownSync(EditorLayout)({
     version: 1,
     tabs: [
       {
@@ -97,22 +97,25 @@ describe("code schema editor-layout reconciliation", () => {
       const group = tab?.groups[0];
       assert.strictEqual(tab?.title, "Writing");
       assert.strictEqual(group?.columns, 2);
-      assert.deepStrictEqual(group?.fields, [
-        {
-          id: titlePlacementId,
-          fieldId: titleId,
-          position: 0,
-          helpTextOverride: "Custom title help",
-          visibleToRoles: defaultFieldEditorMetadata.visibleToRoles,
-        },
-        {
-          id: summaryPlacementId,
-          fieldId: summaryId,
-          position: 1,
-          helpTextOverride: null,
-          visibleToRoles: defaultFieldEditorMetadata.visibleToRoles,
-        },
-      ]);
+      assert.deepStrictEqual(
+        group?.fields.map((field) => ({ ...field })),
+        [
+          {
+            id: titlePlacementId,
+            fieldId: titleId,
+            position: 0,
+            helpTextOverride: "Custom title help",
+            visibleToRoles: defaultFieldEditorMetadata.visibleToRoles,
+          },
+          {
+            id: summaryPlacementId,
+            fieldId: summaryId,
+            position: 1,
+            helpTextOverride: null,
+            visibleToRoles: defaultFieldEditorMetadata.visibleToRoles,
+          },
+        ],
+      );
     }
   });
 

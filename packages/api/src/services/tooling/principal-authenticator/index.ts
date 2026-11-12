@@ -54,10 +54,10 @@ export function makeToolingOAuthTokenVerifier(
   };
 }
 
-export class ToolingOAuthTokenVerifier extends Context.Tag("ToolingOAuthTokenVerifier")<
+export class ToolingOAuthTokenVerifier extends Context.Service<
   ToolingOAuthTokenVerifier,
   ReturnType<typeof makeToolingOAuthTokenVerifier>
->() {}
+>()("ToolingOAuthTokenVerifier") {}
 
 export const ToolingOAuthTokenVerifierLive = Layer.succeed(
   ToolingOAuthTokenVerifier,
@@ -156,10 +156,10 @@ const toolingPrincipalAuthenticatorLiveService = makeToolingPrincipalAuthenticat
   (source) => Effect.flatMap(CredentialAttemptLimiter, (service) => service.assertAllowed(source)),
 );
 
-export class ToolingPrincipalAuthenticator extends Context.Tag("ToolingPrincipalAuthenticator")<
+export class ToolingPrincipalAuthenticator extends Context.Service<
   ToolingPrincipalAuthenticator,
   typeof toolingPrincipalAuthenticatorLiveService
->() {}
+>()("ToolingPrincipalAuthenticator") {}
 
 export const ToolingPrincipalAuthenticatorLive = Layer.succeed(
   ToolingPrincipalAuthenticator,

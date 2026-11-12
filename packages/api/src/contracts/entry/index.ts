@@ -1,6 +1,6 @@
 // Defines M7 named entry identities, bounded draft mutations, validation feedback, revisions, and API envelopes.
 
-import { Schema } from "effect";
+import { Schema, SchemaTransformation } from "effect";
 
 import { ApiCredentialId } from "../access";
 import { ApiSuccessSchema } from "../response/api";
@@ -16,13 +16,15 @@ import {
 } from "../platform";
 import { CollectionFieldId, CollectionId, ContractHash, SchemaRevisionId } from "../schema";
 
-export const EntryId = Schema.UUID.pipe(Schema.brand("EntryId"));
+import * as SchemaStrict from "../../lib/schema-strict";
+import { UuidValue } from "../uuid";
+export const EntryId = UuidValue.pipe(Schema.brand("EntryId"));
 export type EntryId = typeof EntryId.Type;
 
-export const EntryRevisionId = Schema.UUID.pipe(Schema.brand("EntryRevisionId"));
+export const EntryRevisionId = UuidValue.pipe(Schema.brand("EntryRevisionId"));
 export type EntryRevisionId = typeof EntryRevisionId.Type;
 
-export const EntryCommandId = Schema.UUID.pipe(Schema.brand("EntryCommandId"));
+export const EntryCommandId = UuidValue.pipe(Schema.brand("EntryCommandId"));
 export type EntryCommandId = typeof EntryCommandId.Type;
 
 /** Detects database-forbidden C0/C1 control characters in management names. */
@@ -36,56 +38,58 @@ function hasEntryNameControlCharacter(value: string): boolean {
 }
 
 export const EntryDisplayName = Schema.String.pipe(
-  Schema.transform(Schema.String, {
-    decode: (value) => value.trim().normalize("NFC"),
-    encode: (value) => value,
-  }),
-  Schema.minLength(1),
-  Schema.maxLength(100),
-  Schema.filter((value) => !hasEntryNameControlCharacter(value), {
-    message: () => "Entry names cannot contain control characters.",
-  }),
-  Schema.brand("EntryDisplayName"),
-);
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transform({
+      decode: (value) => value.trim().normalize("NFC"),
+      encode: (value) => value,
+    }),
+  ),
+)
+  .check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(100),
+    Schema.makeFilter((value) => !hasEntryNameControlCharacter(value), {
+      message: "Entry names cannot contain control characters.",
+    }),
+  )
+  .pipe(Schema.brand("EntryDisplayName"));
 export type EntryDisplayName = typeof EntryDisplayName.Type;
 
-export const EntryNameVersion = Schema.Number.pipe(
-  Schema.int(),
-  Schema.greaterThanOrEqualTo(1),
-  Schema.brand("EntryNameVersion"),
-);
+export const EntryNameVersion = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isGreaterThanOrEqualTo(1),
+).pipe(Schema.brand("EntryNameVersion"));
 export type EntryNameVersion = typeof EntryNameVersion.Type;
 
-export const EntryDraftVersion = Schema.Number.pipe(
-  Schema.int(),
-  Schema.greaterThanOrEqualTo(0),
-  Schema.brand("EntryDraftVersion"),
-);
+export const EntryDraftVersion = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isGreaterThanOrEqualTo(0),
+).pipe(Schema.brand("EntryDraftVersion"));
 export type EntryDraftVersion = typeof EntryDraftVersion.Type;
 
-export const EntryRevisionSequence = Schema.Number.pipe(
-  Schema.int(),
-  Schema.greaterThanOrEqualTo(1),
-  Schema.brand("EntryRevisionSequence"),
-);
+export const EntryRevisionSequence = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isGreaterThanOrEqualTo(1),
+).pipe(Schema.brand("EntryRevisionSequence"));
 export type EntryRevisionSequence = typeof EntryRevisionSequence.Type;
 
-export const EntryRevisionScope = Schema.Literal("shared", "localized");
+export const EntryRevisionScope = Schema.Literals(["shared", "localized"]);
 export type EntryRevisionScope = typeof EntryRevisionScope.Type;
 
-export const EntryValues = Schema.Record({
-  key: CollectionFieldId,
-  value: Schema.Unknown,
-});
+export const EntryValues = Schema.Record(CollectionFieldId, Schema.Unknown);
 export type EntryValues = typeof EntryValues.Type;
 
-const EntryListIndex = Schema.Number.pipe(Schema.int(), Schema.between(0, 100));
-export const EntryValuePathSegment = Schema.Union(CollectionFieldId, EntryListIndex);
+const EntryListIndex = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isBetween({ minimum: 0, maximum: 100 }),
+);
+export const EntryValuePathSegment = Schema.Union([CollectionFieldId, EntryListIndex]);
 export type EntryValuePathSegment = typeof EntryValuePathSegment.Type;
 
-export const EntryValuePath = Schema.Array(EntryValuePathSegment).pipe(
-  Schema.minItems(1),
-  Schema.maxItems(16),
+export const EntryValuePath = Schema.Array(EntryValuePathSegment).check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(16),
 );
 export type EntryValuePath = typeof EntryValuePath.Type;
 
@@ -118,41 +122,41 @@ export class RemoveEntryListItemMutation extends Schema.Class<RemoveEntryListIte
 )({
   operation: Schema.Literal("list_remove"),
   path: EntryValuePath,
-  index: Schema.Number.pipe(Schema.int(), Schema.between(0, 99)),
+  index: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 99 })),
 }) {}
 
-export const EntryValueMutation = Schema.Union(
+export const EntryValueMutation = Schema.Union([
   SetEntryValueMutation,
   UnsetEntryValueMutation,
   InsertEntryListItemMutation,
   RemoveEntryListItemMutation,
-);
+]);
 export type EntryValueMutation = typeof EntryValueMutation.Type;
 
-export const EntryValueMutations = Schema.Array(EntryValueMutation).pipe(Schema.maxItems(500));
+export const EntryValueMutations = Schema.Array(EntryValueMutation).check(Schema.isMaxLength(500));
 export type EntryValueMutations = typeof EntryValueMutations.Type;
 
-export const EntryValidationIssueCode = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(64),
-  Schema.pattern(/^[a-z][a-z0-9_]{0,63}$/u),
+export const EntryValidationIssueCode = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(64),
+  Schema.isPattern(/^[a-z][a-z0-9_]{0,63}$/u),
 );
 
 export class EntryValidationIssue extends Schema.Class<EntryValidationIssue>(
   "EntryValidationIssue",
 )({
   fieldId: CollectionFieldId,
-  path: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
   scope: EntryRevisionScope,
   localeId: Schema.NullOr(ProjectLocaleId),
   locale: Schema.NullOr(LocaleTag),
   code: EntryValidationIssueCode,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
 export class EntryValidation extends Schema.Class<EntryValidation>("EntryValidation")({
   valid: Schema.Boolean,
-  issues: Schema.Array(EntryValidationIssue).pipe(Schema.maxItems(50)),
+  issues: Schema.Array(EntryValidationIssue).check(Schema.isMaxLength(50)),
   capped: Schema.Boolean,
 }) {}
 
@@ -174,11 +178,11 @@ export class CmsEntry extends Schema.Class<CmsEntry>("CmsEntry")({
 
 export class CmsEntryListItem extends Schema.Class<CmsEntryListItem>("CmsEntryListItem")({
   entry: CmsEntry,
-  displayName: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
+  displayName: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
 }) {}
 
 export class CmsEntryPage extends Schema.Class<CmsEntryPage>("CmsEntryPage")({
-  items: Schema.Array(CmsEntryListItem).pipe(Schema.maxItems(50)),
+  items: Schema.Array(CmsEntryListItem).check(Schema.isMaxLength(50)),
   nextCursor: Schema.NullOr(Cursor),
 }) {}
 
@@ -212,10 +216,10 @@ export class SaveEntryDraftResult extends Schema.Class<SaveEntryDraftResult>(
   validation: EntryValidation,
 }) {}
 
-export const ChangedEntryFieldIds = Schema.Array(CollectionFieldId).pipe(
-  Schema.maxItems(100),
-  Schema.filter((fieldIds) => new Set(fieldIds).size === fieldIds.length, {
-    message: () => "Changed entry field IDs must be unique.",
+export const ChangedEntryFieldIds = Schema.Array(CollectionFieldId).check(
+  Schema.isMaxLength(100),
+  Schema.makeFilter((fieldIds) => new Set(fieldIds).size === fieldIds.length, {
+    message: "Changed entry field IDs must be unique.",
   }),
 );
 
@@ -238,7 +242,7 @@ export class EntryRevisionSummary extends Schema.Class<EntryRevisionSummary>(
 }) {}
 
 export class EntryRevisionPage extends Schema.Class<EntryRevisionPage>("EntryRevisionPage")({
-  items: Schema.Array(EntryRevisionSummary).pipe(Schema.maxItems(50)),
+  items: Schema.Array(EntryRevisionSummary).check(Schema.isMaxLength(50)),
   nextCursor: Schema.NullOr(Cursor),
 }) {}
 
@@ -334,20 +338,26 @@ export class RestoreEntryRevisionInput extends Schema.Class<RestoreEntryRevision
   commandId: EntryCommandId,
 }) {}
 
-export const ListEntriesInputSchema = Schema.standardSchemaV1(ListEntriesInput);
-export const CreateEntryInputSchema = Schema.standardSchemaV1(CreateEntryInput);
-export const RenameEntryInputSchema = Schema.standardSchemaV1(RenameEntryInput);
-export const GetEntryDraftInputSchema = Schema.standardSchemaV1(GetEntryDraftInput);
-export const SaveEntryDraftInputSchema = Schema.standardSchemaV1(SaveEntryDraftInput);
-export const ListEntryRevisionsInputSchema = Schema.standardSchemaV1(ListEntryRevisionsInput);
-export const RestoreEntryRevisionInputSchema = Schema.standardSchemaV1(RestoreEntryRevisionInput);
+export const ListEntriesInputSchema = SchemaStrict.toStandardSchemaV1(ListEntriesInput);
+export const CreateEntryInputSchema = SchemaStrict.toStandardSchemaV1(CreateEntryInput);
+export const RenameEntryInputSchema = SchemaStrict.toStandardSchemaV1(RenameEntryInput);
+export const GetEntryDraftInputSchema = SchemaStrict.toStandardSchemaV1(GetEntryDraftInput);
+export const SaveEntryDraftInputSchema = SchemaStrict.toStandardSchemaV1(SaveEntryDraftInput);
+export const ListEntryRevisionsInputSchema =
+  SchemaStrict.toStandardSchemaV1(ListEntryRevisionsInput);
+export const RestoreEntryRevisionInputSchema =
+  SchemaStrict.toStandardSchemaV1(RestoreEntryRevisionInput);
 
-export const CmsEntryOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(CmsEntry));
-export const CmsEntryPageOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(CmsEntryPage));
-export const CmsEntryDraftOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(CmsEntryDraft));
-export const SaveEntryDraftResultOutputSchema = Schema.standardSchemaV1(
+export const CmsEntryOutputSchema = SchemaStrict.toStandardSchemaV1(ApiSuccessSchema(CmsEntry));
+export const CmsEntryPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+  ApiSuccessSchema(CmsEntryPage),
+);
+export const CmsEntryDraftOutputSchema = SchemaStrict.toStandardSchemaV1(
+  ApiSuccessSchema(CmsEntryDraft),
+);
+export const SaveEntryDraftResultOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(SaveEntryDraftResult),
 );
-export const EntryRevisionPageOutputSchema = Schema.standardSchemaV1(
+export const EntryRevisionPageOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(EntryRevisionPage),
 );

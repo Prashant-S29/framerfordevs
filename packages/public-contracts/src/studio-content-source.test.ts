@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { studioContentOpenApiDocument } from "@framerfordevs/api/contracts/studio-content/openapi/index";
+import { studioContentV2OpenApiDocument } from "@framerfordevs/api/contracts/studio-content/openapi/v2";
 import { describe, expect, it } from "vitest";
 
 import { canonicalizePublicArtifact, generatePublicArtifacts } from "./artifacts";
@@ -35,6 +36,18 @@ describe("Studio Content v1 contract source", () => {
       ].toSorted(),
     );
     expect(first).not.toContain("access_token");
+  });
+
+  it("publishes the complete v2 successor with only the bounded resolution addition", () => {
+    const bytes = canonicalizePublicArtifact("openapi", studioContentV2OpenApiDocument);
+    expect(studioContentV2OpenApiDocument.info.version).toBe("2.0.0");
+    expect(bytes).toContain('"operationId": "resolveStudioEntryLabels"');
+    expect(
+      Object.values(studioContentV2OpenApiDocument.paths).flatMap((path) =>
+        Object.values(path).map((operation) => operation.operationId),
+      ),
+    ).toHaveLength(9);
+    expect(bytes).not.toContain("access_token");
   });
 
   it("leaves accepted Authoring, Control Plane, and Studio v1 bytes unchanged", () => {

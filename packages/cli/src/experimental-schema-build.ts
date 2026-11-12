@@ -1,6 +1,6 @@
 import { Worker } from "node:worker_threads";
 
-import { Effect, Either, Schema } from "effect";
+import { Effect, Result } from "effect";
 
 import {
   ExperimentalSchemaBuildError,
@@ -17,6 +17,7 @@ import {
   type ExperimentalSchemaBuildOutput,
 } from "./schema/experimental-build/runner";
 
+import * as SchemaStrict from "./schema-strict";
 export type { ExperimentalSchemaBuildInput, ExperimentalSchemaBuildOutput };
 export {
   ExperimentalSchemaBuildError,
@@ -47,13 +48,13 @@ function buildError(
 export const runExperimentalSchemaBuild = Effect.fn("cli.schema.build.experimental")(function* (
   input: ExperimentalSchemaBuildInput,
 ) {
-  const validatedInput = yield* Schema.decodeUnknown(ExperimentalSchemaBuildWorkerInput)(
-    input,
-  ).pipe(Effect.mapError(() => buildError("entry_invalid")));
+  const validatedInput = yield* SchemaStrict.decodeUnknownEffect(
+    ExperimentalSchemaBuildWorkerInput,
+  )(input).pipe(Effect.mapError(() => buildError("entry_invalid")));
   if (!validatedInput.experimental)
     return yield* Effect.fail(buildError("experimental_opt_in_required"));
 
-  return yield* Effect.async<ExperimentalSchemaBuildOutput, ExperimentalSchemaBuildError>(
+  return yield* Effect.callback<ExperimentalSchemaBuildOutput, ExperimentalSchemaBuildError>(
     (resume) => {
       let settled = false;
       const worker = new Worker(workerUrl(), {
@@ -86,12 +87,14 @@ export const runExperimentalSchemaBuild = Effect.fn("cli.schema.build.experiment
       );
 
       worker.once("message", (message: unknown) => {
-        const decoded = Schema.decodeUnknownEither(ExperimentalSchemaBuildWorkerResponse)(message);
-        if (Either.isLeft(decoded)) {
+        const decoded = SchemaStrict.decodeUnknownResult(ExperimentalSchemaBuildWorkerResponse)(
+          message,
+        );
+        if (Result.isFailure(decoded)) {
           finish(Effect.fail(buildError("worker_protocol_invalid")));
           return;
         }
-        const response = decoded.right;
+        const response = decoded.success;
         if (!response.ok) {
           finish(
             Effect.fail(

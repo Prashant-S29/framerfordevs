@@ -932,9 +932,9 @@ export function makeSchemaEngine() {
   };
 }
 
-export class SchemaEngine extends Context.Tag("SchemaEngine")<
+export class SchemaEngine extends Context.Service<
   SchemaEngine,
   ReturnType<typeof makeSchemaEngine>
->() {}
+>()("SchemaEngine") {}
 
 export const SchemaEngineLive = Layer.succeed(SchemaEngine, makeSchemaEngine());

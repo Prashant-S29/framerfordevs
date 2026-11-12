@@ -1,11 +1,11 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import { EnumOptionId } from "../../../contracts/field";
 import { CollectionFieldId, CollectionId } from "../../../contracts/schema";
 import { validateCompleteProjectSchema } from "../schema-document";
 import { type PersistedProjectSourceIdentities, reconcileProjectSourceIdentities } from "./index";
 
+import * as SchemaStrict from "../../schema-strict";
 function project(includeStatus = true) {
   return {
     collections: [
@@ -69,9 +69,9 @@ function typedProject(value: unknown) {
   return result.project;
 }
 
-const decodeCollectionId = Schema.decodeUnknownSync(CollectionId);
-const decodeFieldId = Schema.decodeUnknownSync(CollectionFieldId);
-const decodeOptionId = Schema.decodeUnknownSync(EnumOptionId);
+const decodeCollectionId = SchemaStrict.decodeUnknownSync(CollectionId);
+const decodeFieldId = SchemaStrict.decodeUnknownSync(CollectionFieldId);
+const decodeOptionId = SchemaStrict.decodeUnknownSync(EnumOptionId);
 const postsId = decodeCollectionId("019fae8b-1234-7000-8000-000000000201");
 const seoId = decodeFieldId("019fae8b-1234-7000-8000-000000000202");
 const titleId = decodeFieldId("019fae8b-1234-7000-8000-000000000203");

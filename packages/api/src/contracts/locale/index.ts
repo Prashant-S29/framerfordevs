@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Schema, SchemaTransformation } from "effect";
 
 import { ApiSuccessSchema } from "../response/api";
 import {
@@ -9,6 +9,8 @@ import {
 } from "./tag";
 import { IsoDateTime, ProjectId, ResourceVersion, WorkspaceId } from "../platform";
 
+import * as SchemaStrict from "../../lib/schema-strict";
+import { UuidValue } from "../uuid";
 export { canonicalizeLocaleTag } from "./tag";
 
 function hasControlCharacter(value: string): boolean {
@@ -22,58 +24,67 @@ function hasControlCharacter(value: string): boolean {
 }
 
 const TrimmedLocaleTag = Schema.String.pipe(
-  Schema.transform(Schema.String, {
-    decode: (value) => value.trim(),
-    encode: (value) => value,
-  }),
-  Schema.maxLength(localeTagMaxLength),
-  Schema.filter((value) => {
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transform({ decode: (value) => value.trim(), encode: (value) => value }),
+  ),
+).check(
+  Schema.isMaxLength(localeTagMaxLength),
+  Schema.makeFilter((value) => {
     const result = validateAndCanonicalizeLocaleTag(value);
     return result.ok ? true : localeTagValidationMessage(result.code);
   }),
 );
 
 export const LocaleTag = TrimmedLocaleTag.pipe(
-  Schema.transform(Schema.String, {
-    decode: (value) => canonicalizeLocaleTag(value) ?? value,
-    encode: (value) => value,
-  }),
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transform({
+      decode: (value) => canonicalizeLocaleTag(value) ?? value,
+      encode: (value) => value,
+    }),
+  ),
   Schema.brand("LocaleTag"),
 );
 export type LocaleTag = typeof LocaleTag.Type;
 
 const NormalizedString = Schema.String.pipe(
-  Schema.transform(Schema.String, {
-    decode: (value) => value.trim().normalize("NFC"),
-    encode: (value) => value,
-  }),
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transform({
+      decode: (value) => value.trim().normalize("NFC"),
+      encode: (value) => value,
+    }),
+  ),
 );
 
-export const LocaleDisplayName = NormalizedString.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(100),
-  Schema.filter((value) => !hasControlCharacter(value), {
-    message: () => "Locale display names cannot contain control characters.",
+export const LocaleDisplayName = NormalizedString.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(100),
+  Schema.makeFilter((value) => !hasControlCharacter(value), {
+    message: "Locale display names cannot contain control characters.",
   }),
-  Schema.brand("LocaleDisplayName"),
-);
+).pipe(Schema.brand("LocaleDisplayName"));
 export type LocaleDisplayName = typeof LocaleDisplayName.Type;
 
-export const ProjectLocaleId = Schema.UUID.pipe(Schema.brand("ProjectLocaleId"));
+export const ProjectLocaleId = UuidValue.pipe(Schema.brand("ProjectLocaleId"));
 export type ProjectLocaleId = typeof ProjectLocaleId.Type;
 
-export const ProjectLocaleStatus = Schema.Literal("enabled", "disabled", "removed");
+export const ProjectLocaleStatus = Schema.Literals(["enabled", "disabled", "removed"]);
 export type ProjectLocaleStatus = typeof ProjectLocaleStatus.Type;
 
-export const ProjectLocaleListView = Schema.Literal("enabled", "settings");
+export const ProjectLocaleListView = Schema.Literals(["enabled", "settings"]);
 export type ProjectLocaleListView = typeof ProjectLocaleListView.Type;
 
-export const ProjectLocalePosition = Schema.Number.pipe(
-  Schema.int(),
-  Schema.greaterThanOrEqualTo(0),
+export const ProjectLocalePosition = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isGreaterThanOrEqualTo(0),
 );
 
-export const LocaleDependencyCount = Schema.Number.pipe(Schema.int(), Schema.between(0, 100));
+export const LocaleDependencyCount = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isBetween({ minimum: 0, maximum: 100 }),
+);
 
 export const ExplicitLocaleContextFields = {
   locale: LocaleTag,
@@ -115,11 +126,11 @@ export class ProjectLocaleOrderItem extends Schema.Class<ProjectLocaleOrderItem>
   version: ResourceVersion,
 }) {}
 
-export const ProjectLocaleOrder = Schema.Array(ProjectLocaleOrderItem).pipe(
-  Schema.minItems(1),
-  Schema.maxItems(100),
-  Schema.filter((items) => new Set(items.map((item) => item.localeId)).size === items.length, {
-    message: () => "Locale order must contain unique locale IDs.",
+export const ProjectLocaleOrder = Schema.Array(ProjectLocaleOrderItem).check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(100),
+  Schema.makeFilter((items) => new Set(items.map((item) => item.localeId)).size === items.length, {
+    message: "Locale order must contain unique locale IDs.",
   }),
 );
 export type ProjectLocaleOrder = typeof ProjectLocaleOrder.Type;
@@ -176,17 +187,23 @@ export class ResolvedProjectLocale extends Schema.Class<ResolvedProjectLocale>(
   tag: LocaleTag,
 }) {}
 
-export const ListProjectLocalesInputSchema = Schema.standardSchemaV1(ListProjectLocalesInput);
-export const CreateProjectLocaleInputSchema = Schema.standardSchemaV1(CreateProjectLocaleInput);
-export const UpdateProjectLocaleDisplayNameInputSchema = Schema.standardSchemaV1(
+export const ListProjectLocalesInputSchema =
+  SchemaStrict.toStandardSchemaV1(ListProjectLocalesInput);
+export const CreateProjectLocaleInputSchema =
+  SchemaStrict.toStandardSchemaV1(CreateProjectLocaleInput);
+export const UpdateProjectLocaleDisplayNameInputSchema = SchemaStrict.toStandardSchemaV1(
   UpdateProjectLocaleDisplayNameInput,
 );
-export const ReorderProjectLocalesInputSchema = Schema.standardSchemaV1(ReorderProjectLocalesInput);
-export const UpdateProjectLocaleStatusInputSchema = Schema.standardSchemaV1(
+export const ReorderProjectLocalesInputSchema = SchemaStrict.toStandardSchemaV1(
+  ReorderProjectLocalesInput,
+);
+export const UpdateProjectLocaleStatusInputSchema = SchemaStrict.toStandardSchemaV1(
   UpdateProjectLocaleStatusInput,
 );
 
-export const ProjectLocaleOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(ProjectLocale));
-export const ProjectLocaleListOutputSchema = Schema.standardSchemaV1(
+export const ProjectLocaleOutputSchema = SchemaStrict.toStandardSchemaV1(
+  ApiSuccessSchema(ProjectLocale),
+);
+export const ProjectLocaleListOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(ProjectLocaleList),
 );

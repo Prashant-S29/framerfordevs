@@ -1,8 +1,161 @@
 # Milestone 19 Studio content and localization design
 
-**Status:** Developer-approved design; M19A platform/content protocol is accepted at `788b782`, while M19B implementation awaits explicit authorization
+**Status:** M19A platform/content protocol is accepted at `788b782`; the M19B compatibility checkpoint is developer-accepted, and the authorized mounted experience is implemented as a review candidate pending complete evidence and developer acceptance
 
 **Date:** 2026-09-27
+**M19B revalidated:** 2026-09-29
+
+## M19B design confirmation — 2026-09-29
+
+M19A is accepted at `788b782`; developer-applied migration `0021`, immutable Studio Content v1, the finite BFF, and current package source/tests are executable truth. This developer-approved confirmation revalidates the mounted-experience half against that implementation and supersedes conflicting pre-M19A proposal wording below. It did not itself authorize implementation, package publication, production configuration, rollout, deployment, complete M19 acceptance, or M20. The developer subsequently authorized M19B implementation and accepted the compatibility checkpoint defined here; the broader mounted experience is now implemented as a review candidate, while full acceptance and every release action remain gated.
+
+During revalidation, the accepted v1 consumer contract exposed one material gap: a reference value contains only its stable entry ID, while no bounded v1 operation can resolve an existing selected ID to its safe display name. Raw-ID editing is forbidden, and treating every existing value as unavailable would weaken the approved reference UX. The developer selected a new Studio Content v2 label-resolution projection rather than changing immutable v1 bytes or displaying raw IDs.
+
+### Preserved authority and bounded compatibility corrections
+
+M19B preserves the accepted Studio OAuth client, logical v1 resource audience, exact `studio:session offline_access` scope set, encrypted BFF session, absolute eight-hour deadline, v1 routes, and every accepted v1 artifact byte. Studio Content v1 remains served, supported, immutable at `c9226fdcc767d704a41e100a5440560afbb7f64977209f82d42dad20bc48a9fc`, and neither deprecated nor sunset in M19B.
+
+Before broad browser work, implementation must close three response-projection defects found by tracing the accepted DTO into the actual renderer. These corrections strengthen v1 and v2 behavior without changing any v1 schema, route, status, or artifact byte:
+
+1. Object/list configured defaults are projected recursively from source/API-keyed children to visible stable field IDs before browser exposure. Hidden-child defaults are removed. JSON-field data remains inert user content and is not re-keyed.
+2. Studio validation DTO paths become a closed stable locator such as `field/<visible-field-uuid>` rather than forwarding M7 API-key paths. The separate visible `fieldId` remains focus authority. The browser never renders a path or stable ID as user-facing copy.
+3. Studio operation adapters replace downstream validation details that may contain source/API-key paths or messages with closed generic Studio details. Draft-conflict version details remain allowed because they contain only scope and bounded version/revision authority.
+
+Regression scans must prove known API/source keys, hidden values, hidden paths, role metadata, and raw downstream messages are absent from v1/v2 success and failure envelopes. These are security/redaction corrections, not permission to alter accepted authorization, mutation, or persistence semantics.
+
+### Studio Content v2 reference-label projection
+
+Studio Content v2 is a complete successor surface at `/api/studio-content/v2`: it retains the eight v1 operations and exact DTO semantics and adds one read-only operation:
+
+```text
+POST /projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/resolve
+```
+
+The exact request is `{ entryIds: UUID[] }`, with 1–100 unique IDs and an 8 KiB body limit. The exact success data is `{ items: Array<{ id: UUID; displayName: string }> }`, capped at 100 items. Returned items follow first-requested order. Missing, unnamed, foreign, or otherwise unavailable entries are omitted; no missing-ID list, count, reason, content value, version, timestamp, capability, or policy metadata is returned.
+
+Resolution first revalidates the existing Studio grant and exact current project/environment/member/locale authority, then applies the same target-collection role projection gate as browse/search before one tenant-qualified set query. It returns only requested entries from that exact collection. This does not assert publication of a target and does not weaken save-time reference validation or exact-locale publication rules. It costs one Studio user-quota unit, records no business audit, uses only count/outcome telemetry buckets, needs no migration, and must prove an index-backed bounded plan with existing keys.
+
+The v2 OpenAPI document and public registry entry remain `sdkSupported: false`. Its first immutable baseline is registered at the compatibility checkpoint after the real platform route, BFF, strict browser resolution decoder/client, and request/response coherence gates pass; broader picker UI follows only after checkpoint review. V1 bytes and digest are checked in the same gate. No v1 deprecation date is introduced.
+
+The BFF moves its content upstream base to v2 only after strict v2 decoding passes. It adds only the matching finite local route:
+
+```text
+POST {mount}/api/content/collections/{collectionId}/locales/{locale}/entries/resolve
+```
+
+The route has the same exact-Origin, same-origin Fetch Metadata, JSON, cookie/session, refresh, redirect-denial, cancellation, and no-store controls as search and mutations, but uses the 8 KiB request cap and a dedicated operation-specific response decoder. It cannot accept arbitrary IDs outside the exact body, collection, locale, method, or configured upstream.
+
+### Finite shell and browser route tree
+
+The BFF serves the same immutable shell HTML only for `GET | HEAD` on these query-free, canonical patterns, in addition to the mount root:
+
+```text
+/content
+/content/{collectionId}/locales/{locale}
+/content/{collectionId}/locales/{locale}/entries/new
+/content/{collectionId}/locales/{locale}/entries/{entryId}
+```
+
+UUID and locale segments are strictly validated before shell service. Wrong methods return the bounded known-route `405`; malformed, encoded-ambiguous, trailing-slash, unknown, or additional paths remain `404`/raw-target rejection. There is no wildcard SPA fallback.
+
+The browser router mirrors exactly those paths under the configured base. A root authenticated layout owns bootstrap, account actions, session recovery, one page-level main region, and an outlet. Content context loads only after bootstrap succeeds. `/content` requires explicit locale and collection selection; it does not silently choose a fallback locale. Direct collection/entry routes preserve the exact canonical locale and recover to the nearest authorized content context when current authority no longer contains that resource.
+
+Route definitions and the authenticated shell remain eager and small. Content navigation/list code is one lazy boundary; new-entry and entry-workspace code share a later lazy form boundary; `@framerfordevs/content-form` is absent from the initial shell graph; Portable Text remains a separate nested lazy chunk. Standard links, not clickable containers, own ordinary navigation and intent preloading. Search text, content, names, values, and command bodies never enter URLs or route search state.
+
+### Dependency-free browser contracts and request client
+
+`@framerfordevs/studio/contracts` remains dependency-free and gains operation-specific v2 browser DTO decoders. Every decoder:
+
+- accepts `unknown`, enforces exact keys, closed literals, UUID/date/hash/tag/string/array bounds, unique identities, recursive depth/node limits, and operation/status coherence;
+- validates form-tree parent/child roles, unique field/layout identities, placement/editable subsets, sidebar-only validity, value keys against the visible field tree, form/draft revision and contract equality, and route collection/locale/entry equality;
+- copies accepted data into inert plain DTOs rather than returning unchecked parsed objects; and
+- rejects secret/authority-shaped keys, unsafe object keys, malformed JSON values, excess nested fields, and incoherent error/configuration detail.
+
+The browser request client additionally enforces declared and measured response bytes before parsing, exact JSON media type, request-body limits before dispatch, `credentials: "same-origin"`, `redirect: "error"`, and caller `AbortSignal`. It normalizes transport, local BFF, and Studio Content failures into one closed in-memory error model. It never trusts the BFF merely because the BFF already decoded upstream bytes.
+
+### Query ownership, browsing, search, and reference labels
+
+TanStack Query owns server state only; controlled form, rename/create input, pending intent, rebase, dirty, and dialog state remain ordinary in-memory React state. Persistence, dehydration, service workers, local/session storage, IndexedDB, and Cache Storage are absent.
+
+Hierarchical keys contain only closed operation names, stable route scope, canonical locale, opaque in-memory request generation, and an opaque cursor. Search text, display names, content/reference values, IDs supplied only as field values, tokens, cookies, sessions, and command bodies are excluded. A new generation is allocated whenever normalized search intent or a reference-resolution batch changes, preventing cache collision without putting search text or value-only reference IDs in the key.
+
+Browse uses 25 rows by default. The browser retains only the current page plus at most 20 cursor-history entries, renders at most 50 rows, and removes superseded page/search queries outside that bound. Search stays in component memory, is trimmed/NFC-normalized, requires 2–100 control-free characters, waits 300 ms, aborts superseded fetches, and uses the exact POST body. Empty search returns browse; a one-character term sends no request. Counts render as an exact number or `1,000+`.
+
+Queries pass TanStack's signal to Fetch. They retry at most twice only for bounded transport or `503` failures with bounded jitter; they never retry auth, authorization, validation, not-found, configuration, cursor, schema, conflict, or malformed-response failures. `429` exposes a bounded countdown from `Retry-After` and disables manual retry until it elapses. Mutations set `retry: false` without exception.
+
+The reference-picker port batches currently rendered unique selected IDs by target collection and exact selected locale, at most 100 per resolve request, with bounded concurrency and cancellation. It caches labels only in current in-memory query/editor state. While resolving it announces `Loading selected reference`; an omitted result becomes the non-identifying `Unavailable reference`. Search/select uses the same bounded target-collection entry search, immediately remembers the selected safe label, and stores only the canonical stable entry ID as the field value. Raw IDs are never editable, copied, or presented as instructions.
+
+### Minimal content-form generalization
+
+`@framerfordevs/content-form` remains transport-, router-, token-, tenant-, and persistence-free. M19B changes only reusable renderer authority:
+
+- add an optional caller-supplied reference-picker component port; the existing raw-ID fallback remains available only to developer-oriented callers, while Studio always supplies the picker;
+- distinguish authority read-only state from temporary busy disabling and render explicit non-color read-only text;
+- enforce nested object/list editability from the complete `editableFieldIds` set rather than only the root placement;
+- support sidebar-only projections without rendering an empty tablist;
+- allow a parent workspace to suppress per-form submit actions and provide one deliberate save action;
+- accept bounded structured server issues so summaries can focus the first visible field without rendering transport paths;
+- make nested-default keying explicit (`api_key` for existing Authoring adapters, `field_id` for Studio) and apply new-entry defaults only to editable authority; and
+- preserve accessible list add/remove/reorder controls, adding explicit move-down and minimum-item behavior where required.
+
+Studio adapts its strictly decoded field DTO into this renderer model by assigning no API key, using stable-ID defaults, and partitioning shared versus localized fields with the existing mixed-object rules. Shared controls require both projected editability and `canSaveShared`; localized controls require the exact selected locale and `canSaveLocalized`. Read-only values remain visible but never generate mutations.
+
+A browser-safe advisory validator covers the projected 18-kind value vocabulary for focus/rebase decisions. Server validation remains authoritative. Before create/save, the client also enforces 500 mutations, 24 value depth, 10,000 traversed nodes, and 1 MiB encoded body size; exceeding a bound produces a local non-destructive error and no request.
+
+### Workspace state, save, retry, and invalidation
+
+One editor state machine owns old authoritative baseline, current shared/localized values, schema/form signatures, latest accepted versions, visible validation, and any immutable submitted intent. A background query response never replaces controlled values while dirty. It may mark newer authority available, but adoption requires confirmed save, explicit discard, or the recovery flow below.
+
+Create/save command IDs are generated once per submitted intent outside the mutation function. An ambiguous transport/`503` result preserves the exact encoded body, versions, and command ID and offers an explicit retry only while that submitted intent is unchanged. Editing or discarding it retires that retry; a new intent gets a new command ID. Inputs are disabled while one snapshot is in flight. Rename is never blindly retried: after ambiguity Studio refetches and treats the rename as successful only when the exact normalized desired name is authoritative with an advanced version.
+
+Confirmed mutations use targeted cache work:
+
+- create invalidates exact collection/locale pages, navigates to the returned stable entry route, and loads its workspace;
+- rename updates/refetches the exact workspace and invalidates entry pages for that collection across authorized locales because the management name is locale-neutral; and
+- save adopts the submitted visible values plus returned receipt/validation as the clean baseline, then revalidates only the exact workspace and affected collection pages.
+
+Context and unrelated collections/locales are not broadly invalidated. Sign-out removes every `studio` query and all local editor/recovery state.
+
+### Conflict and schema-drift rebase
+
+M19B adds a pure, bounded, stable-ID three-way rebase kernel. Inputs are old form/baseline, local values, and a separately fetched latest workspace. Output contains carried values plus closed unresolved reasons; it performs no fetch, mutation, navigation, logging, or persistence.
+
+A changed atomic field/path is carried only when it still exists and is visible/editable, kind and effective localization are unchanged, latest authority still equals the old baseline at that path, the local value passes the new projected contract, and its parent remains atomically coherent. Changed lists are always unresolved. Mixed objects may carry independently safe descendants. Concurrent value changes, removal/hiding/read-only transitions, kind/localization changes, newly invalid values, and parent/list ambiguity are unresolved.
+
+The recovery dialog identifies unresolved work only with old/new labels and section metadata already visible to the user—never raw IDs, paths, hidden counts, or values. Safe changes may be adopted together. A concurrently changed but still compatible field may be reapplied only through an explicit per-field `Keep my change`; incompatible/removed/hidden/read-only work can only be discarded or manually recreated in currently authorized controls. No unresolved value is submitted automatically. The reviewed recovery becomes a new intent with latest schema/versions and a new command ID. The user can always discard everything and load latest authority; no force save exists.
+
+Draft conflict, stale schema, and name conflict use assertive bounded alerts and preserve local work. `restricted_issues` has no fabricated field link or hidden count. Visible validation summaries focus the first rendered authorized control; repeated list-item IDs focus the first visible occurrence rather than exposing source paths.
+
+### Dirty navigation and responsive accessibility
+
+A root in-memory dirty-state coordinator covers shared/localized edits and changed open create/rename forms. TanStack Router's resolver-form blocker presents one accessible alert dialog for locale, collection, entry, route, and browser-history navigation. It names only the currently visible entry/locale and offers `Stay` or `Discard`; save is separate. The same coordinator gates sign-out. `beforeunload` supplies the browser-native final guard. Proceeding clears only the discarded in-memory state and never writes a recovery copy.
+
+Desktop uses collection navigation, locale navigation, one finite entry panel, and one workspace. At narrow widths these become sequential route views with semantic Back links. Acceptance covers landmarks/headings, labels/help/errors, required/read-only text, roving locale tabs, keyboard list/reference/dialog behavior, focus restoration and route focus, polite loading/save announcements, assertive conflict/session alerts, non-color status, 375 CSS pixels, 200% zoom/reflow, reduced motion, and no drag-only or two-dimensional page-scroll requirement.
+
+### Performance, tests, and stop gates
+
+The first implementation checkpoint stops after v2/reference resolution, redaction corrections, strict browser decoders/client, finite shell routes, and lazy route skeleton. At that checkpoint:
+
+- accepted Studio, Studio Content v1, Authoring, and Control Plane artifact bytes/digests must be unchanged;
+- the real BFF consumer must pass before Studio Content v2 baseline registration;
+- initial shell JS/CSS must remain below accepted M18 ceilings and must not contain content-form or Portable Text code; and
+- the finite content-navigation and workspace route skeletons must remain separate lazy entries outside the initial executable graph.
+
+On 2026-09-29 the developer accepted this checkpoint scope and resolved the sequencing ambiguity: content-form and Portable Text chunk ceilings are fixed after their minimal post-checkpoint integration, and the representative 100-field controlled-form main-thread gate runs before conflict/recovery composition. They are not prerequisites for accepting a placeholder-only route skeleton that intentionally imports neither package.
+
+If v1 bytes drift, reference resolution cannot prove bounded tenant/index behavior, content-form enters the initial graph, or the shell exceeds its existing ceiling, implementation stops for review rather than raising a limit. After form integration, failed form/Portable Text chunk or 100-field interaction gates stop further implementation under the same rule.
+
+Tests then cover strict/excess/malformed DTOs, v1 redaction regressions, v2 tenant/role/locale/non-enumeration and set-query behavior, BFF route/body/status/cancellation matrices, query-key/storage/telemetry forbidden data, debounce/cancellation/page retention, all 18 controls and stable defaults, nested read-only authority, references, create/rename/save/no-op, receipt retry, conflict/rebase reason matrices, dirty blockers, direct-route recovery, sidebar-only forms, accessibility states, responsive CSS assertions, bundle/tarball boundaries, and noninteractive Chromium flows. No migration is proposed; any discovered schema/index requirement stops for amendment. The worker remains stopped for shared-database integration/coverage and is restored only at developer direction.
+
+### M19B implementation sequence
+
+1. Obtain explicit approval of this confirmation and M19B implementation authorization.
+2. Implement the three projection/redaction corrections and Studio Content v2 resolve operation; prove v1 bytes unchanged and stop if existing indexes are insufficient.
+3. Add the v2 BFF adaptation, finite shell patterns, dependency-free browser decoders/client, and lazy route skeleton; run and lock the compatibility checkpoint budgets.
+4. Generalize content-form minimally and implement bounded navigation/search/reference behavior.
+5. Add create/rename/save, exact retries, dirty coordination, and pure rebase/recovery composition.
+6. Complete package, accessibility, security, browser, performance, full readiness, fresh artifact/image, and database-invariant evidence.
+7. Update status documentation, provide one Conventional Commit message, and stop for developer M19 review.
 
 ## Decision summary
 
@@ -10,7 +163,7 @@ Milestone 19 moves ordinary content browsing and exact-locale draft authoring in
 
 The approved design uses:
 
-- A new immutable **Studio Content v1** server-to-server HTTP family at `/api/studio-content/v1`, authenticated only by the existing registration-bound Studio access token
+- The accepted immutable **Studio Content v1** server-to-server HTTP family at `/api/studio-content/v1`, plus an M19B **v2** successor that preserves v1 operations and adds bounded reference-label resolution, both authenticated only by the existing registration-bound Studio access token
 - The accepted Studio v1 bootstrap, OAuth client, resource, scope, grant, encrypted BFF session, and eight-hour absolute deadline unchanged
 - A finite app-local BFF content contract under the configured mount; it strictly decodes and adapts only named Studio Content operations and never becomes an arbitrary platform proxy
 - One server-derived content context containing only effective locales and role-visible published collections
@@ -148,9 +301,9 @@ M19 must resolve these gaps without claiming that a collection-policy model alre
 
 ## Load-bearing decisions
 
-### 1. Add Studio Content v1; do not mutate accepted v1 baselines
+### 1. Preserve Studio Content v1; add v2 without mutating accepted baselines
 
-M19 adds a separate canonical family:
+M19A added the separate canonical family:
 
 ```text
 /api/studio-content/v1
@@ -160,7 +313,7 @@ It is registered as a new immutable public artifact with `sdkSupported: false`. 
 
 Studio Content v1 accepts only a valid existing Studio token whose audience is the accepted logical Studio resource `${platformOrigin}/api/studio/v1` and whose exact scope set remains `studio:session offline_access`. The audience identifies the whole Studio resource boundary; it is not a promise that every operation shares the audience URI's route prefix.
 
-This avoids:
+M19B adds `/api/studio-content/v2` as fixed in the confirmation above while leaving v1 byte-identical, served, and non-deprecated. This avoids:
 
 - silently changing an accepted baseline;
 - adding a second OAuth client per registration;
@@ -172,7 +325,7 @@ The new API reuses current Studio-token verification and then calls shared conte
 
 ### 2. Studio Content is a runtime projection, not a second automation surface
 
-Canonical content business capability remains available through Authoring v1, the CLI, and the approved content-focused SDK. Studio Content v1 supplies a registration/session-bound human projection: effective navigation context, combined workspace reads, safe reference lookup, and the same underlying entry mutations.
+Canonical content business capability remains available through Authoring v1, the CLI, and the approved content-focused SDK. Studio Content supplies a registration/session-bound human projection: v1 provides effective navigation context, combined workspace reads, and the same underlying entry mutations; v2 additionally provides safe reference-label lookup.
 
 The Studio-specific context/search/count/workspace shapes are runtime-only and do not add CLI or SDK methods. There is no new mutation available only to Studio. If implementation discovers a genuinely new content business operation rather than a projection/composition of accepted operations, work stops for a surface amendment and matching CLI decision.
 
@@ -284,11 +437,11 @@ Studio does not accumulate an unbounded infinite list. It keeps at most the curr
 
 Search text stays in component memory and a bounded JSON search-request body rather than route URLs, logs, telemetry, query keys, or persistent browser storage. Routes contain only bounded stable IDs and canonical locale tags.
 
-### 10. References use the same authorized list operation
+### 10. References use authorized search plus bounded v2 label resolution
 
 `@framerfordevs/content-form` gains a first-party reference-picker port supplied by its caller. The renderer still owns no fetching, token, routing, or tenant authority.
 
-For a visible reference field, Studio invokes the same bounded authorized entry search against the configured target collection and exact selected locale. The target collection must itself be role-visible. Existing selected references are projected to safe display names where authorized; unavailable targets render a non-identifying `Unavailable reference` state rather than instructing the user to type an ID.
+For a visible reference field, Studio invokes bounded authorized entry search against the configured target collection and exact selected locale. The target collection must itself be role-visible. Existing selected IDs are resolved in bounded batches through the v2 operation fixed above; unavailable targets render a non-identifying `Unavailable reference` state rather than instructing the user to type an ID.
 
 A selected value remains the canonical stable entry ID. Save-time reference validation and exact-locale publication requirements remain unchanged. M19 does not publish or guarantee that a referenced target is published.
 
@@ -373,9 +526,11 @@ Base:
 | `PATCH` | `/collections/{collectionId}/locales/{locale}/entries/{entryId}/name`  | Optimistic locale-neutral rename                                               |
 | `PATCH` | `/collections/{collectionId}/locales/{locale}/entries/{entryId}/draft` | Receipt-backed shared/localized save                                           |
 
+V2 preserves that complete table and additionally defines `POST /collections/{collectionId}/locales/{locale}/entries/resolve` for the bounded reference-label projection fixed in the M19B confirmation. V1 remains unchanged.
+
 All routes are bearer-only, `no-store`, redirect-free, reject cookies/browser Origin/preflight/query credentials/duplicate Authorization, and retain `{ ok, data, error, message }`. The exact path/method/query/content-type matrix is closed. Unknown routes and methods do not fall through to Authoring or another API.
 
-Browse query keys are only `cursor` and `limit`. Search uses exact JSON `{ query, cursor, limit }` at the read-only `/search` operation so entry names never enter request URLs; mutation and search bodies reject excess properties. Requests are at most 1 MiB; responses are at most 4 MiB; the search body is additionally capped at 2 KiB; issue arrays remain capped at 50; mutations remain capped at 500; existing value/schema depth and document limits remain authoritative.
+Browse query keys are only `cursor` and `limit`. Search uses exact JSON `{ query, cursor, limit }` at the read-only `/search` operation so entry names never enter request URLs; mutation and search bodies reject excess properties. Requests are at most 1 MiB; responses are at most 4 MiB; the search body is additionally capped at 2 KiB and the v2 resolution body at 8 KiB; issue arrays remain capped at 50; mutations remain capped at 500; existing value/schema depth and document limits remain authoritative.
 
 The public error union includes validation, unauthorized, forbidden, not found, owner/developer-only collection configuration invalidity, locale unavailable, CMS/project/registration unavailable, stale schema, draft/name/command conflict, invalid/stale cursor, request/response too large, rate limited, dependency unavailable, and sanitized internal failure. Errors contain no values, hidden IDs/paths, labels, search text, tokens, cookies, or raw upstream details.
 
@@ -397,6 +552,7 @@ GET   /studio/api/content/collections/{collectionId}/locales/{locale}/entries/{e
 POST  /studio/api/content/collections/{collectionId}/locales/{locale}/entries
 PATCH /studio/api/content/collections/{collectionId}/locales/{locale}/entries/{entryId}/name
 PATCH /studio/api/content/collections/{collectionId}/locales/{locale}/entries/{entryId}/draft
+POST  /studio/api/content/collections/{collectionId}/locales/{locale}/entries/resolve
 ```
 
 The first four are finite shell patterns for direct navigation/refresh, not a wildcard SPA fallback. IDs and locale segments are strictly decoded before shell service. Browse cursors exist only on the list GET; search text/cursor exist only in the exact JSON body of the read-only search POST.
@@ -489,7 +645,7 @@ Bootstrap/context/capability flags never replace steps 2–6.
 | Search enumeration                      | Authorization before query/count; body-bound cursors; capped count; no content search   |
 | XSS through Presentation/content        | React escaping, no HTML nodes/dangerous rendering, existing Portable Text allowlist/CSP |
 | SSRF through asset/reference values     | No server fetch/probe; external assets remain inert structured metadata                 |
-| CSRF                                    | Accepted same-origin evidence; exact Origin + JSON for mutations; no CORS               |
+| CSRF                                    | Accepted same-origin evidence; exact Origin + JSON for mutations and read-only POSTs    |
 | Duplicate/ambiguous write               | Command receipts and exact retry intent; rename refetch reconciliation                  |
 | Conflict overwrites                     | Expected versions, no automatic mutation retry, no force, reviewed rebase only          |
 | Hidden validation leak                  | Visible issue projection plus closed restricted status without hidden details           |
@@ -500,13 +656,14 @@ Bootstrap/context/capability flags never replace steps 2–6.
 
 Studio Content reuses the accepted shared platform `studio.global` and `studio.user` identities rather than adding caller-selected or forwarded-source authority. Costs are proposed as:
 
-| Operation           | Cost |
-| ------------------- | ---: |
-| context             |    2 |
-| entry page/search   |    1 |
-| new-entry workspace |    2 |
-| entry workspace     |    3 |
-| create/rename/save  |    5 |
+| Operation            | Cost |
+| -------------------- | ---: |
+| context              |    2 |
+| entry page/search    |    1 |
+| reference resolution |    1 |
+| new-entry workspace  |    2 |
+| entry workspace      |    3 |
+| create/rename/save   |    5 |
 
 The existing BFF registration/session rates remain unchanged: 600/minute burst 100 per registration and 120/minute burst 20 per session. Search debounce, cancellation, and bounded pages prevent ordinary typing from consuming those bounds excessively. Raising accepted M18 limits requires amendment; deployment may lower them.
 
@@ -537,7 +694,7 @@ Metrics use only low-cardinality closed buckets. Ordinary reads add no domain au
 
 ### Platform
 
-- `packages/api/src/contracts/studio-content/`: strict Studio Content DTOs, errors, limits, and OpenAPI source
+- `packages/api/src/contracts/studio-content/`: immutable v1 DTOs/errors/limits plus shared schemas; a versioned v2 OpenAPI source composes v1 operations and bounded reference resolution without changing v1 bytes
 - `packages/api/src/lib/studio-content/`: pure role projection, capped-count/search cursor, issue filtering, and workspace/rebase-support kernels where server-owned
 - `packages/api/src/operations/studio-content-public/`: named Effect workflows, Studio principal adaptation, quotas, and typed errors
 - `packages/api/src/services/studio-content/`: set-based context/search/workspace repository composition over current policy/schema/entry services
@@ -635,6 +792,8 @@ Applicable format, lint, structure, contract drift, all type tasks, unit/integra
 
 The completed M19A review candidate passes format/lint/structure, contract drift, 23 type tasks, 1,642 tests plus coverage, all 14 retry-free browser specifications, and 14 builds. Rollback-isolated 100,000-entry evidence enforces the approved database p95 and index-plan targets, while separate 20-sample platform and BFF checks enforce the approved browse/search/workspace p95 targets. Exhaustive create/save failpoints leave no entry/revision/head/audit/receipt residue; draft operations create no publication, snapshot, publication-head, or outbox state. The finite BFF strictly decodes each operation-specific success DTO and rejects nested drift, status-incoherent failures, unsafe keys, redirects, cancellation leaks, and excessive payloads. The production audit has no high/critical finding; five moderate findings are unchanged test-tool dependency paths with no built-runtime references. Fresh changed server/developer images and the Studio-server tarball pass their applicable startup, residue, and allowlist checks. Final database invariants are clean and the worker remains stopped. The developer accepted, committed, and pushed this M19A baseline at `788b782`; no package publication, production configuration, rollout, or deployment occurred.
 
+The completed M19B review candidate passes exact-source format/lint/structure, contract drift, 23 type tasks, 1,664 tests including all 15 noninteractive Chromium specifications, 1,631 coverage executions, and 14 builds. Immutable Studio Content v1 remains byte-identical while v2 supplies only bounded label resolution. Final bundle ceilings pass at 134,051 gzip bytes initial, 52,961 gzip bytes for the content-form workspace, and 249,401 gzip bytes for Portable Text. Runtime-only package allowlists and fresh healthy server/developer images contain no project test, environment, coverage, source-map, or browser-result residue. Production overrides remove the two high advisories; four reviewed moderate Better Auth → Vitest/mocker metadata paths remain without built-runtime references. Secret-pattern, migration-diff, catalog/index/constraint, orphan/coherence/activity, and scoped residue checks pass with the worker stopped. No migration, publication, production configuration, rollout, deployment, or release action occurred; developer acceptance remains pending.
+
 ## Expected risks and pre-use confirmation
 
 These are expected gates, not design blockers:
@@ -657,12 +816,12 @@ These are expected gates, not design blockers:
 
 ### M19B — mounted Studio experience
 
-1. M19A is accepted; the developer explicitly authorizes M19B implementation.
-2. Add lazy finite content routes and strict dependency-free browser decoders.
-3. Generalize `@content-form` minimally and add the first-party reference picker plus rebase kernel/UI composition.
-4. Implement context/list/search/new/workspace/create/rename/save, dirty guards, conflict/retry/drift recovery, and responsive accessibility states.
-5. Lock measured content-route/chunk and interaction budgets at the compatibility checkpoint; stop if they fail.
-6. Run package, browser, accessibility, security, full readiness, and fresh artifact/image evidence.
+1. M19A and the 2026-09-29 M19B confirmation are developer-approved; obtain separate explicit M19B implementation authorization.
+2. Correct stable-ID default/validation redaction and add complete Studio Content v2 plus bounded reference-label resolution without changing v1 bytes.
+3. Add v2 BFF adaptation, lazy finite shell/browser routes, and strict dependency-free browser decoders; lock route/chunk and interaction budgets at the compatibility checkpoint.
+4. Generalize `@content-form` minimally and add the first-party reference picker plus pure rebase kernel/UI composition.
+5. Implement context/list/search/new/workspace/create/rename/save, dirty guards, exact retry, conflict/schema recovery, and responsive accessibility states.
+6. Run package, browser, accessibility, security, full readiness, fresh artifact/image, and database-invariant evidence.
 7. Update status documentation, provide one Conventional Commit message, and stop for developer M19 review.
 
 M20 does not begin until both units are accepted.
@@ -737,7 +896,7 @@ The separate API family preserves immutable baselines and keeps browser/BFF/plat
 
 ## Approved design decisions
 
-The developer approved these decisions, including the owner/developer zero-projection amendment above; M19A is accepted and M19B implementation remains separately gated:
+The developer approved these decisions, including the owner/developer zero-projection amendment above; M19A and the M19B compatibility checkpoint are accepted, and the authorized broader experience is implemented but remains gated by complete evidence and developer review:
 
 1. New Studio Content v1 companion API; Studio v1 and Authoring v1 remain byte-identical.
 2. Existing Studio OAuth audience/scope/client/grant/session authority remains unchanged.
@@ -751,3 +910,4 @@ The developer approved these decisions, including the owner/developer zero-proje
 10. M20–M21 capabilities and every release/rollout action remain gated.
 11. Valid Presentation authority cannot hide a non-empty collection from owners/developers; bounded owner/developer-only configuration notices and a typed closed-reason route error cover empty/corrupt residual states without weakening `NOT_FOUND` for other roles.
 12. Search-plan amendment risk and the temporary Authoring API/CLI-only recovery path are explicit pre-use gates, not permission to weaken search or ship Studio-native restore early.
+13. M19B preserves immutable Studio Content v1 and adds a complete v2 successor with bounded, non-enumerating batch reference-label resolution; raw IDs never become the Studio reference-editing UX.

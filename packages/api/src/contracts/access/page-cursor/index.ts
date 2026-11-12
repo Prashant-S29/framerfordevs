@@ -5,6 +5,7 @@ import { ApiErrorDetail } from "../../response/api";
 import { ValidationFailure } from "../../response/errors";
 import { Cursor, EnvironmentId, IsoDateTime, ProjectId } from "../../platform";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 class ProjectMemberCursorPayload extends Schema.Class<ProjectMemberCursorPayload>(
   "ProjectMemberCursorPayload",
 )({
@@ -49,12 +50,14 @@ const invalidCursor = () =>
 
 const encodePayload = Effect.fn("accessCursor.encode")(function* (payload: object) {
   const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  return yield* Schema.decodeUnknown(Cursor)(encoded).pipe(Effect.mapError(() => invalidCursor()));
+  return yield* SchemaStrict.decodeUnknownEffect(Cursor)(encoded).pipe(
+    Effect.mapError(() => invalidCursor()),
+  );
 });
 
 const decodePayload = Effect.fn("accessCursor.decode")(function* <A, I>(
   cursor: Cursor,
-  schema: Schema.Schema<A, I, never>,
+  schema: Schema.Codec<A, I, never>,
 ) {
   const json = yield* Effect.try({
     try: () => Buffer.from(cursor, "base64url").toString("utf8"),
@@ -64,7 +67,9 @@ const decodePayload = Effect.fn("accessCursor.decode")(function* <A, I>(
     try: (): unknown => JSON.parse(json),
     catch: () => invalidCursor(),
   });
-  return yield* Schema.decodeUnknown(schema)(payload).pipe(Effect.mapError(() => invalidCursor()));
+  return yield* SchemaStrict.decodeUnknownEffect(schema)(payload).pipe(
+    Effect.mapError(() => invalidCursor()),
+  );
 });
 
 export function encodeProjectMemberCursor(payload: {

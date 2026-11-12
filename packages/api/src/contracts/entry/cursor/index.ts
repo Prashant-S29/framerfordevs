@@ -9,6 +9,7 @@ import { LocaleTag } from "../../locale";
 import { Cursor, EnvironmentId, IsoDateTime, ProjectId } from "../../platform";
 import { CollectionId } from "../../schema";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 class EntryCursorPayload extends Schema.Class<EntryCursorPayload>("EntryCursorPayload")({
   version: Schema.Literal(1),
   kind: Schema.Literal("cms_entry"),
@@ -31,7 +32,7 @@ class EntryRevisionCursorPayload extends Schema.Class<EntryRevisionCursorPayload
   entryId: EntryId,
   locale: LocaleTag,
   scope: EntryRevisionScope,
-  sequence: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(1)),
+  sequence: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1)),
   revisionId: EntryRevisionId,
 }) {}
 
@@ -51,7 +52,7 @@ function invalidEntryCursor() {
 /** Encodes a checked cursor payload into the shared opaque cursor contract. */
 const encodePayload = Effect.fn("entryCursor.encode")(function* (payload: object) {
   const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  return yield* Schema.decodeUnknown(Cursor)(encoded).pipe(
+  return yield* SchemaStrict.decodeUnknownEffect(Cursor)(encoded).pipe(
     Effect.mapError(() => invalidEntryCursor()),
   );
 });
@@ -91,7 +92,7 @@ export const decodeEntryCursor = Effect.fn("entryCursor.decodeEntry")(function* 
   },
 ) {
   const unknownPayload = yield* decodeUnknownPayload(cursor);
-  const payload = yield* Schema.decodeUnknown(EntryCursorPayload)(unknownPayload).pipe(
+  const payload = yield* SchemaStrict.decodeUnknownEffect(EntryCursorPayload)(unknownPayload).pipe(
     Effect.mapError(() => invalidEntryCursor()),
   );
   if (
@@ -132,9 +133,9 @@ export const decodeEntryRevisionCursor = Effect.fn("entryCursor.decodeRevision")
   },
 ) {
   const unknownPayload = yield* decodeUnknownPayload(cursor);
-  const payload = yield* Schema.decodeUnknown(EntryRevisionCursorPayload)(unknownPayload).pipe(
-    Effect.mapError(() => invalidEntryCursor()),
-  );
+  const payload = yield* SchemaStrict.decodeUnknownEffect(EntryRevisionCursorPayload)(
+    unknownPayload,
+  ).pipe(Effect.mapError(() => invalidEntryCursor()));
   if (
     payload.projectId !== scope.projectId ||
     payload.environmentId !== scope.environmentId ||

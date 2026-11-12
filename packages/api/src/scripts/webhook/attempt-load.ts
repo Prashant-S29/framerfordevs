@@ -19,7 +19,7 @@ import {
   webhookEndpointSecret,
   webhookEndpointSubscription,
 } from "@framerfordevs/db/schema/webhooks";
-import { Clock, Effect, Either, Layer } from "effect";
+import { Clock, Effect, Result, Layer } from "effect";
 
 import { runOneWebhookAttempt } from "../../operations/webhook/attempt";
 import { WebhookTelemetry } from "../../observability/webhook-telemetry";
@@ -384,17 +384,18 @@ async function main() {
     if (dispatched !== expectedDeliveries) throw new Error("Attempt-load fan-out mismatch.");
 
     failureStage = "attempts";
-    const liveClock = Clock.make();
+    const liveClock = Effect.runSync(Clock.clockWith(Effect.succeed));
     const fixedEpochMs = Date.now();
     const attemptClock: Clock.Clock =
       selected === "retry_storm"
         ? {
-            ...liveClock,
-            unsafeCurrentTimeMillis: () => fixedEpochMs,
-            unsafeCurrentTimeNanos: () => BigInt(fixedEpochMs) * 1_000_000n,
+            currentTimeMillisUnsafe: () => fixedEpochMs,
             currentTimeMillis: Effect.succeed(fixedEpochMs),
+            currentTimeNanosUnsafe: () => BigInt(fixedEpochMs) * 1_000_000n,
             currentTimeNanos: Effect.succeed(BigInt(fixedEpochMs) * 1_000_000n),
-            sleep: liveClock.sleep,
+            monotonicTimeNanosUnsafe: () => liveClock.monotonicTimeNanosUnsafe(),
+            monotonicTimeNanos: liveClock.monotonicTimeNanos,
+            sleep: (duration) => liveClock.sleep(duration),
           }
         : liveClock;
     const layer = Layer.mergeAll(
@@ -429,18 +430,18 @@ async function main() {
       const executions = Array.from({ length: selectedSettings.slots }, async () => {
         const result = await Effect.runPromise(
           runOneWebhookAttempt().pipe(
-            Effect.withClock(attemptClock),
+            Effect.provideService(Clock.Clock, attemptClock),
             Effect.provide(layer),
-            Effect.either,
+            Effect.result,
           ),
         );
-        if (Either.isRight(result)) return { ok: true as const, value: result.right };
+        if (Result.isSuccess(result)) return { ok: true as const, value: result.success };
         return {
           ok: false as const,
           category:
-            "operation" in result.left && typeof result.left.operation === "string"
-              ? result.left.operation
-              : result.left._tag,
+            "operation" in result.failure && typeof result.failure.operation === "string"
+              ? result.failure.operation
+              : result.failure._tag,
         };
       });
       const healthyMonitor =
@@ -519,7 +520,10 @@ async function main() {
         throw new Error("Retry jitter bounds failed.");
       }
       const idle = await Effect.runPromise(
-        runOneWebhookAttempt().pipe(Effect.withClock(attemptClock), Effect.provide(layer)),
+        runOneWebhookAttempt().pipe(
+          Effect.provideService(Clock.Clock, attemptClock),
+          Effect.provide(layer),
+        ),
       );
       if (idle) throw new Error("Retry storm hot-polled future work.");
     }

@@ -99,6 +99,7 @@ import {
   type ToolingPrincipal,
 } from "../../../services/tooling/principal-authenticator";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const bearerPattern = /^Bearer ([^\s,]+)$/u;
 const positiveIntegerPattern = /^[1-9]\d*$/u;
 
@@ -114,8 +115,8 @@ function validationFailure(path: string) {
   });
 }
 
-function decodeInput<A, I>(schema: Schema.Schema<A, I, never>, value: unknown, path: string) {
-  return Schema.decodeUnknown(schema)(value, { onExcessProperty: "error" }).pipe(
+function decodeInput<A, I>(schema: Schema.Codec<A, I, never>, value: unknown, path: string) {
+  return SchemaStrict.decodeUnknownEffect(schema)(value, { onExcessProperty: "error" }).pipe(
     Effect.mapError(() => validationFailure(path)),
     Effect.withSpan("control-plane.public.input.decode"),
   );

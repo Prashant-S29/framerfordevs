@@ -3,12 +3,12 @@ import { Context, Effect, Layer } from "effect";
 
 import { DatabaseFailure } from "../contracts/response/errors";
 
-export class Database extends Context.Tag("Database")<
+export class Database extends Context.Service<
   Database,
   {
     readonly ping: Effect.Effect<void, DatabaseFailure>;
   }
->() {}
+>()("Database") {}
 
 interface DatabaseClient {
   readonly query: (query: string) => Promise<unknown>;
@@ -34,7 +34,7 @@ const databaseResource = Effect.acquireRelease(Effect.succeed(db), (database) =>
   }).pipe(Effect.ignore),
 );
 
-export const DatabaseLive = Layer.scoped(
+export const DatabaseLive = Layer.effect(
   Database,
   databaseResource.pipe(Effect.map((database) => makeDatabaseService(database.$client))),
 );

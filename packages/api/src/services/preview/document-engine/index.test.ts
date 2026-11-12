@@ -1,7 +1,7 @@
 // Verifies typed Effect service success and hard-corruption translation for Preview compilation.
 
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import { EntryValues } from "../../../contracts/entry";
 import { compilePreviewDocument } from "../../../lib/preview/document";
@@ -11,14 +11,15 @@ import {
   makePreviewDocumentEngine,
 } from "./index";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const baseInput = {
   entryId: "019fae8b-1234-7000-8000-000000000001",
   collectionId: "019fae8b-1234-7000-8000-000000000002",
   collectionKey: "articles",
   locale: "gu",
   fields: [],
-  sharedValues: Schema.decodeUnknownSync(EntryValues)({}),
-  localizedValues: Schema.decodeUnknownSync(EntryValues)({}),
+  sharedValues: SchemaStrict.decodeUnknownSync(EntryValues)({}),
+  localizedValues: SchemaStrict.decodeUnknownSync(EntryValues)({}),
   authority: {
     source: "current" as const,
     schemaRevisionId: "019fae8b-1234-7000-8000-000000000003",
@@ -62,7 +63,7 @@ describe("PreviewDocumentEngine", () => {
           const exit = yield* Effect.exit(
             (yield* PreviewDocumentEngine).compile({
               ...baseInput,
-              sharedValues: Schema.decodeUnknownSync(EntryValues)({
+              sharedValues: SchemaStrict.decodeUnknownSync(EntryValues)({
                 "019fae8b-1234-7000-8000-000000000004": () => undefined,
               }),
             }),

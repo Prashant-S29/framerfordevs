@@ -1,6 +1,6 @@
 // Records only closed, low-cardinality M11 worker metrics; resource identities never become labels.
 
-import { Context, Effect, Layer, Metric, MetricBoundaries } from "effect";
+import { Context, Effect, Layer, Metric } from "effect";
 
 import type { WebhookPublicEventType } from "../../contracts/webhook";
 import type { WebhookAttemptOutcome } from "../../lib/webhook/retry";
@@ -45,11 +45,10 @@ const attemptCount = Metric.counter("webhook_delivery_attempts_total", {
   description: "Webhook attempts by bounded event, delivery kind, outcome, and status family",
   incremental: true,
 });
-const attemptDuration = Metric.histogram(
-  "webhook_delivery_attempt_duration_ms",
-  MetricBoundaries.exponential({ start: 1, factor: 2, count: 16 }),
-  "Webhook attempt duration in milliseconds",
-);
+const attemptDuration = Metric.histogram("webhook_delivery_attempt_duration_ms", {
+  description: "Webhook attempt duration in milliseconds",
+  boundaries: Metric.exponentialBoundaries({ start: 1, factor: 2, count: 16 }),
+});
 const retryCount = Metric.counter("webhook_delivery_retries_total", {
   description: "Webhook retries by bounded delay bucket",
   incremental: true,
@@ -67,22 +66,21 @@ const shutdownCount = Metric.counter("webhook_worker_shutdowns_total", {
   incremental: true,
 });
 
-function attemptLabels<Type, In, Out>(
-  metric: Metric.Metric<Type, In, Out>,
+function attemptLabels<In, State>(
+  metric: Metric.Metric<In, State>,
   event: WebhookAttemptMetric,
-): Metric.Metric<Type, In, Out> {
-  return Metric.tagged(
-    Metric.tagged(
-      Metric.tagged(
-        Metric.tagged(Metric.tagged(metric, "event_type", event.eventType), "kind", event.kind),
-        "outcome",
-        event.outcome,
+): Metric.Metric<In, State> {
+  return Metric.withAttributes(
+    Metric.withAttributes(
+      Metric.withAttributes(
+        Metric.withAttributes(Metric.withAttributes(metric, { event_type: event.eventType }), {
+          kind: event.kind,
+        }),
+        { outcome: event.outcome },
       ),
-      "status_family",
-      event.statusFamily,
+      { status_family: event.statusFamily },
     ),
-    "queue_age",
-    event.queueAge,
+    { queue_age: event.queueAge },
   );
 }
 
@@ -103,15 +101,15 @@ export function webhookRetryDelayBucket(seconds: number | null): WebhookRetryDel
   return "over_6h";
 }
 
-export class WebhookTelemetry extends Context.Tag("WebhookTelemetry")<
-  WebhookTelemetry,
-  WebhookTelemetryService
->() {}
+export class WebhookTelemetry extends Context.Service<WebhookTelemetry, WebhookTelemetryService>()(
+  "WebhookTelemetry",
+) {}
 
 export const WebhookTelemetryLive = Layer.succeed(WebhookTelemetry, {
-  recordDispatchPoll: (result) => Metric.update(Metric.tagged(pollCount, "result", result), 1),
+  recordDispatchPoll: (result) =>
+    Metric.update(Metric.withAttributes(pollCount, { result: result }), 1),
   recordProjection: (outcome) =>
-    Metric.update(Metric.tagged(projectionCount, "outcome", outcome), 1),
+    Metric.update(Metric.withAttributes(projectionCount, { outcome: outcome }), 1),
   recordAttempt: (event) => {
     const effects = [
       Metric.update(attemptLabels(attemptCount, event), 1),
@@ -120,10 +118,9 @@ export const WebhookTelemetryLive = Layer.succeed(WebhookTelemetry, {
     if (event.retryDelay !== "none") {
       effects.push(
         Metric.update(
-          Metric.tagged(
-            Metric.tagged(retryCount, "event_type", event.eventType),
-            "delay",
-            event.retryDelay,
+          Metric.withAttributes(
+            Metric.withAttributes(retryCount, { event_type: event.eventType }),
+            { delay: event.retryDelay },
           ),
           1,
         ),
@@ -132,10 +129,9 @@ export const WebhookTelemetryLive = Layer.succeed(WebhookTelemetry, {
     if (event.outcome !== "succeeded" && event.retryDelay === "none") {
       effects.push(
         Metric.update(
-          Metric.tagged(
-            Metric.tagged(deadLetterCount, "event_type", event.eventType),
-            "reason",
-            event.outcome,
+          Metric.withAttributes(
+            Metric.withAttributes(deadLetterCount, { event_type: event.eventType }),
+            { reason: event.outcome },
           ),
           1,
         ),
@@ -145,5 +141,5 @@ export const WebhookTelemetryLive = Layer.succeed(WebhookTelemetry, {
   },
   recordLeaseRecovery: () => Metric.update(leaseRecoveryCount, 1),
   recordGracefulShutdown: (outcome) =>
-    Metric.update(Metric.tagged(shutdownCount, "outcome", outcome), 1),
+    Metric.update(Metric.withAttributes(shutdownCount, { outcome: outcome }), 1),
 });

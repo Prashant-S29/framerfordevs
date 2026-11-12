@@ -2,9 +2,9 @@
 
 import { randomBytes } from "node:crypto";
 
-import * as OtelTracer from "@effect/opentelemetry/Tracer";
+import * as OtelTracer from "@effect/opentelemetry/OtelTracer";
 import { env } from "@framerfordevs/env/server";
-import { Cause, Chunk, Clock, Effect, Exit, Layer, ManagedRuntime, Option } from "effect";
+import { Cause, Clock, Effect, Exit, Layer, ManagedRuntime, Option } from "effect";
 
 import { type ApiData, type ApiResponse, apiSuccess } from "../contracts/response/api";
 import {
@@ -287,15 +287,15 @@ export type CauseClassification<E> =
   | { readonly kind: "interrupted" };
 
 export function classifyCause<E>(cause: Cause.Cause<E>): CauseClassification<E> {
-  const defects = Cause.defects(cause);
-  if (Chunk.isNonEmpty(defects)) {
-    return { kind: "defect", defects: Array.from(defects) };
+  const defects = cause.reasons.filter(Cause.isDieReason).map((reason) => reason.defect);
+  if (defects.length > 0) {
+    return { kind: "defect", defects };
   }
-  if (Cause.isInterruptedOnly(cause)) {
+  if (Cause.hasInterruptsOnly(cause)) {
     return { kind: "interrupted" };
   }
 
-  const failure = Option.getOrUndefined(Cause.failureOption(cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(cause));
   if (failure !== undefined) {
     return { kind: "failure", error: failure };
   }

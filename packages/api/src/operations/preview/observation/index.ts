@@ -68,7 +68,7 @@ export function observePreviewRead<E, R>(
               durationMs: Math.max(0, completedAt - startedAt),
             });
             const auditFailure = Exit.isFailure(exit)
-              ? Option.getOrUndefined(Cause.failureOption(exit.cause))
+              ? Option.getOrUndefined(Cause.findErrorOption(exit.cause))
               : undefined;
             return Effect.all([
               readMetric,
@@ -77,7 +77,7 @@ export function observePreviewRead<E, R>(
                 : []),
             ]).pipe(
               Effect.asVoid,
-              Effect.catchAllCause(() => Effect.void),
+              Effect.catchCause(() => Effect.void),
             );
           }),
         ),

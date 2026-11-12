@@ -43,9 +43,9 @@ export function makeWebhookDestinationValidator(
         try: () => resolve(normalized.value.hostname),
         catch: resolutionFailure,
       }).pipe(
-        Effect.timeoutFail({
+        Effect.timeoutOrElse({
           duration: resolutionTimeoutMs,
-          onTimeout: resolutionFailure,
+          orElse: () => Effect.fail(resolutionFailure()),
         }),
       );
       const validated = validateWebhookDnsAnswers(answers);
@@ -55,10 +55,10 @@ export function makeWebhookDestinationValidator(
   };
 }
 
-export class WebhookDestinationValidator extends Context.Tag("WebhookDestinationValidator")<
+export class WebhookDestinationValidator extends Context.Service<
   WebhookDestinationValidator,
   ReturnType<typeof makeWebhookDestinationValidator>
->() {}
+>()("WebhookDestinationValidator") {}
 
 export const WebhookDestinationValidatorLive = Layer.succeed(
   WebhookDestinationValidator,

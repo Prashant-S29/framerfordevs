@@ -12,7 +12,7 @@ import {
   outboxEvent,
 } from "@framerfordevs/db/schema/cms";
 import { auditEvent, environment, projectCapability } from "@framerfordevs/db/schema/platform";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import {
   DeliveryCollectionConfiguration,
@@ -35,6 +35,7 @@ import { SchemaValidationIssue } from "../../contracts/schema";
 import type { ApplicationDb, ApplicationExecutor } from "../project-access";
 import { authorizeUserProject } from "../project-access";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const supportedKinds = new Set([
   "short_text",
   "slug",
@@ -154,7 +155,7 @@ function decodeConfiguration(
   row: DeliveryConfigurationRow,
   fields: ReadonlyArray<DeliveryFieldCapability>,
 ) {
-  return Schema.decodeUnknown(DeliveryCollectionConfiguration)(
+  return SchemaStrict.decodeUnknownEffect(DeliveryCollectionConfiguration)(
     configurationValue(row, fields),
   ).pipe(Effect.mapError((cause) => databaseFailure("delivery.configuration.decode", cause)));
 }
@@ -273,7 +274,7 @@ async function loadConfigurationRows(
     .orderBy(cmsSchemaRevisionField.position, cmsSchemaRevisionField.fieldId)
     .then((rows) =>
       rows.map((row) =>
-        Schema.decodeUnknownSync(DeliveryFieldCapability)({
+        SchemaStrict.decodeUnknownSync(DeliveryFieldCapability)({
           fieldId: row.fieldId,
           fieldKey: row.fieldKey,
           kind: row.kind,
@@ -667,9 +668,9 @@ export function makeDeliveryRepository(database: ApplicationDb = db): DeliveryRe
   };
 }
 
-export class DeliveryRepository extends Context.Tag("DeliveryRepository")<
+export class DeliveryRepository extends Context.Service<
   DeliveryRepository,
   DeliveryRepositoryService
->() {}
+>()("DeliveryRepository") {}
 
 export const DeliveryRepositoryLive = Layer.succeed(DeliveryRepository, makeDeliveryRepository());

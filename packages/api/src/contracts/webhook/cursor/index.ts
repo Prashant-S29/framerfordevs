@@ -14,6 +14,7 @@ import {
   WebhookPublicEventType,
 } from "..";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const Scope = { projectId: ProjectId, environmentId: EnvironmentId };
 
 class EndpointCursorPayload extends Schema.Class<EndpointCursorPayload>("EndpointCursorPayload")({
@@ -48,7 +49,7 @@ class AttemptCursorPayload extends Schema.Class<AttemptCursorPayload>("AttemptCu
   kind: Schema.Literal("webhook-attempt"),
   ...Scope,
   deliveryId: WebhookDeliveryId,
-  attemptNumber: Schema.Number.pipe(Schema.int(), Schema.between(1, 12)),
+  attemptNumber: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 12 })),
   attemptId: WebhookAttemptId,
 }) {}
 
@@ -65,18 +66,22 @@ const invalidCursor = () =>
 
 const encodePayload = Effect.fn("webhookCursor.encode")(function* (payload: object) {
   const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  return yield* Schema.decodeUnknown(Cursor)(encoded).pipe(Effect.mapError(() => invalidCursor()));
+  return yield* SchemaStrict.decodeUnknownEffect(Cursor)(encoded).pipe(
+    Effect.mapError(() => invalidCursor()),
+  );
 });
 
 const decodePayload = Effect.fn("webhookCursor.decode")(function* <A, I>(
   cursor: Cursor,
-  schema: Schema.Schema<A, I, never>,
+  schema: Schema.Codec<A, I, never>,
 ) {
   const payload = yield* Effect.try({
     try: (): unknown => JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")),
     catch: () => invalidCursor(),
   });
-  return yield* Schema.decodeUnknown(schema)(payload).pipe(Effect.mapError(() => invalidCursor()));
+  return yield* SchemaStrict.decodeUnknownEffect(schema)(payload).pipe(
+    Effect.mapError(() => invalidCursor()),
+  );
 });
 
 function scopeMatches(

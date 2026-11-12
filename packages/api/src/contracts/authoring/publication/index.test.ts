@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit } from "effect";
 
 import {
   AuthoringPublicationStatus,
@@ -8,12 +8,13 @@ import {
   AuthoringValidatePublicationRequest,
 } from "./index";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const id = "019fae8b-1234-7000-8000-000000000001";
 
 describe("authoring publication contracts", () => {
   it.effect("keeps publication commands exact and closed", () =>
     Effect.gen(function* () {
-      const publish = yield* Schema.decodeUnknown(AuthoringPublishEntryRequest)({
+      const publish = yield* SchemaStrict.decodeUnknownEffect(AuthoringPublishEntryRequest)({
         commandId: id,
         authorityHash: "a".repeat(64),
         expectedStateVersion: 0,
@@ -25,12 +26,14 @@ describe("authoring publication contracts", () => {
         expectedLocalizedVersion: 0,
         expectedLocalizedRevisionId: null,
       });
-      const emptyValidation = yield* Schema.decodeUnknown(AuthoringValidatePublicationRequest)({});
+      const emptyValidation = yield* SchemaStrict.decodeUnknownEffect(
+        AuthoringValidatePublicationRequest,
+      )({});
       const excessValidation = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringValidatePublicationRequest)({ force: true }),
+        SchemaStrict.decodeUnknownEffect(AuthoringValidatePublicationRequest)({ force: true }),
       );
       const excess = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringUnpublishEntryRequest)({
+        SchemaStrict.decodeUnknownEffect(AuthoringUnpublishEntryRequest)({
           commandId: id,
           expectedStateVersion: 0,
           expectedPublicationId: null,
@@ -46,7 +49,7 @@ describe("authoring publication contracts", () => {
 
   it.effect("excludes actor and tenant metadata from publication status", () =>
     Effect.gen(function* () {
-      const status = yield* Schema.decodeUnknown(AuthoringPublicationStatus)({
+      const status = yield* SchemaStrict.decodeUnknownEffect(AuthoringPublicationStatus)({
         entryId: id,
         locale: "en-US",
         state: "unpublished",

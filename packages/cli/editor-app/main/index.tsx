@@ -37,6 +37,7 @@ import type { EditorOperationRequest } from "../../src/editor/protocol";
 import "../editor.css";
 import { projectLocalContentForm } from "../local-form";
 
+import * as SchemaStrict from "../../src/schema-strict";
 const ContentForm = lazy(() =>
   import("@framerfordevs/content-form/renderer").then((module) => ({
     default: module.ContentForm,
@@ -57,24 +58,24 @@ const ProjectDocument = Schema.declare<ProjectSchema>(isProjectSchema, {
 const LocalSchemaSnapshot = Schema.Struct({
   localProject: ProjectDocument,
   hostedProject: ProjectDocument,
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
+}).annotate({ closedObject: true });
 const Collection = Schema.Struct({
   sourceKey: Schema.String,
   apiKey: Schema.String,
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
+}).annotate({ closedObject: true });
 const Status = Schema.Struct({
   projectId: Schema.String,
   environment: Schema.String,
   schemaMatchesHosted: Schema.Boolean,
   schemaValid: Schema.Boolean,
-  schemaGeneration: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
+  schemaGeneration: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   schemaDiagnosticCode: Schema.NullOr(Schema.String),
-  localCollectionCount: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
-  locales: Schema.Array(Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64))).pipe(
-    Schema.maxItems(100),
+  localCollectionCount: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  locales: Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))).check(
+    Schema.isMaxLength(100),
   ),
   collections: Schema.Array(Collection),
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
+}).annotate({ closedObject: true });
 
 type EditorStatus = typeof Status.Type;
 
@@ -146,11 +147,11 @@ async function statusRequest(): Promise<EditorStatus> {
   });
   const payload = await responsePayload(response);
   if (!response.ok) throw new EditorRequestError(response.status, failureCode(payload));
-  return Schema.decodeUnknownSync(Status)(payload, { onExcessProperty: "error" });
+  return SchemaStrict.decodeUnknownSync(Status)(payload, { onExcessProperty: "error" });
 }
 
 async function operationData<A, I>(
-  schema: Schema.Schema<A, I, never>,
+  schema: Schema.Codec<A, I, never>,
   request: EditorOperationRequest,
 ): Promise<A> {
   const response = await fetch("/api/operation", {
@@ -164,7 +165,7 @@ async function operationData<A, I>(
   if (!response.ok || envelope?.ok !== true) {
     throw new EditorRequestError(response.status, failureCode(payload));
   }
-  return Schema.decodeUnknownSync(schema)(envelope.data, { onExcessProperty: "error" });
+  return SchemaStrict.decodeUnknownSync(schema)(envelope.data, { onExcessProperty: "error" });
 }
 
 function jsonValue(value: unknown, depth = 0): JsonValue {

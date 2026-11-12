@@ -19,6 +19,7 @@ import {
 } from "./index";
 import { EnvironmentId } from "../platform";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = EnvironmentId.make("019fae8b-1234-7000-8000-000000000002");
 const otherEnvironmentId = EnvironmentId.make("019fae8b-1234-7000-8000-000000000003");
@@ -30,8 +31,9 @@ const createdAt = "2026-08-01T12:00:00.000Z";
 describe("collection schema contracts", () => {
   it.effect("accepts trimmed lowercase snake-case keys and keeps collection and field brands", () =>
     Effect.gen(function* () {
-      const collectionKey = yield* Schema.decodeUnknown(CollectionApiKey)("  blog_posts  ");
-      const fieldKey = yield* Schema.decodeUnknown(CollectionFieldApiKey)("hero_title");
+      const collectionKey =
+        yield* SchemaStrict.decodeUnknownEffect(CollectionApiKey)("  blog_posts  ");
+      const fieldKey = yield* SchemaStrict.decodeUnknownEffect(CollectionFieldApiKey)("hero_title");
 
       assert.strictEqual(collectionKey, "blog_posts");
       assert.strictEqual(fieldKey, "hero_title");
@@ -51,7 +53,7 @@ describe("collection schema contracts", () => {
         "x".repeat(64),
       ];
       const exits = yield* Effect.forEach(invalid, (key) =>
-        Effect.exit(Schema.decodeUnknown(CollectionApiKey)(key)),
+        Effect.exit(SchemaStrict.decodeUnknownEffect(CollectionApiKey)(key)),
       );
 
       assert.isTrue(exits.every(Exit.isFailure));
@@ -81,14 +83,19 @@ describe("collection schema contracts", () => {
         "external_asset",
       ] as const;
       for (const kind of kinds) {
-        assert.strictEqual(yield* Schema.decodeUnknown(CollectionFieldKind)(kind), kind);
+        assert.strictEqual(
+          yield* SchemaStrict.decodeUnknownEffect(CollectionFieldKind)(kind),
+          kind,
+        );
       }
 
       const unsupportedKind = yield* Effect.exit(
-        Schema.decodeUnknown(CollectionFieldKind)("markdown"),
+        SchemaStrict.decodeUnknownEffect(CollectionFieldKind)("markdown"),
       );
-      const emptyConfiguration = yield* Schema.decodeUnknown(CollectionFieldConfiguration)({});
-      const configured = yield* Schema.decodeUnknown(CollectionFieldConfiguration)({
+      const emptyConfiguration = yield* SchemaStrict.decodeUnknownEffect(
+        CollectionFieldConfiguration,
+      )({});
+      const configured = yield* SchemaStrict.decodeUnknownEffect(CollectionFieldConfiguration)({
         minLength: 1,
       });
 
@@ -100,7 +107,7 @@ describe("collection schema contracts", () => {
 
   it.effect("keeps server-owned field identity out of create-field authority", () =>
     Effect.gen(function* () {
-      const decoded = yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+      const decoded = yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
         projectId,
         environmentId,
         collectionId,
@@ -127,7 +134,7 @@ describe("collection schema contracts", () => {
 
   it.effect("accepts a recursive authoring tree with nullable identities", () =>
     Effect.gen(function* () {
-      const decoded = yield* Schema.decodeUnknown(ReplaceCollectionDraftFieldsInput)({
+      const decoded = yield* SchemaStrict.decodeUnknownEffect(ReplaceCollectionDraftFieldsInput)({
         projectId,
         environmentId,
         collectionId,
@@ -170,19 +177,21 @@ describe("collection schema contracts", () => {
 
   it.effect("requires unique bounded reorder and acknowledgement sets", () =>
     Effect.gen(function* () {
-      const order = yield* Schema.decodeUnknown(CollectionFieldOrder)([
+      const order = yield* SchemaStrict.decodeUnknownEffect(CollectionFieldOrder)([
         firstFieldId,
         secondFieldId,
       ]);
       const duplicateOrder = yield* Effect.exit(
-        Schema.decodeUnknown(CollectionFieldOrder)([firstFieldId, firstFieldId]),
+        SchemaStrict.decodeUnknownEffect(CollectionFieldOrder)([firstFieldId, firstFieldId]),
       );
-      const acknowledgements = yield* Schema.decodeUnknown(AcknowledgedSchemaChangeIds)([
-        "a".repeat(64),
-        "b".repeat(64),
-      ]);
+      const acknowledgements = yield* SchemaStrict.decodeUnknownEffect(AcknowledgedSchemaChangeIds)(
+        ["a".repeat(64), "b".repeat(64)],
+      );
       const duplicateAcknowledgements = yield* Effect.exit(
-        Schema.decodeUnknown(AcknowledgedSchemaChangeIds)(["a".repeat(64), "a".repeat(64)]),
+        SchemaStrict.decodeUnknownEffect(AcknowledgedSchemaChangeIds)([
+          "a".repeat(64),
+          "a".repeat(64),
+        ]),
       );
 
       assert.strictEqual(order.length, 2);
@@ -196,12 +205,14 @@ describe("collection schema contracts", () => {
     Effect.gen(function* () {
       const validUuid = "019fae8b-1234-7000-8000-000000000099";
       const values = yield* Effect.all([
-        Schema.decodeUnknown(CollectionId)(validUuid),
-        Schema.decodeUnknown(SchemaRevisionId)(validUuid),
-        Schema.decodeUnknown(SchemaPublicationCommandId)(validUuid),
-        Schema.decodeUnknown(OutboxEventId)(validUuid),
+        SchemaStrict.decodeUnknownEffect(CollectionId)(validUuid),
+        SchemaStrict.decodeUnknownEffect(SchemaRevisionId)(validUuid),
+        SchemaStrict.decodeUnknownEffect(SchemaPublicationCommandId)(validUuid),
+        SchemaStrict.decodeUnknownEffect(OutboxEventId)(validUuid),
       ]);
-      const malformed = yield* Effect.exit(Schema.decodeUnknown(CollectionId)("collection_1"));
+      const malformed = yield* Effect.exit(
+        SchemaStrict.decodeUnknownEffect(CollectionId)("collection_1"),
+      );
 
       assert.isTrue(values.every((value) => value === validUuid));
       assert.isTrue(Exit.isFailure(malformed));
@@ -213,10 +224,12 @@ describe("collection schema contracts", () => {
     [Schema.String],
     ([value]) =>
       Effect.gen(function* () {
-        const first = yield* Effect.option(Schema.decodeUnknown(CollectionApiKey)(value));
+        const first = yield* Effect.option(
+          SchemaStrict.decodeUnknownEffect(CollectionApiKey)(value),
+        );
         if (first._tag === "Some") {
           assert.strictEqual(
-            yield* Schema.decodeUnknown(CollectionApiKey)(first.value),
+            yield* SchemaStrict.decodeUnknownEffect(CollectionApiKey)(first.value),
             first.value,
           );
         }

@@ -38,13 +38,13 @@ export type AuthoringProjectSchemaDocument = typeof AuthoringProjectSchemaDocume
 export class AuthoringSchemaValidationIssue extends Schema.Class<AuthoringSchemaValidationIssue>(
   "AuthoringSchemaValidationIssue",
 )({
-  path: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
-  code: Schema.String.pipe(
-    Schema.minLength(1),
-    Schema.maxLength(64),
-    Schema.pattern(/^[a-z][a-z0-9_]{0,63}$/u),
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  code: Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(64),
+    Schema.isPattern(/^[a-z][a-z0-9_]{0,63}$/u),
   ),
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
 export class AuthoringSchemaChange extends Schema.Class<AuthoringSchemaChange>(
@@ -55,7 +55,7 @@ export class AuthoringSchemaChange extends Schema.Class<AuthoringSchemaChange>(
   classification: SchemaChangeClassification,
   collectionSourceKey: CollectionSourceKey,
   fieldSourceKey: Schema.NullOr(FieldSourceKey),
-  summary: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
+  summary: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
 }) {}
 
 const CandidateWithAllocatedIdentities = Schema.Struct({
@@ -65,7 +65,7 @@ const CandidateWithAllocatedIdentities = Schema.Struct({
   containsUnallocatedIdentities: Schema.Literal(false),
   candidateStructureHash: StructureHash,
   candidateContractHash: ContractHash,
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
+}).annotate({ closedObject: true });
 
 const CandidateWithUnallocatedIdentities = Schema.Struct({
   collectionSourceKey: CollectionSourceKey,
@@ -74,16 +74,16 @@ const CandidateWithUnallocatedIdentities = Schema.Struct({
   containsUnallocatedIdentities: Schema.Literal(true),
   candidateStructureHash: Schema.Null,
   candidateContractHash: Schema.NullOr(ContractHash),
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
+}).annotate({ closedObject: true });
 
 /**
  * `candidateStructureHash` is always present. It is exactly `null` when any candidate identity has
  * not yet received its server-generated ID; omission is never used to represent this state.
  */
-export const AuthoringSchemaCandidate = Schema.Union(
+export const AuthoringSchemaCandidate = Schema.Union([
   CandidateWithAllocatedIdentities,
   CandidateWithUnallocatedIdentities,
-).annotations({ identifier: "AuthoringSchemaCandidate" });
+]).annotate({ identifier: "AuthoringSchemaCandidate" });
 export type AuthoringSchemaCandidate = typeof AuthoringSchemaCandidate.Type;
 
 export class AuthoringSchemaExportInput extends Schema.Class<AuthoringSchemaExportInput>(
@@ -101,45 +101,45 @@ export class AuthoringSchemaPlanInput extends Schema.Class<AuthoringSchemaPlanIn
 
 export const AuthoringSchemaPlanRequest = Schema.Struct({
   project: AuthoringProjectSchemaDocument,
-}).annotations({
+}).annotate({
   identifier: "AuthoringSchemaPlanRequest",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type AuthoringSchemaPlanRequest = typeof AuthoringSchemaPlanRequest.Type;
 
 const AuthoringSchemaPlanBase = {
   current: AuthoringSchemaAuthority,
-  changes: Schema.Array(AuthoringSchemaChange).pipe(Schema.maxItems(10_000)),
-  candidates: Schema.Array(AuthoringSchemaCandidate).pipe(Schema.maxItems(100)),
+  changes: Schema.Array(AuthoringSchemaChange).check(Schema.isMaxLength(10_000)),
+  candidates: Schema.Array(AuthoringSchemaCandidate).check(Schema.isMaxLength(100)),
 } as const;
 
 const ValidAuthoringSchemaPlan = Schema.Struct({
   ...AuthoringSchemaPlanBase,
   valid: Schema.Literal(true),
   planHash: SchemaPlanHash,
-  issues: Schema.Array(AuthoringSchemaValidationIssue).pipe(Schema.maxItems(50)),
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
+  issues: Schema.Array(AuthoringSchemaValidationIssue).check(Schema.isMaxLength(50)),
+}).annotate({ closedObject: true });
 
 const InvalidAuthoringSchemaPlan = Schema.Struct({
   ...AuthoringSchemaPlanBase,
   valid: Schema.Literal(false),
   planHash: Schema.Null,
-  issues: Schema.Array(AuthoringSchemaValidationIssue).pipe(
-    Schema.minItems(1),
-    Schema.maxItems(50),
+  issues: Schema.Array(AuthoringSchemaValidationIssue).check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(50),
   ),
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
+}).annotate({ closedObject: true });
 
-export const AuthoringSchemaPlan = Schema.Union(
+export const AuthoringSchemaPlan = Schema.Union([
   ValidAuthoringSchemaPlan,
   InvalidAuthoringSchemaPlan,
-).annotations({ identifier: "AuthoringSchemaPlan" });
+]).annotate({ identifier: "AuthoringSchemaPlan" });
 export type AuthoringSchemaPlan = typeof AuthoringSchemaPlan.Type;
 
-export const AcknowledgedAuthoringSchemaChangeIds = Schema.Array(SchemaChangeId).pipe(
-  Schema.maxItems(10_000),
-  Schema.filter((values) => new Set(values).size === values.length, {
-    message: () => "Acknowledged schema change IDs must be unique.",
+export const AcknowledgedAuthoringSchemaChangeIds = Schema.Array(SchemaChangeId).check(
+  Schema.isMaxLength(10_000),
+  Schema.makeFilter((values) => new Set(values).size === values.length, {
+    message: "Acknowledged schema change IDs must be unique.",
   }),
 );
 export type AcknowledgedAuthoringSchemaChangeIds = typeof AcknowledgedAuthoringSchemaChangeIds.Type;
@@ -161,9 +161,9 @@ export const AuthoringSchemaApplyRequest = Schema.Struct({
   expectedCurrent: AuthoringSchemaAuthority,
   expectedPlanHash: SchemaPlanHash,
   acknowledgedChangeIds: AcknowledgedAuthoringSchemaChangeIds,
-}).annotations({
+}).annotate({
   identifier: "AuthoringSchemaApplyRequest",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type AuthoringSchemaApplyRequest = typeof AuthoringSchemaApplyRequest.Type;
 
@@ -209,10 +209,10 @@ export class AuthoringSchemaExportResult extends Schema.Class<AuthoringSchemaExp
 )({
   project: AuthoringProjectSchemaDocument,
   current: AuthoringSchemaAuthority,
-  collections: Schema.Array(AppliedCollectionSourceIdentity).pipe(Schema.maxItems(100)),
-  fields: Schema.Array(AppliedFieldSourceIdentity).pipe(Schema.maxItems(10_000)),
-  enumOptions: Schema.Array(AppliedEnumOptionSourceIdentity).pipe(Schema.maxItems(10_000)),
-  revisions: Schema.Array(AppliedCollectionRevision).pipe(Schema.maxItems(100)),
+  collections: Schema.Array(AppliedCollectionSourceIdentity).check(Schema.isMaxLength(100)),
+  fields: Schema.Array(AppliedFieldSourceIdentity).check(Schema.isMaxLength(10_000)),
+  enumOptions: Schema.Array(AppliedEnumOptionSourceIdentity).check(Schema.isMaxLength(10_000)),
+  revisions: Schema.Array(AppliedCollectionRevision).check(Schema.isMaxLength(100)),
 }) {}
 
 export class AuthoringSchemaApplyResult extends Schema.Class<AuthoringSchemaApplyResult>(
@@ -222,10 +222,10 @@ export class AuthoringSchemaApplyResult extends Schema.Class<AuthoringSchemaAppl
   replayed: Schema.Boolean,
   noOp: Schema.Boolean,
   projectManifestHash: ProjectStructureManifestHash,
-  collections: Schema.Array(AppliedCollectionSourceIdentity).pipe(Schema.maxItems(100)),
-  fields: Schema.Array(AppliedFieldSourceIdentity).pipe(Schema.maxItems(10_000)),
-  enumOptions: Schema.Array(AppliedEnumOptionSourceIdentity).pipe(Schema.maxItems(10_000)),
-  revisions: Schema.Array(AppliedCollectionRevision).pipe(Schema.maxItems(100)),
+  collections: Schema.Array(AppliedCollectionSourceIdentity).check(Schema.isMaxLength(100)),
+  fields: Schema.Array(AppliedFieldSourceIdentity).check(Schema.isMaxLength(10_000)),
+  enumOptions: Schema.Array(AppliedEnumOptionSourceIdentity).check(Schema.isMaxLength(10_000)),
+  revisions: Schema.Array(AppliedCollectionRevision).check(Schema.isMaxLength(100)),
 }) {}
 
 export const AuthoringSchemaExportResponse = ApiSuccessSchema(AuthoringSchemaExportResult);

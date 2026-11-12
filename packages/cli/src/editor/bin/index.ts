@@ -127,7 +127,7 @@ async function readManagementTokenFromStdin(): Promise<string> {
 export async function runEditorCli(rawArguments: ReadonlyArray<string>) {
   const prepared = await Effect.runPromiseExit(prepareEditorCommand(rawArguments));
   if (prepared._tag === "Failure") {
-    const code = failureCode(Option.getOrUndefined(Cause.failureOption(prepared.cause)));
+    const code = failureCode(Option.getOrUndefined(Cause.findErrorOption(prepared.cause)));
     process.stderr.write(
       `The command failed (${code}). Fix local editor configuration or schema authority.\n`,
     );

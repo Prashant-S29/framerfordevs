@@ -1,5 +1,4 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import {
   AuthoringSchemaAuthority,
@@ -20,6 +19,7 @@ import {
   verifyAuthoringSchemaApply,
 } from "./index";
 
+import * as SchemaStrict from "../../schema-strict";
 const posts = CollectionSourceKey.make("posts");
 const revisionId = SchemaRevisionId.make("019fae8b-1234-7000-8000-000000000901");
 const planHash = SchemaPlanHash.make("a".repeat(64));
@@ -28,7 +28,7 @@ const current = AuthoringSchemaAuthority.make({
   projectManifestHash: ProjectStructureManifestHash.make("c".repeat(64)),
   revisionIds: { [posts]: revisionId },
 });
-const plan = Schema.decodeUnknownSync(AuthoringSchemaPlan)({
+const plan = SchemaStrict.decodeUnknownSync(AuthoringSchemaPlan)({
   valid: true,
   current,
   planHash,
@@ -47,7 +47,7 @@ const plan = Schema.decodeUnknownSync(AuthoringSchemaPlan)({
 });
 
 function acknowledgements(...ids: ReadonlyArray<SchemaChangeId>) {
-  return Schema.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)(ids);
+  return SchemaStrict.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)(ids);
 }
 
 describe("Authoring schema apply gate", () => {

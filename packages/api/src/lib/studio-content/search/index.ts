@@ -2,10 +2,9 @@
 
 import { createHash } from "node:crypto";
 
-import { Schema } from "effect";
-
 import { StudioContentSearchText } from "../../../contracts/studio-content";
 
+import * as SchemaStrict from "../../schema-strict";
 const likeEscapePattern = /[\\%_]/gu;
 
 export interface StudioSearchAuthority {
@@ -18,7 +17,7 @@ export interface StudioSearchAuthority {
 
 /** Produces canonical case-insensitive prefix authority and a log-safe cursor digest. */
 export function studioSearchAuthority(input: unknown): StudioSearchAuthority {
-  const normalized = Schema.decodeUnknownSync(StudioContentSearchText)(input);
+  const normalized = SchemaStrict.decodeUnknownSync(StudioContentSearchText)(input);
   const folded = normalized.toLocaleLowerCase("en-US");
   const escaped = folded.replace(likeEscapePattern, (value) => `\\${value}`);
   const databaseEscaped = normalized.replace(likeEscapePattern, (value) => `\\${value}`);

@@ -16,6 +16,7 @@ import {
   SchemaRevisionSequence,
 } from "../../schema";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 export class GetCollectionPresentationInput extends Schema.Class<GetCollectionPresentationInput>(
   "GetCollectionPresentationInput",
 )({
@@ -36,15 +37,15 @@ export class PublishCollectionPresentationInput extends Schema.Class<PublishColl
   presentation: AuthoringCollectionPresentation,
 }) {}
 
-export const CollectionPresentationOutputSchema = Schema.standardSchemaV1(
+export const CollectionPresentationOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(AuthoringPresentationSnapshot),
 );
-export const PublishCollectionPresentationOutputSchema = Schema.standardSchemaV1(
+export const PublishCollectionPresentationOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(AuthoringPublishPresentationResult),
 );
-export const GetCollectionPresentationInputSchema = Schema.standardSchemaV1(
+export const GetCollectionPresentationInputSchema = SchemaStrict.toStandardSchemaV1(
   GetCollectionPresentationInput,
 );
-export const PublishCollectionPresentationInputSchema = Schema.standardSchemaV1(
+export const PublishCollectionPresentationInputSchema = SchemaStrict.toStandardSchemaV1(
   PublishCollectionPresentationInput,
 );

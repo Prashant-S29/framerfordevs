@@ -14,6 +14,7 @@ import { parseArguments, stringFlag, validateFlags } from "../../command-argumen
 import { CliConfigFileSystemLive, loadCliConfig } from "../../config";
 import type { CliConfigV2 } from "../../schema";
 
+import * as SchemaStrict from "../../schema-strict";
 const maximumMutationBytes = 1_048_576;
 export type ContentCommand =
   | "entry list"
@@ -114,9 +115,9 @@ async function readMutations(
   }
   try {
     const mutationsSchema = requireItems
-      ? Schema.Array(AuthoringMutationSchema).pipe(Schema.minItems(1), Schema.maxItems(500))
-      : Schema.Array(AuthoringMutationSchema).pipe(Schema.maxItems(500));
-    return Schema.decodeUnknownSync(mutationsSchema)(value, { onExcessProperty: "error" });
+      ? Schema.Array(AuthoringMutationSchema).check(Schema.isMinLength(1), Schema.isMaxLength(500))
+      : Schema.Array(AuthoringMutationSchema).check(Schema.isMaxLength(500));
+    return SchemaStrict.decodeUnknownSync(mutationsSchema)(value, { onExcessProperty: "error" });
   } catch {
     throw new Error("CLI_MUTATION_FILE_INVALID");
   }
@@ -213,7 +214,7 @@ export async function runContentCli(rawArguments: ReadonlyArray<string>) {
   const json = rawArguments.includes("--json");
   const prepared = await Effect.runPromiseExit(prepareContentCommand(rawArguments));
   if (prepared._tag === "Failure") {
-    const code = failureCode(Option.getOrUndefined(Cause.failureOption(prepared.cause)));
+    const code = failureCode(Option.getOrUndefined(Cause.findErrorOption(prepared.cause)));
     process.stderr.write(
       json
         ? `${JSON.stringify({ ok: false, code })}\n`

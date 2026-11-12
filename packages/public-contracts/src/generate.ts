@@ -46,7 +46,7 @@ for (const artifact of generatePublicArtifacts()) {
     readFile(baselinePath, "utf8"),
   ]);
   if (output !== artifact.bytes) throw new Error(`${artifact.key}: generated artifact drift`);
-  if (baseline !== artifact.bytes) throw new Error(`${artifact.key}: released v1 baseline drift`);
+  if (baseline !== artifact.bytes) throw new Error(`${artifact.key}: released baseline drift`);
   if (entry.baselineDigest !== artifact.digest) {
     throw new Error(`${artifact.key}: registry baseline digest drift`);
   }

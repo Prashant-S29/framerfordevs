@@ -824,7 +824,7 @@ describe("Preview HTTP isolation", () => {
   });
 });
 
-describe.sequential("Better Auth foundation", () => {
+describe("Better Auth foundation", () => {
   it("uses environment-appropriate cookie defaults", () => {
     expect(getDefaultCookieAttributes("development")).toEqual({
       sameSite: "lax",
@@ -1104,7 +1104,7 @@ describe.sequential("Better Auth foundation", () => {
   });
 });
 
-describe.sequential("official CLI OAuth device authorization", () => {
+describe("official CLI OAuth device authorization", () => {
   it("keeps every device endpoint absent while the rollout flag is disabled", async () => {
     const response = await request(app)
       .post("/api/auth/device/code")

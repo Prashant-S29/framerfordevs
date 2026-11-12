@@ -4,7 +4,7 @@ import { link, open, lstat, mkdir, readFile, realpath, rm, writeFile } from "nod
 import { dirname, join, relative, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import { canonicalJsonBytes, toJsonValue } from "../canonical";
 import { CliRetryJournalConflictError, CliRetryJournalError } from "../errors";
@@ -17,6 +17,7 @@ import {
   type ControlPlaneMutationOperation,
 } from "../schema";
 
+import * as SchemaStrict from "../schema-strict";
 const relativePath = ".framerfordevs/retry/schema-apply.json";
 const contentRelativePath = ".framerfordevs/retry/content-command.json";
 const presentationRelativePath = ".framerfordevs/retry/presentation-publish.json";
@@ -39,7 +40,7 @@ async function readExisting(path: string) {
       throw CliRetryJournalConflictError.make();
     }
     const value: unknown = JSON.parse(await readFile(path, "utf8"));
-    return Schema.decodeUnknownSync(SchemaMutationRetryJournal)(value, {
+    return SchemaStrict.decodeUnknownSync(SchemaMutationRetryJournal)(value, {
       onExcessProperty: "error",
     });
   } catch (cause) {
@@ -128,7 +129,7 @@ async function readExistingControlPlane(path: string) {
       throw CliRetryJournalConflictError.make();
     }
     const value: unknown = JSON.parse(await readFile(path, "utf8"));
-    return Schema.decodeUnknownSync(ControlPlaneMutationRetryJournal)(value, {
+    return SchemaStrict.decodeUnknownSync(ControlPlaneMutationRetryJournal)(value, {
       onExcessProperty: "error",
     });
   } catch (cause) {
@@ -251,7 +252,7 @@ async function readExistingContent(path: string) {
       throw CliRetryJournalConflictError.make();
     }
     const value: unknown = JSON.parse(await readFile(path, "utf8"));
-    return Schema.decodeUnknownSync(ContentMutationRetryJournal)(value, {
+    return SchemaStrict.decodeUnknownSync(ContentMutationRetryJournal)(value, {
       onExcessProperty: "error",
     });
   } catch (cause) {
@@ -383,7 +384,7 @@ async function readExistingPresentation(path: string) {
       throw CliRetryJournalConflictError.make();
     }
     const value: unknown = JSON.parse(await readFile(path, "utf8"));
-    return Schema.decodeUnknownSync(PresentationMutationRetryJournal)(value, {
+    return SchemaStrict.decodeUnknownSync(PresentationMutationRetryJournal)(value, {
       onExcessProperty: "error",
     });
   } catch (cause) {

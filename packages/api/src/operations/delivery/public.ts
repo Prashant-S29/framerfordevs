@@ -24,12 +24,13 @@ import {
 } from "../../services/delivery/read-repository";
 import { RateLimitManager } from "../../services/rate-limit/manager";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const bearerPattern = /^Bearer ([^\s,]+)$/u;
-const DeliveryEnvironmentKey = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(63),
-  Schema.pattern(/^[a-z][a-z0-9-]{0,62}$/u),
-  Schema.filter((value) => !value.includes("--") && !value.endsWith("-")),
+const DeliveryEnvironmentKey = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(63),
+  Schema.isPattern(/^[a-z][a-z0-9-]{0,62}$/u),
+  Schema.makeFilter((value) => !value.includes("--") && !value.endsWith("-")),
 );
 
 function lookupExpansion(
@@ -83,17 +84,19 @@ export function makeDeliveryRouteScope(input: {
     if (locale === undefined) {
       return yield* fail("locale", "locale_invalid", "Use a supported canonical locale tag.");
     }
-    const projectId = yield* Schema.decodeUnknown(ProjectId)(input.projectId).pipe(
+    const projectId = yield* SchemaStrict.decodeUnknownEffect(ProjectId)(input.projectId).pipe(
       Effect.mapError(() => fail("projectId", "project_id_invalid", "Use a valid project ID.")),
     );
-    const environmentKey = yield* Schema.decodeUnknown(DeliveryEnvironmentKey)(
+    const environmentKey = yield* SchemaStrict.decodeUnknownEffect(DeliveryEnvironmentKey)(
       input.environmentKey,
     ).pipe(
       Effect.mapError(() =>
         fail("environmentKey", "environment_key_invalid", "Use a valid environment key."),
       ),
     );
-    const collectionKey = yield* Schema.decodeUnknown(CollectionApiKey)(input.collectionKey).pipe(
+    const collectionKey = yield* SchemaStrict.decodeUnknownEffect(CollectionApiKey)(
+      input.collectionKey,
+    ).pipe(
       Effect.mapError(() =>
         fail("collectionKey", "collection_key_invalid", "Use a valid collection key."),
       ),
@@ -122,7 +125,7 @@ export const authenticateDeliveryRequest = Effect.fn("delivery.public.authentica
 ) {
   if (authorization === null) {
     if (scope.access === "protected") return yield* UnauthorizedFailure.make();
-    return yield* Schema.decodeUnknown(DeliveryAccessPrincipal)({
+    return yield* SchemaStrict.decodeUnknownEffect(DeliveryAccessPrincipal)({
       kind: "anonymous",
       credentialId: null,
     }).pipe(Effect.mapError(() => CredentialInvalidFailure.make()));
@@ -139,7 +142,7 @@ export const authenticateDeliveryRequest = Effect.fn("delivery.public.authentica
     environmentId: scope.environmentId,
     source,
   });
-  return yield* Schema.decodeUnknown(DeliveryAccessPrincipal)({
+  return yield* SchemaStrict.decodeUnknownEffect(DeliveryAccessPrincipal)({
     kind: "credential",
     credentialId: principal.credentialId,
   }).pipe(Effect.mapError(() => CredentialInvalidFailure.make()));
@@ -186,7 +189,7 @@ export const getCurrentDeliveryEntry = Effect.fn("delivery.public.entry.current"
   principal: DeliveryAccessPrincipal,
 ) {
   const requestedPaths = yield* lookupExpansion(rawQuery, false);
-  const entryId = yield* Schema.decodeUnknown(EntryId)(rawEntryId).pipe(
+  const entryId = yield* SchemaStrict.decodeUnknownEffect(EntryId)(rawEntryId).pipe(
     Effect.mapError(() =>
       DeliveryQueryInvalidFailure.make({
         details: [
@@ -227,7 +230,7 @@ export const getUniqueDeliveryEntry = Effect.fn("delivery.public.entry.unique")(
       ],
     });
   }
-  const fieldKey = yield* Schema.decodeUnknown(CollectionApiKey)(rawFieldKey).pipe(
+  const fieldKey = yield* SchemaStrict.decodeUnknownEffect(CollectionApiKey)(rawFieldKey).pipe(
     Effect.mapError(() =>
       DeliveryQueryInvalidFailure.make({
         details: [
@@ -258,8 +261,8 @@ export const getImmutableDeliveryEntry = Effect.fn("delivery.public.entry.immuta
 ) {
   const requestedPaths = yield* lookupExpansion(rawQuery, false);
   const [entryId, publicationId] = yield* Effect.all([
-    Schema.decodeUnknown(EntryId)(rawEntryId),
-    Schema.decodeUnknown(EntryPublicationId)(rawPublicationId),
+    SchemaStrict.decodeUnknownEffect(EntryId)(rawEntryId),
+    SchemaStrict.decodeUnknownEffect(EntryPublicationId)(rawPublicationId),
   ]).pipe(
     Effect.mapError(() =>
       DeliveryQueryInvalidFailure.make({

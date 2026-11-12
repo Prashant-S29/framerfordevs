@@ -1,6 +1,6 @@
 import { Worker } from "node:worker_threads";
 
-import { Effect, Either, Schema } from "effect";
+import { Effect, Result } from "effect";
 
 import {
   StaticSchemaExtractionError,
@@ -10,6 +10,7 @@ import {
 import type { ExtractedStaticProjectSchema, StaticSchemaExtractionInput } from "./static-extractor";
 import { staticSchemaExtractorLimits } from "./static-extractor";
 import { StaticSchemaWorkerInput, StaticSchemaWorkerResponse } from "./static-extractor/protocol";
+import * as SchemaStrict from "../schema-strict";
 export {
   validateStaticProjectSchema,
   type StaticSchemaValidationIssue,
@@ -46,11 +47,11 @@ function extractionError(
 export const extractStaticProjectSchema = Effect.fn("cli.schema.extract.static")(function* (
   input: StaticSchemaExtractionInput,
 ) {
-  const validatedInput = yield* Schema.decodeUnknown(StaticSchemaWorkerInput)(input).pipe(
-    Effect.mapError(() => extractionError("entry_invalid")),
-  );
+  const validatedInput = yield* SchemaStrict.decodeUnknownEffect(StaticSchemaWorkerInput)(
+    input,
+  ).pipe(Effect.mapError(() => extractionError("entry_invalid")));
 
-  return yield* Effect.async<ExtractedStaticProjectSchema, StaticSchemaExtractionError>(
+  return yield* Effect.callback<ExtractedStaticProjectSchema, StaticSchemaExtractionError>(
     (resume) => {
       let settled = false;
       const worker = new Worker(workerUrl(), {
@@ -84,12 +85,12 @@ export const extractStaticProjectSchema = Effect.fn("cli.schema.extract.static")
       );
 
       worker.once("message", (message: unknown) => {
-        const decoded = Schema.decodeUnknownEither(StaticSchemaWorkerResponse)(message);
-        if (Either.isLeft(decoded)) {
+        const decoded = SchemaStrict.decodeUnknownResult(StaticSchemaWorkerResponse)(message);
+        if (Result.isFailure(decoded)) {
           finish(Effect.fail(extractionError("worker_protocol_invalid")));
           return;
         }
-        const response = decoded.right;
+        const response = decoded.success;
         if (!response.ok) {
           finish(
             Effect.fail(

@@ -1,4 +1,3 @@
-import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { ProjectRole } from "../../../contracts/access";
@@ -32,20 +31,23 @@ import {
   studioResource,
 } from "./index";
 
-const registrationId = Schema.decodeUnknownSync(StudioRegistrationId)(
+import * as SchemaStrict from "../../schema-strict";
+const registrationId = SchemaStrict.decodeUnknownSync(StudioRegistrationId)(
   "019fae8b-1234-7000-8000-000000000001",
 );
-const projectId = Schema.decodeUnknownSync(ProjectId)("019fae8b-1234-7000-8000-000000000002");
-const environmentId = Schema.decodeUnknownSync(EnvironmentId)(
+const projectId = SchemaStrict.decodeUnknownSync(ProjectId)("019fae8b-1234-7000-8000-000000000002");
+const environmentId = SchemaStrict.decodeUnknownSync(EnvironmentId)(
   "019fae8b-1234-7000-8000-000000000003",
 );
-const userId = Schema.decodeUnknownSync(AuthUserId)("studio-user");
-const grantId = Schema.decodeUnknownSync(StudioGrantId)("019fae8b-1234-7000-8000-000000000004");
-const version = Schema.decodeUnknownSync(ResourceVersion)(3);
-const applicationOrigin = Schema.decodeUnknownSync(StudioApplicationOrigin)(
+const userId = SchemaStrict.decodeUnknownSync(AuthUserId)("studio-user");
+const grantId = SchemaStrict.decodeUnknownSync(StudioGrantId)(
+  "019fae8b-1234-7000-8000-000000000004",
+);
+const version = SchemaStrict.decodeUnknownSync(ResourceVersion)(3);
+const applicationOrigin = SchemaStrict.decodeUnknownSync(StudioApplicationOrigin)(
   "https://application.example.test",
 );
-const mountPath = Schema.decodeUnknownSync(StudioMountPath)("/admin/content/studio");
+const mountPath = SchemaStrict.decodeUnknownSync(StudioMountPath)("/admin/content/studio");
 
 const registration = {
   id: registrationId,
@@ -80,7 +82,7 @@ function currentAuthority() {
     audience: "https://api.example.test/api/studio/v1",
     registrationId,
     registrationVersion: version,
-    runtimeStatus: Schema.decodeUnknownSync(StudioRuntimeStatus)("active"),
+    runtimeStatus: SchemaStrict.decodeUnknownSync(StudioRuntimeStatus)("active"),
     projectId,
     environmentId,
     userId,
@@ -127,8 +129,8 @@ describe("Studio authority kernel", () => {
 
   it("composes canonical HTTPS and loopback callbacks without prefix matching", () => {
     const loopbackOrigin =
-      Schema.decodeUnknownSync(StudioApplicationOrigin)("http://127.0.0.1:43210");
-    const loopbackMount = Schema.decodeUnknownSync(StudioMountPath)("/studio");
+      SchemaStrict.decodeUnknownSync(StudioApplicationOrigin)("http://127.0.0.1:43210");
+    const loopbackMount = SchemaStrict.decodeUnknownSync(StudioMountPath)("/studio");
 
     expect(studioCallbackUri(applicationOrigin, mountPath)).toBe(
       "https://application.example.test/admin/content/studio/auth/callback",
@@ -142,7 +144,7 @@ describe("Studio authority kernel", () => {
   });
 
   it("projects only bounded acknowledgement labels and shell actions", () => {
-    const projectName = Schema.decodeUnknownSync(ProjectName)("Customer Site");
+    const projectName = SchemaStrict.decodeUnknownSync(ProjectName)("Customer Site");
     const projection = studioConsentProjection({
       registrationId,
       registrationVersion: version,
@@ -158,11 +160,11 @@ describe("Studio authority kernel", () => {
       projectName: "Customer Site",
       applicationOrigin: "https://application.example.test",
     });
-    expect(projectStudioActions(Schema.decodeUnknownSync(ProjectRole)("owner"))).toEqual([
+    expect(projectStudioActions(SchemaStrict.decodeUnknownSync(ProjectRole)("owner"))).toEqual([
       "project.read",
       "project.update",
     ]);
-    expect(projectStudioActions(Schema.decodeUnknownSync(ProjectRole)("editor"))).toEqual([
+    expect(projectStudioActions(SchemaStrict.decodeUnknownSync(ProjectRole)("editor"))).toEqual([
       "project.read",
     ]);
   });
@@ -191,14 +193,14 @@ describe("Studio authority kernel", () => {
       ["audience_mismatch", { audience: "https://api.example.test/api/tooling/v1" }],
       [
         "registration_inactive",
-        { runtimeStatus: Schema.decodeUnknownSync(StudioRuntimeStatus)("inactive") },
+        { runtimeStatus: SchemaStrict.decodeUnknownSync(StudioRuntimeStatus)("inactive") },
       ],
       ["registration_version_mismatch", { registrationVersion: ResourceVersion.make(4) }],
       ["project_mismatch", { projectActive: false }],
       [
         "environment_mismatch",
         {
-          environmentId: Schema.decodeUnknownSync(EnvironmentId)(
+          environmentId: SchemaStrict.decodeUnknownSync(EnvironmentId)(
             "019fae8b-1234-7000-8000-000000000099",
           ),
         },

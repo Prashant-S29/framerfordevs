@@ -17,10 +17,10 @@ export function makeStudioOAuthTokenVerifier(
   };
 }
 
-export class StudioOAuthTokenVerifier extends Context.Tag("StudioOAuthTokenVerifier")<
+export class StudioOAuthTokenVerifier extends Context.Service<
   StudioOAuthTokenVerifier,
   ReturnType<typeof makeStudioOAuthTokenVerifier>
->() {}
+>()("StudioOAuthTokenVerifier") {}
 
 export const StudioOAuthTokenVerifierLive = Layer.succeed(
   StudioOAuthTokenVerifier,

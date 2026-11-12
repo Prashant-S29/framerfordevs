@@ -18,13 +18,13 @@ import { ContractHash, SchemaRevisionId } from "../../schema";
 export class AuthoringPublicationIssue extends Schema.Class<AuthoringPublicationIssue>(
   "AuthoringPublicationIssue",
 )({
-  path: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
-  code: Schema.String.pipe(
-    Schema.minLength(1),
-    Schema.maxLength(64),
-    Schema.pattern(/^[a-z][a-z0-9_]{0,63}$/u),
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  code: Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(64),
+    Schema.isPattern(/^[a-z][a-z0-9_]{0,63}$/u),
   ),
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
 export class AuthoringPublicationSummary extends Schema.Class<AuthoringPublicationSummary>(
@@ -53,7 +53,7 @@ export class AuthoringPublicationStatus extends Schema.Class<AuthoringPublicatio
 )({
   entryId: EntryId,
   locale: LocaleTag,
-  state: Schema.Literal("published", "unpublished"),
+  state: Schema.Literals(["published", "unpublished"]),
   stateVersion: EntryPublicationStateVersion,
   currentPublication: Schema.NullOr(AuthoringPublicationSummary),
   currentSchemaRevisionId: SchemaRevisionId,
@@ -82,7 +82,7 @@ export class AuthoringPublicationPlan extends Schema.Class<AuthoringPublicationP
   localizedRevisionId: Schema.NullOr(EntryRevisionId),
   localizedVersion: EntryDraftVersion,
   valid: Schema.Boolean,
-  issues: Schema.Array(AuthoringPublicationIssue).pipe(Schema.maxItems(50)),
+  issues: Schema.Array(AuthoringPublicationIssue).check(Schema.isMaxLength(50)),
   capped: Schema.Boolean,
   contentHash: Schema.NullOr(EntryPublicationHash),
   authorityHash: Schema.NullOr(EntryPublicationHash),
@@ -121,9 +121,9 @@ export const AuthoringPublishEntryRequest = Schema.Struct({
   expectedSharedRevisionId: Schema.NullOr(EntryRevisionId),
   expectedLocalizedVersion: EntryDraftVersion,
   expectedLocalizedRevisionId: Schema.NullOr(EntryRevisionId),
-}).annotations({
+}).annotate({
   identifier: "AuthoringPublishEntryRequest",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type AuthoringPublishEntryRequest = typeof AuthoringPublishEntryRequest.Type;
 
@@ -131,9 +131,9 @@ export const AuthoringUnpublishEntryRequest = Schema.Struct({
   commandId: EntryCommandId,
   expectedStateVersion: EntryPublicationStateVersion,
   expectedPublicationId: Schema.NullOr(EntryPublicationId),
-}).annotations({
+}).annotate({
   identifier: "AuthoringUnpublishEntryRequest",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type AuthoringUnpublishEntryRequest = typeof AuthoringUnpublishEntryRequest.Type;
 
@@ -144,7 +144,7 @@ export class AuthoringPublishEntryResult extends Schema.Class<AuthoringPublishEn
   locale: LocaleTag,
   commandId: EntryCommandId,
   stateVersion: EntryPublicationStateVersion,
-  resultKind: Schema.Literal("changed", "no_op"),
+  resultKind: Schema.Literals(["changed", "no_op"]),
   publication: AuthoringPublicationSummary,
 }) {}
 
@@ -155,7 +155,7 @@ export class AuthoringUnpublishEntryResult extends Schema.Class<AuthoringUnpubli
   locale: LocaleTag,
   commandId: EntryCommandId,
   stateVersion: EntryPublicationStateVersion,
-  resultKind: Schema.Literal("changed", "no_op"),
+  resultKind: Schema.Literals(["changed", "no_op"]),
   unpublishedPublicationId: Schema.NullOr(EntryPublicationId),
   unpublishedPublicationSequence: Schema.NullOr(EntryPublicationSequence),
   unpublishedAt: IsoDateTime,

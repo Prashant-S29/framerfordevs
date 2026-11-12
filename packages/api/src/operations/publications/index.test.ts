@@ -1,7 +1,7 @@
 // Verifies all M8 workflows forward through replaceable repository and telemetry services.
 
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer } from "effect";
 
 import {
   EntryPublicationPage,
@@ -29,6 +29,7 @@ import {
   validateEntryPublication,
 } from "./index";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const ids = {
   project: "019fae8b-1234-7000-8000-000000000001",
   environment: "019fae8b-1234-7000-8000-000000000002",
@@ -55,7 +56,7 @@ const size = {
   maximumBytes: 1_048_576,
   bucket: "small",
 };
-const summary = Schema.decodeUnknownSync(EntryPublicationSummary)({
+const summary = SchemaStrict.decodeUnknownSync(EntryPublicationSummary)({
   id: ids.publication,
   snapshotId: ids.publication,
   entryId: ids.entry,
@@ -78,7 +79,7 @@ const summary = Schema.decodeUnknownSync(EntryPublicationSummary)({
   publishedAt: timestamp,
   current: true,
 });
-const status = Schema.decodeUnknownSync(EntryPublicationStatus)({
+const status = SchemaStrict.decodeUnknownSync(EntryPublicationStatus)({
   entryId: ids.entry,
   localeId: ids.locale,
   locale: "en",
@@ -96,7 +97,7 @@ const status = Schema.decodeUnknownSync(EntryPublicationStatus)({
   schemaChanged: false,
   changedSincePublication: false,
 });
-const plan = Schema.decodeUnknownSync(EntryPublicationPlan)({
+const plan = SchemaStrict.decodeUnknownSync(EntryPublicationPlan)({
   entryId: ids.entry,
   localeId: ids.locale,
   locale: "en",
@@ -118,7 +119,7 @@ const plan = Schema.decodeUnknownSync(EntryPublicationPlan)({
   referencesWouldRefresh: false,
   wouldCreatePublication: false,
 });
-const publishResult = Schema.decodeUnknownSync(PublishEntryResult)({
+const publishResult = SchemaStrict.decodeUnknownSync(PublishEntryResult)({
   entryId: ids.entry,
   localeId: ids.locale,
   locale: "en",
@@ -127,7 +128,7 @@ const publishResult = Schema.decodeUnknownSync(PublishEntryResult)({
   resultKind: "no_op",
   publication: summary,
 });
-const unpublishResult = Schema.decodeUnknownSync(UnpublishEntryResult)({
+const unpublishResult = SchemaStrict.decodeUnknownSync(UnpublishEntryResult)({
   entryId: ids.entry,
   localeId: ids.locale,
   locale: "en",
@@ -185,15 +186,15 @@ describe("publication operations", () => {
         metrics.length = 0;
         yield* getEntryPublicationStatus(
           "user-1",
-          yield* Schema.decodeUnknown(GetEntryPublicationStatusInput)(scope),
+          yield* SchemaStrict.decodeUnknownEffect(GetEntryPublicationStatusInput)(scope),
         );
         yield* validateEntryPublication(
           "user-1",
-          yield* Schema.decodeUnknown(ValidateEntryPublicationInput)(scope),
+          yield* SchemaStrict.decodeUnknownEffect(ValidateEntryPublicationInput)(scope),
         );
         yield* publishEntryLocale(
           "user-1",
-          yield* Schema.decodeUnknown(PublishEntryInput)({
+          yield* SchemaStrict.decodeUnknownEffect(PublishEntryInput)({
             ...scope,
             commandId: ids.command,
             authorityHash: hash,
@@ -210,7 +211,7 @@ describe("publication operations", () => {
         );
         yield* unpublishEntryLocale(
           "user-1",
-          yield* Schema.decodeUnknown(UnpublishEntryInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UnpublishEntryInput)({
             ...scope,
             commandId: ids.command,
             expectedStateVersion: 1,
@@ -220,7 +221,7 @@ describe("publication operations", () => {
         );
         yield* listEntryPublications(
           "user-1",
-          yield* Schema.decodeUnknown(ListEntryPublicationsInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListEntryPublicationsInput)({
             ...scope,
             cursor: null,
             limit: 25,

@@ -12,6 +12,7 @@ import {
   ToolingSuccessResponse,
 } from "../schema";
 
+import * as SchemaStrict from "../schema-strict";
 const maximumResponseBytes = 1_572_864;
 const maximumTokenBytes = 16_384;
 const defaultTimeoutMs = 15_000;
@@ -82,7 +83,7 @@ export function makeToolingHttpClient(options: ToolingHttpClientOptions) {
 
   const request = <A, I>(
     path: string,
-    dataSchema: Schema.Schema<A, I, never>,
+    dataSchema: Schema.Codec<A, I, never>,
     requestOptions: ToolingRequestOptions = {},
   ) =>
     Effect.gen(function* () {
@@ -118,7 +119,7 @@ export function makeToolingHttpClient(options: ToolingHttpClientOptions) {
         catch: (cause) => transportError("tooling.response.json", cause),
       });
       if (response.ok) {
-        const success = yield* Schema.decodeUnknown(ToolingSuccessResponse(dataSchema))(
+        const success = yield* SchemaStrict.decodeUnknownEffect(ToolingSuccessResponse(dataSchema))(
           unknownBody,
           { onExcessProperty: "error" },
         ).pipe(
@@ -126,7 +127,7 @@ export function makeToolingHttpClient(options: ToolingHttpClientOptions) {
         );
         return success.data;
       }
-      const failure = yield* Schema.decodeUnknown(ToolingFailureResponse)(unknownBody, {
+      const failure = yield* SchemaStrict.decodeUnknownEffect(ToolingFailureResponse)(unknownBody, {
         onExcessProperty: "error",
       }).pipe(Effect.mapError((cause) => transportError("tooling.response.decode_failure", cause)));
       return yield* ToolingHttpError.make({
@@ -185,7 +186,7 @@ export function makeToolingHttpClient(options: ToolingHttpClientOptions) {
   };
 }
 
-export class ToolingHttpClient extends Context.Tag("ToolingHttpClient")<
+export class ToolingHttpClient extends Context.Service<
   ToolingHttpClient,
   ReturnType<typeof makeToolingHttpClient>
->() {}
+>()("ToolingHttpClient") {}

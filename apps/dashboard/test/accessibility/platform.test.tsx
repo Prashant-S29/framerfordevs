@@ -24,7 +24,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
-import { Schema } from "effect";
+
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -54,7 +54,8 @@ import {
 } from "@/components/webhook-controls";
 import { orpc } from "@/utils/orpc";
 
-const locale = Schema.decodeUnknownSync(ProjectLocale)({
+import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
+const locale = SchemaStrict.decodeUnknownSync(ProjectLocale)({
   id: "019fae8b-1234-7000-8000-000000000004",
   workspaceId: "019fae8b-1234-7000-8000-000000000002",
   projectId: "019fae8b-1234-7000-8000-000000000001",
@@ -67,7 +68,7 @@ const locale = Schema.decodeUnknownSync(ProjectLocale)({
   updatedAt: "2026-07-29T00:00:00.000Z",
 });
 
-const hindiLocale = Schema.decodeUnknownSync(ProjectLocale)({
+const hindiLocale = SchemaStrict.decodeUnknownSync(ProjectLocale)({
   ...locale,
   id: "019fae8b-1234-7000-8000-000000000005",
   tag: "hi",
@@ -75,7 +76,7 @@ const hindiLocale = Schema.decodeUnknownSync(ProjectLocale)({
   position: 1,
 });
 
-const member = Schema.decodeUnknownSync(ProjectMember)({
+const member = SchemaStrict.decodeUnknownSync(ProjectMember)({
   id: "019fae8b-1234-7000-8000-000000000006",
   projectId: "019fae8b-1234-7000-8000-000000000001",
   userId: "accessible-user",
@@ -89,7 +90,7 @@ const member = Schema.decodeUnknownSync(ProjectMember)({
   updatedAt: "2026-07-29T00:00:00.000Z",
 });
 
-const acceptedInvitation = Schema.decodeUnknownSync(ProjectInvitation)({
+const acceptedInvitation = SchemaStrict.decodeUnknownSync(ProjectInvitation)({
   id: "019fae8b-1234-7000-8000-000000000007",
   projectId: "019fae8b-1234-7000-8000-000000000001",
   email: "accepted@example.test",
@@ -104,7 +105,7 @@ const acceptedInvitation = Schema.decodeUnknownSync(ProjectInvitation)({
   updatedAt: "2026-09-16T00:00:00.000Z",
 });
 
-const project = Schema.decodeUnknownSync(Project)({
+const project = SchemaStrict.decodeUnknownSync(Project)({
   id: "019fae8b-1234-7000-8000-000000000001",
   workspaceId: "019fae8b-1234-7000-8000-000000000002",
   name: "Accessible project",
@@ -126,7 +127,7 @@ const project = Schema.decodeUnknownSync(Project)({
   capabilities: [],
 });
 
-const webhookEndpoint = Schema.decodeUnknownSync(WebhookEndpoint)({
+const webhookEndpoint = SchemaStrict.decodeUnknownSync(WebhookEndpoint)({
   id: "019fae8b-1234-7000-8000-000000000071",
   projectId: project.id,
   environmentId: project.environment.id,
@@ -145,7 +146,7 @@ const webhookEndpoint = Schema.decodeUnknownSync(WebhookEndpoint)({
   updatedAt: "2026-08-12T00:00:00.000Z",
 });
 
-const collectionDraft = Schema.decodeUnknownSync(CollectionDraftSchema)({
+const collectionDraft = SchemaStrict.decodeUnknownSync(CollectionDraftSchema)({
   formatVersion: 2,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
@@ -235,7 +236,7 @@ describe("platform management accessibility", () => {
   it("has accessible project restoration semantics", async () => {
     renderWithQueryClient(
       <RestoreProjectDialog
-        project={Schema.decodeUnknownSync(Project)({
+        project={SchemaStrict.decodeUnknownSync(Project)({
           ...project,
           version: 2,
           archivedAt: "2026-08-14T00:00:00.000Z",
@@ -247,7 +248,7 @@ describe("platform management accessibility", () => {
 
   it("has accessible Studio registration and runtime semantics", async () => {
     const queryClient = new QueryClient();
-    const registration = Schema.decodeUnknownSync(StudioRegistration)({
+    const registration = SchemaStrict.decodeUnknownSync(StudioRegistration)({
       id: "019fae8b-1234-7000-8000-000000000009",
       projectId: project.id,
       environmentId: project.environment.id,
@@ -483,7 +484,7 @@ describe("platform management accessibility", () => {
 
   it("keeps one-time invitation tokens out of the mutation cache and clears the dialog copy", async () => {
     const token = "t".repeat(43);
-    const issued = Schema.decodeUnknownSync(IssuedProjectInvitation)({
+    const issued = SchemaStrict.decodeUnknownSync(IssuedProjectInvitation)({
       invitation: {
         id: "019fae8b-1234-7000-8000-000000000099",
         projectId: project.id,
@@ -540,7 +541,7 @@ describe("platform management accessibility", () => {
   });
 
   it("warns that legacy non-expiring Preview credentials fail closed", async () => {
-    const credential = Schema.decodeUnknownSync(ApiCredential)({
+    const credential = SchemaStrict.decodeUnknownSync(ApiCredential)({
       id: "019fae8b-1234-7000-8000-000000000099",
       workspaceId: project.workspaceId,
       projectId: project.id,
@@ -567,7 +568,7 @@ describe("platform management accessibility", () => {
   });
 
   it("has accessible staged credential rotation and pending-state recovery semantics", async () => {
-    const baseCredential = Schema.decodeUnknownSync(ApiCredential)({
+    const baseCredential = SchemaStrict.decodeUnknownSync(ApiCredential)({
       id: "019fae8b-1234-7000-8000-000000000091",
       workspaceId: project.workspaceId,
       projectId: project.id,
@@ -585,7 +586,7 @@ describe("platform management accessibility", () => {
       createdAt: "2026-09-16T00:00:00.000Z",
       updatedAt: "2026-09-16T00:00:00.000Z",
     });
-    const pendingRotation = Schema.decodeUnknownSync(ApiCredentialRotation)({
+    const pendingRotation = SchemaStrict.decodeUnknownSync(ApiCredentialRotation)({
       id: "019fae8b-1234-7000-8000-000000000092",
       projectId: project.id,
       environmentId: project.environment.id,
@@ -615,7 +616,7 @@ describe("platform management accessibility", () => {
     expect((await axe.run(await screen.findByRole("alertdialog"))).violations).toEqual([]);
     pending.unmount();
 
-    const overlapRotation = Schema.decodeUnknownSync(ApiCredentialRotation)({
+    const overlapRotation = SchemaStrict.decodeUnknownSync(ApiCredentialRotation)({
       ...pendingRotation,
       status: "overlap",
       version: 2,
@@ -715,7 +716,7 @@ describe("platform management accessibility", () => {
       maximumBytes: 1_048_576,
       bucket: "small",
     };
-    const summary = Schema.decodeUnknownSync(EntryPublicationSummary)({
+    const summary = SchemaStrict.decodeUnknownSync(EntryPublicationSummary)({
       id: publicationId,
       snapshotId: publicationId,
       entryId: scope.entryId,
@@ -738,7 +739,7 @@ describe("platform management accessibility", () => {
       publishedAt: "2026-08-09T12:00:00.000Z",
       current: true,
     });
-    const status = Schema.decodeUnknownSync(EntryPublicationStatus)({
+    const status = SchemaStrict.decodeUnknownSync(EntryPublicationStatus)({
       entryId: scope.entryId,
       localeId: locale.id,
       locale: scope.locale,
@@ -756,7 +757,7 @@ describe("platform management accessibility", () => {
       schemaChanged: false,
       changedSincePublication: false,
     });
-    const plan = Schema.decodeUnknownSync(EntryPublicationPlan)({
+    const plan = SchemaStrict.decodeUnknownSync(EntryPublicationPlan)({
       entryId: scope.entryId,
       localeId: locale.id,
       locale: scope.locale,

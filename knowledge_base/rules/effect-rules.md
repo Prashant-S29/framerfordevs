@@ -1,6 +1,6 @@
 # Effect Rules
 
-- Use stable Effect v3 until an explicit approved decision changes the version.
+- Use Effect 4.1 as recorded in `knowledge_base/decisions/effect-v4-and-dependency-security-upgrade.md`.
 - Business workflows return `Effect<A, E, R>`.
 - Prefer named `Effect.fn` for meaningful reusable operations and observability.
 - Use typed expected errors; prefer schema-backed tagged errors for serialized/domain contracts.
@@ -14,6 +14,7 @@
 - Prefer scoped resource management for resources requiring cleanup.
 - Never use `any`, unsafe assertions, or `orDie` merely to silence type errors.
 - Use `@effect/vitest` patterns for Effect tests.
-- Before Effect work, inspect `.agents/skills/effect-ts/` and relevant stable-v3 source under `.repos/effect/`.
+- Before Effect work, inspect `.agents/skills/effect-ts/` and relevant Effect 4.1 source under `.repos/effect/`.
+- Decode closed objects through the package `schema-strict` helpers, never with bare `Schema.decode*`.
 
 Third-party protocols may remain Promise-native at their boundary when required for compatibility, but internal application adapters must expose typed Effects.

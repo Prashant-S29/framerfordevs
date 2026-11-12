@@ -7,7 +7,7 @@ import {
   cmsEnumOptionSourceIdentity,
 } from "@framerfordevs/db/schema/cms";
 import { environment, projectCapability } from "@framerfordevs/db/schema/platform";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import {
   AuthoringSchemaAuthority,
@@ -65,6 +65,7 @@ import {
   loadPublishedRevisionRows,
 } from "../../schema/repository";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 function databaseFailure(operation: string, cause: unknown) {
   return DatabaseFailure.make({ operation, cause });
 }
@@ -209,7 +210,7 @@ export async function loadAuthoringProjectPlanContext(
     [];
   const revisionIds: Record<string, SchemaRevisionId> = {};
   for (const { collection, head } of collectionRows) {
-    const model = Schema.decodeUnknownSync(CmsCollection)({
+    const model = SchemaStrict.decodeUnknownSync(CmsCollection)({
       id: collection.id,
       workspaceId: collection.workspaceId,
       projectId: collection.projectId,
@@ -251,9 +252,11 @@ export async function loadAuthoringProjectPlanContext(
   }
 
   return {
-    workspaceId: Schema.decodeUnknownSync(CmsCollection.fields.workspaceId)(options.workspaceId),
-    projectId: Schema.decodeUnknownSync(CmsCollection.fields.projectId)(options.projectId),
-    environmentId: Schema.decodeUnknownSync(CmsCollection.fields.environmentId)(
+    workspaceId: SchemaStrict.decodeUnknownSync(CmsCollection.fields.workspaceId)(
+      options.workspaceId,
+    ),
+    projectId: SchemaStrict.decodeUnknownSync(CmsCollection.fields.projectId)(options.projectId),
+    environmentId: SchemaStrict.decodeUnknownSync(CmsCollection.fields.environmentId)(
       options.environmentId,
     ),
     current: AuthoringSchemaAuthority.make({
@@ -578,15 +581,15 @@ export function makeAuthoringSchemaRepository(options: RepositoryOptions = {}) {
       if (result.kind === "not_found") return yield* NotFoundFailure.make({ resource: "project" });
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
       if (result.kind === "cms_required") return yield* CmsCapabilityRequiredFailure.make();
-      return Schema.decodeUnknownSync(AuthoringSchemaPlan)(result.plan);
+      return SchemaStrict.decodeUnknownSync(AuthoringSchemaPlan)(result.plan);
     }),
   };
 }
 
-export class AuthoringSchemaRepository extends Context.Tag("AuthoringSchemaRepository")<
+export class AuthoringSchemaRepository extends Context.Service<
   AuthoringSchemaRepository,
   ReturnType<typeof makeAuthoringSchemaRepository>
->() {}
+>()("AuthoringSchemaRepository") {}
 
 export const AuthoringSchemaRepositoryLive = Layer.succeed(
   AuthoringSchemaRepository,

@@ -1,5 +1,4 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import { ProjectRole } from "../../../contracts/access";
 import { EditorLayout } from "../../../contracts/field";
@@ -7,12 +6,13 @@ import { CollectionFieldDefinition, ContractHash } from "../../../contracts/sche
 import { projectStudioForm } from "../../studio-content/form-projection";
 import { generatedFormDefinition } from "./index";
 
+import * as SchemaStrict from "../../schema-strict";
 const visibleId = "019fae8b-1234-7000-8000-000000000001";
 const hiddenId = "019fae8b-1234-7000-8000-000000000002";
 const visibleRoles = ["owner", "developer"] as const;
 
 function field(id: string, apiKey: string, roles: ReadonlyArray<typeof ProjectRole.Type>) {
-  return Schema.decodeUnknownSync(CollectionFieldDefinition)({
+  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
     id,
     parentFieldId: null,
     nodeRole: "root",
@@ -34,7 +34,7 @@ function field(id: string, apiKey: string, roles: ReadonlyArray<typeof ProjectRo
   });
 }
 
-const layout = Schema.decodeUnknownSync(EditorLayout)({
+const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
   version: 1,
   tabs: [
     {
@@ -113,7 +113,7 @@ describe("generated form definition", () => {
   });
 
   it("preserves a visible sidebar when the role has no visible tab placements", () => {
-    const sidebarOnlyLayout = Schema.decodeUnknownSync(EditorLayout)({
+    const sidebarOnlyLayout = SchemaStrict.decodeUnknownSync(EditorLayout)({
       version: 1,
       tabs: layout.tabs,
       sidebarGroups: [

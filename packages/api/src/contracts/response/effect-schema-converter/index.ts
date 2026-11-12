@@ -1,10 +1,12 @@
 import type { JSONSchema as ORPCJsonSchema } from "@orpc/openapi";
 import type { ConditionalSchemaConverter, SchemaConvertOptions } from "@orpc/openapi";
-import { JSONSchema, Schema } from "effect";
+import { Schema } from "effect";
+
+import { make as makeJsonSchema, type JsonSchemaRoot } from "../json-schema";
 
 type ORPCSchema = Parameters<ConditionalSchemaConverter["condition"]>[0];
 
-function toOrpcJsonSchema(schema: JSONSchema.JsonSchema7Root): Exclude<ORPCJsonSchema, boolean> {
+function toOrpcJsonSchema(schema: JsonSchemaRoot): Exclude<ORPCJsonSchema, boolean> {
   return JSON.parse(JSON.stringify(schema));
 }
 
@@ -20,6 +22,6 @@ export class EffectSchemaToJsonSchemaConverter implements ConditionalSchemaConve
     if (!Schema.isSchema(schema)) {
       throw new Error("Expected an Effect Schema.");
     }
-    return [true, toOrpcJsonSchema(JSONSchema.make(schema))];
+    return [true, toOrpcJsonSchema(makeJsonSchema(schema))];
   }
 }

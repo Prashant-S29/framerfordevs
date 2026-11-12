@@ -1,5 +1,5 @@
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Exit, Layer, Schema } from "effect";
+import { Effect, Exit, Layer } from "effect";
 
 import {
   CreateProjectLocaleInput,
@@ -20,10 +20,11 @@ import {
   updateProjectLocaleStatus,
 } from "./index";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const localeId = "019fae8b-1234-7000-8000-000000000002";
 const timestamp = "2026-08-01T12:00:00.000Z";
-const locale = Schema.decodeUnknownSync(ProjectLocale)({
+const locale = SchemaStrict.decodeUnknownSync(ProjectLocale)({
   id: localeId,
   workspaceId: "019fae8b-1234-7000-8000-000000000003",
   projectId,
@@ -57,7 +58,7 @@ describe("locale operations", () => {
         const requestId = "request-locale-operations";
         yield* listProjectLocales(
           actorId,
-          yield* Schema.decodeUnknown(ListProjectLocalesInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectLocalesInput)({
             projectId,
             view: "settings",
             includeRemoved: false,
@@ -65,7 +66,7 @@ describe("locale operations", () => {
         );
         yield* createProjectLocale(
           actorId,
-          yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectLocaleInput)({
             projectId,
             tag: "hi",
             displayName: "Hindi",
@@ -74,7 +75,7 @@ describe("locale operations", () => {
         );
         yield* updateProjectLocaleDisplayName(
           actorId,
-          yield* Schema.decodeUnknown(UpdateProjectLocaleDisplayNameInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleDisplayNameInput)({
             projectId,
             localeId,
             version: 1,
@@ -84,7 +85,7 @@ describe("locale operations", () => {
         );
         yield* reorderProjectLocales(
           actorId,
-          yield* Schema.decodeUnknown(ReorderProjectLocalesInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ReorderProjectLocalesInput)({
             projectId,
             locales: [{ localeId, version: 1 }],
           }),
@@ -92,7 +93,7 @@ describe("locale operations", () => {
         );
         yield* updateProjectLocaleStatus(
           actorId,
-          yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleStatusInput)({
             projectId,
             localeId,
             version: 1,
@@ -118,7 +119,7 @@ describe("locale operations", () => {
         const exit = yield* Effect.exit(
           listProjectLocales(
             "",
-            yield* Schema.decodeUnknown(ListProjectLocalesInput)({
+            yield* SchemaStrict.decodeUnknownEffect(ListProjectLocalesInput)({
               projectId,
               view: "enabled",
               includeRemoved: false,

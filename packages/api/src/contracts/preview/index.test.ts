@@ -1,7 +1,7 @@
 // Verifies Preview source authority, response envelopes, selectors, and public error allowlisting.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit } from "effect";
 
 import { ApiSuccessSchema } from "../response/api";
 import {
@@ -14,6 +14,7 @@ import {
   PreviewRevisionSelector,
 } from "./index";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const ids = {
   entry: "019fae8b-1234-7000-8000-000000000001",
   collection: "019fae8b-1234-7000-8000-000000000002",
@@ -46,13 +47,13 @@ function item() {
 describe("Preview contracts", () => {
   it.effect("decodes current and revision source metadata through the success envelope", () =>
     Effect.gen(function* () {
-      const current = yield* Schema.decodeUnknown(ApiSuccessSchema(PreviewItem))({
+      const current = yield* SchemaStrict.decodeUnknownEffect(ApiSuccessSchema(PreviewItem))({
         ok: true,
         data: item(),
         error: null,
         message: "Preview entry loaded.",
       });
-      const revision = yield* Schema.decodeUnknown(PreviewItem)({
+      const revision = yield* SchemaStrict.decodeUnknownEffect(PreviewItem)({
         ...item(),
         preview: { ...item().preview, source: "revision" },
       });
@@ -63,13 +64,16 @@ describe("Preview contracts", () => {
 
   it.effect("accepts only explicit none or a branded revision selector", () =>
     Effect.gen(function* () {
-      assert.strictEqual(yield* Schema.decodeUnknown(PreviewRevisionSelector)("none"), "none");
       assert.strictEqual(
-        yield* Schema.decodeUnknown(PreviewRevisionSelector)(ids.revision),
+        yield* SchemaStrict.decodeUnknownEffect(PreviewRevisionSelector)("none"),
+        "none",
+      );
+      assert.strictEqual(
+        yield* SchemaStrict.decodeUnknownEffect(PreviewRevisionSelector)(ids.revision),
         ids.revision,
       );
       const malformed = yield* Effect.exit(
-        Schema.decodeUnknown(PreviewRevisionSelector)("current"),
+        SchemaStrict.decodeUnknownEffect(PreviewRevisionSelector)("current"),
       );
       assert.isTrue(Exit.isFailure(malformed));
     }),
@@ -77,7 +81,7 @@ describe("Preview contracts", () => {
 
   it.effect("bounds route keys and strips caller-supplied subject authority", () =>
     Effect.gen(function* () {
-      const scope = yield* Schema.decodeUnknown(PreviewRouteScope)({
+      const scope = yield* SchemaStrict.decodeUnknownEffect(PreviewRouteScope)({
         projectId: ids.entry,
         environmentKey: "main",
         collectionKey: "articles",
@@ -85,7 +89,7 @@ describe("Preview contracts", () => {
         locale: "GU",
         credentialId: ids.revision,
       });
-      const user = yield* Schema.decodeUnknown(GetCurrentUserPreviewInput)({
+      const user = yield* SchemaStrict.decodeUnknownEffect(GetCurrentUserPreviewInput)({
         projectId: ids.entry,
         environmentId: ids.collection,
         collectionId: ids.collection,
@@ -94,19 +98,24 @@ describe("Preview contracts", () => {
         role: "owner",
         actorId: "injected",
       });
-      const historical = yield* Schema.decodeUnknown(GetRevisionCredentialPreviewInput)({
-        ...scope,
-        schemaRevisionId: ids.schema,
-        sharedRevisionId: null,
-        localizedRevisionId: ids.revision,
-      });
+      const historical = yield* SchemaStrict.decodeUnknownEffect(GetRevisionCredentialPreviewInput)(
+        {
+          ...scope,
+          schemaRevisionId: ids.schema,
+          sharedRevisionId: null,
+          localizedRevisionId: ids.revision,
+        },
+      );
       assert.strictEqual(scope.locale, "gu");
       assert.isFalse(Object.hasOwn(scope, "credentialId"));
       assert.isFalse(Object.hasOwn(user, "role"));
       assert.isFalse(Object.hasOwn(user, "actorId"));
       assert.isNull(historical.sharedRevisionId);
       const invalidEnvironment = yield* Effect.exit(
-        Schema.decodeUnknown(PreviewRouteScope)({ ...scope, environmentKey: "bad--key" }),
+        SchemaStrict.decodeUnknownEffect(PreviewRouteScope)({
+          ...scope,
+          environmentKey: "bad--key",
+        }),
       );
       assert.isTrue(Exit.isFailure(invalidEnvironment));
     }),
@@ -115,14 +124,16 @@ describe("Preview contracts", () => {
   it.effect("allowlists Preview errors without importing Delivery-only cursor contracts", () =>
     Effect.gen(function* () {
       assert.strictEqual(
-        yield* Schema.decodeUnknown(PreviewApiErrorCode)("PREVIEW_REVISION_INCOMPATIBLE"),
+        yield* SchemaStrict.decodeUnknownEffect(PreviewApiErrorCode)(
+          "PREVIEW_REVISION_INCOMPATIBLE",
+        ),
         "PREVIEW_REVISION_INCOMPATIBLE",
       );
       const deliveryOnly = yield* Effect.exit(
-        Schema.decodeUnknown(PreviewApiErrorCode)("DELIVERY_CURSOR_STALE"),
+        SchemaStrict.decodeUnknownEffect(PreviewApiErrorCode)("DELIVERY_CURSOR_STALE"),
       );
       assert.isTrue(Exit.isFailure(deliveryOnly));
-      const failure = yield* Schema.decodeUnknown(PreviewApiFailure)({
+      const failure = yield* SchemaStrict.decodeUnknownEffect(PreviewApiFailure)({
         ok: false,
         data: null,
         error: {

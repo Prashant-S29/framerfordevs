@@ -19,7 +19,7 @@ import {
   projectCapability,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import { AuthUserId } from "../../contracts/platform";
 import {
@@ -51,6 +51,7 @@ import {
   type ApplicationTransaction,
 } from "../project-access";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 interface PageInput {
   readonly afterId: string | null;
   readonly limit: number;
@@ -263,7 +264,7 @@ export function makeToolingRepository(options: ToolingRepositoryOptions = {}) {
       });
       const pageRows = rows.slice(0, input.limit);
       return {
-        items: pageRows.map((row) => Schema.decodeUnknownSync(ToolingProjectSummary)(row)),
+        items: pageRows.map((row) => SchemaStrict.decodeUnknownSync(ToolingProjectSummary)(row)),
         nextAfterId: rows.length > input.limit ? (pageRows.at(-1)?.id ?? null) : null,
       };
     }),
@@ -311,10 +312,12 @@ export function makeToolingRepository(options: ToolingRepositoryOptions = {}) {
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
       const pageRows = result.rows.slice(0, input.limit);
       return {
-        projectId: Schema.decodeUnknownSync(ToolingEnvironmentPage.fields.projectId)(
+        projectId: SchemaStrict.decodeUnknownSync(ToolingEnvironmentPage.fields.projectId)(
           input.projectId,
         ),
-        items: pageRows.map((row) => Schema.decodeUnknownSync(ToolingEnvironmentSummary)(row)),
+        items: pageRows.map((row) =>
+          SchemaStrict.decodeUnknownSync(ToolingEnvironmentSummary)(row),
+        ),
         nextAfterId: result.rows.length > input.limit ? (pageRows.at(-1)?.id ?? null) : null,
       };
     }),
@@ -389,7 +392,7 @@ export function makeToolingRepository(options: ToolingRepositoryOptions = {}) {
                 revision,
                 fields: groupedFields.get(revision.id) ?? [],
               });
-              return Schema.decodeUnknownSync(ToolingCollectionSummary)({
+              return SchemaStrict.decodeUnknownSync(ToolingCollectionSummary)({
                 id: published.collectionId,
                 key: published.collectionApiKey,
                 revisionId: published.id,
@@ -398,9 +401,9 @@ export function makeToolingRepository(options: ToolingRepositoryOptions = {}) {
               });
             });
             const localeItems = locales.map((locale) =>
-              Schema.decodeUnknownSync(ToolingLocaleSummary)(locale),
+              SchemaStrict.decodeUnknownSync(ToolingLocaleSummary)(locale),
             );
-            const page = Schema.decodeUnknownSync(ToolingSchemaManifestPage)({
+            const page = SchemaStrict.decodeUnknownSync(ToolingSchemaManifestPage)({
               projectId: scope.projectId,
               environmentId: scope.environmentId,
               environmentKey: scope.environmentKey,
@@ -479,7 +482,7 @@ export function makeToolingRepository(options: ToolingRepositoryOptions = {}) {
             if (!revision) return { kind: "not_found" as const };
             const fields = await loadRevisionFields(transaction, [revision.id]);
             const published = decodePublishedSchemaRevisionSync({ revision, fields });
-            const response = Schema.decodeUnknownSync(ToolingCollectionContractRevision)({
+            const response = SchemaStrict.decodeUnknownSync(ToolingCollectionContractRevision)({
               projectId: scope.projectId,
               environmentId: scope.environmentId,
               environmentKey: scope.environmentKey,
@@ -518,9 +521,9 @@ export function makeToolingRepository(options: ToolingRepositoryOptions = {}) {
   };
 }
 
-export class ToolingRepository extends Context.Tag("ToolingRepository")<
+export class ToolingRepository extends Context.Service<
   ToolingRepository,
   ReturnType<typeof makeToolingRepository>
->() {}
+>()("ToolingRepository") {}
 
 export const ToolingRepositoryLive = Layer.succeed(ToolingRepository, makeToolingRepository());

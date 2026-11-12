@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 
 import { Effect, Schema } from "effect";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
+import { Uuid } from "../../../contracts/uuid";
 const serverEnvironmentPath = "../../apps/server/.env";
 const loadEnvironmentPath = "../../delivery-load.env";
 process.loadEnvFile(serverEnvironmentPath);
@@ -24,7 +26,7 @@ const entryIds = (process.env.DELIVERY_ENTRY_IDS ?? "").split(",").filter(Boolea
 const slugs = (process.env.DELIVERY_UNIQUE_VALUES ?? "").split(",").filter(Boolean);
 const fixtureCount = 32;
 
-if (!Schema.is(Schema.UUID)(projectId)) throw new Error("DELIVERY_PROJECT_ID must be a UUID.");
+if (!Schema.is(Uuid)(projectId)) throw new Error("DELIVERY_PROJECT_ID must be a UUID.");
 if (!/^[a-z][a-z0-9_]{0,62}$/u.test(collectionKey)) {
   throw new Error("DELIVERY_COLLECTION_KEY must be canonical.");
 }
@@ -35,7 +37,7 @@ if (entryIds.length < fixtureCount || slugs.length < fixtureCount) {
 const fixture = entryIds.slice(0, fixtureCount).map((entryId, index) => {
   const slug = slugs[index] ?? "";
   const match = /^load-entry-(\d{5})$/u.exec(slug);
-  if (!Schema.is(Schema.UUID)(entryId) || match?.[1] === undefined) {
+  if (!Schema.is(Uuid)(entryId) || match?.[1] === undefined) {
     throw new Error("Boundary fixture identifiers do not match the deterministic fixture.");
   }
   return { entryId, index: Number(match[1]) };
@@ -133,7 +135,7 @@ try {
     throw new Error("The boundary fixture requires title and body fields.");
   }
 
-  const actorId = Schema.decodeUnknownSync(AuthUserId)(authority.actorId);
+  const actorId = SchemaStrict.decodeUnknownSync(AuthUserId)(authority.actorId);
   const scope = {
     projectId,
     environmentId: authority.environmentId,
@@ -147,7 +149,7 @@ try {
     let draft = await run(
       entries.getDraft(
         actorId,
-        Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
+        SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
           ...scope,
           entryId: item.entryId,
         }),
@@ -166,7 +168,7 @@ try {
       await run(
         entries.saveDraft(
           actorId,
-          Schema.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
+          SchemaStrict.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
             ...scope,
             entryId: item.entryId,
             schemaRevisionId: draft.schemaRevisionId,
@@ -184,7 +186,7 @@ try {
       draft = await run(
         entries.getDraft(
           actorId,
-          Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
+          SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
             ...scope,
             entryId: item.entryId,
           }),
@@ -192,7 +194,7 @@ try {
       );
     }
 
-    const publicationScope = Schema.decodeUnknownSync(
+    const publicationScope = SchemaStrict.decodeUnknownSync(
       publicationContracts.ValidateEntryPublicationInput,
     )({ ...scope, entryId: item.entryId });
     const plan = await run(publications.validate(actorId, publicationScope, new Date()));
@@ -203,7 +205,7 @@ try {
       await run(
         publications.publish(
           actorId,
-          Schema.decodeUnknownSync(publicationContracts.PublishEntryInput)({
+          SchemaStrict.decodeUnknownSync(publicationContracts.PublishEntryInput)({
             ...scope,
             entryId: item.entryId,
             commandId: randomUUID(),

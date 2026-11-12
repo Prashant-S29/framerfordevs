@@ -48,6 +48,7 @@ import {
   controlPlaneSuccessResponse,
 } from "./schema";
 
+import * as SchemaStrict from "../schema-strict";
 const maximumRequestBytes = 64 * 1_024;
 const maximumResponseBytes = 512 * 1_024;
 const maximumTokenBytes = 16_384;
@@ -185,7 +186,7 @@ export function makeControlPlaneHttpClient(options: ControlPlaneHttpClientOption
   const request = <A, I>(
     method: "GET" | "POST" | "PUT" | "PATCH",
     path: string,
-    dataSchema: Schema.Schema<A, I, never>,
+    dataSchema: Schema.Codec<A, I, never>,
     body: unknown | null,
     requestOptions: ControlPlaneRequestOptions = {},
   ) =>
@@ -231,19 +232,21 @@ export function makeControlPlaneHttpClient(options: ControlPlaneHttpClientOption
         catch: (cause) => transportError("control-plane.response.json", cause),
       });
       if (response.ok) {
-        const success = yield* Schema.decodeUnknown(controlPlaneSuccessResponse(dataSchema))(
-          unknownBody,
-          { onExcessProperty: "error" },
-        ).pipe(
+        const success = yield* SchemaStrict.decodeUnknownEffect(
+          controlPlaneSuccessResponse(dataSchema),
+        )(unknownBody, { onExcessProperty: "error" }).pipe(
           Effect.mapError((cause) =>
             transportError("control-plane.response.decode_success", cause),
           ),
         );
         return success.data;
       }
-      const failure = yield* Schema.decodeUnknown(ControlPlaneFailureResponse)(unknownBody, {
-        onExcessProperty: "error",
-      }).pipe(
+      const failure = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneFailureResponse)(
+        unknownBody,
+        {
+          onExcessProperty: "error",
+        },
+      ).pipe(
         Effect.mapError((cause) => transportError("control-plane.response.decode_failure", cause)),
       );
       return yield* ControlPlaneHttpError.make({
@@ -916,7 +919,7 @@ export function makeControlPlaneHttpClient(options: ControlPlaneHttpClientOption
   };
 }
 
-export class ControlPlaneHttpClient extends Context.Tag("ControlPlaneHttpClient")<
+export class ControlPlaneHttpClient extends Context.Service<
   ControlPlaneHttpClient,
   ReturnType<typeof makeControlPlaneHttpClient>
->() {}
+>()("ControlPlaneHttpClient") {}

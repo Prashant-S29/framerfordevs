@@ -1,6 +1,6 @@
 // Adapts authenticated hosted sessions to the shared operational webhook read authority.
 
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import type {
   ControlPlaneWebhookDeliveryListQuery,
@@ -14,8 +14,9 @@ import {
   listControlPlaneWebhookDeliveries,
 } from "../control-plane/operational/webhook";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const userActor = (userId: string) =>
-  Schema.decodeUnknown(AuthUserId)(userId).pipe(
+  SchemaStrict.decodeUnknownEffect(AuthUserId)(userId).pipe(
     Effect.mapError(() => UnauthorizedFailure.make()),
     Effect.map((id) => ({ kind: "user" as const, id })),
   );

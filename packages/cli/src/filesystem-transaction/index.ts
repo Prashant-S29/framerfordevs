@@ -4,7 +4,7 @@ import { open, lstat, mkdir, readFile, readdir, rename, rm, writeFile } from "no
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import { sha256 } from "../canonical";
 import {
@@ -16,6 +16,7 @@ import {
 import type { GenerationPlan } from "../generator";
 import { SchemaLock } from "../schema";
 
+import * as SchemaStrict from "../schema-strict";
 export type FileSystemEntryKind = "missing" | "file" | "directory" | "symbolic_link" | "other";
 
 export interface GeneratorFileSystemService {
@@ -30,10 +31,10 @@ export interface GeneratorFileSystemService {
   readonly syncDirectory: (path: string) => Effect.Effect<void, CliFileSystemError>;
 }
 
-export class GeneratorFileSystem extends Context.Tag("GeneratorFileSystem")<
+export class GeneratorFileSystem extends Context.Service<
   GeneratorFileSystem,
   GeneratorFileSystemService
->() {}
+>()("GeneratorFileSystem") {}
 
 function fileSystemFailure(operation: string, cause: unknown) {
   return CliFileSystemError.make({ operation, cause });
@@ -199,7 +200,7 @@ export const commitGenerationPlan = Effect.fn("GeneratorFileSystem.commit")(func
       return yield* GeneratorOutputUnownedError.make();
     }
     if (previousLockBytes !== null) {
-      const previousLock = yield* Schema.decodeUnknown(SchemaLock)(
+      const previousLock = yield* SchemaStrict.decodeUnknownEffect(SchemaLock)(
         yield* Effect.try({
           try: (): unknown => JSON.parse(previousLockBytes),
           catch: () => GeneratorOutputUnownedError.make(),

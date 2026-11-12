@@ -1,5 +1,4 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import { EditorLayout } from "../../../contracts/field";
 import {
@@ -10,6 +9,7 @@ import {
 } from "../../../contracts/schema";
 import { projectStudioForm, projectStudioValues } from ".";
 
+import * as SchemaStrict from "../../schema-strict";
 const fieldId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000001");
 const unplacedFieldId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000007");
 const readOnlyFieldId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000008");
@@ -18,7 +18,7 @@ const roles = ["owner", "developer"] as const;
 
 describe("Studio form projection", () => {
   it("keeps stable editing authority while removing source keys and role arrays", () => {
-    const field = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+    const field = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
       id: fieldId,
       parentFieldId: null,
       nodeRole: "root",
@@ -38,14 +38,14 @@ describe("Studio form projection", () => {
       configuration: { maxLength: 100 },
       children: [],
     });
-    const unplacedField = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+    const unplacedField = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
       ...field,
       id: unplacedFieldId,
       apiKey: "unplaced_source_key",
       displayLabel: "Unplaced",
       position: 1,
     });
-    const readOnlyField = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+    const readOnlyField = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
       ...field,
       id: readOnlyFieldId,
       apiKey: "read_only_source_key",
@@ -53,7 +53,7 @@ describe("Studio form projection", () => {
       position: 2,
       editor: { ...field.editor, editableByRoles: [] },
     });
-    const layout = Schema.decodeUnknownSync(EditorLayout)({
+    const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
       version: 1,
       tabs: [
         {
@@ -160,7 +160,7 @@ describe("Studio form projection", () => {
         },
       ],
     });
-    const form = Schema.decodeUnknownSync(GeneratedFormDefinition)({
+    const form = SchemaStrict.decodeUnknownSync(GeneratedFormDefinition)({
       source: "published",
       collectionId: "019fae8b-1234-7000-8000-000000000005",
       revisionId: "019fae8b-1234-7000-8000-000000000006",
@@ -233,6 +233,10 @@ describe("Studio form projection", () => {
         };
       }
       if (kind === "reference") return { targetCollectionId: id(91) };
+      if (kind === "object") {
+        return { default: { hidden_child: "must-not-leak", visible_child: "Visible default" } };
+      }
+      if (kind === "list") return { default: ["List default"] };
       return {};
     };
     const fields = kinds.map((kind, index) => {
@@ -286,7 +290,7 @@ describe("Studio form projection", () => {
                 : []),
             ]
           : [];
-      return Schema.decodeUnknownSync(CollectionFieldDefinition)({
+      return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
         id: rootId,
         parentFieldId: null,
         nodeRole: "root",
@@ -307,7 +311,7 @@ describe("Studio form projection", () => {
         children,
       });
     });
-    const editorLayout = Schema.decodeUnknownSync(EditorLayout)({
+    const editorLayout = SchemaStrict.decodeUnknownSync(EditorLayout)({
       version: 1,
       tabs: [
         {
@@ -337,7 +341,7 @@ describe("Studio form projection", () => {
       ],
       sidebarGroups: [],
     });
-    const form = Schema.decodeUnknownSync(GeneratedFormDefinition)({
+    const form = SchemaStrict.decodeUnknownSync(GeneratedFormDefinition)({
       source: "published",
       collectionId: id(1),
       revisionId: id(2),
@@ -370,10 +374,19 @@ describe("Studio form projection", () => {
     assert.strictEqual(objectField?.children.length, 1);
     assert.strictEqual(objectField?.children[0]?.id, id(94));
     assert.strictEqual(objectField?.children[0]?.localization, "shared");
+    if (objectField?.kind !== "object") throw new Error("Expected projected object field.");
+    assert.deepStrictEqual(objectField.configuration.default, {
+      [id(94)]: "Visible default",
+    });
     const listField = projected.fields.find((field) => field.kind === "list");
     assert.strictEqual(listField?.children.length, 1);
+    if (listField?.kind !== "list") throw new Error("Expected projected list field.");
+    assert.deepStrictEqual(listField.configuration.default, ["List default"]);
     const serialized = JSON.stringify(projected);
     assert.notInclude(serialized, id(74));
+    assert.notInclude(serialized, "hidden_child");
+    assert.notInclude(serialized, "visible_child");
+    assert.notInclude(serialized, "must-not-leak");
     assert.notInclude(serialized, "apiKey");
     assert.notInclude(serialized, "visibleToRoles");
     assert.notInclude(serialized, "editableByRoles");

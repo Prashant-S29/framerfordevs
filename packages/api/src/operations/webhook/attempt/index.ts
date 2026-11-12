@@ -125,7 +125,7 @@ export const runOneWebhookAttempt = Effect.fn("webhook.worker.attempt")(function
 
   const completedAt = new Date(yield* Clock.currentTimeMillis);
   if (Exit.isFailure(sendExit)) {
-    const failure = Option.getOrUndefined(Cause.failureOption(sendExit.cause));
+    const failure = Option.getOrUndefined(Cause.findErrorOption(sendExit.cause));
     const operation =
       typeof failure === "object" &&
       failure !== null &&

@@ -2,12 +2,13 @@
 
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
 
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import { WebhookSecret } from "../../../contracts/webhook";
 import { SecurityServiceFailure } from "../../../contracts/response/errors";
 import { canonicalizeEntryValue } from "../../../lib/entry/values";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 export interface WebhookEncryptionScope {
   readonly workspaceId: string;
   readonly projectId: string;
@@ -85,7 +86,7 @@ export function makeWebhookCrypto(options: WebhookCryptoOptions): WebhookCryptoS
         try: () => `whsec_${generateRandom(32).toString("base64url")}`,
         catch: (cause) => failure("webhook.crypto.secret.generate", cause),
       });
-      return yield* Schema.decodeUnknown(WebhookSecret)(value).pipe(
+      return yield* SchemaStrict.decodeUnknownEffect(WebhookSecret)(value).pipe(
         Effect.mapError((cause) => failure("webhook.crypto.secret.decode", cause)),
       );
     }),
@@ -149,10 +150,9 @@ export function makeWebhookCrypto(options: WebhookCryptoOptions): WebhookCryptoS
   };
 }
 
-export class WebhookCrypto extends Context.Tag("WebhookCrypto")<
-  WebhookCrypto,
-  WebhookCryptoService
->() {}
+export class WebhookCrypto extends Context.Service<WebhookCrypto, WebhookCryptoService>()(
+  "WebhookCrypto",
+) {}
 
 /** Keeps management paths fail-closed when no persistent deployment key ring is configured. */
 export const WebhookCryptoUnavailableLive = Layer.succeed(WebhookCrypto, {

@@ -1,9 +1,9 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import { classifySchemaDrift } from "./index";
 import { SchemaLock } from "../schema";
 
+import * as SchemaStrict from "../schema-strict";
 const ids = {
   project: "019fae8b-1234-7000-8000-000000000001",
   environment: "019fae8b-1234-7000-8000-000000000002",
@@ -61,7 +61,7 @@ function collection(options?: {
 }
 
 function lock(options: LockOptions = {}) {
-  return Schema.decodeUnknownSync(SchemaLock)({
+  return SchemaStrict.decodeUnknownSync(SchemaLock)({
     lockVersion: 1,
     generatorVersion: "1.0.0",
     sdkCompatibility: "^0.1.0",

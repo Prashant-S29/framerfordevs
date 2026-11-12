@@ -10,21 +10,26 @@ import {
   SecurityServiceFailure,
 } from "../../../contracts/response/errors";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
+import { Uuid } from "../../../contracts/uuid";
 const cursorLifetimeMs = 15 * 60 * 1_000;
 const cursorMaximumLength = 512;
-const EpochMillis = Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0));
+const EpochMillis = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0));
 
 const ControlPlaneCursorPayload = Schema.Struct({
   version: Schema.Literal(1),
   kind: Schema.Literal("control_plane_page"),
-  authorityDigest: Schema.String.pipe(Schema.length(64), Schema.pattern(/^[0-9a-f]{64}$/u)),
+  authorityDigest: Schema.String.check(
+    Schema.isBetweenLength(64, 64),
+    Schema.isPattern(/^[0-9a-f]{64}$/u),
+  ),
   finalSortAtEpochMs: EpochMillis,
-  finalId: Schema.UUID,
+  finalId: Uuid,
   issuedAtEpochMs: EpochMillis,
   expiresAtEpochMs: EpochMillis,
-  asOfEpochMs: Schema.optionalWith(Schema.NullOr(EpochMillis), {
-    default: () => null,
-  }),
+  asOfEpochMs: Schema.NullOr(EpochMillis).pipe(
+    Schema.withDecodingDefaultType(Effect.sync(() => null)),
+  ),
 });
 
 export type ControlPlaneCursorRoute =
@@ -205,9 +210,9 @@ export function makeControlPlaneCursorSigner(
           try: (): unknown => JSON.parse(Buffer.from(payloadText, "base64url").toString("utf8")),
           catch: () => invalidCursor(),
         });
-        const payload = yield* Schema.decodeUnknown(ControlPlaneCursorPayload)(unknownPayload).pipe(
-          Effect.mapError(() => invalidCursor()),
-        );
+        const payload = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCursorPayload)(
+          unknownPayload,
+        ).pipe(Effect.mapError(() => invalidCursor()));
         const now = yield* Clock.currentTimeMillis;
         if (
           payload.authorityDigest !== authorityDigest(authority) ||
@@ -226,10 +231,10 @@ export function makeControlPlaneCursorSigner(
   };
 }
 
-export class ControlPlaneCursorSigner extends Context.Tag("ControlPlaneCursorSigner")<
+export class ControlPlaneCursorSigner extends Context.Service<
   ControlPlaneCursorSigner,
   ControlPlaneCursorSignerService
->() {}
+>()("ControlPlaneCursorSigner") {}
 
 export function makeControlPlaneCursorSignerLive(options: ControlPlaneCursorSignerOptions) {
   return Layer.succeed(ControlPlaneCursorSigner, makeControlPlaneCursorSigner(options));

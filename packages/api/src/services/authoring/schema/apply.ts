@@ -64,6 +64,7 @@ import { cmsActorMatches, cmsActorReferences, cmsAuditActor } from "../../cms-ac
 import type { ApplicationTransaction } from "../../project-access";
 import { loadAuthoringProjectPlanContext } from "./repository";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 export type AuthoringSchemaApplyFailureStage =
   | "identities"
   | "revisions"
@@ -84,10 +85,10 @@ export type AuthoringSchemaApplyDecision =
       readonly issues?: ReadonlyArray<{ readonly path: string; readonly code: string }>;
     };
 
-const JsonObject = Schema.Record({ key: Schema.String, value: Schema.Unknown });
+const JsonObject = Schema.Record(Schema.String, Schema.Unknown);
 
 function jsonObject(value: unknown): Readonly<Record<string, unknown>> {
-  return Schema.decodeUnknownSync(JsonObject)(JSON.parse(JSON.stringify(value)));
+  return SchemaStrict.decodeUnknownSync(JsonObject)(JSON.parse(JSON.stringify(value)));
 }
 
 function displayName(apiKey: string): string {
@@ -105,7 +106,7 @@ function collectionModel(options: {
   readonly sourceApiKey: string;
   readonly now: Date;
 }): CmsCollection {
-  return Schema.decodeUnknownSync(CmsCollection)({
+  return SchemaStrict.decodeUnknownSync(CmsCollection)({
     id: options.id,
     workspaceId: options.workspaceId,
     projectId: options.projectId,
@@ -157,7 +158,7 @@ async function loadReplay(
   ) {
     return { kind: "command_conflict" };
   }
-  const result = Schema.decodeUnknownSync(AuthoringSchemaApplyResult)(receipt.result);
+  const result = SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyResult)(receipt.result);
   return {
     kind: "success",
     result: AuthoringSchemaApplyResult.make({ ...result, replayed: true }),

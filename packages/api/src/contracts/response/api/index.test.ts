@@ -73,6 +73,7 @@ import {
   StudioNameVersionConflictFailure,
 } from "../../studio-content";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const requestId = "request.contract-1";
 const TestData = Schema.Struct({ value: Schema.Number });
 const TestResponse = ApiResponseSchema(TestData);
@@ -88,7 +89,7 @@ describe("API response contract", () => {
   it.effect("decodes a valid success response", () =>
     Effect.gen(function* () {
       const response = apiSuccess({ value: 42 }, "Loaded.");
-      const decoded = yield* Schema.decodeUnknown(TestResponse)(response);
+      const decoded = yield* SchemaStrict.decodeUnknownEffect(TestResponse)(response);
 
       assert.isTrue(decoded.ok);
       if (decoded.ok) {
@@ -107,7 +108,7 @@ describe("API response contract", () => {
         requestId,
         retryable: false,
       });
-      const decoded = yield* Schema.decodeUnknown(TestResponse)(response);
+      const decoded = yield* SchemaStrict.decodeUnknownEffect(TestResponse)(response);
 
       assert.isFalse(decoded.ok);
       if (!decoded.ok) {
@@ -121,7 +122,7 @@ describe("API response contract", () => {
   it.effect("rejects a success response that contains an error", () =>
     Effect.gen(function* () {
       const result = yield* Effect.exit(
-        Schema.decodeUnknown(TestResponse)({
+        SchemaStrict.decodeUnknownEffect(TestResponse)({
           ok: true,
           data: { value: 1 },
           error: { code: "INTERNAL_ERROR" },
@@ -136,7 +137,7 @@ describe("API response contract", () => {
   it.effect("rejects a failure response that contains data", () =>
     Effect.gen(function* () {
       const result = yield* Effect.exit(
-        Schema.decodeUnknown(TestResponse)({
+        SchemaStrict.decodeUnknownEffect(TestResponse)({
           ok: false,
           data: { value: 1 },
           error: {
@@ -155,7 +156,9 @@ describe("API response contract", () => {
 
   it.effect("rejects ad hoc error codes", () =>
     Effect.gen(function* () {
-      const result = yield* Effect.exit(Schema.decodeUnknown(ApiErrorCodeSchema)("AD_HOC"));
+      const result = yield* Effect.exit(
+        SchemaStrict.decodeUnknownEffect(ApiErrorCodeSchema)("AD_HOC"),
+      );
 
       assert.isTrue(Exit.isFailure(result));
     }),
@@ -163,7 +166,7 @@ describe("API response contract", () => {
 
   it.effect.prop(
     "always preserves success discriminant invariants",
-    [Schema.Union(Schema.String, Schema.Number, Schema.Boolean, TestData)],
+    [Schema.Union([Schema.String, Schema.Number, Schema.Boolean, TestData])],
     ([data]) =>
       Effect.sync(() => {
         const response = apiSuccess(data, "Success.");
@@ -701,7 +704,7 @@ describe("application error mapping", () => {
     const failures = Object.keys(apiErrorHttpStatus)
       .sort()
       .map((rawCode) => {
-        const code = Schema.decodeUnknownSync(ApiErrorCodeSchema)(rawCode);
+        const code = SchemaStrict.decodeUnknownSync(ApiErrorCodeSchema)(rawCode);
         const failure = apiFailure({
           code,
           message: `${code} message`,

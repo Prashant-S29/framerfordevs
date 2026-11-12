@@ -11,6 +11,7 @@ import { Schema } from "effect";
 
 import type { JsonObject, JsonValue } from "../../schema";
 
+import * as SchemaStrict from "../../schema-strict";
 export interface AuthoringOperatorClientOptions {
   readonly baseUrl: string;
   readonly projectId: string;
@@ -33,15 +34,18 @@ export interface AuthoringOperatorResponse<A> {
     | null;
 }
 
-const Uuid = Schema.String.pipe(
-  Schema.pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu),
+const Uuid = Schema.String.check(
+  Schema.isPattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu),
 );
-const Digest = Schema.String.pipe(Schema.length(64), Schema.pattern(/^[0-9a-f]{64}$/u));
-const ApiKey = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(63),
-  Schema.pattern(/^[a-z][a-z0-9_]{0,62}$/u),
-  Schema.filter((value) => !value.includes("__") && !value.endsWith("_")),
+const Digest = Schema.String.check(
+  Schema.isBetweenLength(64, 64),
+  Schema.isPattern(/^[0-9a-f]{64}$/u),
+);
+const ApiKey = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(63),
+  Schema.isPattern(/^[a-z][a-z0-9_]{0,62}$/u),
+  Schema.makeFilter((value) => !value.includes("__") && !value.endsWith("_")),
 );
 const reservedSourceKeys = new Set([
   "id",
@@ -59,11 +63,11 @@ const reservedSourceKeys = new Set([
   "prototype",
   "constructor",
 ]);
-const SourceKey = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(63),
-  Schema.pattern(/^[a-z][a-z0-9_-]{0,62}$/u),
-  Schema.filter(
+const SourceKey = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(63),
+  Schema.isPattern(/^[a-z][a-z0-9_-]{0,62}$/u),
+  Schema.makeFilter(
     (value) =>
       !value.includes("--") &&
       !value.includes("__") &&
@@ -80,7 +84,7 @@ export class AuthoringSchemaAuthority extends Schema.Class<AuthoringSchemaAuthor
   "CliAuthoringSchemaAuthority",
 )({
   projectManifestHash: Digest,
-  revisionIds: Schema.Record({ key: SourceKey, value: Uuid }),
+  revisionIds: Schema.Record(SourceKey, Uuid),
 }) {}
 
 export class AuthoringSchemaPlanRequest extends Schema.Class<AuthoringSchemaPlanRequest>(
@@ -94,9 +98,9 @@ export class AuthoringSchemaApplyRequest extends Schema.Class<AuthoringSchemaApp
   commandId: Uuid,
   expectedCurrent: AuthoringSchemaAuthority,
   expectedPlanHash: Digest,
-  acknowledgedChangeIds: Schema.Array(Digest).pipe(
-    Schema.maxItems(10_000),
-    Schema.filter((values) => new Set(values).size === values.length),
+  acknowledgedChangeIds: Schema.Array(Digest).check(
+    Schema.isMaxLength(10_000),
+    Schema.makeFilter((values) => new Set(values).size === values.length),
   ),
 }) {}
 
@@ -125,16 +129,16 @@ export class AuthoringEnumOptionIdentity extends Schema.Class<AuthoringEnumOptio
 export class AuthoringSchemaValidationIssue extends Schema.Class<AuthoringSchemaValidationIssue>(
   "CliAuthoringSchemaValidationIssue",
 )({
-  path: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
-  code: Schema.String.pipe(
-    Schema.minLength(1),
-    Schema.maxLength(64),
-    Schema.pattern(/^[a-z][a-z0-9_]{0,63}$/u),
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  code: Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(64),
+    Schema.isPattern(/^[a-z][a-z0-9_]{0,63}$/u),
   ),
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
-const SchemaChangeCode = Schema.Literal(
+const SchemaChangeCode = Schema.Literals([
   "collection.metadata.updated",
   "collection.api_key.updated",
   "schema.format.upgraded",
@@ -155,17 +159,17 @@ const SchemaChangeCode = Schema.Literal(
   "field.configuration.updated",
   "field.editor.updated",
   "field.removed",
-);
+]);
 
 export class AuthoringSchemaChange extends Schema.Class<AuthoringSchemaChange>(
   "CliAuthoringSchemaChange",
 )({
   changeId: Digest,
   code: SchemaChangeCode,
-  classification: Schema.Literal("non_breaking", "potentially_breaking", "breaking"),
+  classification: Schema.Literals(["non_breaking", "potentially_breaking", "breaking"]),
   collectionSourceKey: SourceKey,
   fieldSourceKey: Schema.NullOr(SourceKey),
-  summary: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
+  summary: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
 }) {}
 
 const AllocatedSchemaCandidate = Schema.Struct({
@@ -175,7 +179,7 @@ const AllocatedSchemaCandidate = Schema.Struct({
   containsUnallocatedIdentities: Schema.Literal(false),
   candidateStructureHash: Digest,
   candidateContractHash: Digest,
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
+}).annotate({ closedObject: true });
 const UnallocatedSchemaCandidate = Schema.Struct({
   collectionSourceKey: SourceKey,
   collectionId: Schema.NullOr(Uuid),
@@ -183,11 +187,11 @@ const UnallocatedSchemaCandidate = Schema.Struct({
   containsUnallocatedIdentities: Schema.Literal(true),
   candidateStructureHash: Schema.Null,
   candidateContractHash: Schema.NullOr(Digest),
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
-export const AuthoringSchemaCandidate = Schema.Union(
+}).annotate({ closedObject: true });
+export const AuthoringSchemaCandidate = Schema.Union([
   AllocatedSchemaCandidate,
   UnallocatedSchemaCandidate,
-).annotations({ identifier: "CliAuthoringSchemaCandidate" });
+]).annotate({ identifier: "CliAuthoringSchemaCandidate" });
 
 export class AuthoringAppliedRevision extends Schema.Class<AuthoringAppliedRevision>(
   "CliAuthoringAppliedRevision",
@@ -205,34 +209,34 @@ export class AuthoringSchemaExport extends Schema.Class<AuthoringSchemaExport>(
 )({
   project: ProjectDocument,
   current: AuthoringSchemaAuthority,
-  collections: Schema.Array(AuthoringCollectionIdentity).pipe(Schema.maxItems(100)),
-  fields: Schema.Array(AuthoringFieldIdentity).pipe(Schema.maxItems(10_000)),
-  enumOptions: Schema.Array(AuthoringEnumOptionIdentity).pipe(Schema.maxItems(10_000)),
-  revisions: Schema.Array(AuthoringAppliedRevision).pipe(Schema.maxItems(100)),
+  collections: Schema.Array(AuthoringCollectionIdentity).check(Schema.isMaxLength(100)),
+  fields: Schema.Array(AuthoringFieldIdentity).check(Schema.isMaxLength(10_000)),
+  enumOptions: Schema.Array(AuthoringEnumOptionIdentity).check(Schema.isMaxLength(10_000)),
+  revisions: Schema.Array(AuthoringAppliedRevision).check(Schema.isMaxLength(100)),
 }) {}
 
 const AuthoringSchemaPlanBase = {
   current: AuthoringSchemaAuthority,
-  changes: Schema.Array(AuthoringSchemaChange).pipe(Schema.maxItems(10_000)),
-  candidates: Schema.Array(AuthoringSchemaCandidate).pipe(Schema.maxItems(100)),
+  changes: Schema.Array(AuthoringSchemaChange).check(Schema.isMaxLength(10_000)),
+  candidates: Schema.Array(AuthoringSchemaCandidate).check(Schema.isMaxLength(100)),
 } as const;
-export const AuthoringSchemaPlan = Schema.Union(
+export const AuthoringSchemaPlan = Schema.Union([
   Schema.Struct({
     ...AuthoringSchemaPlanBase,
     valid: Schema.Literal(true),
     planHash: Digest,
-    issues: Schema.Array(AuthoringSchemaValidationIssue).pipe(Schema.maxItems(50)),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+    issues: Schema.Array(AuthoringSchemaValidationIssue).check(Schema.isMaxLength(50)),
+  }).annotate({ closedObject: true }),
   Schema.Struct({
     ...AuthoringSchemaPlanBase,
     valid: Schema.Literal(false),
     planHash: Schema.Null,
-    issues: Schema.Array(AuthoringSchemaValidationIssue).pipe(
-      Schema.minItems(1),
-      Schema.maxItems(50),
+    issues: Schema.Array(AuthoringSchemaValidationIssue).check(
+      Schema.isMinLength(1),
+      Schema.isMaxLength(50),
     ),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
-).annotations({ identifier: "CliAuthoringSchemaPlan" });
+  }).annotate({ closedObject: true }),
+]).annotate({ identifier: "CliAuthoringSchemaPlan" });
 
 export class AuthoringSchemaApply extends Schema.Class<AuthoringSchemaApply>(
   "CliAuthoringSchemaApply",
@@ -241,10 +245,10 @@ export class AuthoringSchemaApply extends Schema.Class<AuthoringSchemaApply>(
   replayed: Schema.Boolean,
   noOp: Schema.Boolean,
   projectManifestHash: Digest,
-  collections: Schema.Array(AuthoringCollectionIdentity).pipe(Schema.maxItems(100)),
-  fields: Schema.Array(AuthoringFieldIdentity).pipe(Schema.maxItems(10_000)),
-  enumOptions: Schema.Array(AuthoringEnumOptionIdentity).pipe(Schema.maxItems(10_000)),
-  revisions: Schema.Array(AuthoringAppliedRevision).pipe(Schema.maxItems(100)),
+  collections: Schema.Array(AuthoringCollectionIdentity).check(Schema.isMaxLength(100)),
+  fields: Schema.Array(AuthoringFieldIdentity).check(Schema.isMaxLength(10_000)),
+  enumOptions: Schema.Array(AuthoringEnumOptionIdentity).check(Schema.isMaxLength(10_000)),
+  revisions: Schema.Array(AuthoringAppliedRevision).check(Schema.isMaxLength(100)),
 }) {}
 
 export class AuthoringPublishPresentationRequest extends Schema.Class<AuthoringPublishPresentationRequest>(
@@ -252,7 +256,7 @@ export class AuthoringPublishPresentationRequest extends Schema.Class<AuthoringP
 )({
   commandId: Uuid,
   expectedRevisionId: Uuid,
-  expectedSequence: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(1)),
+  expectedSequence: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1)),
   presentation: AuthoringCollectionPresentation,
 }) {}
 
@@ -267,21 +271,19 @@ export class AuthoringPublishPresentationResult extends Schema.Class<AuthoringPu
 }) {}
 
 const AuthoringErrorDetail = Schema.Struct({
-  path: Schema.optionalWith(Schema.String.pipe(Schema.maxLength(256)), { exact: true }),
-  code: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
-  scope: Schema.optionalWith(Schema.Literal("shared", "localized"), { exact: true }),
-  expectedVersion: Schema.optionalWith(
-    Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
-    { exact: true },
+  path: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(256))),
+  code: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  scope: Schema.optionalKey(Schema.Literals(["shared", "localized"])),
+  expectedVersion: Schema.optionalKey(
+    Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   ),
-  currentVersion: Schema.optionalWith(
-    Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
-    { exact: true },
+  currentVersion: Schema.optionalKey(
+    Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   ),
-  currentRevisionId: Schema.optionalWith(Schema.NullOr(Uuid), { exact: true }),
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
-const AuthoringErrorCode = Schema.Literal(
+  currentRevisionId: Schema.optionalKey(Schema.NullOr(Uuid)),
+}).annotate({ closedObject: true });
+const AuthoringErrorCode = Schema.Literals([
   "VALIDATION_ERROR",
   "UNAUTHORIZED",
   "FORBIDDEN",
@@ -301,21 +303,20 @@ const AuthoringErrorCode = Schema.Literal(
   "RATE_LIMITED",
   "SERVICE_UNAVAILABLE",
   "INTERNAL_ERROR",
-);
+]);
 const AuthoringPublicError = Schema.Struct({
   code: AuthoringErrorCode,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
-  details: Schema.optionalWith(
-    Schema.Array(AuthoringErrorDetail).pipe(Schema.minItems(1), Schema.maxItems(50)),
-    { exact: true },
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  details: Schema.optionalKey(
+    Schema.Array(AuthoringErrorDetail).check(Schema.isMinLength(1), Schema.isMaxLength(50)),
   ),
   retryable: Schema.Boolean,
-  requestId: Schema.String.pipe(
-    Schema.minLength(1),
-    Schema.maxLength(128),
-    Schema.pattern(/^[A-Za-z0-9._:-]+$/u),
+  requestId: Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(128),
+    Schema.isPattern(/^[A-Za-z0-9._:-]+$/u),
   ),
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
+}).annotate({ closedObject: true });
 
 const maximumRequestBytes = 1_048_576;
 const maximumResponseBytes = 4_194_304;
@@ -355,11 +356,11 @@ function jsonObject(value: unknown): JsonObject {
   return decoded;
 }
 
-function requestBody<A, I>(schema: Schema.Schema<A, I, never>, value: unknown): JsonObject {
-  return jsonObject(Schema.decodeUnknownSync(schema)(value, { onExcessProperty: "error" }));
+function requestBody<A, I>(schema: Schema.Codec<A, I, never>, value: unknown): JsonObject {
+  return jsonObject(SchemaStrict.decodeUnknownSync(schema)(value, { onExcessProperty: "error" }));
 }
 
-function decodeEnvelope<A, I>(value: unknown, dataSchema: Schema.Schema<A, I, never>) {
+function decodeEnvelope<A, I>(value: unknown, dataSchema: Schema.Codec<A, I, never>) {
   if (
     !isRecord(value) ||
     Object.keys(value).length !== 4 ||
@@ -374,13 +375,13 @@ function decodeEnvelope<A, I>(value: unknown, dataSchema: Schema.Schema<A, I, ne
     if (value.error !== null) throw new Error("CLI_AUTHORING_RESPONSE_INVALID");
     return {
       ok: true as const,
-      data: Schema.decodeUnknownSync(dataSchema)(value.data, { onExcessProperty: "error" }),
+      data: SchemaStrict.decodeUnknownSync(dataSchema)(value.data, { onExcessProperty: "error" }),
       error: null,
       message: value.message,
     };
   }
   if (value.data !== null) throw new Error("CLI_AUTHORING_RESPONSE_INVALID");
-  const error = Schema.decodeUnknownSync(AuthoringPublicError)(value.error, {
+  const error = SchemaStrict.decodeUnknownSync(AuthoringPublicError)(value.error, {
     onExcessProperty: "error",
   });
   return {
@@ -408,8 +409,8 @@ function origin(value: string): URL {
   return url;
 }
 
-function segment<I>(schema: Schema.Schema<string, I, never>, value: unknown) {
-  return encodeURIComponent(Schema.decodeUnknownSync(schema)(value));
+function segment<I>(schema: Schema.Codec<string, I, never>, value: unknown) {
+  return encodeURIComponent(SchemaStrict.decodeUnknownSync(schema)(value));
 }
 
 function requestSignal(input: AbortSignal | undefined, timeoutMs: number) {
@@ -464,7 +465,7 @@ export function makeAuthoringOperatorClient(options: AuthoringOperatorClientOpti
     path: string,
     method: "GET" | "POST",
     body: JsonObject | undefined,
-    dataSchema: Schema.Schema<A, I, never>,
+    dataSchema: Schema.Codec<A, I, never>,
   ): Promise<AuthoringOperatorResponse<A>> => {
     const url = new URL(path, base);
     if (url.origin !== base.origin) throw new Error("CLI_AUTHORING_ORIGIN_INVALID");

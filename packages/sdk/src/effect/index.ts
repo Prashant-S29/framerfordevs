@@ -2,6 +2,7 @@
 
 import { Effect, Schema } from "effect";
 
+import * as SchemaStrict from "../schema-strict";
 export type PublicJsonValue =
   | null
   | boolean
@@ -13,66 +14,67 @@ export interface PublicJsonObject {
   readonly [key: string]: PublicJsonValue;
 }
 
-export const PublicJsonValue: Schema.Schema<PublicJsonValue> = Schema.suspend(() =>
-  Schema.Union(
+export const PublicJsonValue: Schema.Codec<PublicJsonValue> = Schema.suspend(() =>
+  Schema.Union([
     Schema.Null,
     Schema.Boolean,
-    Schema.Number.pipe(Schema.finite()),
+    Schema.Number.check(Schema.isFinite()),
     Schema.String,
     Schema.Array(PublicJsonValue),
-    Schema.Record({ key: Schema.String, value: PublicJsonValue }),
-  ),
+    Schema.Record(Schema.String, PublicJsonValue),
+  ]),
 );
-export const PublicJsonObject = Schema.Record({ key: Schema.String, value: PublicJsonValue });
+export const PublicJsonObject = Schema.Record(Schema.String, PublicJsonValue);
 
-const Uuid = Schema.String.pipe(
-  Schema.pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu),
+const Uuid = Schema.String.check(
+  Schema.isPattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu),
 );
-const IsoDateTime = Schema.String.pipe(
-  Schema.pattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u),
+const IsoDateTime = Schema.String.check(
+  Schema.isPattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u),
 );
-const Digest = Schema.String.pipe(Schema.length(64), Schema.pattern(/^[0-9a-f]{64}$/u));
-const Cursor = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(1_024),
-  Schema.pattern(/^[A-Za-z0-9_-]+$/u),
+const Digest = Schema.String.check(
+  Schema.isBetweenLength(64, 64),
+  Schema.isPattern(/^[0-9a-f]{64}$/u),
+);
+const Cursor = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(1_024),
+  Schema.isPattern(/^[A-Za-z0-9_-]+$/u),
 );
 
 export class PublicApiError extends Schema.Class<PublicApiError>("PublicApiError")({
-  code: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
-  details: Schema.optionalWith(Schema.Array(PublicJsonObject).pipe(Schema.maxItems(50)), {
-    exact: true,
-  }),
+  code: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  details: Schema.optionalKey(Schema.Array(PublicJsonObject).check(Schema.isMaxLength(50))),
   retryable: Schema.Boolean,
-  requestId: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128)),
+  requestId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
 }) {}
 
 export const PublicApiFailure = Schema.Struct({
   ok: Schema.Literal(false),
   data: Schema.Null,
   error: PublicApiError,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 });
 
-export function PublicApiSuccess<A, I, R>(data: Schema.Schema<A, I, R>) {
+export function PublicApiSuccess<A, I, R>(data: Schema.Codec<A, I, R>) {
   return Schema.Struct({
     ok: Schema.Literal(true),
     data,
     error: Schema.Null,
-    message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+    message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
   });
 }
 
-export function PublicApiEnvelope<A, I, R>(data: Schema.Schema<A, I, R>) {
-  return Schema.Union(PublicApiSuccess(data), PublicApiFailure);
+export function PublicApiEnvelope<A, I, R>(data: Schema.Codec<A, I, R>) {
+  return Schema.Union([PublicApiSuccess(data), PublicApiFailure]);
 }
 
 export class DeliveryPublicationMetadata extends Schema.Class<DeliveryPublicationMetadata>(
   "DeliveryPublicationMetadata",
 )({
   id: Uuid,
-  sequence: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(1)),
+  sequence: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1)),
   schemaRevisionId: Uuid,
   publishedAt: IsoDateTime,
 }) {}
@@ -80,8 +82,8 @@ export class DeliveryPublicationMetadata extends Schema.Class<DeliveryPublicatio
 export class DeliveryItem extends Schema.Class<DeliveryItem>("DeliveryItem")({
   id: Uuid,
   collectionId: Uuid,
-  collection: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(63)),
-  locale: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
+  collection: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(63)),
+  locale: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
   publication: DeliveryPublicationMetadata,
   data: PublicJsonObject,
 }) {}
@@ -89,13 +91,13 @@ export class DeliveryItem extends Schema.Class<DeliveryItem>("DeliveryItem")({
 export class DeliveryPageMetadata extends Schema.Class<DeliveryPageMetadata>(
   "DeliveryPageMetadata",
 )({
-  limit: Schema.Number.pipe(Schema.int(), Schema.between(1, 50)),
+  limit: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 50 })),
   nextCursor: Schema.NullOr(Cursor),
   hasMore: Schema.Boolean,
 }) {}
 
 export class DeliveryPage extends Schema.Class<DeliveryPage>("DeliveryPage")({
-  items: Schema.Array(DeliveryItem).pipe(Schema.maxItems(50)),
+  items: Schema.Array(DeliveryItem).check(Schema.isMaxLength(50)),
   page: DeliveryPageMetadata,
 }) {}
 
@@ -104,32 +106,32 @@ export class PreviewSource extends Schema.Class<PreviewSource>("PreviewSource")(
   schemaRevisionId: Uuid,
   contractHash: Digest,
   sharedRevisionId: Schema.NullOr(Uuid),
-  sharedVersion: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
+  sharedVersion: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   localizedRevisionId: Schema.NullOr(Uuid),
-  localizedVersion: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
-  source: Schema.Literal("current", "revision"),
+  localizedVersion: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  source: Schema.Literals(["current", "revision"]),
 }) {}
 
 export class PreviewValidationIssue extends Schema.Class<PreviewValidationIssue>(
   "PreviewValidationIssue",
 )({
   fieldId: Schema.NullOr(Uuid),
-  path: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
-  code: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  code: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
 export class PreviewValidation extends Schema.Class<PreviewValidation>("PreviewValidation")({
   valid: Schema.Boolean,
-  issues: Schema.Array(PreviewValidationIssue).pipe(Schema.maxItems(50)),
+  issues: Schema.Array(PreviewValidationIssue).check(Schema.isMaxLength(50)),
   capped: Schema.Boolean,
 }) {}
 
 export class PreviewItem extends Schema.Class<PreviewItem>("PreviewItem")({
   id: Uuid,
   collectionId: Uuid,
-  collection: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(63)),
-  locale: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
+  collection: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(63)),
+  locale: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
   preview: PreviewSource,
   data: PublicJsonObject,
   validation: PreviewValidation,
@@ -150,7 +152,7 @@ export type RecognizedContract<T> =
 export function recognizeDeliveryContract<A, I>(
   item: DeliveryItem,
   revisionId: string,
-  schema: Schema.Schema<A, I, never>,
+  schema: Schema.Codec<A, I, never>,
 ) {
   if (item.publication.schemaRevisionId !== revisionId) {
     return Effect.succeed({
@@ -160,7 +162,7 @@ export function recognizeDeliveryContract<A, I>(
     });
   }
   return Effect.map(
-    Schema.decodeUnknown(schema)(item.data, { onExcessProperty: "error" }),
+    SchemaStrict.decodeUnknownEffect(schema)(item.data, { onExcessProperty: "error" }),
     (data) => ({
       kind: "recognized_contract" as const,
       schemaRevisionId: item.publication.schemaRevisionId,
@@ -172,7 +174,7 @@ export function recognizeDeliveryContract<A, I>(
 export function recognizePreviewContract<A, I>(
   item: PreviewItem,
   revisionId: string,
-  schema: Schema.Schema<A, I, never>,
+  schema: Schema.Codec<A, I, never>,
 ) {
   if (item.preview.schemaRevisionId !== revisionId) {
     return Effect.succeed({
@@ -182,7 +184,7 @@ export function recognizePreviewContract<A, I>(
     });
   }
   return Effect.map(
-    Schema.decodeUnknown(schema)(item.data, { onExcessProperty: "error" }),
+    SchemaStrict.decodeUnknownEffect(schema)(item.data, { onExcessProperty: "error" }),
     (data) => ({
       kind: "recognized_contract" as const,
       schemaRevisionId: item.preview.schemaRevisionId,
@@ -191,18 +193,18 @@ export function recognizePreviewContract<A, I>(
   );
 }
 
-export function decodePublicEnvelope<A, I>(schema: Schema.Schema<A, I, never>, value: unknown) {
-  return Schema.decodeUnknown(PublicApiEnvelope(schema))(value, {
+export function decodePublicEnvelope<A, I>(schema: Schema.Codec<A, I, never>, value: unknown) {
+  return SchemaStrict.decodeUnknownEffect(PublicApiEnvelope(schema))(value, {
     onExcessProperty: "error",
   });
 }
 
-export function decodePublicEnvelopeSync<A, I>(schema: Schema.Schema<A, I, never>, value: unknown) {
-  return Schema.decodeUnknownSync(PublicApiEnvelope(schema))(value, {
+export function decodePublicEnvelopeSync<A, I>(schema: Schema.Codec<A, I, never>, value: unknown) {
+  return SchemaStrict.decodeUnknownSync(PublicApiEnvelope(schema))(value, {
     onExcessProperty: "error",
   });
 }
 
-export function decodePublicData<A, I>(schema: Schema.Schema<A, I, never>, value: unknown) {
-  return Schema.decodeUnknown(schema)(value, { onExcessProperty: "error" });
+export function decodePublicData<A, I>(schema: Schema.Codec<A, I, never>, value: unknown) {
+  return SchemaStrict.decodeUnknownEffect(schema)(value, { onExcessProperty: "error" });
 }

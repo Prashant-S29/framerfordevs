@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit } from "effect";
 
 import {
   StudioBoundedMatchCount,
@@ -18,11 +18,14 @@ import {
   StudioListEntriesQuery,
   StudioNewEntryWorkspaceResponse,
   StudioRenameEntryResponse,
+  StudioResolveEntriesRequest,
+  StudioResolveEntriesResponse,
   StudioSaveEntryDraftResponse,
   StudioSearchEntriesRequest,
   studioContentLimits,
 } from "./index";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const ids = {
   locale: "019fae8b-1234-7000-8000-000000000001",
   collection: "019fae8b-1234-7000-8000-000000000002",
@@ -40,17 +43,17 @@ const ids = {
 describe("Studio Content contracts", () => {
   it.effect("strictly decodes bounded browse and normalized search requests", () =>
     Effect.gen(function* () {
-      const browse = yield* Schema.decodeUnknown(StudioListEntriesQuery)({
+      const browse = yield* SchemaStrict.decodeUnknownEffect(StudioListEntriesQuery)({
         cursor: null,
         limit: 25,
       });
-      const search = yield* Schema.decodeUnknown(StudioSearchEntriesRequest)({
+      const search = yield* SchemaStrict.decodeUnknownEffect(StudioSearchEntriesRequest)({
         query: "  Café  ",
         cursor: null,
         limit: 50,
       });
       const excess = yield* Effect.exit(
-        Schema.decodeUnknown(StudioSearchEntriesRequest)({
+        SchemaStrict.decodeUnknownEffect(StudioSearchEntriesRequest)({
           query: "posts",
           cursor: null,
           limit: 25,
@@ -58,7 +61,7 @@ describe("Studio Content contracts", () => {
         }),
       );
 
-      const defaults = yield* Schema.decodeUnknown(StudioListEntriesQuery)({});
+      const defaults = yield* SchemaStrict.decodeUnknownEffect(StudioListEntriesQuery)({});
 
       assert.strictEqual(browse.limit, 25);
       assert.strictEqual(defaults.limit, 25);
@@ -159,7 +162,7 @@ describe("Studio Content contracts", () => {
     });
     const decoders = [
       () =>
-        Schema.decodeUnknownSync(StudioContentContextResponse)(
+        SchemaStrict.decodeUnknownSync(StudioContentContextResponse)(
           success({
             locales: [
               { id: ids.locale, tag: "en", displayName: "English", canRead: true, canWrite: true },
@@ -168,17 +171,21 @@ describe("Studio Content contracts", () => {
             configurationNotices: [],
           }),
         ),
-      () => Schema.decodeUnknownSync(StudioEntryPageResponse)(success(page)),
+      () => SchemaStrict.decodeUnknownSync(StudioEntryPageResponse)(success(page)),
       () =>
-        Schema.decodeUnknownSync(StudioNewEntryWorkspaceResponse)(
+        SchemaStrict.decodeUnknownSync(StudioResolveEntriesResponse)(
+          success({ items: [{ id: ids.entry, displayName: "Entry" }] }),
+        ),
+      () =>
+        SchemaStrict.decodeUnknownSync(StudioNewEntryWorkspaceResponse)(
           success({ localeId: ids.locale, locale: "en", form, capabilities }),
         ),
       () =>
-        Schema.decodeUnknownSync(StudioEntryWorkspaceResponse)(
+        SchemaStrict.decodeUnknownSync(StudioEntryWorkspaceResponse)(
           success({ localeId: ids.locale, locale: "en", form, capabilities, draft }),
         ),
       () =>
-        Schema.decodeUnknownSync(StudioCreateEntryResponse)(
+        SchemaStrict.decodeUnknownSync(StudioCreateEntryResponse)(
           success({
             entry,
             commandId: ids.command,
@@ -189,9 +196,9 @@ describe("Studio Content contracts", () => {
             validation,
           }),
         ),
-      () => Schema.decodeUnknownSync(StudioRenameEntryResponse)(success(entry)),
+      () => SchemaStrict.decodeUnknownSync(StudioRenameEntryResponse)(success(entry)),
       () =>
-        Schema.decodeUnknownSync(StudioSaveEntryDraftResponse)(
+        SchemaStrict.decodeUnknownSync(StudioSaveEntryDraftResponse)(
           success({
             entryId: ids.entry,
             commandId: ids.command,
@@ -208,15 +215,18 @@ describe("Studio Content contracts", () => {
 
     for (const decode of decoders) decode();
     assert.throws(() =>
-      Schema.decodeUnknownSync(StudioEntryPageResponse)({ ...success(page), unexpected: true }),
+      SchemaStrict.decodeUnknownSync(StudioEntryPageResponse)({
+        ...success(page),
+        unexpected: true,
+      }),
     );
     assert.throws(() =>
-      Schema.decodeUnknownSync(StudioEntryPageResponse)(
+      SchemaStrict.decodeUnknownSync(StudioEntryPageResponse)(
         success({ ...page, items: [{ ...entry, unexpected: true }] }),
       ),
     );
     assert.throws(() =>
-      Schema.decodeUnknownSync(StudioNewEntryWorkspaceResponse)(
+      SchemaStrict.decodeUnknownSync(StudioNewEntryWorkspaceResponse)(
         success({
           localeId: ids.locale,
           locale: "en",
@@ -226,7 +236,7 @@ describe("Studio Content contracts", () => {
       ),
     );
     assert.throws(() =>
-      Schema.decodeUnknownSync(StudioContentApiFailure)({
+      SchemaStrict.decodeUnknownSync(StudioContentApiFailure)({
         ok: false,
         data: null,
         error: {
@@ -241,8 +251,30 @@ describe("Studio Content contracts", () => {
     );
   });
 
+  it("bounds reference-label resolution to unique requested entry IDs", () => {
+    assert.deepStrictEqual(
+      SchemaStrict.decodeUnknownSync(StudioResolveEntriesRequest)({
+        entryIds: [ids.entry],
+      }).entryIds.map(String),
+      [ids.entry],
+    );
+    assert.throws(() =>
+      SchemaStrict.decodeUnknownSync(StudioResolveEntriesRequest)({
+        entryIds: [ids.entry, ids.entry],
+      }),
+    );
+    assert.throws(() =>
+      SchemaStrict.decodeUnknownSync(StudioResolveEntriesRequest)({
+        entryIds: Array.from(
+          { length: studioContentLimits.maximumResolvedEntries + 1 },
+          (_, index) => `019fae8b-1234-7000-8000-${String(index).padStart(12, "0")}`,
+        ),
+      }),
+    );
+  });
+
   it("locks closed configuration reasons without exposing schema details", () => {
-    const error = Schema.decodeUnknownSync(StudioContentApiError)({
+    const error = SchemaStrict.decodeUnknownSync(StudioContentApiError)({
       code: "STUDIO_COLLECTION_CONFIGURATION_INVALID",
       message: "The collection configuration is invalid.",
       configurationReason: "projection_invalid",
@@ -252,7 +284,7 @@ describe("Studio Content contracts", () => {
 
     assert.strictEqual(error.configurationReason, "projection_invalid");
     assert.throws(() =>
-      Schema.decodeUnknownSync(StudioContentApiError)({
+      SchemaStrict.decodeUnknownSync(StudioContentApiError)({
         ...error,
         configurationReason: "field_hidden",
       }),
@@ -261,7 +293,7 @@ describe("Studio Content contracts", () => {
 
   it("rejects a field configuration that does not match its discriminated kind", () => {
     assert.throws(() =>
-      Schema.decodeUnknownSync(StudioFormField)({
+      SchemaStrict.decodeUnknownSync(StudioFormField)({
         id: "019fae8b-1234-7000-8000-000000000003",
         parentFieldId: null,
         nodeRole: "root",
@@ -298,7 +330,7 @@ describe("Studio Content contracts", () => {
       displayName: "Entries",
       reason: "empty_schema",
     };
-    const maximumContext = Schema.decodeUnknownSync(StudioContentContext)({
+    const maximumContext = SchemaStrict.decodeUnknownSync(StudioContentContext)({
       locales: Array.from({ length: 100 }, () => locale),
       collections: Array.from({ length: 50 }, () => collection),
       configurationNotices: Array.from({ length: 50 }, () => notice),
@@ -324,7 +356,7 @@ describe("Studio Content contracts", () => {
         configurationNotices: Array.from({ length: 51 }, () => notice),
       },
     ]) {
-      assert.throws(() => Schema.decodeUnknownSync(StudioContentContext)(invalid));
+      assert.throws(() => SchemaStrict.decodeUnknownSync(StudioContentContext)(invalid));
     }
     const entry = {
       id: ids.entry,
@@ -333,14 +365,14 @@ describe("Studio Content contracts", () => {
       createdAt: "2026-09-28T00:00:00.000Z",
       updatedAt: "2026-09-28T00:00:00.000Z",
     };
-    Schema.decodeUnknownSync(StudioEntryPage)({
+    SchemaStrict.decodeUnknownSync(StudioEntryPage)({
       items: Array.from({ length: 50 }, () => entry),
       hasMore: false,
       nextCursor: null,
       count: { value: 50, relation: "exact" },
     });
     assert.throws(() =>
-      Schema.decodeUnknownSync(StudioEntryPage)({
+      SchemaStrict.decodeUnknownSync(StudioEntryPage)({
         items: Array.from({ length: 51 }, () => entry),
         hasMore: true,
         nextCursor: null,
@@ -356,20 +388,20 @@ describe("Studio Content contracts", () => {
       code: "required",
       message: "Required.",
     };
-    Schema.decodeUnknownSync(StudioEntryValidation)({
+    SchemaStrict.decodeUnknownSync(StudioEntryValidation)({
       status: "invalid",
       issues: Array.from({ length: 50 }, () => issue),
       capped: true,
     });
     assert.throws(() =>
-      Schema.decodeUnknownSync(StudioEntryValidation)({
+      SchemaStrict.decodeUnknownSync(StudioEntryValidation)({
         status: "invalid",
         issues: Array.from({ length: 51 }, () => issue),
         capped: true,
       }),
     );
     const mutation = { operation: "unset", path: [ids.field] };
-    Schema.decodeUnknownSync(StudioCreateEntryRequest)({
+    SchemaStrict.decodeUnknownSync(StudioCreateEntryRequest)({
       displayName: "Entry",
       schemaRevisionId: ids.revision,
       contractHash: "a".repeat(64),
@@ -378,7 +410,7 @@ describe("Studio Content contracts", () => {
       localizedMutations: [],
     });
     assert.throws(() =>
-      Schema.decodeUnknownSync(StudioCreateEntryRequest)({
+      SchemaStrict.decodeUnknownSync(StudioCreateEntryRequest)({
         displayName: "Entry",
         schemaRevisionId: ids.revision,
         contractHash: "a".repeat(64),
@@ -390,22 +422,22 @@ describe("Studio Content contracts", () => {
 
     for (const value of [0, 1, 999, 1_000]) {
       assert.strictEqual(
-        Schema.decodeUnknownSync(StudioBoundedMatchCount)({ value, relation: "exact" }).value,
+        SchemaStrict.decodeUnknownSync(StudioBoundedMatchCount)({ value, relation: "exact" }).value,
         value,
       );
     }
-    Schema.decodeUnknownSync(StudioBoundedMatchCount)({ value: 1_000, relation: "at_least" });
+    SchemaStrict.decodeUnknownSync(StudioBoundedMatchCount)({ value: 1_000, relation: "at_least" });
     for (const invalid of [
       { value: 1_001, relation: "exact" },
       { value: 999, relation: "at_least" },
       { value: 1_000, relation: "more" },
     ]) {
-      assert.throws(() => Schema.decodeUnknownSync(StudioBoundedMatchCount)(invalid));
+      assert.throws(() => SchemaStrict.decodeUnknownSync(StudioBoundedMatchCount)(invalid));
     }
   });
 
   it("bounds context projections and exact versus capped counts", () => {
-    const context = Schema.decodeUnknownSync(StudioContentContext)({
+    const context = SchemaStrict.decodeUnknownSync(StudioContentContext)({
       locales: [
         {
           id: ids.locale,
@@ -424,11 +456,11 @@ describe("Studio Content contracts", () => {
         },
       ],
     });
-    const exact = Schema.decodeUnknownSync(StudioBoundedMatchCount)({
+    const exact = SchemaStrict.decodeUnknownSync(StudioBoundedMatchCount)({
       value: 1_000,
       relation: "exact",
     });
-    const capped = Schema.decodeUnknownSync(StudioBoundedMatchCount)({
+    const capped = SchemaStrict.decodeUnknownSync(StudioBoundedMatchCount)({
       value: 1_000,
       relation: "at_least",
     });
@@ -436,6 +468,9 @@ describe("Studio Content contracts", () => {
     assert.strictEqual(context.configurationNotices[0]?.reason, "empty_schema");
     assert.strictEqual(exact.relation, "exact");
     assert.strictEqual(capped.relation, "at_least");
-    assert.strictEqual(Schema.decodeUnknownSync(StudioContentSearchText)("  posts  "), "posts");
+    assert.strictEqual(
+      SchemaStrict.decodeUnknownSync(StudioContentSearchText)("  posts  "),
+      "posts",
+    );
   });
 });

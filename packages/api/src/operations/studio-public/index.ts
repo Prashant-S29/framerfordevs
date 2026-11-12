@@ -2,7 +2,7 @@
 
 import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
 import { env } from "@framerfordevs/env/server";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import { ApiErrorDetail } from "../../contracts/response/api";
 import {
@@ -16,6 +16,7 @@ import { RateLimitManager } from "../../services/rate-limit/manager";
 import { authenticateStudioBearer } from "../../services/studio/principal-authenticator";
 import { StudioRepository } from "../../services/studio/repository";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const bearerPattern = /^Bearer ([^\s,]+)$/u;
 
 function invalidStudioInput(
@@ -41,7 +42,7 @@ export function validateStudioEmptyQuery(rawQuery: string) {
 }
 
 export function decodeStudioBootstrapScope(projectId: string, environmentId: string) {
-  return Schema.decodeUnknown(StudioBootstrapScope)({ projectId, environmentId }).pipe(
+  return SchemaStrict.decodeUnknownEffect(StudioBootstrapScope)({ projectId, environmentId }).pipe(
     Effect.mapError(() =>
       invalidStudioInput(
         "path",

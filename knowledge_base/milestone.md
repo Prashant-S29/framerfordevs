@@ -93,14 +93,14 @@ Post-M13 repository/context normalization is developer-approved and committed at
 
 ### Milestone 19 — Studio content and localization
 
-**Status:** `[R]` M19A is developer-accepted, committed, and pushed at `788b782` with the Studio Content protocol, BFF, immutable artifact, developer-applied/catalog-verified migration `0021_add_studio_entry_name_search_index`, and final validation evidence. M19B mounted Studio-experience implementation awaits explicit developer authorization.
+**Status:** `[R]` M19A is developer-accepted at `788b782`, and the migration-free M19B compatibility checkpoint is developer-accepted. The complete mounted experience and final readiness/security/artifact/database evidence pass; developer acceptance of M19B and the complete milestone remains pending.
 
 **Depends on:** M18B.
 
 **Summary:** Move everyday role-projected content and exact-locale draft authoring into the mounted project Studio.
 
 - Move role-projected collection and entry browsing into Studio with bounded pagination/search, permission-correct counts, direct-route enforcement, and large-collection behavior.
-- Render the complete 18-kind generated form system with immutable Presentation metadata, shared-field separation, exact enabled-locale tabs, and no schema-structure authoring.
+- Render the complete 18-kind generated form system with immutable Presentation metadata, shared-field separation, exact enabled-locale tabs, bounded safe reference-label resolution, and no schema-structure authoring.
 - Support entry create/rename, shared and localized draft save, validation/status, optimistic conflicts, retries, unsaved navigation, and source/schema drift recovery.
 - Ensure hidden or read-only collections/fields/locales are removed or immutable in server payload/authority—not merely hidden in React—and reject forged direct requests.
 - Preserve exact locale, role, project/environment, stable ID, revision, and actor authority across Studio BFF and Authoring services.

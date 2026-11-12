@@ -1,5 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Fiber, Layer, Schema, TestClock } from "effect";
+import { Effect, Fiber, Layer } from "effect";
+import { TestClock } from "effect/testing";
 
 import { CredentialStore, StoredOAuthAuthority, makeCredentialStore } from "../credential-store";
 import {
@@ -9,6 +10,7 @@ import {
   loginWithDeviceAuthorization,
 } from "./index";
 
+import * as SchemaStrict from "../schema-strict";
 function success(value: unknown, status = 200) {
   return Promise.resolve(
     new Response(JSON.stringify(value), {
@@ -92,7 +94,7 @@ describe("OAuth device CLI flow", () => {
           : success(tokenResponse);
       };
       return Effect.gen(function* () {
-        const fiber = yield* Effect.fork(
+        const fiber = yield* Effect.forkChild(
           loginWithDeviceAuthorization({
             apiOrigin: "https://api.example.com",
             openBrowser: false,
@@ -132,7 +134,7 @@ describe("OAuth device CLI flow", () => {
         : success(tokenResponse);
     };
     return Effect.gen(function* () {
-      const fiber = yield* Effect.fork(
+      const fiber = yield* Effect.forkChild(
         loginWithDeviceAuthorization({
           apiOrigin: "https://api.example.com",
           openBrowser: true,
@@ -162,7 +164,7 @@ describe("OAuth device CLI flow", () => {
       const store = yield* CredentialStore;
       yield* store.save(
         "https://api.example.com",
-        Schema.decodeUnknownSync(StoredOAuthAuthority)({
+        SchemaStrict.decodeUnknownSync(StoredOAuthAuthority)({
           version: 1,
           accessToken: "expired-access",
           refreshToken: "old-refresh",

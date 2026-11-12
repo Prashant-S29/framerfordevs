@@ -35,7 +35,7 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Cause, Effect, Exit, Option, Schema } from "effect";
+import { Cause, Effect, Exit, Option } from "effect";
 
 import { ApiCredentialId } from "../../../src/contracts/access";
 import { AuthoringValueMutations, CmsActor } from "../../../src/contracts/authoring";
@@ -73,6 +73,7 @@ import {
   StudioCollectionLocaleScope,
   StudioContentPageLimit,
   StudioContentScope,
+  StudioResolveEntryIds,
 } from "../../../src/contracts/studio-content";
 import { resolveAuthoringMutations } from "../../../src/lib/authoring/mutations";
 import { studioSearchAuthority } from "../../../src/lib/studio-content/search";
@@ -83,14 +84,15 @@ import { makePlatformRepository } from "../../../src/services/platform-repositor
 import { makeSchemaRepository } from "../../../src/services/schema/repository";
 import { makeStudioContentRepository } from "../../../src/services/studio-content/repository";
 
+import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ownerId = `m7-entry-owner-${suffix}`;
 const editorId = `m7-entry-editor-${suffix}`;
-const ownerActor = Schema.decodeUnknownSync(AuthUserId)(ownerId);
-const ownerCmsActor = Schema.decodeUnknownSync(CmsActor)({ kind: "user", id: ownerActor });
-const editorActor = Schema.decodeUnknownSync(AuthUserId)(editorId);
-const managementCredentialId = Schema.decodeUnknownSync(ApiCredentialId)(randomUUID());
-const managementActor = Schema.decodeUnknownSync(CmsActor)({
+const ownerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(ownerId);
+const ownerCmsActor = SchemaStrict.decodeUnknownSync(CmsActor)({ kind: "user", id: ownerActor });
+const editorActor = SchemaStrict.decodeUnknownSync(AuthUserId)(editorId);
+const managementCredentialId = SchemaStrict.decodeUnknownSync(ApiCredentialId)(randomUUID());
+const managementActor = SchemaStrict.decodeUnknownSync(CmsActor)({
   kind: "credential",
   id: managementCredentialId,
 });
@@ -119,7 +121,7 @@ function required<A>(value: A | undefined, label: string): A {
 
 function failureTag(exit: Exit.Exit<unknown, unknown>): string | undefined {
   if (Exit.isSuccess(exit)) return undefined;
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   return typeof failure === "object" &&
     failure !== null &&
     "_tag" in failure &&
@@ -146,14 +148,14 @@ beforeAll(async () => {
   workspaceModel = await Effect.runPromise(
     platform.createWorkspace(
       ownerActor,
-      Schema.decodeUnknownSync(CreateWorkspaceInput)({ name: "M7 Entry Workspace" }),
+      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M7 Entry Workspace" }),
       `m7-workspace-${suffix}`,
     ),
   );
   projectModel = await Effect.runPromise(
     platform.createProject(
       ownerActor,
-      Schema.decodeUnknownSync(CreateProjectInput)({
+      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
         workspaceId: required(workspaceModel, "workspace").id,
         name: "M7 Entry Project",
         key: `entry-${suffix.slice(0, 8)}`,
@@ -165,7 +167,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     platform.enableCapability(
       ownerActor,
-      Schema.decodeUnknownSync(EnableCapabilityInput)({
+      SchemaStrict.decodeUnknownSync(EnableCapabilityInput)({
         projectId: required(projectModel, "project").id,
         capability: "cms",
       }),
@@ -213,7 +215,7 @@ beforeAll(async () => {
   collectionModel = await Effect.runPromise(
     schemas.createCollection(
       ownerActor,
-      Schema.decodeUnknownSync(CreateCollectionInput)({
+      SchemaStrict.decodeUnknownSync(CreateCollectionInput)({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         apiKey: "articles",
@@ -227,7 +229,7 @@ beforeAll(async () => {
   const sharedDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      Schema.decodeUnknownSync(CreateCollectionFieldInput)({
+      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -252,7 +254,7 @@ beforeAll(async () => {
   const localizedDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      Schema.decodeUnknownSync(CreateCollectionFieldInput)({
+      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -277,7 +279,7 @@ beforeAll(async () => {
   const referenceDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      Schema.decodeUnknownSync(CreateCollectionFieldInput)({
+      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -302,7 +304,7 @@ beforeAll(async () => {
   const mixedDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      Schema.decodeUnknownSync(CreateCollectionFieldInput)({
+      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -327,7 +329,7 @@ beforeAll(async () => {
   const mixedSharedDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      Schema.decodeUnknownSync(CreateCollectionFieldInput)({
+      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -352,7 +354,7 @@ beforeAll(async () => {
   const mixedLocalizedDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      Schema.decodeUnknownSync(CreateCollectionFieldInput)({
+      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -377,7 +379,7 @@ beforeAll(async () => {
   const validation = await Effect.runPromise(
     schemas.validateSchema(
       ownerActor,
-      Schema.decodeUnknownSync(ValidateCollectionSchemaInput)({
+      SchemaStrict.decodeUnknownSync(ValidateCollectionSchemaInput)({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -387,7 +389,7 @@ beforeAll(async () => {
   publishedModel = await Effect.runPromise(
     schemas.publishSchema(
       ownerActor,
-      Schema.decodeUnknownSync(PublishCollectionSchemaInput)({
+      SchemaStrict.decodeUnknownSync(PublishCollectionSchemaInput)({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -405,7 +407,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     localeRepository.createLocale(
       ownerActor,
-      Schema.decodeUnknownSync(CreateProjectLocaleInput)({
+      SchemaStrict.decodeUnknownSync(CreateProjectLocaleInput)({
         projectId: currentProject.id,
         tag: "hi",
         displayName: "Hindi",
@@ -501,14 +503,14 @@ afterAll(async () => {
   await db.delete(user).where(or(eq(user.id, ownerId), eq(user.id, editorId)));
 });
 
-describe.sequential("entry repository PostgreSQL integration", () => {
+describe("entry repository PostgreSQL integration", () => {
   it.effect("returns an empty management list before the collection schema is published", () =>
     Effect.gen(function* () {
       const project = required(projectModel, "project");
       const page = yield* Effect.acquireUseRelease(
         schemas.createCollection(
           ownerActor,
-          Schema.decodeUnknownSync(CreateCollectionInput)({
+          SchemaStrict.decodeUnknownSync(CreateCollectionInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             apiKey: "unpublished_entries",
@@ -522,7 +524,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           Effect.all({
             page: entries.listEntries(
               ownerActor,
-              Schema.decodeUnknownSync(ListEntriesInput)({
+              SchemaStrict.decodeUnknownSync(ListEntriesInput)({
                 projectId: project.id,
                 environmentId: project.environment.id,
                 collectionId: collection.id,
@@ -533,7 +535,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
             ),
             context: studioContent.getContext(
               ownerActor,
-              Schema.decodeUnknownSync(StudioContentScope)({
+              SchemaStrict.decodeUnknownSync(StudioContentScope)({
                 projectId: project.id,
                 environmentId: project.environment.id,
               }),
@@ -569,16 +571,16 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const project = required(projectModel, "project");
       const collection = required(collectionModel, "collection");
       const published = required(publishedModel, "published schema");
-      const contextScope = Schema.decodeUnknownSync(StudioContentScope)({
+      const contextScope = SchemaStrict.decodeUnknownSync(StudioContentScope)({
         projectId: project.id,
         environmentId: project.environment.id,
       });
-      const englishScope = Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+      const englishScope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
         ...contextScope,
         collectionId: collection.id,
         locale: "en",
       });
-      const hindiScope = Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+      const hindiScope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
         ...contextScope,
         collectionId: collection.id,
         locale: "hi",
@@ -602,7 +604,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const foreignEnvironment = yield* Effect.exit(
         studioContent.authorizeCollection(
           ownerActor,
-          Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+          SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
             ...englishScope,
             environmentId: randomUUID(),
           }),
@@ -612,7 +614,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const foreignCollection = yield* Effect.exit(
         studioContent.authorizeCollection(
           ownerActor,
-          Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+          SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
             ...englishScope,
             collectionId: randomUUID(),
           }),
@@ -622,7 +624,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const foreignProject = yield* Effect.exit(
         studioContent.authorizeCollection(
           ownerActor,
-          Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+          SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
             ...englishScope,
             projectId: randomUUID(),
             environmentId: randomUUID(),
@@ -635,8 +637,9 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           ownerActor,
           {
             scope: englishScope,
-            expectedSchemaRevisionId: Schema.decodeUnknownSync(SchemaRevisionId)(randomUUID()),
-            limit: Schema.decodeUnknownSync(StudioContentPageLimit)(25),
+            expectedSchemaRevisionId:
+              SchemaStrict.decodeUnknownSync(SchemaRevisionId)(randomUUID()),
+            limit: SchemaStrict.decodeUnknownSync(StudioContentPageLimit)(25),
             search: null,
             browseOrder: null,
             searchOrder: null,
@@ -670,11 +673,11 @@ describe.sequential("entry repository PostgreSQL integration", () => {
   it("enforces the Studio fixed-role and locale-access capability matrix", async () => {
     const currentProject = required(projectModel, "project");
     const currentCollection = required(collectionModel, "collection");
-    const scope = Schema.decodeUnknownSync(StudioContentScope)({
+    const scope = SchemaStrict.decodeUnknownSync(StudioContentScope)({
       projectId: currentProject.id,
       environmentId: currentProject.environment.id,
     });
-    const localeScope = Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+    const localeScope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
       ...scope,
       collectionId: currentCollection.id,
       locale: "en",
@@ -771,11 +774,11 @@ describe.sequential("entry repository PostgreSQL integration", () => {
     const currentProject = required(projectModel, "project");
     const currentCollection = required(collectionModel, "collection");
     const published = required(publishedModel, "published schema");
-    const scope = Schema.decodeUnknownSync(StudioContentScope)({
+    const scope = SchemaStrict.decodeUnknownSync(StudioContentScope)({
       projectId: currentProject.id,
       environmentId: currentProject.environment.id,
     });
-    const localeScope = Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+    const localeScope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
       ...scope,
       collectionId: currentCollection.id,
       locale: "en",
@@ -827,13 +830,16 @@ describe.sequential("entry repository PostgreSQL integration", () => {
             ),
           );
 
-        assert.deepStrictEqual(ownerContext.configurationNotices, [
-          {
-            collectionId: currentCollection.id,
-            displayName: currentCollection.displayName,
-            reason: "empty_schema",
-          },
-        ]);
+        assert.deepStrictEqual(
+          ownerContext.configurationNotices.map((notice) => ({ ...notice })),
+          [
+            {
+              collectionId: currentCollection.id,
+              displayName: currentCollection.displayName,
+              reason: "empty_schema",
+            },
+          ],
+        );
         assert.deepStrictEqual(
           developerContext.configurationNotices,
           ownerContext.configurationNotices,
@@ -934,13 +940,16 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         );
         assert.strictEqual(failureTag(editorDirectBeforeSupport), "NotFoundFailure");
         assert.strictEqual(beforeSupportAudit?.count, 0);
-        assert.deepStrictEqual(ownerContext.configurationNotices, [
-          {
-            collectionId: currentCollection.id,
-            displayName: currentCollection.displayName,
-            reason: "projection_invalid",
-          },
-        ]);
+        assert.deepStrictEqual(
+          ownerContext.configurationNotices.map((notice) => ({ ...notice })),
+          [
+            {
+              collectionId: currentCollection.id,
+              displayName: currentCollection.displayName,
+              reason: "projection_invalid",
+            },
+          ],
+        );
         assert.deepStrictEqual(
           repeatedOwnerContext.configurationNotices,
           ownerContext.configurationNotices,
@@ -1088,7 +1097,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const collection = required(collectionModel, "collection");
       const published = required(publishedModel, "published schema");
       const commandId = randomUUID();
-      const input = yield* Schema.decodeUnknown(CreateEntryInput)({
+      const input = yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
         projectId: project.id,
         environmentId: project.environment.id,
         collectionId: collection.id,
@@ -1117,7 +1126,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       );
       const page = yield* entries.listEntries(
         ownerActor,
-        yield* Schema.decodeUnknown(ListEntriesInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ListEntriesInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1131,7 +1140,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const commandConflict = yield* Effect.exit(
         entries.createEntry(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateEntryInput)({ ...input, locale: "hi" }),
+          yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({ ...input, locale: "hi" }),
           new Date("2026-08-08T11:01:30.000Z"),
           `m7-create-conflict-${suffix}`,
         ),
@@ -1140,7 +1149,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const nameCommandConflict = yield* Effect.exit(
         entries.createEntry(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateEntryInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
             ...input,
             displayName: "Different command name",
           }),
@@ -1153,7 +1162,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       assert.strictEqual(page.items[0]?.displayName, "Primary entry");
       const renamed = yield* entries.renameEntry(
         ownerActor,
-        yield* Schema.decodeUnknown(RenameEntryInput)({
+        yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1169,7 +1178,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       assert.strictEqual(renamed.nameVersion, 2);
       const noOpRename = yield* entries.renameEntry(
         ownerActor,
-        yield* Schema.decodeUnknown(RenameEntryInput)({
+        yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1185,7 +1194,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const rollbackRename = yield* Effect.exit(
         makeEntryRepository({ failAfter: "audit" }).renameEntry(
           ownerActor,
-          yield* Schema.decodeUnknown(RenameEntryInput)({
+          yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1201,7 +1210,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       assert.strictEqual(failureTag(rollbackRename), "DatabaseFailure");
       const afterRenameRollback = yield* entries.getDraft(
         ownerActor,
-        yield* Schema.decodeUnknown(GetEntryDraftInput)({
+        yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1214,7 +1223,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const staleRename = yield* Effect.exit(
         entries.renameEntry(
           ownerActor,
-          yield* Schema.decodeUnknown(RenameEntryInput)({
+          yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1230,7 +1239,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       assert.strictEqual(failureTag(staleRename), "VersionConflictFailure");
       const renamedPage = yield* entries.listEntries(
         ownerActor,
-        yield* Schema.decodeUnknown(ListEntriesInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ListEntriesInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1252,6 +1261,49 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           ),
       );
       assert.strictEqual(renameAudits[0]?.count, 1);
+    }),
+  );
+
+  it.effect("resolves only requested available Studio entry labels", () =>
+    Effect.gen(function* () {
+      const project = required(projectModel, "project");
+      const collection = required(collectionModel, "collection");
+      const published = required(publishedModel, "published schema");
+      const entryId = required(primaryEntryId, "primary entry");
+      const unavailableId = randomUUID();
+      const scope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
+        projectId: project.id,
+        environmentId: project.environment.id,
+        collectionId: collection.id,
+        locale: "en",
+      });
+      const labels = yield* studioContent.resolveEntryLabels(
+        ownerActor,
+        {
+          scope,
+          expectedSchemaRevisionId: published.id,
+          entryIds: SchemaStrict.decodeUnknownSync(StudioResolveEntryIds)([unavailableId, entryId]),
+        },
+        new Date("2026-08-08T11:04:30.000Z"),
+      );
+      const stale = yield* Effect.exit(
+        studioContent.resolveEntryLabels(
+          ownerActor,
+          {
+            scope,
+            expectedSchemaRevisionId:
+              SchemaStrict.decodeUnknownSync(SchemaRevisionId)(randomUUID()),
+            entryIds: SchemaStrict.decodeUnknownSync(StudioResolveEntryIds)([entryId]),
+          },
+          new Date("2026-08-08T11:04:30.000Z"),
+        ),
+      );
+
+      assert.deepStrictEqual(
+        labels.map((label) => ({ ...label })),
+        [{ id: entryId, displayName: "Renamed primary entry" }],
+      );
+      assert.strictEqual(failureTag(stale), "AuthoringStaleSchemaFailure");
     }),
   );
 
@@ -1277,7 +1329,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           action: "content.read",
         },
       );
-      const mutations = yield* Schema.decodeUnknown(AuthoringValueMutations)([
+      const mutations = yield* SchemaStrict.decodeUnknownEffect(AuthoringValueMutations)([
         { operation: "set", scope: "shared", path: ["internal_name"], value: "Internal" },
         { operation: "set", scope: "localized", path: ["hero", "heading"], value: "Hello" },
       ]);
@@ -1292,13 +1344,13 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       );
       assert.isTrue(resolved.valid);
       if (resolved.valid) {
-        const sharedId = Schema.decodeUnknownSync(CollectionFieldId)(
+        const sharedId = SchemaStrict.decodeUnknownSync(CollectionFieldId)(
           required(sharedFieldId, "shared field"),
         );
-        const mixedObjectId = Schema.decodeUnknownSync(CollectionFieldId)(
+        const mixedObjectId = SchemaStrict.decodeUnknownSync(CollectionFieldId)(
           required(mixedObjectFieldId, "mixed object field"),
         );
-        const mixedLocalizedId = Schema.decodeUnknownSync(CollectionFieldId)(
+        const mixedLocalizedId = SchemaStrict.decodeUnknownSync(CollectionFieldId)(
           required(mixedLocalizedFieldId, "mixed localized field"),
         );
         assert.deepStrictEqual(resolved.mutations, [
@@ -1319,7 +1371,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const collection = required(collectionModel, "collection");
       const published = required(publishedModel, "published schema");
       const commandId = randomUUID();
-      const input = yield* Schema.decodeUnknown(CreateEntryWithDraftInput)({
+      const input = yield* SchemaStrict.decodeUnknownEffect(CreateEntryWithDraftInput)({
         projectId: project.id,
         environmentId: project.environment.id,
         collectionId: collection.id,
@@ -1362,7 +1414,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       );
       const draft = yield* entries.getDraft(
         managementActor,
-        yield* Schema.decodeUnknown(GetEntryDraftInput)({
+        yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1372,12 +1424,12 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       );
       const conflictingCommandId = randomUUID();
       const conflictingInputs = [
-        yield* Schema.decodeUnknown(CreateEntryWithDraftInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateEntryWithDraftInput)({
           ...input,
           commandId: conflictingCommandId,
           displayName: "Concurrent conflict A",
         }),
-        yield* Schema.decodeUnknown(CreateEntryWithDraftInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateEntryWithDraftInput)({
           ...input,
           commandId: conflictingCommandId,
           displayName: "Concurrent conflict B",
@@ -1406,7 +1458,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const failed = yield* Effect.exit(
         entries.createEntryWithDraft(
           managementActor,
-          yield* Schema.decodeUnknown(CreateEntryWithDraftInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateEntryWithDraftInput)({
             ...input,
             commandId: failedCommandId,
             displayName: "Must roll back",
@@ -1443,7 +1495,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         const rolledBack = yield* Effect.exit(
           makeEntryRepository({ failAfter: stage }).createEntryWithDraft(
             managementActor,
-            yield* Schema.decodeUnknown(CreateEntryWithDraftInput)({
+            yield* SchemaStrict.decodeUnknownEffect(CreateEntryWithDraftInput)({
               ...input,
               commandId: rollbackCommandId,
               displayName: `Injected ${stage} rollback`,
@@ -1510,7 +1562,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         const published = required(publishedModel, "published schema");
         const page = yield* entries.listEntries(
           ownerActor,
-          yield* Schema.decodeUnknown(ListEntriesInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListEntriesInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1527,7 +1579,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         const mixedLocalizedId = required(mixedLocalizedFieldId, "mixed localized field");
         const first = yield* entries.saveDraft(
           ownerActor,
-          yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+          yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1552,7 +1604,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         assert.strictEqual(first.validation.issues[0]?.code, "required");
         const localized = yield* entries.saveDraft(
           ownerActor,
-          yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+          yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1581,7 +1633,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         const malformed = yield* Effect.exit(
           entries.saveDraft(
             ownerActor,
-            yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+            yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
               projectId: project.id,
               environmentId: project.environment.id,
               collectionId: collection.id,
@@ -1606,7 +1658,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           const rollback = yield* Effect.exit(
             makeEntryRepository({ failAfter: stage }).saveDraft(
               ownerActor,
-              yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+              yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
                 projectId: project.id,
                 environmentId: project.environment.id,
                 collectionId: collection.id,
@@ -1641,7 +1693,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         }
         const afterRollback = yield* entries.getDraft(
           ownerActor,
-          yield* Schema.decodeUnknown(GetEntryDraftInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1669,7 +1721,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           "English heading",
         );
         const replayCommand = randomUUID();
-        const replayInput = yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+        const replayInput = yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1706,7 +1758,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         assert.strictEqual(replay.sharedRevisionId, saved.sharedRevisionId);
         const noOp = yield* entries.saveDraft(
           ownerActor,
-          yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+          yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
             ...replayInput,
             commandId: randomUUID(),
             expectedSharedVersion: 2,
@@ -1719,7 +1771,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         const commandConflict = yield* Effect.exit(
           entries.saveDraft(
             ownerActor,
-            yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+            yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
               ...replayInput,
               sharedMutations: [{ operation: "set", path: [sharedId], value: "Different" }],
             }),
@@ -1731,7 +1783,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         const stale = yield* Effect.exit(
           entries.saveDraft(
             ownerActor,
-            yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+            yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
               ...replayInput,
               commandId: randomUUID(),
               expectedSharedVersion: 0,
@@ -1755,7 +1807,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const missingReferenceId = randomUUID();
       const entry = yield* entries.createEntry(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateEntryInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1771,7 +1823,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const malformedReference = yield* Effect.exit(
         entries.saveDraft(
           ownerActor,
-          Schema.decodeUnknownSync(SaveEntryDraftInput)({
+          SchemaStrict.decodeUnknownSync(SaveEntryDraftInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1796,7 +1848,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const save = (locale: "en" | "hi", value: string) =>
         entries.saveDraft(
           ownerActor,
-          Schema.decodeUnknownSync(SaveEntryDraftInput)({
+          SchemaStrict.decodeUnknownSync(SaveEntryDraftInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1831,7 +1883,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const [englishDraft, hindiDraft] = yield* Effect.all([
         entries.getDraft(
           ownerActor,
-          yield* Schema.decodeUnknown(GetEntryDraftInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1841,7 +1893,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         ),
         entries.getDraft(
           ownerActor,
-          yield* Schema.decodeUnknown(GetEntryDraftInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1867,7 +1919,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         const published = required(publishedModel, "published schema");
         const page = yield* entries.listEntries(
           ownerActor,
-          yield* Schema.decodeUnknown(ListEntriesInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListEntriesInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1882,7 +1934,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         ).entry;
         const draft = yield* entries.getDraft(
           editorActor,
-          yield* Schema.decodeUnknown(GetEntryDraftInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1898,7 +1950,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         const unauthorizedLocale = yield* Effect.exit(
           entries.getDraft(
             editorActor,
-            yield* Schema.decodeUnknown(GetEntryDraftInput)({
+            yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
               projectId: project.id,
               environmentId: project.environment.id,
               collectionId: collection.id,
@@ -1911,7 +1963,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         const denied = yield* Effect.exit(
           entries.saveDraft(
             editorActor,
-            yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+            yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
               projectId: project.id,
               environmentId: project.environment.id,
               collectionId: collection.id,
@@ -1938,7 +1990,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         assert.strictEqual(failureTag(denied), "ForbiddenFailure");
         const localizedHistory = yield* entries.listRevisions(
           ownerActor,
-          yield* Schema.decodeUnknown(ListEntryRevisionsInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListEntryRevisionsInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1952,7 +2004,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         const target = required(localizedHistory.items[0], "localized revision");
         const changed = yield* entries.saveDraft(
           ownerActor,
-          yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+          yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1977,7 +2029,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         );
         const restored = yield* entries.restoreRevision(
           ownerActor,
-          yield* Schema.decodeUnknown(RestoreEntryRevisionInput)({
+          yield* SchemaStrict.decodeUnknownEffect(RestoreEntryRevisionInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1994,19 +2046,21 @@ describe.sequential("entry repository PostgreSQL integration", () => {
           `m7-restore-${suffix}`,
         );
         assert.strictEqual(restored.localizedVersion, 3);
-        const restoreNoOpInput = yield* Schema.decodeUnknown(RestoreEntryRevisionInput)({
-          projectId: project.id,
-          environmentId: project.environment.id,
-          collectionId: collection.id,
-          entryId: entry.id,
-          locale: "en",
-          scope: "localized",
-          revisionId: target.id,
-          schemaRevisionId: published.id,
-          contractHash: published.contractHash,
-          expectedVersion: 3,
-          commandId: randomUUID(),
-        });
+        const restoreNoOpInput = yield* SchemaStrict.decodeUnknownEffect(RestoreEntryRevisionInput)(
+          {
+            projectId: project.id,
+            environmentId: project.environment.id,
+            collectionId: collection.id,
+            entryId: entry.id,
+            locale: "en",
+            scope: "localized",
+            revisionId: target.id,
+            schemaRevisionId: published.id,
+            contractHash: published.contractHash,
+            expectedVersion: 3,
+            commandId: randomUUID(),
+          },
+        );
         const restoreNoOp = yield* entries.restoreRevision(
           ownerActor,
           restoreNoOpInput,
@@ -2023,7 +2077,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         assert.strictEqual(restoreReplay.localizedVersion, 3);
         const revisions = yield* entries.listRevisions(
           ownerActor,
-          yield* Schema.decodeUnknown(ListEntryRevisionsInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListEntryRevisionsInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -2061,7 +2115,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const entryId = required(primaryEntryId, "primary entry");
       const current = yield* entries.getDraft(
         managementActor,
-        yield* Schema.decodeUnknown(GetEntryDraftInput)({
+        yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -2072,7 +2126,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       const requestId = `m13-entry-credential-${suffix}`;
       const renamed = yield* entries.renameEntry(
         managementActor,
-        yield* Schema.decodeUnknown(RenameEntryInput)({
+        yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -2129,7 +2183,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       ]) {
         const created = yield* entries.createEntry(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateEntryInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -2144,13 +2198,13 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         );
         entryIdsByName.set(displayName, created.id);
       }
-      const scope = Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+      const scope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
         projectId: project.id,
         environmentId: project.environment.id,
         collectionId: collection.id,
         locale: "en",
       });
-      const limit = Schema.decodeUnknownSync(StudioContentPageLimit)(10);
+      const limit = SchemaStrict.decodeUnknownSync(StudioContentPageLimit)(10);
       const firstBrowse = yield* studioContent.listEntries(
         ownerActor,
         {
@@ -2165,7 +2219,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       );
       yield* entries.createEntry(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateEntryInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -2205,7 +2259,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       );
       yield* entries.createEntry(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateEntryInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -2220,7 +2274,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       );
       yield* entries.renameEntry(
         ownerActor,
-        yield* Schema.decodeUnknown(RenameEntryInput)({
+        yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -2234,7 +2288,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       );
       yield* entries.renameEntry(
         ownerActor,
-        yield* Schema.decodeUnknown(RenameEntryInput)({
+        yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -2311,7 +2365,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         {
           scope,
           expectedSchemaRevisionId: published.id,
-          limit: Schema.decodeUnknownSync(StudioContentPageLimit)(13),
+          limit: SchemaStrict.decodeUnknownSync(StudioContentPageLimit)(13),
           search: alpha,
           browseOrder: null,
           searchOrder: null,
@@ -2323,7 +2377,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         {
           scope,
           expectedSchemaRevisionId: published.id,
-          limit: Schema.decodeUnknownSync(StudioContentPageLimit)(50),
+          limit: SchemaStrict.decodeUnknownSync(StudioContentPageLimit)(50),
           search: null,
           browseOrder: null,
           searchOrder: null,
@@ -2376,24 +2430,30 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       assert.strictEqual(literalSearch.page.items[0]?.displayName, "%_literal");
       assert.strictEqual(escapeSearch.page.items[0]?.displayName, String.raw`\slash literal`);
       assert.strictEqual(unicodeCaseSearch.page.items[0]?.displayName, "İstanbul unicode");
-      assert.deepStrictEqual(emptySearch.page, {
-        items: [],
-        hasMore: false,
-        nextCursor: null,
-        count: { value: 0, relation: "exact" },
-      });
+      assert.deepStrictEqual(
+        { ...emptySearch.page },
+        {
+          items: [],
+          hasMore: false,
+          nextCursor: null,
+          count: { value: 0, relation: "exact" },
+        },
+      );
       assert.strictEqual(exactSearch.page.items.length, 13);
       assert.strictEqual(exactSearch.page.hasMore, false);
       assert.isNull(exactSearch.page.nextCursor);
       assert.strictEqual(fullBrowse.page.hasMore, false);
       assert.isNull(fullBrowse.page.nextCursor);
       assert.isAtMost(fullBrowse.page.items.length, 50);
-      assert.deepStrictEqual(nullDisplayNameSearch.page, {
-        items: [],
-        hasMore: false,
-        nextCursor: null,
-        count: { value: 0, relation: "exact" },
-      });
+      assert.deepStrictEqual(
+        { ...nullDisplayNameSearch.page },
+        {
+          items: [],
+          hasMore: false,
+          nextCursor: null,
+          count: { value: 0, relation: "exact" },
+        },
+      );
     }),
   );
 
@@ -2407,7 +2467,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
       for (let index = 0; index < 12; index += 1) {
         const created = yield* entries.createEntry(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateEntryInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -2422,7 +2482,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         );
         createdIds.push(created.id);
       }
-      const scope = Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+      const scope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
         projectId: project.id,
         environmentId: project.environment.id,
         collectionId: collection.id,
@@ -2434,7 +2494,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         {
           scope,
           expectedSchemaRevisionId: published.id,
-          limit: Schema.decodeUnknownSync(StudioContentPageLimit)(10),
+          limit: SchemaStrict.decodeUnknownSync(StudioContentPageLimit)(10),
           search,
           browseOrder: null,
           searchOrder: null,
@@ -2446,7 +2506,7 @@ describe.sequential("entry repository PostgreSQL integration", () => {
         {
           scope,
           expectedSchemaRevisionId: published.id,
-          limit: Schema.decodeUnknownSync(StudioContentPageLimit)(10),
+          limit: SchemaStrict.decodeUnknownSync(StudioContentPageLimit)(10),
           search,
           browseOrder: null,
           searchOrder: first.finalSearchOrder,

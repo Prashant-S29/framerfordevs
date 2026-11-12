@@ -55,7 +55,7 @@ describe("Express Studio adapter", () => {
       .post("/admin/studio/auth/logout")
       .set("Host", "127.0.0.1")
       .set("Content-Type", "text/plain")
-      .send("x".repeat(2_000));
+      .send("x".repeat(1 * 1_024 * 1_024 + 1));
     expect(response.status).toBe(413);
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -132,7 +132,7 @@ describe("Express Studio adapter", () => {
     );
   });
 
-  it("accepts exactly 1 KiB and rejects one byte more before the core", async () => {
+  it("accepts exactly 1 MiB and rejects one byte more before the core", async () => {
     const fetch = vi.fn(
       async (incoming: Request) =>
         new Response(String((await incoming.arrayBuffer()).byteLength), { status: 200 }),
@@ -143,14 +143,14 @@ describe("Express Studio adapter", () => {
       .post("/admin/studio/auth/logout")
       .set("Host", "127.0.0.1")
       .set("Content-Type", "application/json")
-      .send("x".repeat(1_024));
+      .send("x".repeat(1 * 1_024 * 1_024));
     expect(exact.status).toBe(200);
-    expect(exact.text).toBe("1024");
+    expect(exact.text).toBe(String(1 * 1_024 * 1_024));
     const over = await request(app)
       .post("/admin/studio/auth/logout")
       .set("Host", "127.0.0.1")
       .set("Content-Type", "application/json")
-      .send("x".repeat(1_025));
+      .send("x".repeat(1 * 1_024 * 1_024 + 1));
     expect(over.status).toBe(413);
     expect(fetch).toHaveBeenCalledOnce();
   });

@@ -1,7 +1,7 @@
 // Verifies M7 entry/revision cursors preserve immutable ordering and reject cross-scope reuse.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit } from "effect";
 
 import {
   decodeEntryCursor,
@@ -14,6 +14,7 @@ import { LocaleTag } from "../../locale";
 import { Cursor, EnvironmentId, ProjectId } from "../../platform";
 import { CollectionId } from "../../schema";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const projectId = ProjectId.make("019fae8b-1234-7000-8000-000000000001");
 const environmentId = EnvironmentId.make("019fae8b-1234-7000-8000-000000000002");
 const collectionId = CollectionId.make("019fae8b-1234-7000-8000-000000000003");
@@ -75,7 +76,7 @@ describe("entry cursors", () => {
   it.effect("rejects malformed and wrong-kind payloads without defects", () =>
     Effect.gen(function* () {
       const malformed = yield* Effect.exit(
-        decodeEntryCursor(yield* Schema.decodeUnknown(Cursor)("bm90LWpzb24"), scope),
+        decodeEntryCursor(yield* SchemaStrict.decodeUnknownEffect(Cursor)("bm90LWpzb24"), scope),
       );
       const revisionCursor = yield* encodeEntryRevisionCursor({
         ...scope,

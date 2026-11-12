@@ -7,7 +7,7 @@ export class CliConfigNotFoundError extends Schema.TaggedError<CliConfigNotFound
 export class CliConfigAmbiguousError extends Schema.TaggedError<CliConfigAmbiguousError>(
   "CliConfigAmbiguousError",
 )("CliConfigAmbiguousError", {
-  count: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(2)),
+  count: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(2)),
 }) {}
 
 export class CliConfigInvalidError extends Schema.TaggedError<CliConfigInvalidError>(
@@ -18,13 +18,13 @@ export class CliFileSystemError extends Schema.TaggedError<CliFileSystemError>(
   "CliFileSystemError",
 )("CliFileSystemError", {
   operation: Schema.String,
-  cause: Schema.Defect,
+  cause: Schema.Defect(),
 }) {}
 
 export class OAuthDeviceError extends Schema.TaggedError<OAuthDeviceError>("OAuthDeviceError")(
   "OAuthDeviceError",
   {
-    code: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
+    code: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
     retryable: Schema.Boolean,
   },
 ) {}
@@ -44,8 +44,8 @@ export class StoredCredentialInvalidError extends Schema.TaggedError<StoredCrede
 export class ControlPlaneHttpError extends Schema.TaggedError<ControlPlaneHttpError>(
   "ControlPlaneHttpError",
 )("ControlPlaneHttpError", {
-  status: Schema.Number.pipe(Schema.int(), Schema.between(0, 599)),
-  code: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
+  status: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 599 })),
+  code: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
   retryable: Schema.Boolean,
 }) {}
 
@@ -57,14 +57,14 @@ export class ControlPlaneTransportError extends Schema.TaggedError<ControlPlaneT
   "ControlPlaneTransportError",
 )("ControlPlaneTransportError", {
   operation: Schema.String,
-  cause: Schema.Defect,
+  cause: Schema.Defect(),
 }) {}
 
 export class ToolingHttpError extends Schema.TaggedError<ToolingHttpError>("ToolingHttpError")(
   "ToolingHttpError",
   {
-    status: Schema.Number.pipe(Schema.int(), Schema.between(0, 599)),
-    code: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
+    status: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 599 })),
+    code: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
     retryable: Schema.Boolean,
   },
 ) {}
@@ -85,7 +85,7 @@ export class ToolingTransportError extends Schema.TaggedError<ToolingTransportEr
   "ToolingTransportError",
 )("ToolingTransportError", {
   operation: Schema.String,
-  cause: Schema.Defect,
+  cause: Schema.Defect(),
 }) {}
 
 export class GeneratorContractInvalidError extends Schema.TaggedError<GeneratorContractInvalidError>(
@@ -108,7 +108,7 @@ export class GeneratorCommitError extends Schema.TaggedError<GeneratorCommitErro
   "GeneratorCommitError",
 )("GeneratorCommitError", {
   stage: Schema.String,
-  cause: Schema.Defect,
+  cause: Schema.Defect(),
 }) {}
 
 export const staticSchemaExtractionErrorCodeValues = [
@@ -136,8 +136,8 @@ export const staticSchemaExtractionErrorCodeValues = [
   "worker_protocol_invalid",
 ] as const;
 
-export const StaticSchemaExtractionErrorCode = Schema.Literal(
-  ...staticSchemaExtractionErrorCodeValues,
+export const StaticSchemaExtractionErrorCode = Schema.Literals(
+  staticSchemaExtractionErrorCodeValues,
 );
 export type StaticSchemaExtractionErrorCode = typeof StaticSchemaExtractionErrorCode.Type;
 
@@ -145,9 +145,9 @@ export class StaticSchemaExtractionError extends Schema.TaggedError<StaticSchema
   "StaticSchemaExtractionError",
 )("StaticSchemaExtractionError", {
   code: StaticSchemaExtractionErrorCode,
-  relativePath: Schema.NullOr(Schema.String.pipe(Schema.maxLength(240))),
-  line: Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(1))),
-  column: Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(1))),
+  relativePath: Schema.NullOr(Schema.String.check(Schema.isMaxLength(240))),
+  line: Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1))),
+  column: Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1))),
 }) {}
 
 export const experimentalSchemaBuildErrorCodeValues = [
@@ -174,8 +174,8 @@ export const experimentalSchemaBuildErrorCodeValues = [
   "worker_protocol_invalid",
 ] as const;
 
-export const ExperimentalSchemaBuildErrorCode = Schema.Literal(
-  ...experimentalSchemaBuildErrorCodeValues,
+export const ExperimentalSchemaBuildErrorCode = Schema.Literals(
+  experimentalSchemaBuildErrorCodeValues,
 );
 export type ExperimentalSchemaBuildErrorCode = typeof ExperimentalSchemaBuildErrorCode.Type;
 
@@ -183,7 +183,7 @@ export class ExperimentalSchemaBuildError extends Schema.TaggedError<Experimenta
   "ExperimentalSchemaBuildError",
 )("ExperimentalSchemaBuildError", {
   code: ExperimentalSchemaBuildErrorCode,
-  relativePath: Schema.NullOr(Schema.String.pipe(Schema.maxLength(240))),
+  relativePath: Schema.NullOr(Schema.String.check(Schema.isMaxLength(240))),
 }) {}
 
 export class CliSchemaBuildNotConfiguredError extends Schema.TaggedError<CliSchemaBuildNotConfiguredError>(
@@ -206,7 +206,7 @@ export class CliSchemaBuildCommitError extends Schema.TaggedError<CliSchemaBuild
   "CliSchemaBuildCommitError",
 )("CliSchemaBuildCommitError", {
   stage: Schema.String,
-  cause: Schema.Defect,
+  cause: Schema.Defect(),
 }) {}
 
 export class CliAuthoringSchemaUnownedError extends Schema.TaggedError<CliAuthoringSchemaUnownedError>(
@@ -219,7 +219,7 @@ export class CliAuthoringSchemaModifiedError extends Schema.TaggedError<CliAutho
 
 export class CliAuthoringSchemaLockError extends Schema.TaggedError<CliAuthoringSchemaLockError>(
   "CliAuthoringSchemaLockError",
-)("CliAuthoringSchemaLockError", { operation: Schema.String, cause: Schema.Defect }) {}
+)("CliAuthoringSchemaLockError", { operation: Schema.String, cause: Schema.Defect() }) {}
 
 export class CliRetryJournalConflictError extends Schema.TaggedError<CliRetryJournalConflictError>(
   "CliRetryJournalConflictError",
@@ -227,4 +227,4 @@ export class CliRetryJournalConflictError extends Schema.TaggedError<CliRetryJou
 
 export class CliRetryJournalError extends Schema.TaggedError<CliRetryJournalError>(
   "CliRetryJournalError",
-)("CliRetryJournalError", { operation: Schema.String, cause: Schema.Defect }) {}
+)("CliRetryJournalError", { operation: Schema.String, cause: Schema.Defect() }) {}

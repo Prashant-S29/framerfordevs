@@ -1,16 +1,16 @@
-import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { AuthUserId, IsoDateTime, ResourceVersion } from "../../../contracts/platform";
 import { StudioRuntimeStatus } from "../../../contracts/studio";
 import { decideStudioRuntimeTransition, studioMetadataRuntimeEffect } from "./index";
 
-const actorUserId = Schema.decodeUnknownSync(AuthUserId)("studio-operator");
-const now = Schema.decodeUnknownSync(IsoDateTime)("2026-09-21T12:00:00.000Z");
+import * as SchemaStrict from "../../schema-strict";
+const actorUserId = SchemaStrict.decodeUnknownSync(AuthUserId)("studio-operator");
+const now = SchemaStrict.decodeUnknownSync(IsoDateTime)("2026-09-21T12:00:00.000Z");
 
 function transitionInput() {
   return {
-    currentStatus: Schema.decodeUnknownSync(StudioRuntimeStatus)("inactive"),
+    currentStatus: SchemaStrict.decodeUnknownSync(StudioRuntimeStatus)("inactive"),
     currentVersion: ResourceVersion.make(3),
     currentChangedAt: null,
     currentChangedByUserId: null,
@@ -86,7 +86,7 @@ describe("Studio registration runtime kernel", () => {
   });
 
   it("preserves authority metadata for a true no-op", () => {
-    const changedAt = Schema.decodeUnknownSync(IsoDateTime)("2026-09-20T10:00:00.000Z");
+    const changedAt = SchemaStrict.decodeUnknownSync(IsoDateTime)("2026-09-20T10:00:00.000Z");
     expect(
       decideStudioRuntimeTransition({
         ...transitionInput(),

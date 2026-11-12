@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 
-import { Either, Schema } from "effect";
+import { Result } from "effect";
 
 import {
   type AuthoringSchemaAuthority,
@@ -20,6 +20,7 @@ import { SchemaChangeId, type SchemaChangeSet } from "../../../contracts/schema"
 import type { AcknowledgedAuthoringSchemaChangeIds } from "../../../contracts/authoring/schema";
 import { canonicalizeSchemaDocument } from "../../field/document";
 
+import * as SchemaStrict from "../../schema-strict";
 export type QualifyProjectSchemaChangesResult =
   | { readonly valid: true; readonly changes: ReadonlyArray<AuthoringSchemaChange> }
   | {
@@ -39,8 +40,8 @@ export function qualifyProjectSchemaChanges(
   const qualified: Array<AuthoringSchemaChange> = [];
   const issues: Array<{ readonly path: string; readonly code: "source_identity_missing" }> = [];
   const decodedCollectionSourceKey =
-    Schema.decodeUnknownEither(CollectionSourceKey)(collectionSourceKey);
-  if (Either.isLeft(decodedCollectionSourceKey)) {
+    SchemaStrict.decodeUnknownResult(CollectionSourceKey)(collectionSourceKey);
+  if (Result.isFailure(decodedCollectionSourceKey)) {
     return {
       valid: false,
       issues: [{ path: "collectionSourceKey", code: "source_identity_missing" }],
@@ -65,8 +66,10 @@ export function qualifyProjectSchemaChanges(
       continue;
     }
     const decodedFieldSourceKey =
-      fieldSourceKey === null ? null : Schema.decodeUnknownEither(FieldSourceKey)(fieldSourceKey);
-    if (decodedFieldSourceKey !== null && Either.isLeft(decodedFieldSourceKey)) {
+      fieldSourceKey === null
+        ? null
+        : SchemaStrict.decodeUnknownResult(FieldSourceKey)(fieldSourceKey);
+    if (decodedFieldSourceKey !== null && Result.isFailure(decodedFieldSourceKey)) {
       issues.push({
         path: `changes.${change.changeId}.fieldId`,
         code: "source_identity_missing",
@@ -91,8 +94,8 @@ export function qualifyProjectSchemaChanges(
         changeId,
         code: change.code,
         classification: change.classification,
-        collectionSourceKey: decodedCollectionSourceKey.right,
-        fieldSourceKey: decodedFieldSourceKey?.right ?? null,
+        collectionSourceKey: decodedCollectionSourceKey.success,
+        fieldSourceKey: decodedFieldSourceKey?.success ?? null,
         summary: change.summary,
       }),
     );

@@ -1,7 +1,9 @@
-import { Schema } from "effect";
+import { Schema, SchemaTransformation, Effect } from "effect";
 
 import { ApiSuccessSchema } from "../response/api";
 
+import * as SchemaStrict from "../../lib/schema-strict";
+import { UuidValue } from "../uuid";
 const projectKeyPattern = /^[a-z][a-z0-9-]{0,62}$/u;
 
 function hasControlCharacter(value: string): boolean {
@@ -15,41 +17,42 @@ function hasControlCharacter(value: string): boolean {
 }
 
 const NormalizedString = Schema.String.pipe(
-  Schema.transform(Schema.String, {
-    decode: (value) => value.trim().normalize("NFC"),
-    encode: (value) => value,
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transform({
+      decode: (value) => value.trim().normalize("NFC"),
+      encode: (value) => value,
+    }),
+  ),
+);
+
+const SafeName = NormalizedString.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(100),
+  Schema.makeFilter((value) => !hasControlCharacter(value), {
+    message: "Names cannot contain control characters.",
   }),
 );
 
-const SafeName = NormalizedString.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(100),
-  Schema.filter((value) => !hasControlCharacter(value), {
-    message: () => "Names cannot contain control characters.",
-  }),
-);
-
-export const WorkspaceId = Schema.UUID.pipe(Schema.brand("WorkspaceId"));
+export const WorkspaceId = UuidValue.pipe(Schema.brand("WorkspaceId"));
 export type WorkspaceId = typeof WorkspaceId.Type;
 
-export const WorkspaceMembershipId = Schema.UUID.pipe(Schema.brand("WorkspaceMembershipId"));
+export const WorkspaceMembershipId = UuidValue.pipe(Schema.brand("WorkspaceMembershipId"));
 export type WorkspaceMembershipId = typeof WorkspaceMembershipId.Type;
 
-export const ProjectId = Schema.UUID.pipe(Schema.brand("ProjectId"));
+export const ProjectId = UuidValue.pipe(Schema.brand("ProjectId"));
 export type ProjectId = typeof ProjectId.Type;
 
-export const EnvironmentId = Schema.UUID.pipe(Schema.brand("EnvironmentId"));
+export const EnvironmentId = UuidValue.pipe(Schema.brand("EnvironmentId"));
 export type EnvironmentId = typeof EnvironmentId.Type;
 
-export const ProjectCapabilityId = Schema.UUID.pipe(Schema.brand("ProjectCapabilityId"));
+export const ProjectCapabilityId = UuidValue.pipe(Schema.brand("ProjectCapabilityId"));
 export type ProjectCapabilityId = typeof ProjectCapabilityId.Type;
 
-export const AuditEventId = Schema.UUID.pipe(Schema.brand("AuditEventId"));
+export const AuditEventId = UuidValue.pipe(Schema.brand("AuditEventId"));
 export type AuditEventId = typeof AuditEventId.Type;
 
-export const AuthUserId = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(255),
+export const AuthUserId = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)).pipe(
   Schema.brand("AuthUserId"),
 );
 export type AuthUserId = typeof AuthUserId.Type;
@@ -60,61 +63,55 @@ export type WorkspaceName = typeof WorkspaceName.Type;
 export const ProjectName = SafeName.pipe(Schema.brand("ProjectName"));
 export type ProjectName = typeof ProjectName.Type;
 
-export const ProjectKey = NormalizedString.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(63),
-  Schema.filter(
+export const ProjectKey = NormalizedString.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(63),
+  Schema.makeFilter(
     (value) => projectKeyPattern.test(value) && !value.includes("--") && !value.endsWith("-"),
-    { message: () => "Use lowercase letters, numbers, and single hyphens." },
+    { message: "Use lowercase letters, numbers, and single hyphens." },
   ),
-  Schema.brand("ProjectKey"),
-);
+).pipe(Schema.brand("ProjectKey"));
 export type ProjectKey = typeof ProjectKey.Type;
 
-export const ProjectDescription = NormalizedString.pipe(
-  Schema.maxLength(500),
+export const ProjectDescription = NormalizedString.check(Schema.isMaxLength(500)).pipe(
   Schema.brand("ProjectDescription"),
 );
 export type ProjectDescription = typeof ProjectDescription.Type;
 
-export const ResourceVersion = Schema.Number.pipe(
-  Schema.int(),
-  Schema.greaterThanOrEqualTo(1),
-  Schema.brand("ResourceVersion"),
-);
+export const ResourceVersion = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isGreaterThanOrEqualTo(1),
+).pipe(Schema.brand("ResourceVersion"));
 export type ResourceVersion = typeof ResourceVersion.Type;
 
-export const PageLimit = Schema.Number.pipe(
-  Schema.int(),
-  Schema.between(1, 50),
-  Schema.brand("PageLimit"),
-);
+export const PageLimit = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isBetween({ minimum: 1, maximum: 50 }),
+).pipe(Schema.brand("PageLimit"));
 export type PageLimit = typeof PageLimit.Type;
 
-export const IsoDateTime = Schema.String.pipe(
-  Schema.pattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u),
-  Schema.brand("IsoDateTime"),
-);
+export const IsoDateTime = Schema.String.check(
+  Schema.isPattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u),
+).pipe(Schema.brand("IsoDateTime"));
 export type IsoDateTime = typeof IsoDateTime.Type;
 
-export const Cursor = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(512),
-  Schema.pattern(/^[A-Za-z0-9_-]+$/u),
-  Schema.brand("Cursor"),
-);
+export const Cursor = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(512),
+  Schema.isPattern(/^[A-Za-z0-9_-]+$/u),
+).pipe(Schema.brand("Cursor"));
 export type Cursor = typeof Cursor.Type;
 
-export const ProjectListStatus = Schema.Literal("active", "archived");
+export const ProjectListStatus = Schema.Literals(["active", "archived"]);
 export type ProjectListStatus = typeof ProjectListStatus.Type;
 
 export const CapabilityKey = Schema.Literal("cms");
 export type CapabilityKey = typeof CapabilityKey.Type;
 
-export const CapabilityStatus = Schema.Literal("enabled", "disabled");
+export const CapabilityStatus = Schema.Literals(["enabled", "disabled"]);
 export type CapabilityStatus = typeof CapabilityStatus.Type;
 
-export const WorkspaceRole = Schema.Literal("owner", "collaborator");
+export const WorkspaceRole = Schema.Literals(["owner", "collaborator"]);
 export type WorkspaceRole = typeof WorkspaceRole.Type;
 
 export class CreateWorkspaceInput extends Schema.Class<CreateWorkspaceInput>(
@@ -133,15 +130,14 @@ export class CreateProjectInput extends Schema.Class<CreateProjectInput>("Create
   name: ProjectName,
   key: ProjectKey,
   description: Schema.NullOr(ProjectDescription),
-  initialCapabilities: Schema.optionalWith(
-    Schema.Array(Schema.Literal("cms")).pipe(
-      Schema.maxItems(1),
-      Schema.filter((capabilities) => new Set(capabilities).size === capabilities.length, {
-        message: () => "Initial capabilities must be unique.",
+  initialCapabilities: Schema.Array(Schema.Literal("cms"))
+    .check(
+      Schema.isMaxLength(1),
+      Schema.makeFilter((capabilities) => new Set(capabilities).size === capabilities.length, {
+        message: "Initial capabilities must be unique.",
       }),
-    ),
-    { default: () => [] },
-  ),
+    )
+    .pipe(Schema.withDecodingDefaultType(Effect.sync(() => []))),
 }) {}
 
 export class ListProjectsInput extends Schema.Class<ListProjectsInput>("ListProjectsInput")({
@@ -240,18 +236,22 @@ export class ProjectPage extends Schema.Class<ProjectPage>("ProjectPage")({
   nextCursor: Schema.NullOr(Cursor),
 }) {}
 
-export const CreateWorkspaceInputSchema = Schema.standardSchemaV1(CreateWorkspaceInput);
-export const ListWorkspacesInputSchema = Schema.standardSchemaV1(ListWorkspacesInput);
-export const CreateProjectInputSchema = Schema.standardSchemaV1(CreateProjectInput);
-export const ListProjectsInputSchema = Schema.standardSchemaV1(ListProjectsInput);
-export const GetProjectInputSchema = Schema.standardSchemaV1(GetProjectInput);
-export const UpdateProjectInputSchema = Schema.standardSchemaV1(UpdateProjectInput);
-export const ArchiveProjectInputSchema = Schema.standardSchemaV1(ArchiveProjectInput);
-export const RestoreProjectInputSchema = Schema.standardSchemaV1(RestoreProjectInput);
-export const EnableCapabilityInputSchema = Schema.standardSchemaV1(EnableCapabilityInput);
+export const CreateWorkspaceInputSchema = SchemaStrict.toStandardSchemaV1(CreateWorkspaceInput);
+export const ListWorkspacesInputSchema = SchemaStrict.toStandardSchemaV1(ListWorkspacesInput);
+export const CreateProjectInputSchema = SchemaStrict.toStandardSchemaV1(CreateProjectInput);
+export const ListProjectsInputSchema = SchemaStrict.toStandardSchemaV1(ListProjectsInput);
+export const GetProjectInputSchema = SchemaStrict.toStandardSchemaV1(GetProjectInput);
+export const UpdateProjectInputSchema = SchemaStrict.toStandardSchemaV1(UpdateProjectInput);
+export const ArchiveProjectInputSchema = SchemaStrict.toStandardSchemaV1(ArchiveProjectInput);
+export const RestoreProjectInputSchema = SchemaStrict.toStandardSchemaV1(RestoreProjectInput);
+export const EnableCapabilityInputSchema = SchemaStrict.toStandardSchemaV1(EnableCapabilityInput);
 
-export const WorkspaceOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(Workspace));
-export const WorkspacePageOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(WorkspacePage));
-export const ProjectOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(Project));
-export const ProjectPageOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(ProjectPage));
-export const CapabilityOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(Capability));
+export const WorkspaceOutputSchema = SchemaStrict.toStandardSchemaV1(ApiSuccessSchema(Workspace));
+export const WorkspacePageOutputSchema = SchemaStrict.toStandardSchemaV1(
+  ApiSuccessSchema(WorkspacePage),
+);
+export const ProjectOutputSchema = SchemaStrict.toStandardSchemaV1(ApiSuccessSchema(Project));
+export const ProjectPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+  ApiSuccessSchema(ProjectPage),
+);
+export const CapabilityOutputSchema = SchemaStrict.toStandardSchemaV1(ApiSuccessSchema(Capability));

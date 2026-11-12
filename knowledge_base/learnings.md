@@ -561,3 +561,19 @@
 **Incorrect assumption or decision:** The first M18A pass assumed an existing dashboard session could resume Better Auth OAuth with an empty continue body, that the verifier configured for the Tooling audience would accept a correctly issued Studio-resource token, and that successful JWT access tokens would have persisted access-token rows.
 
 **Learning:** OAuth library behavior at login continuation, redirect validation, token issuance, persistence, and verification is executable security authority. Prevention: The private compatibility harness now proves the exact pinned provider flow; dashboard continuation explicitly sets `postLogin: true`, the JWT verifier allowlists both exact API resources, and a pre-provider Studio guard rejects unregistered redirect URIs without redirecting because the pinned provider otherwise delays that check until after consent and returns its error through the unregistered URI. M18A must also enforce current registration, grant, and audit-marker state during bootstrap because Better Auth persists the refresh token but emits the short-lived access token as a stateless JWT.
+
+---
+
+## 2026-11-12 — Effect v4 keeps v3 code compiling while changing schema behavior
+
+**Incorrect assumption or decision:** The Effect v3 to v4 migration was assumed to be mostly renames that the type checker would surface.
+
+**Learning:** Several v4 changes compile and still change behavior. v4 ignores the `parseOptions` annotation, so closed objects silently accept unknown keys. Its JSON Schema output differs from v3. Its `isUUID` is stricter. Its `brand` no longer drops an inherited identifier. Prevention: closed objects use the `closedObject` marker with the `schema-strict` decoders, public artifacts are compared byte for byte against released baselines, and `Uuid` and `UuidValue` keep the v3 pattern.
+
+---
+
+## 2026-11-12 — Vitest 5 changes defaults that tests relied on
+
+**Incorrect assumption or decision:** Test behavior was assumed to stay the same across the Vitest 3 to 5 upgrade.
+
+**Learning:** Vitest 5 removes `describe.sequential`, stops excluding `dist` by default, no longer brings DOM or Node types through its globals, and its `deep-eql` treats Effect v4 class instances as different from object literals. Prevention: server and worker configs exclude `dist`, packages declare the `DOM` lib and `node` types they use, assertions compare plain copies of decoded classes, and one `@types/node` override keeps a single Vitest instance.

@@ -3,7 +3,6 @@
 import { createHash } from "node:crypto";
 
 import type { CollectionSchema } from "@framerfordevs/schema";
-import { Schema } from "effect";
 
 import { type AuthoringSchemaAuthority, CollectionSourceKey } from "../../../contracts/authoring";
 import {
@@ -36,6 +35,7 @@ import {
 } from "../sources";
 import type { StructureIdentityMap } from "../hash";
 
+import * as SchemaStrict from "../../schema-strict";
 export interface CurrentCollectionPlanState {
   readonly sourceKey: string;
   readonly collection: CmsCollection;
@@ -74,7 +74,7 @@ function invalidPlan(
   current: AuthoringSchemaAuthority,
   issues: ReadonlyArray<{ readonly path: string; readonly code: string }>,
 ): AuthoringSchemaPlan {
-  return Schema.decodeUnknownSync(AuthoringSchemaPlan)({
+  return SchemaStrict.decodeUnknownSync(AuthoringSchemaPlan)({
     valid: false,
     current,
     planHash: null,
@@ -245,7 +245,7 @@ export function buildAuthoringProjectPlan(
           identity.collectionSourceKey === schema.sourceKey && identity.status === "new",
       );
     candidates.push(
-      Schema.decodeUnknownSync(AuthoringSchemaCandidate)({
+      SchemaStrict.decodeUnknownSync(AuthoringSchemaCandidate)({
         collectionSourceKey: schema.sourceKey,
         collectionId: reconciledCollection.collectionId,
         currentRevisionId: state?.published?.id ?? null,
@@ -261,7 +261,7 @@ export function buildAuthoringProjectPlan(
   }
   if (issues.length > 0) return invalidPlan(context.current, issues);
 
-  return Schema.decodeUnknownSync(AuthoringSchemaPlan)({
+  return SchemaStrict.decodeUnknownSync(AuthoringSchemaPlan)({
     valid: true,
     current: context.current,
     planHash,

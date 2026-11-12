@@ -184,7 +184,7 @@ afterAll(async () => {
   await disposeApplicationRuntime();
 });
 
-describe.sequential("platform API contracts", () => {
+describe("platform API contracts", () => {
   it.each([
     ["platform/workspaces/create", { name: "Anonymous" }],
     ["platform/workspaces/list", { cursor: null, limit: 20 }],

@@ -2,10 +2,9 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import { Schema } from "effect";
-
 import { PublicationWebhookEvent } from "../../../contracts/webhook";
 
+import * as SchemaStrict from "../../schema-strict";
 const signaturePattern = /^v1,([A-Za-z0-9+/]+={0,2})$/u;
 const maximumSignatures = 2;
 const defaultToleranceSeconds = 5 * 60;
@@ -130,7 +129,7 @@ export function verifyWebhookRequest(input: VerifyWebhookInput): WebhookVerifica
 
   let event: PublicationWebhookEvent;
   try {
-    event = Schema.decodeUnknownSync(PublicationWebhookEvent)(
+    event = SchemaStrict.decodeUnknownSync(PublicationWebhookEvent)(
       JSON.parse(Buffer.from(input.body).toString("utf8")),
     );
   } catch {

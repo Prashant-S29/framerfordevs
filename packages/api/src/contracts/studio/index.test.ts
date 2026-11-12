@@ -1,4 +1,3 @@
-import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -10,6 +9,7 @@ import {
   studioLimits,
 } from "./index";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const ids = {
   registration: "019fae8b-1234-7000-8000-000000000001",
   project: "019fae8b-1234-7000-8000-000000000002",
@@ -48,7 +48,7 @@ const bootstrap = {
 
 describe("Studio contracts", () => {
   it("decodes the bounded bootstrap projection without content or credential authority", () => {
-    const decoded = Schema.decodeUnknownSync(StudioBootstrap)(bootstrap, {
+    const decoded = SchemaStrict.decodeUnknownSync(StudioBootstrap)(bootstrap, {
       onExcessProperty: "error",
     });
 
@@ -65,7 +65,7 @@ describe("Studio contracts", () => {
 
   it("rejects excess, duplicate, and unknown bootstrap authority", () => {
     expect(() =>
-      Schema.decodeUnknownSync(StudioBootstrap)(
+      SchemaStrict.decodeUnknownSync(StudioBootstrap)(
         { ...bootstrap, hidden: true },
         {
           onExcessProperty: "error",
@@ -73,13 +73,13 @@ describe("Studio contracts", () => {
       ),
     ).toThrow();
     expect(() =>
-      Schema.decodeUnknownSync(StudioBootstrap)({
+      SchemaStrict.decodeUnknownSync(StudioBootstrap)({
         ...bootstrap,
         effectiveActions: ["project.read", "project.read"],
       }),
     ).toThrow();
     expect(() =>
-      Schema.decodeUnknownSync(StudioBootstrap)({
+      SchemaStrict.decodeUnknownSync(StudioBootstrap)({
         ...bootstrap,
         effectiveActions: ["schema.write"],
       }),
@@ -87,7 +87,7 @@ describe("Studio contracts", () => {
   });
 
   it("decodes the exact additive access-token authority", () => {
-    const authority = Schema.decodeUnknownSync(StudioAccessTokenAuthority)(
+    const authority = SchemaStrict.decodeUnknownSync(StudioAccessTokenAuthority)(
       {
         clientKind: "studio_v1",
         registrationId: ids.registration,
@@ -109,7 +109,7 @@ describe("Studio contracts", () => {
     expect(authority.clientKind).toBe("studio_v1");
     expect(authority.scopes).toEqual(["studio:session", "offline_access"]);
     expect(() =>
-      Schema.decodeUnknownSync(StudioAccessTokenAuthority)(
+      SchemaStrict.decodeUnknownSync(StudioAccessTokenAuthority)(
         { ...authority, token: "secret" },
         { onExcessProperty: "error" },
       ),
@@ -117,7 +117,7 @@ describe("Studio contracts", () => {
   });
 
   it("keeps acknowledgement projection bounded to resolved labels", () => {
-    const projection = Schema.decodeUnknownSync(StudioConsentProjection)(
+    const projection = SchemaStrict.decodeUnknownSync(StudioConsentProjection)(
       {
         registrationId: ids.registration,
         registrationVersion: 3,
@@ -149,7 +149,7 @@ describe("Studio contracts", () => {
   });
 
   it("decodes standard envelope failures with closed Studio errors", () => {
-    const failure = Schema.decodeUnknownSync(StudioApiFailure)({
+    const failure = SchemaStrict.decodeUnknownSync(StudioApiFailure)({
       ok: false,
       data: null,
       error: {
@@ -163,7 +163,7 @@ describe("Studio contracts", () => {
 
     expect(failure.error.code).toBe("STUDIO_AUTHORITY_CHANGED");
     expect(() =>
-      Schema.decodeUnknownSync(StudioApiFailure)({
+      SchemaStrict.decodeUnknownSync(StudioApiFailure)({
         ...failure,
         error: { ...failure.error, code: "CONTENT_WRITE_FAILED" },
       }),

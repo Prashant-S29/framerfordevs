@@ -260,7 +260,7 @@ function makeRedisClient(options: RedisRateLimitStoreOptions): {
 
 /** Builds the scoped production store while retaining memory fallback as a separate manager dependency. */
 export function makeRedisRateLimitStoreLive(options: RedisRateLimitStoreOptions) {
-  return Layer.scoped(
+  return Layer.effect(
     RateLimitStore,
     Effect.acquireRelease(
       Effect.sync(() => makeRedisClient(options)),

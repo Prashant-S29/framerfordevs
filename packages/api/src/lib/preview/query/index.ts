@@ -1,11 +1,12 @@
 // Parses the closed bounded Preview query grammar without consulting headers, persistence, or credentials.
 
-import { Option, Schema } from "effect";
+import { Option } from "effect";
 
 import { EntryRevisionId } from "../../../contracts/entry";
 import { canonicalizeLocaleTag } from "../../../contracts/locale/tag";
 import { previewLimits, type PreviewRevisionSelector } from "../../../contracts/preview";
 
+import * as SchemaStrict from "../../schema-strict";
 export interface PreviewQueryIssue {
   readonly path: string;
   readonly code: string;
@@ -80,7 +81,7 @@ function parseRevisionSelector(
     );
   }
   if (raw === "none") return { ok: true, value: "none" };
-  const revisionId = Option.getOrUndefined(Schema.decodeUnknownOption(EntryRevisionId)(raw));
+  const revisionId = Option.getOrUndefined(SchemaStrict.decodeUnknownOption(EntryRevisionId)(raw));
   return revisionId === undefined
     ? invalid(key, "revision_selector_invalid", "Use `none` or a valid revision ID.")
     : { ok: true, value: revisionId };

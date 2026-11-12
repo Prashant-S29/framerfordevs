@@ -1,7 +1,7 @@
 // Verifies strict Preview route decoding, bearer-only authentication, closed quotas, and operation dispatch.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Layer } from "effect";
 
 import { CredentialPrincipal } from "../../../contracts/access";
 import {
@@ -39,6 +39,7 @@ import {
   getUserRevisionPreview,
 } from "./index";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const ids = {
   workspace: "019fae8b-1234-7000-8000-000000000001",
   project: "019fae8b-1234-7000-8000-000000000002",
@@ -51,7 +52,7 @@ const ids = {
   credential: "019fae8b-1234-7000-8000-000000000009",
 };
 
-const principal = Schema.decodeUnknownSync(CredentialPrincipal)({
+const principal = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
   credentialId: ids.credential,
   workspaceId: ids.workspace,
   projectId: ids.project,
@@ -60,7 +61,7 @@ const principal = Schema.decodeUnknownSync(CredentialPrincipal)({
   scopes: ["preview.read"],
 });
 
-const item = Schema.decodeUnknownSync(PreviewItem)({
+const item = SchemaStrict.decodeUnknownSync(PreviewItem)({
   id: ids.entry,
   collectionId: ids.collection,
   collection: "articles",
@@ -80,8 +81,12 @@ const item = Schema.decodeUnknownSync(PreviewItem)({
 });
 
 function failureTag(exit: Exit.Exit<unknown, unknown>): string | undefined {
-  if (Exit.isSuccess(exit) || exit.cause._tag !== "Fail") return undefined;
-  const failure = exit.cause.error;
+  if (Exit.isSuccess(exit)) return undefined;
+  const [reason] = exit.cause.reasons;
+  if (exit.cause.reasons.length !== 1 || reason === undefined || !Cause.isFailReason(reason)) {
+    return undefined;
+  }
+  const failure = reason.error;
   return typeof failure === "object" && failure !== null && "_tag" in failure
     ? String(failure._tag)
     : undefined;
@@ -105,7 +110,7 @@ function makeLayers(
     evaluate: (input) =>
       Effect.sync(() => {
         calls.push(`${input.policy}:${input.identity}`);
-        return Schema.decodeUnknownSync(RateLimitDecision)({
+        return SchemaStrict.decodeUnknownSync(RateLimitDecision)({
           allowed: input.policy !== deniedPolicy,
           policy: input.policy,
           cost: 1,
@@ -241,7 +246,7 @@ describe("Preview operations", () => {
   });
 
   it("stops dashboard reads at the global or user quota before repository access", async () => {
-    const currentUser = Schema.decodeUnknownSync(GetCurrentUserPreviewInput)({
+    const currentUser = SchemaStrict.decodeUnknownSync(GetCurrentUserPreviewInput)({
       projectId: ids.project,
       environmentId: ids.environment,
       collectionId: ids.collection,
@@ -286,14 +291,14 @@ describe("Preview operations", () => {
         rawQuery: `locale=gu&sharedRevision=${ids.shared}&localizedRevision=${ids.localized}`,
       }),
     );
-    const currentUser = Schema.decodeUnknownSync(GetCurrentUserPreviewInput)({
+    const currentUser = SchemaStrict.decodeUnknownSync(GetCurrentUserPreviewInput)({
       projectId: ids.project,
       environmentId: ids.environment,
       collectionId: ids.collection,
       entryId: ids.entry,
       locale: "gu",
     });
-    const revisionUser = Schema.decodeUnknownSync(GetRevisionUserPreviewInput)({
+    const revisionUser = SchemaStrict.decodeUnknownSync(GetRevisionUserPreviewInput)({
       ...currentUser,
       schemaRevisionId: ids.schema,
       sharedRevisionId: ids.shared,

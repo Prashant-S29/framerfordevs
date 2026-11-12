@@ -8,6 +8,7 @@ import { makeControlPlaneHttpClient } from "../control-plane-http-client";
 import { ControlPlaneHttpError } from "../errors";
 import { acquireControlPlaneCommand, clearControlPlaneCommand } from "../retry-journal";
 
+import * as SchemaStrict from "../schema-strict";
 const positiveIntegerPattern = /^[1-9]\d*$/u;
 const controlPlaneCommands = new Set([
   "workspace list",
@@ -142,7 +143,7 @@ function positiveIntegerFlag(
 function optionalCommandId(arguments_: ParsedArguments) {
   const value = stringFlag(arguments_, "command-id");
   if (value === undefined) return Effect.succeed(undefined);
-  return Schema.decodeUnknown(Schema.UUID)(value).pipe(
+  return SchemaStrict.decodeUnknownEffect(Schema.String.check(Schema.isUUID()))(value).pipe(
     Effect.mapError(() => new Error("CLI_COMMAND_ID_INVALID")),
   );
 }

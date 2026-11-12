@@ -14,13 +14,14 @@ import {
   SchemaRevisionId,
 } from "../schema";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 export const previewLimits = {
   queryBytes: 4_096,
   responseBytes: 2_621_440,
   issues: 50,
 } as const;
 
-export const PreviewRevisionSelector = Schema.Union(Schema.Literal("none"), EntryRevisionId);
+export const PreviewRevisionSelector = Schema.Union([Schema.Literal("none"), EntryRevisionId]);
 export type PreviewRevisionSelector = typeof PreviewRevisionSelector.Type;
 
 const PreviewSourceFields = {
@@ -28,9 +29,9 @@ const PreviewSourceFields = {
   schemaRevisionId: SchemaRevisionId,
   contractHash: ContractHash,
   sharedRevisionId: Schema.NullOr(EntryRevisionId),
-  sharedVersion: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
+  sharedVersion: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   localizedRevisionId: Schema.NullOr(EntryRevisionId),
-  localizedVersion: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
+  localizedVersion: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
 };
 
 export class CurrentPreviewSource extends Schema.Class<CurrentPreviewSource>(
@@ -47,29 +48,29 @@ export class RevisionPreviewSource extends Schema.Class<RevisionPreviewSource>(
   source: Schema.Literal("revision"),
 }) {}
 
-export const PreviewSource = Schema.Union(CurrentPreviewSource, RevisionPreviewSource);
+export const PreviewSource = Schema.Union([CurrentPreviewSource, RevisionPreviewSource]);
 export type PreviewSource = typeof PreviewSource.Type;
 
 export class PreviewValidationIssue extends Schema.Class<PreviewValidationIssue>(
   "PreviewValidationIssue",
 )({
   fieldId: Schema.NullOr(CollectionFieldId),
-  path: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
-  code: Schema.String.pipe(
-    Schema.minLength(1),
-    Schema.maxLength(64),
-    Schema.pattern(/^[a-z][a-z0-9_]{0,63}$/u),
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  code: Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(64),
+    Schema.isPattern(/^[a-z][a-z0-9_]{0,63}$/u),
   ),
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
 export class PreviewValidation extends Schema.Class<PreviewValidation>("PreviewValidation")({
   valid: Schema.Boolean,
-  issues: Schema.Array(PreviewValidationIssue).pipe(Schema.maxItems(previewLimits.issues)),
+  issues: Schema.Array(PreviewValidationIssue).check(Schema.isMaxLength(previewLimits.issues)),
   capped: Schema.Boolean,
 }) {}
 
-const PreviewData = Schema.Record({ key: Schema.String, value: Schema.Unknown });
+const PreviewData = Schema.Record(Schema.String, Schema.Unknown);
 
 export class PreviewItem extends Schema.Class<PreviewItem>("PreviewItem")({
   id: EntryId,
@@ -83,11 +84,11 @@ export class PreviewItem extends Schema.Class<PreviewItem>("PreviewItem")({
 
 const PreviewRouteScopeFields = {
   projectId: ProjectId,
-  environmentKey: Schema.String.pipe(
-    Schema.minLength(1),
-    Schema.maxLength(63),
-    Schema.pattern(/^[a-z][a-z0-9-]{0,62}$/u),
-    Schema.filter((value) => !value.includes("--") && !value.endsWith("-")),
+  environmentKey: Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(63),
+    Schema.isPattern(/^[a-z][a-z0-9-]{0,62}$/u),
+    Schema.makeFilter((value) => !value.includes("--") && !value.endsWith("-")),
   ),
   collectionKey: CollectionApiKey,
   entryId: EntryId,
@@ -130,7 +131,7 @@ export class GetRevisionUserPreviewInput extends Schema.Class<GetRevisionUserPre
   localizedRevisionId: Schema.NullOr(EntryRevisionId),
 }) {}
 
-export const PreviewApiErrorCode = Schema.Literal(
+export const PreviewApiErrorCode = Schema.Literals([
   "VALIDATION_ERROR",
   "UNAUTHORIZED",
   "FORBIDDEN",
@@ -144,14 +145,13 @@ export const PreviewApiErrorCode = Schema.Literal(
   "RATE_LIMITED",
   "SERVICE_UNAVAILABLE",
   "INTERNAL_ERROR",
-);
+]);
 
 export class PreviewApiError extends Schema.Class<PreviewApiError>("PreviewApiError")({
   code: PreviewApiErrorCode,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
-  details: Schema.optionalWith(
-    Schema.Array(ApiErrorDetail).pipe(Schema.minItems(1), Schema.maxItems(50)),
-    { exact: true },
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  details: Schema.optionalKey(
+    Schema.Array(ApiErrorDetail).check(Schema.isMinLength(1), Schema.isMaxLength(50)),
   ),
   retryable: Schema.Boolean,
   requestId: RequestIdSchema,
@@ -161,15 +161,19 @@ export class PreviewApiFailure extends Schema.Class<PreviewApiFailure>("PreviewA
   ok: Schema.Literal(false),
   data: Schema.Null,
   error: PreviewApiError,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
-export const PreviewRouteScopeInputSchema = Schema.standardSchemaV1(PreviewRouteScope);
-export const GetRevisionCredentialPreviewInputSchema = Schema.standardSchemaV1(
+export const PreviewRouteScopeInputSchema = SchemaStrict.toStandardSchemaV1(PreviewRouteScope);
+export const GetRevisionCredentialPreviewInputSchema = SchemaStrict.toStandardSchemaV1(
   GetRevisionCredentialPreviewInput,
 );
-export const GetCurrentUserPreviewInputSchema = Schema.standardSchemaV1(GetCurrentUserPreviewInput);
-export const GetRevisionUserPreviewInputSchema = Schema.standardSchemaV1(
+export const GetCurrentUserPreviewInputSchema = SchemaStrict.toStandardSchemaV1(
+  GetCurrentUserPreviewInput,
+);
+export const GetRevisionUserPreviewInputSchema = SchemaStrict.toStandardSchemaV1(
   GetRevisionUserPreviewInput,
 );
-export const PreviewItemOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(PreviewItem));
+export const PreviewItemOutputSchema = SchemaStrict.toStandardSchemaV1(
+  ApiSuccessSchema(PreviewItem),
+);

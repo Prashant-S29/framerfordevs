@@ -1,6 +1,6 @@
 // Exposes authenticated Delivery configuration while keeping transport outside Effect services.
 
-import { Clock, Effect, Schema } from "effect";
+import { Clock, Effect } from "effect";
 
 import type {
   GetDeliveryConfigurationInput,
@@ -10,8 +10,11 @@ import { UnauthorizedFailure } from "../../../contracts/response/errors";
 import { AuthUserId } from "../../../contracts/platform";
 import { DeliveryRepository } from "../../../services/delivery/repository";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const decodeActorId = (actorId: string) =>
-  Schema.decodeUnknown(AuthUserId)(actorId).pipe(Effect.mapError(() => UnauthorizedFailure.make()));
+  SchemaStrict.decodeUnknownEffect(AuthUserId)(actorId).pipe(
+    Effect.mapError(() => UnauthorizedFailure.make()),
+  );
 
 export const getDeliveryConfiguration = Effect.fn("delivery.configuration.get")(function* (
   actorUserId: string,

@@ -50,13 +50,14 @@ import {
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
 import { createStudioOAuthHarness } from "@framerfordevs/studio-oauth-harness";
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit } from "effect";
 import { like } from "drizzle-orm";
 import express from "express";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { toNodeHandler } from "better-auth/node";
 
+import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const apiOrigin = "https://runtime-api.example.test";
 const dashboardOrigin = "https://runtime-dashboard.example.test";
 const applicationOrigin = "http://127.0.0.1:43218";
@@ -117,7 +118,7 @@ beforeAll(async () => {
   const createdWorkspace = await Effect.runPromise(
     platform.createWorkspace(
       actorId,
-      Schema.decodeUnknownSync(CreateWorkspaceInput)({ name: `Studio Runtime ${suffix}` }),
+      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: `Studio Runtime ${suffix}` }),
       `m18-runtime-workspace-${suffix}`,
     ),
   );
@@ -125,7 +126,7 @@ beforeAll(async () => {
   const createdProject = await Effect.runPromise(
     platform.createProject(
       actorId,
-      Schema.decodeUnknownSync(CreateProjectInput)({
+      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
         workspaceId: createdWorkspace.id,
         name: "Runtime Project",
         key: `runtime-${suffix}`,
@@ -139,7 +140,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     platform.enableCapability(
       actorId,
-      Schema.decodeUnknownSync(EnableCapabilityInput)({
+      SchemaStrict.decodeUnknownSync(EnableCapabilityInput)({
         projectId: createdProject.id,
         capability: "cms",
       }),
@@ -151,7 +152,7 @@ beforeAll(async () => {
       { kind: "user", id: actorId },
       createdProject.id,
       createdProject.environment.id,
-      Schema.decodeUnknownSync(ControlPlanePutStudioRegistrationRequest)({
+      SchemaStrict.decodeUnknownSync(ControlPlanePutStudioRegistrationRequest)({
         commandId: randomUUID(),
         expectedVersion: null,
         applicationOrigin,
@@ -165,7 +166,7 @@ beforeAll(async () => {
       { kind: "user", id: actorId },
       createdProject.id,
       createdProject.environment.id,
-      Schema.decodeUnknownSync(ControlPlaneSetStudioRuntimeRequest)({
+      SchemaStrict.decodeUnknownSync(ControlPlaneSetStudioRuntimeRequest)({
         commandId: randomUUID(),
         expectedVersion: registered.registration.version,
         enabled: true,
@@ -257,7 +258,7 @@ async function approveAuthorization() {
   return { attempt, callback: harness.callback(String(approval.body.url), attempt) };
 }
 
-describe.sequential("M18A Studio runtime authority", () => {
+describe("M18A Studio runtime authority", () => {
   it("fails closed without mutating a preexisting active nonportable mount", async () => {
     const metadata = {
       kind: "studio_v1",
@@ -286,7 +287,7 @@ describe.sequential("M18A Studio runtime authority", () => {
           { kind: "user", id: AuthUserId.make(userId) },
           ProjectId.make(projectId),
           EnvironmentId.make(environmentId),
-          Schema.decodeUnknownSync(ControlPlaneSetStudioRuntimeRequest)({
+          SchemaStrict.decodeUnknownSync(ControlPlaneSetStudioRuntimeRequest)({
             commandId: randomUUID(),
             expectedVersion: registrationVersion,
             enabled: true,
@@ -575,7 +576,7 @@ describe.sequential("M18A Studio runtime authority", () => {
         { kind: "user", id: actorId },
         ProjectId.make(projectId),
         EnvironmentId.make(environmentId),
-        Schema.decodeUnknownSync(ControlPlaneSetStudioRuntimeRequest)({
+        SchemaStrict.decodeUnknownSync(ControlPlaneSetStudioRuntimeRequest)({
           commandId: randomUUID(),
           expectedVersion: registrationVersion,
           enabled: false,

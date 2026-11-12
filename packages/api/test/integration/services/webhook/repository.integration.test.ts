@@ -17,7 +17,7 @@ import {
   webhookEndpointSecret,
   webhookEndpointSubscription,
 } from "@framerfordevs/db/schema/webhooks";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import { ApiCredentialId } from "../../../../src/contracts/access";
 import { AuthUserId } from "../../../../src/contracts/platform";
@@ -38,6 +38,7 @@ import {
 } from "../../../../src/contracts/webhook";
 import { makeWebhookRepository } from "../../../../src/services/webhook/repository";
 
+import * as SchemaStrict from "../../../../src/lib/schema-strict";
 interface FixtureScope {
   readonly actorId: string;
   readonly workspaceId: string;
@@ -102,7 +103,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const current = fixture();
     const actorId = {
       kind: "user" as const,
-      id: Schema.decodeUnknownSync(AuthUserId)(current.actorId),
+      id: SchemaStrict.decodeUnknownSync(AuthUserId)(current.actorId),
     };
     const endpointId = randomUUID();
     const destinationId = randomUUID();
@@ -113,7 +114,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     resourceIds.push(endpointId);
     const repository = makeWebhookRepository();
     const createdAt = new Date("2026-08-13T00:00:00.000Z");
-    const input = Schema.decodeUnknownSync(CreateWebhookEndpointInput)({
+    const input = SchemaStrict.decodeUnknownSync(CreateWebhookEndpointInput)({
       projectId: current.projectId,
       environmentId: current.environmentId,
       name: `Integration receiver ${endpointId.slice(0, 8)}`,
@@ -145,7 +146,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const updated = await Effect.runPromise(
       repository.updateEndpoint(
         actorId,
-        Schema.decodeUnknownSync(UpdateWebhookEndpointInput)({
+        SchemaStrict.decodeUnknownSync(UpdateWebhookEndpointInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           endpointId,
@@ -169,7 +170,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const subscribed = await Effect.runPromise(
       repository.replaceSubscriptions(
         actorId,
-        Schema.decodeUnknownSync(ReplaceWebhookSubscriptionsInput)({
+        SchemaStrict.decodeUnknownSync(ReplaceWebhookSubscriptionsInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           endpointId,
@@ -205,7 +206,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const pendingPage = await Effect.runPromise(
       repository.listEndpoints(
         actorId,
-        Schema.decodeUnknownSync(ListWebhookEndpointsInput)({
+        SchemaStrict.decodeUnknownSync(ListWebhookEndpointsInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           cursor: null,
@@ -220,7 +221,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const activated = await Effect.runPromise(
       repository.changeSecretRotation(
         actorId,
-        Schema.decodeUnknownSync(ChangeWebhookSecretRotationInput)({
+        SchemaStrict.decodeUnknownSync(ChangeWebhookSecretRotationInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           endpointId,
@@ -235,7 +236,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const activatedPage = await Effect.runPromise(
       repository.listEndpoints(
         actorId,
-        Schema.decodeUnknownSync(ListWebhookEndpointsInput)({
+        SchemaStrict.decodeUnknownSync(ListWebhookEndpointsInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           cursor: null,
@@ -251,7 +252,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     await Effect.runPromise(
       repository.changeSecretRotation(
         actorId,
-        Schema.decodeUnknownSync(ChangeWebhookSecretRotationInput)({
+        SchemaStrict.decodeUnknownSync(ChangeWebhookSecretRotationInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           endpointId,
@@ -270,7 +271,7 @@ describe("Webhook repository PostgreSQL integration", () => {
       .limit(1);
     if (!storedEvent) throw new Error("Webhook replay integration requires a canonical event.");
     const firstCommandId = randomUUID();
-    const replayInput = Schema.decodeUnknownSync(ReplayWebhookEventInput)({
+    const replayInput = SchemaStrict.decodeUnknownSync(ReplayWebhookEventInput)({
       projectId: current.projectId,
       environmentId: current.environmentId,
       endpointId,
@@ -312,7 +313,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const secondReplay = await Effect.runPromise(
       repository.replayEvent(
         actorId,
-        Schema.decodeUnknownSync(ReplayWebhookEventInput)({
+        SchemaStrict.decodeUnknownSync(ReplayWebhookEventInput)({
           ...replayInput,
           commandId: randomUUID(),
         }),
@@ -326,7 +327,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const firstDeliveryPage = await Effect.runPromise(
       repository.listDeliveries(
         actorId,
-        Schema.decodeUnknownSync(ListWebhookDeliveriesInput)({
+        SchemaStrict.decodeUnknownSync(ListWebhookDeliveriesInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           endpointId,
@@ -346,7 +347,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const secondDeliveryPage = await Effect.runPromise(
       repository.listDeliveries(
         actorId,
-        Schema.decodeUnknownSync(ListWebhookDeliveriesInput)({
+        SchemaStrict.decodeUnknownSync(ListWebhookDeliveriesInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           endpointId,
@@ -361,7 +362,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const attempts = await Effect.runPromise(
       repository.listAttempts(
         actorId,
-        Schema.decodeUnknownSync(ListWebhookAttemptsInput)({
+        SchemaStrict.decodeUnknownSync(ListWebhookAttemptsInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           deliveryId: replay.id,
@@ -375,7 +376,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const disabled = await Effect.runPromise(
       repository.setEndpointState(
         actorId,
-        Schema.decodeUnknownSync(SetWebhookEndpointStateInput)({
+        SchemaStrict.decodeUnknownSync(SetWebhookEndpointStateInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           endpointId,
@@ -400,7 +401,7 @@ describe("Webhook repository PostgreSQL integration", () => {
       Effect.exit(
         repository.replayEvent(
           actorId,
-          Schema.decodeUnknownSync(ReplayWebhookEventInput)({
+          SchemaStrict.decodeUnknownSync(ReplayWebhookEventInput)({
             ...replayInput,
             commandId: randomUUID(),
           }),
@@ -455,13 +456,13 @@ describe("Webhook repository PostgreSQL integration", () => {
     });
     const actor = {
       kind: "credential" as const,
-      id: Schema.decodeUnknownSync(ApiCredentialId)(credentialId),
+      id: SchemaStrict.decodeUnknownSync(ApiCredentialId)(credentialId),
     };
     const repository = makeWebhookRepository();
     await Effect.runPromise(
       repository.createEndpoint(
         actor,
-        Schema.decodeUnknownSync(CreateWebhookEndpointInput)({
+        SchemaStrict.decodeUnknownSync(CreateWebhookEndpointInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           name: `Credential receiver ${endpointId.slice(0, 8)}`,
@@ -486,7 +487,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     await Effect.runPromise(
       repository.replaceSubscriptions(
         actor,
-        Schema.decodeUnknownSync(ReplaceWebhookSubscriptionsInput)({
+        SchemaStrict.decodeUnknownSync(ReplaceWebhookSubscriptionsInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           endpointId,
@@ -518,7 +519,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     await Effect.runPromise(
       repository.changeSecretRotation(
         actor,
-        Schema.decodeUnknownSync(ChangeWebhookSecretRotationInput)({
+        SchemaStrict.decodeUnknownSync(ChangeWebhookSecretRotationInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           endpointId,
@@ -532,7 +533,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const mapping = await Effect.runPromise(
       repository.createMapping(
         actor,
-        Schema.decodeUnknownSync(CreateInvalidationRouteMappingInput)({
+        SchemaStrict.decodeUnknownSync(CreateInvalidationRouteMappingInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           collectionId: current.collectionId,
@@ -559,7 +560,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const replay = await Effect.runPromise(
       repository.replayEvent(
         actor,
-        Schema.decodeUnknownSync(ReplayWebhookEventInput)({
+        SchemaStrict.decodeUnknownSync(ReplayWebhookEventInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           endpointId,
@@ -663,13 +664,13 @@ describe("Webhook repository PostgreSQL integration", () => {
     const current = fixture();
     const actorId = {
       kind: "user" as const,
-      id: Schema.decodeUnknownSync(AuthUserId)(current.actorId),
+      id: SchemaStrict.decodeUnknownSync(AuthUserId)(current.actorId),
     };
     const repository = makeWebhookRepository();
     const created = await Effect.runPromise(
       repository.createMapping(
         actorId,
-        Schema.decodeUnknownSync(CreateInvalidationRouteMappingInput)({
+        SchemaStrict.decodeUnknownSync(CreateInvalidationRouteMappingInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           collectionId: current.collectionId,
@@ -689,7 +690,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const second = await Effect.runPromise(
       repository.createMapping(
         actorId,
-        Schema.decodeUnknownSync(CreateInvalidationRouteMappingInput)({
+        SchemaStrict.decodeUnknownSync(CreateInvalidationRouteMappingInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           collectionId: current.collectionId,
@@ -709,7 +710,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const firstPage = await Effect.runPromise(
       repository.listMappings(
         actorId,
-        Schema.decodeUnknownSync(ListInvalidationRouteMappingsInput)({
+        SchemaStrict.decodeUnknownSync(ListInvalidationRouteMappingsInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           cursor: null,
@@ -723,7 +724,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const secondPage = await Effect.runPromise(
       repository.listMappings(
         actorId,
-        Schema.decodeUnknownSync(ListInvalidationRouteMappingsInput)({
+        SchemaStrict.decodeUnknownSync(ListInvalidationRouteMappingsInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           cursor: firstPage.nextCursor,
@@ -735,7 +736,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const updated = await Effect.runPromise(
       repository.updateMapping(
         actorId,
-        Schema.decodeUnknownSync(UpdateInvalidationRouteMappingInput)({
+        SchemaStrict.decodeUnknownSync(UpdateInvalidationRouteMappingInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           mappingId: created.id,
@@ -756,7 +757,7 @@ describe("Webhook repository PostgreSQL integration", () => {
     const disabled = await Effect.runPromise(
       repository.setMappingState(
         actorId,
-        Schema.decodeUnknownSync(SetInvalidationRouteMappingStateInput)({
+        SchemaStrict.decodeUnknownSync(SetInvalidationRouteMappingStateInput)({
           projectId: current.projectId,
           environmentId: current.environmentId,
           mappingId: created.id,

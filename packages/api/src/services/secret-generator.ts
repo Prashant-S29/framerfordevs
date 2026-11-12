@@ -13,6 +13,7 @@ import {
 } from "../contracts/access";
 import { SecurityServiceFailure } from "../contracts/response/errors";
 
+import * as SchemaStrict from "../lib/schema-strict";
 export interface CredentialMaterial {
   readonly key: CredentialSecret;
   readonly keyPrefix: CredentialKeyPrefix;
@@ -36,10 +37,10 @@ function securityFailure(operation: string, cause: unknown) {
 
 function decodeGenerated<A, I>(
   operation: string,
-  schema: Schema.Schema<A, I, never>,
+  schema: Schema.Codec<A, I, never>,
   value: unknown,
 ) {
-  return Schema.decodeUnknown(schema)(value).pipe(
+  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
     Effect.mapError((cause) => securityFailure(`${operation}.decode`, cause)),
   );
 }
@@ -49,11 +50,11 @@ function sha256(value: string): string {
 }
 
 export function parseCredentialKey(value: string): ParsedCredentialKey | undefined {
-  const decoded = Option.getOrUndefined(Schema.decodeUnknownOption(CredentialSecret)(value));
+  const decoded = Option.getOrUndefined(SchemaStrict.decodeUnknownOption(CredentialSecret)(value));
   if (decoded === undefined) return undefined;
   const match = /^ffd_(mgmt|del|prev)_([0-9a-f-]{36})_[A-Za-z0-9_-]{43}$/u.exec(decoded);
   const familyCode = match?.[1];
-  const id = Option.getOrUndefined(Schema.decodeUnknownOption(ApiCredentialId)(match?.[2]));
+  const id = Option.getOrUndefined(SchemaStrict.decodeUnknownOption(ApiCredentialId)(match?.[2]));
   if (id === undefined) return undefined;
 
   switch (familyCode) {
@@ -128,9 +129,9 @@ export function makeSecretGenerator() {
   };
 }
 
-export class SecretGenerator extends Context.Tag("SecretGenerator")<
+export class SecretGenerator extends Context.Service<
   SecretGenerator,
   ReturnType<typeof makeSecretGenerator>
->() {}
+>()("SecretGenerator") {}
 
 export const SecretGeneratorLive = Layer.succeed(SecretGenerator, makeSecretGenerator());

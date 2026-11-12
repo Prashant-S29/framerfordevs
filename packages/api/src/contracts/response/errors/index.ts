@@ -15,9 +15,9 @@ import type {
   StudioNameVersionConflictFailure,
 } from "../../studio-content";
 
-const ValidationDetailsSchema = Schema.Array(ApiErrorDetail).pipe(
-  Schema.minItems(1),
-  Schema.maxItems(50),
+const ValidationDetailsSchema = Schema.Array(ApiErrorDetail).check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(50),
 );
 
 export class ValidationFailure extends Schema.TaggedError<ValidationFailure>("ValidationFailure")(
@@ -39,7 +39,7 @@ export class ForbiddenFailure extends Schema.TaggedError<ForbiddenFailure>("Forb
 export class NotFoundFailure extends Schema.TaggedError<NotFoundFailure>("NotFoundFailure")(
   "NotFoundFailure",
   {
-    resource: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
+    resource: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
   },
 ) {}
 
@@ -71,7 +71,7 @@ export class LocaleUnavailableFailure extends Schema.TaggedError<LocaleUnavailab
 export class LocaleDependenciesExistFailure extends Schema.TaggedError<LocaleDependenciesExistFailure>(
   "LocaleDependenciesExistFailure",
 )("LocaleDependenciesExistFailure", {
-  requestedStatus: Schema.Literal("disabled", "removed"),
+  requestedStatus: Schema.Literals(["disabled", "removed"]),
   dependencies: LocaleDependencySummary,
 }) {}
 
@@ -102,7 +102,7 @@ export class PublishedSchemaRequiredFailure extends Schema.TaggedError<Published
 export class EntryDraftConflictFailure extends Schema.TaggedError<EntryDraftConflictFailure>(
   "EntryDraftConflictFailure",
 )("EntryDraftConflictFailure", {
-  details: Schema.Array(ApiErrorDetail).pipe(Schema.minItems(1), Schema.maxItems(2)),
+  details: Schema.Array(ApiErrorDetail).check(Schema.isMinLength(1), Schema.isMaxLength(2)),
 }) {}
 
 export class EntryCommandConflictFailure extends Schema.TaggedError<EntryCommandConflictFailure>(
@@ -116,16 +116,16 @@ export class EntryRevisionIncompatibleFailure extends Schema.TaggedError<EntryRe
 export class EntryPublicationInvalidFailure extends Schema.TaggedError<EntryPublicationInvalidFailure>(
   "EntryPublicationInvalidFailure",
 )("EntryPublicationInvalidFailure", {
-  issues: Schema.Array(EntryPublicationValidationIssue).pipe(
-    Schema.minItems(1),
-    Schema.maxItems(50),
+  issues: Schema.Array(EntryPublicationValidationIssue).check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(50),
   ),
 }) {}
 
 export class EntryPublicationConflictFailure extends Schema.TaggedError<EntryPublicationConflictFailure>(
   "EntryPublicationConflictFailure",
 )("EntryPublicationConflictFailure", {
-  details: Schema.Array(ApiErrorDetail).pipe(Schema.minItems(1), Schema.maxItems(50)),
+  details: Schema.Array(ApiErrorDetail).check(Schema.isMinLength(1), Schema.isMaxLength(50)),
 }) {}
 
 export class DeliveryQueryInvalidFailure extends Schema.TaggedError<DeliveryQueryInvalidFailure>(
@@ -215,7 +215,7 @@ export class AuthoringStaleSchemaFailure extends Schema.TaggedError<AuthoringSta
 export class AuthoringDraftConflictFailure extends Schema.TaggedError<AuthoringDraftConflictFailure>(
   "AuthoringDraftConflictFailure",
 )("AuthoringDraftConflictFailure", {
-  details: Schema.Array(ApiErrorDetail).pipe(Schema.minItems(1), Schema.maxItems(2)),
+  details: Schema.Array(ApiErrorDetail).check(Schema.isMinLength(1), Schema.isMaxLength(2)),
 }) {}
 
 export class AuthoringPublicationConflictFailure extends Schema.TaggedError<AuthoringPublicationConflictFailure>(
@@ -295,23 +295,23 @@ export class RateLimitedFailure extends Schema.TaggedError<RateLimitedFailure>(
 export class DatabaseFailure extends Schema.TaggedError<DatabaseFailure>("DatabaseFailure")(
   "DatabaseFailure",
   {
-    operation: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128)),
-    cause: Schema.Defect,
+    operation: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+    cause: Schema.Defect(),
   },
 ) {}
 
 export class AuthSessionFailure extends Schema.TaggedError<AuthSessionFailure>(
   "AuthSessionFailure",
 )("AuthSessionFailure", {
-  operation: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128)),
-  cause: Schema.Defect,
+  operation: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  cause: Schema.Defect(),
 }) {}
 
 export class SecurityServiceFailure extends Schema.TaggedError<SecurityServiceFailure>(
   "SecurityServiceFailure",
 )("SecurityServiceFailure", {
-  operation: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(128)),
-  cause: Schema.Defect,
+  operation: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  cause: Schema.Defect(),
 }) {}
 
 export type ApplicationError =

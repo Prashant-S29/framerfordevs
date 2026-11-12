@@ -1,7 +1,8 @@
 // Proves Delivery cursor signing, rolling expiry, key rotation, authority binding, and stale-generation recovery.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Option, TestClock } from "effect";
+import { Cause, Effect, Exit, Option } from "effect";
+import { TestClock } from "effect/testing";
 
 import { makeDeliveryCursorSigner, type SignDeliveryCursorInput } from "./index";
 
@@ -30,7 +31,7 @@ const page = {
 /** Reads a tagged expected failure without flattening defects or interruption. */
 function failureTag(exit: Exit.Exit<unknown, unknown>): string | undefined {
   if (Exit.isSuccess(exit)) return undefined;
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   return typeof failure === "object" &&
     failure !== null &&
     "_tag" in failure &&

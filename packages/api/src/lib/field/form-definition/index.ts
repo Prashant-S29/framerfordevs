@@ -1,7 +1,5 @@
 // Builds bounded role-projected generated-form authority independently from persistence and transport.
 
-import { Schema } from "effect";
-
 import { ProjectRole } from "../../../contracts/access";
 import { EditorLayout } from "../../../contracts/field";
 import {
@@ -12,6 +10,7 @@ import {
 import { iso4217MinorUnits } from "../../../registry/iso-4217.generated";
 import { flattenFieldTree } from "../tree";
 
+import * as SchemaStrict from "../../schema-strict";
 const allProjectRoles = [
   "owner",
   "developer",
@@ -30,7 +29,7 @@ function compareFieldPosition(
 }
 
 export function syntheticEditorLayout(fields: ReadonlyArray<CollectionFieldDefinition>) {
-  return Schema.decodeUnknownSync(EditorLayout)({
+  return SchemaStrict.decodeUnknownSync(EditorLayout)({
     version: 1,
     tabs: [
       {
@@ -113,9 +112,9 @@ function projectLayoutForRole(
     }));
   if (tabs.length === 0) {
     const synthetic = syntheticEditorLayout([]);
-    return Schema.decodeUnknownSync(EditorLayout)({ ...synthetic, sidebarGroups });
+    return SchemaStrict.decodeUnknownSync(EditorLayout)({ ...synthetic, sidebarGroups });
   }
-  return Schema.decodeUnknownSync(EditorLayout)({ version: 1, tabs, sidebarGroups });
+  return SchemaStrict.decodeUnknownSync(EditorLayout)({ version: 1, tabs, sidebarGroups });
 }
 
 export function generatedFormDefinition(options: {
@@ -154,7 +153,7 @@ export function generatedFormDefinition(options: {
     const minorUnit = Reflect.get(iso4217MinorUnits, currency);
     if (typeof minorUnit === "number") currencyMinorUnits[currency] = minorUnit;
   }
-  return Schema.decodeUnknownSync(GeneratedFormDefinition)({
+  return SchemaStrict.decodeUnknownSync(GeneratedFormDefinition)({
     ...options,
     fields,
     editableFieldIds,

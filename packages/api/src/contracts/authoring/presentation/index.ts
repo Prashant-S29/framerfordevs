@@ -24,17 +24,17 @@ export class AuthoringEnumOptionPresentation extends Schema.Class<AuthoringEnumO
 )(
   Schema.Struct({
     optionId: EnumOptionId,
-    label: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
-    position: Schema.Number.pipe(Schema.int(), Schema.between(0, 99)),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+    label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+    position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 99 })),
+  }).annotate({ closedObject: true }),
 ) {}
 
-const AuthoringEnumOptionPresentations = Schema.Array(AuthoringEnumOptionPresentation).pipe(
-  Schema.maxItems(100),
-  Schema.filter(
+const AuthoringEnumOptionPresentations = Schema.Array(AuthoringEnumOptionPresentation).check(
+  Schema.isMaxLength(100),
+  Schema.makeFilter(
     (options) => new Set(options.map((option) => option.optionId)).size === options.length,
     {
-      message: () => "Enum option presentation IDs must be unique.",
+      message: "Enum option presentation IDs must be unique.",
     },
   ),
 );
@@ -45,18 +45,21 @@ export class AuthoringFieldPresentation extends Schema.Class<AuthoringFieldPrese
   Schema.Struct({
     fieldId: CollectionFieldId,
     displayLabel: Schema.NullOr(CollectionFieldDisplayLabel),
-    position: Schema.Number.pipe(Schema.int(), Schema.between(0, 99)),
+    position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 99 })),
     editor: FieldEditorMetadata,
     enumOptions: AuthoringEnumOptionPresentations,
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+  }).annotate({ closedObject: true }),
 ) {}
 
-export const AuthoringFieldPresentations = Schema.Array(AuthoringFieldPresentation).pipe(
-  Schema.minItems(1),
-  Schema.maxItems(100),
-  Schema.filter((fields) => new Set(fields.map((field) => field.fieldId)).size === fields.length, {
-    message: () => "Field presentation IDs must be unique.",
-  }),
+export const AuthoringFieldPresentations = Schema.Array(AuthoringFieldPresentation).check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(100),
+  Schema.makeFilter(
+    (fields) => new Set(fields.map((field) => field.fieldId)).size === fields.length,
+    {
+      message: "Field presentation IDs must be unique.",
+    },
+  ),
 );
 export type AuthoringFieldPresentations = typeof AuthoringFieldPresentations.Type;
 
@@ -68,7 +71,7 @@ export class AuthoringCollectionPresentation extends Schema.Class<AuthoringColle
     description: Schema.NullOr(CollectionDescription),
     fields: AuthoringFieldPresentations,
     editorLayout: EditorLayout,
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+  }).annotate({ closedObject: true }),
 ) {}
 
 export const AuthoringPublishPresentationRequest = Schema.Struct({
@@ -76,9 +79,9 @@ export const AuthoringPublishPresentationRequest = Schema.Struct({
   expectedRevisionId: SchemaRevisionId,
   expectedSequence: SchemaRevisionSequence,
   presentation: AuthoringCollectionPresentation,
-}).annotations({
+}).annotate({
   identifier: "AuthoringPublishPresentationRequest",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type AuthoringPublishPresentationRequest = typeof AuthoringPublishPresentationRequest.Type;
 

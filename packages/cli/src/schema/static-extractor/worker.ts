@@ -1,11 +1,12 @@
 import { parentPort, workerData } from "node:worker_threads";
 
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import { StaticSchemaExtractionError } from "../../errors";
 import { runStaticSchemaExtractorInWorker } from "./index";
 import { StaticSchemaWorkerInput, type StaticSchemaWorkerResponse } from "./protocol";
 
+import * as SchemaStrict from "../../schema-strict";
 const protocolFailure = StaticSchemaExtractionError.make({
   code: "worker_protocol_invalid",
   relativePath: null,
@@ -16,7 +17,7 @@ const protocolFailure = StaticSchemaExtractionError.make({
 const program = Effect.suspend(() =>
   Object.keys(process.env).length === 0 ? Effect.void : Effect.fail(protocolFailure),
 ).pipe(
-  Effect.andThen(Schema.decodeUnknown(StaticSchemaWorkerInput)(workerData)),
+  Effect.andThen(SchemaStrict.decodeUnknownEffect(StaticSchemaWorkerInput)(workerData)),
   Effect.mapError(() => protocolFailure),
   Effect.flatMap(runStaticSchemaExtractorInWorker),
   Effect.match({

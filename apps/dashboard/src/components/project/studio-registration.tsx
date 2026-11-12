@@ -16,13 +16,14 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@framerfordevs/ui/com
 import { Input } from "@framerfordevs/ui/components/input";
 import { Spinner } from "@framerfordevs/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Option, Schema } from "effect";
+import { Option } from "effect";
 import { ExternalLinkIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";
 
+import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 function applicationErrorCode(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null) return undefined;
   if ("code" in error && typeof error.code === "string") return error.code;
@@ -96,7 +97,7 @@ export function StudioRegistrationSettings({
       pendingRuntimeCommand.current = { intent, commandId: crypto.randomUUID() };
     }
     const decoded = Option.getOrUndefined(
-      Schema.decodeUnknownOption(ControlPlaneSetStudioRuntimeRequest)({
+      SchemaStrict.decodeUnknownOption(ControlPlaneSetStudioRuntimeRequest)({
         commandId: pendingRuntimeCommand.current.commandId,
         expectedVersion: registration.version,
         enabled,
@@ -112,7 +113,7 @@ export function StudioRegistrationSettings({
       pendingCommand.current = { intent, commandId: crypto.randomUUID() };
     }
     const decoded = Option.getOrUndefined(
-      Schema.decodeUnknownOption(ControlPlanePutStudioRegistrationRequest)({
+      SchemaStrict.decodeUnknownOption(ControlPlanePutStudioRegistrationRequest)({
         commandId: pendingCommand.current.commandId,
         expectedVersion: registration?.version ?? null,
         applicationOrigin,

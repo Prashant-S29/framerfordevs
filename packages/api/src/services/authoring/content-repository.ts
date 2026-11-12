@@ -9,7 +9,7 @@ import {
   cmsSchemaRevisionField,
 } from "@framerfordevs/db/schema/cms";
 import { projectLocale } from "@framerfordevs/db/schema/locale";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import { ProjectRole } from "../../contracts/access";
 import {
@@ -46,6 +46,7 @@ import { authorizeCmsActorProject, type ApplicationDb } from "../project-access"
 import { isRoleAllowed } from "../policy";
 import { hashSchemaContract } from "../schema/engine";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 async function resolveEnabledLocaleId(
   database: ApplicationDb,
   projectId: string,
@@ -66,7 +67,7 @@ async function resolveEnabledLocaleId(
 }
 
 function fieldValue(row: typeof cmsSchemaRevisionField.$inferSelect): CollectionField {
-  return Schema.decodeUnknownSync(CollectionFieldDefinition)({
+  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
     id: row.fieldId,
     parentFieldId: row.parentFieldId,
     nodeRole: row.nodeRole,
@@ -180,11 +181,11 @@ function projectValues(values: EntryValues, fields: ReadonlyArray<CollectionFiel
     const value = Reflect.get(values, field.id);
     if (value !== undefined) projected[field.apiKey] = projectFieldValue(field, value);
   }
-  return Schema.decodeUnknownSync(AuthoringEntryValues)(projected);
+  return SchemaStrict.decodeUnknownSync(AuthoringEntryValues)(projected);
 }
 
 export function authoringEntrySummary(entry: CmsEntry) {
-  return Schema.decodeUnknownSync(AuthoringEntrySummary)({
+  return SchemaStrict.decodeUnknownSync(AuthoringEntrySummary)({
     id: entry.id,
     displayName: entry.displayName ?? `Entry ${entry.id}`,
     nameVersion: entry.nameVersion,
@@ -239,7 +240,7 @@ export function makeAuthoringContentRepository(database: ApplicationDb = db) {
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
       if (result.kind === "locale_unavailable") return yield* LocaleUnavailableFailure.make();
       if (result.kind !== "success") return yield* NotFoundFailure.make({ resource: "collection" });
-      return Schema.decodeUnknownSync(CollectionId)(result.collectionId);
+      return SchemaStrict.decodeUnknownSync(CollectionId)(result.collectionId);
     }),
 
     getPublishedForm: Effect.fn("AuthoringContentRepository.getPublishedForm")(function* (
@@ -322,7 +323,7 @@ export function makeAuthoringContentRepository(database: ApplicationDb = db) {
           if (!revision) throw new Error("Published Authoring revision is missing.");
           const tree = reconstructFieldTree(rows.map(fieldValue));
           if (!tree.valid) throw new Error("Published Authoring field tree is invalid.");
-          const role = Schema.decodeUnknownSync(ProjectRole)(authorization.access.role);
+          const role = SchemaStrict.decodeUnknownSync(ProjectRole)(authorization.access.role);
           const canEdit =
             actor.kind === "user"
               ? isRoleAllowed(role, "content.write") &&
@@ -339,7 +340,7 @@ export function makeAuthoringContentRepository(database: ApplicationDb = db) {
                 ).kind === "allowed";
           return {
             kind: "success" as const,
-            form: Schema.decodeUnknownSync(AuthoringGeneratedForm)(
+            form: SchemaStrict.decodeUnknownSync(AuthoringGeneratedForm)(
               generatedFormDefinition({
                 source: "published",
                 collectionId: collection.id,
@@ -360,7 +361,7 @@ export function makeAuthoringContentRepository(database: ApplicationDb = db) {
                 editorLayout:
                   revision.editorLayout === null
                     ? syntheticEditorLayout(tree.roots)
-                    : Schema.decodeUnknownSync(EditorLayout)(revision.editorLayout),
+                    : SchemaStrict.decodeUnknownSync(EditorLayout)(revision.editorLayout),
               }),
             ),
           };
@@ -476,7 +477,7 @@ export function makeAuthoringContentRepository(database: ApplicationDb = db) {
         if (result.kind === "published_required")
           return yield* PublishedSchemaRequiredFailure.make();
         return {
-          collectionId: Schema.decodeUnknownSync(CollectionId)(result.collectionId),
+          collectionId: SchemaStrict.decodeUnknownSync(CollectionId)(result.collectionId),
           revisionId: result.revisionId,
           contractHash: result.contractHash,
           fields: result.fields,
@@ -541,10 +542,10 @@ export function makeAuthoringContentRepository(database: ApplicationDb = db) {
   };
 }
 
-export class AuthoringContentRepository extends Context.Tag("AuthoringContentRepository")<
+export class AuthoringContentRepository extends Context.Service<
   AuthoringContentRepository,
   ReturnType<typeof makeAuthoringContentRepository>
->() {}
+>()("AuthoringContentRepository") {}
 
 export const AuthoringContentRepositoryLive = Layer.succeed(
   AuthoringContentRepository,

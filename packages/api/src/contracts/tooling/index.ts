@@ -21,14 +21,14 @@ export const toolingLimits = {
   maximumContractDepth: 24,
 } as const;
 
-export const ToolingEnvironmentKey = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(63),
-  Schema.pattern(/^[a-z][a-z0-9-]{0,62}$/u),
-  Schema.filter((value) => !value.includes("--") && !value.endsWith("-")),
+export const ToolingEnvironmentKey = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(63),
+  Schema.isPattern(/^[a-z][a-z0-9-]{0,62}$/u),
+  Schema.makeFilter((value) => !value.includes("--") && !value.endsWith("-")),
 );
 
-export const ToolingApiErrorCode = Schema.Literal(
+export const ToolingApiErrorCode = Schema.Literals([
   "VALIDATION_ERROR",
   "UNAUTHORIZED",
   "FORBIDDEN",
@@ -42,14 +42,13 @@ export const ToolingApiErrorCode = Schema.Literal(
   "RATE_LIMITED",
   "SERVICE_UNAVAILABLE",
   "INTERNAL_ERROR",
-);
+]);
 
 export class ToolingApiError extends Schema.Class<ToolingApiError>("ToolingApiError")({
   code: ToolingApiErrorCode,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
-  details: Schema.optionalWith(
-    Schema.Array(ApiErrorDetail).pipe(Schema.minItems(1), Schema.maxItems(50)),
-    { exact: true },
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  details: Schema.optionalKey(
+    Schema.Array(ApiErrorDetail).check(Schema.isMinLength(1), Schema.isMaxLength(50)),
   ),
   retryable: Schema.Boolean,
   requestId: RequestIdSchema,
@@ -59,17 +58,20 @@ export class ToolingApiFailure extends Schema.Class<ToolingApiFailure>("ToolingA
   ok: Schema.Literal(false),
   data: Schema.Null,
   error: ToolingApiError,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
-const ToolingCursorInput = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(2_048),
-  Schema.pattern(/^[A-Za-z0-9_-]+$/u),
+const ToolingCursorInput = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(2_048),
+  Schema.isPattern(/^[A-Za-z0-9_-]+$/u),
 );
 
 export class ToolingPageQuery extends Schema.Class<ToolingPageQuery>("ToolingPageQuery")({
-  limit: Schema.Number.pipe(Schema.int(), Schema.between(1, toolingLimits.maximumPageSize)),
+  limit: Schema.Number.check(
+    Schema.isInt(),
+    Schema.isBetween({ minimum: 1, maximum: toolingLimits.maximumPageSize }),
+  ),
   cursor: Schema.NullOr(ToolingCursorInput),
 }) {}
 
@@ -97,12 +99,14 @@ export class ToolingProjectSummary extends Schema.Class<ToolingProjectSummary>(
   "ToolingProjectSummary",
 )({
   id: ProjectId,
-  key: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(63)),
-  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
+  key: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(63)),
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
 }) {}
 
 export class ToolingProjectPage extends Schema.Class<ToolingProjectPage>("ToolingProjectPage")({
-  items: Schema.Array(ToolingProjectSummary).pipe(Schema.maxItems(toolingLimits.maximumPageSize)),
+  items: Schema.Array(ToolingProjectSummary).check(
+    Schema.isMaxLength(toolingLimits.maximumPageSize),
+  ),
   nextCursor: Schema.NullOr(Cursor),
 }) {}
 
@@ -111,7 +115,7 @@ export class ToolingEnvironmentSummary extends Schema.Class<ToolingEnvironmentSu
 )({
   id: EnvironmentId,
   key: ToolingEnvironmentKey,
-  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
   primary: Schema.Boolean,
 }) {}
 
@@ -119,8 +123,8 @@ export class ToolingEnvironmentPage extends Schema.Class<ToolingEnvironmentPage>
   "ToolingEnvironmentPage",
 )({
   projectId: ProjectId,
-  items: Schema.Array(ToolingEnvironmentSummary).pipe(
-    Schema.maxItems(toolingLimits.maximumPageSize),
+  items: Schema.Array(ToolingEnvironmentSummary).check(
+    Schema.isMaxLength(toolingLimits.maximumPageSize),
   ),
   nextCursor: Schema.NullOr(Cursor),
 }) {}
@@ -148,10 +152,10 @@ export class ToolingSchemaManifestPage extends Schema.Class<ToolingSchemaManifes
   projectId: ProjectId,
   environmentId: EnvironmentId,
   environmentKey: ToolingEnvironmentKey,
-  locales: Schema.Array(ToolingLocaleSummary).pipe(Schema.maxItems(100)),
+  locales: Schema.Array(ToolingLocaleSummary).check(Schema.isMaxLength(100)),
   localeContractHash: ContractHash,
-  collections: Schema.Array(ToolingCollectionSummary).pipe(
-    Schema.maxItems(toolingLimits.maximumPageSize),
+  collections: Schema.Array(ToolingCollectionSummary).check(
+    Schema.isMaxLength(toolingLimits.maximumPageSize),
   ),
   nextCursor: Schema.NullOr(Cursor),
 }) {}
@@ -168,21 +172,18 @@ export type ToolingJsonValue =
   | ReadonlyArray<ToolingJsonValue>
   | ToolingJsonObject;
 
-export const ToolingJsonValue: Schema.Schema<ToolingJsonValue> = Schema.suspend(() =>
-  Schema.Union(
+export const ToolingJsonValue: Schema.Codec<ToolingJsonValue> = Schema.suspend(() =>
+  Schema.Union([
     Schema.Null,
     Schema.Boolean,
     Schema.Number,
     Schema.String,
     Schema.Array(ToolingJsonValue),
-    Schema.Record({ key: Schema.String, value: ToolingJsonValue }),
-  ),
-).annotations({ identifier: "ToolingJsonValue" });
+    Schema.Record(Schema.String, ToolingJsonValue),
+  ]),
+).annotate({ identifier: "ToolingJsonValue" });
 
-export const ToolingCollectionContract = Schema.Record({
-  key: Schema.String,
-  value: ToolingJsonValue,
-});
+export const ToolingCollectionContract = Schema.Record(Schema.String, ToolingJsonValue);
 
 export class ToolingCollectionContractRevision extends Schema.Class<ToolingCollectionContractRevision>(
   "ToolingCollectionContractRevision",

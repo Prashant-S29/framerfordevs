@@ -127,7 +127,7 @@ export async function runSchemaAuthoringCli(rawArguments: ReadonlyArray<string>)
     if (prepared._tag === "Failure") {
       writeFailure(
         json,
-        failureCode(Option.getOrUndefined(Cause.failureOption(prepared.cause))),
+        failureCode(Option.getOrUndefined(Cause.findErrorOption(prepared.cause))),
         true,
       );
       return;
@@ -182,7 +182,7 @@ export async function runSchemaAuthoringCli(rawArguments: ReadonlyArray<string>)
   if (prepared._tag === "Failure") {
     writeFailure(
       json,
-      failureCode(Option.getOrUndefined(Cause.failureOption(prepared.cause))),
+      failureCode(Option.getOrUndefined(Cause.findErrorOption(prepared.cause))),
       true,
     );
     return;

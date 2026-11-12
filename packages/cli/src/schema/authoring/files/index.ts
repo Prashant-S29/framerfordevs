@@ -11,7 +11,7 @@ import { open, lstat, mkdir, readFile, realpath, rename, rm, writeFile } from "n
 import { randomUUID } from "node:crypto";
 import { dirname, join, relative, sep } from "node:path";
 
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import { canonicalJsonBytes, sha256, toJsonValue } from "../../../canonical";
 import {
@@ -21,6 +21,7 @@ import {
 } from "../../../errors";
 import { AuthoringSchemaLock } from "../../../schema";
 
+import * as SchemaStrict from "../../../schema-strict";
 export const authoringSchemaLockRelativePath = ".framerfordevs/schema.lock.json";
 
 export interface AuthoringSchemaLockInput {
@@ -81,7 +82,9 @@ async function optionalFile(path: string) {
 function decodeLock(bytes: string) {
   try {
     const value: unknown = JSON.parse(bytes);
-    return Schema.decodeUnknownSync(AuthoringSchemaLock)(value, { onExcessProperty: "error" });
+    return SchemaStrict.decodeUnknownSync(AuthoringSchemaLock)(value, {
+      onExcessProperty: "error",
+    });
   } catch {
     throw CliAuthoringSchemaUnownedError.make();
   }
@@ -92,7 +95,7 @@ function compareText(left: string, right: string) {
 }
 
 function makeLock(input: AuthoringSchemaLockInput, schemaFileSha256: string) {
-  return Schema.decodeUnknownSync(AuthoringSchemaLock)({
+  return SchemaStrict.decodeUnknownSync(AuthoringSchemaLock)({
     lockVersion: 2,
     authoringApi: "authoring/v1",
     projectId: input.projectId,

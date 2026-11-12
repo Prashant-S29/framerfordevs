@@ -12,6 +12,7 @@ import {
   ToolingTransportError,
 } from "../errors";
 
+import * as SchemaStrict from "../schema-strict";
 const clientId = "framerfordevs-cli";
 const scope =
   "openid profile offline_access tooling:read authoring:read authoring:draft:write authoring:content:publish authoring:schema:push control-plane:read control-plane:write control-plane:project:lifecycle control-plane:governance:read control-plane:governance:write control-plane:operations:read control-plane:operations:write control-plane:security:read";
@@ -20,37 +21,34 @@ const maximumResponseBytes = 64 * 1_024;
 const requestTimeoutMs = 15_000;
 
 const DeviceAuthorization = Schema.Struct({
-  device_code: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(2_048)),
-  user_code: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
-  verification_uri: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(2_048)),
-  verification_uri_complete: Schema.optionalWith(
-    Schema.String.pipe(Schema.minLength(1), Schema.maxLength(2_048)),
-    { exact: true },
+  device_code: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)),
+  user_code: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+  verification_uri: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)),
+  verification_uri_complete: Schema.optionalKey(
+    Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)),
   ),
-  expires_in: Schema.Number.pipe(Schema.int(), Schema.between(1, 1_800)),
-  interval: Schema.Number.pipe(Schema.int(), Schema.between(1, 60)),
+  expires_in: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 1_800 })),
+  interval: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 60 })),
 });
 
 const TokenResponse = Schema.Struct({
-  access_token: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(16_384)),
-  refresh_token: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(16_384)),
-  id_token: Schema.optionalWith(Schema.String.pipe(Schema.maxLength(16_384)), { exact: true }),
+  access_token: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(16_384)),
+  refresh_token: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(16_384)),
+  id_token: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(16_384))),
   token_type: Schema.Literal("Bearer"),
-  expires_in: Schema.Number.pipe(Schema.int(), Schema.between(1, 86_400)),
-  expires_at: Schema.optionalWith(
-    Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
-    { exact: true },
+  expires_in: Schema.Number.check(
+    Schema.isInt(),
+    Schema.isBetween({ minimum: 1, maximum: 86_400 }),
   ),
-  scope: Schema.optionalWith(Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)), {
-    exact: true,
-  }),
+  expires_at: Schema.optionalKey(
+    Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  ),
+  scope: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512))),
 });
 
 const OAuthErrorResponse = Schema.Struct({
-  error: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
-  error_description: Schema.optionalWith(Schema.String.pipe(Schema.maxLength(512)), {
-    exact: true,
-  }),
+  error: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+  error_description: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(512))),
 });
 
 export interface DeviceAuthorizationPresentation {
@@ -63,19 +61,18 @@ export interface DeviceAuthorizationPresenterService {
   readonly present: (value: DeviceAuthorizationPresentation) => Effect.Effect<void, never>;
 }
 
-export class DeviceAuthorizationPresenter extends Context.Tag("DeviceAuthorizationPresenter")<
+export class DeviceAuthorizationPresenter extends Context.Service<
   DeviceAuthorizationPresenter,
   DeviceAuthorizationPresenterService
->() {}
+>()("DeviceAuthorizationPresenter") {}
 
 export interface BrowserOpenerService {
   readonly open: (url: string) => Effect.Effect<void, OAuthBrowserOpenError>;
 }
 
-export class BrowserOpener extends Context.Tag("BrowserOpener")<
-  BrowserOpener,
-  BrowserOpenerService
->() {}
+export class BrowserOpener extends Context.Service<BrowserOpener, BrowserOpenerService>()(
+  "BrowserOpener",
+) {}
 
 function openBrowser(url: string): Promise<void> {
   const parsed = new URL(url);
@@ -153,7 +150,7 @@ export function makeOAuthDeviceClient(options: OAuthDeviceClientOptions) {
     });
 
   const decodeError = (status: number, value: unknown) =>
-    Schema.decodeUnknown(OAuthErrorResponse)(value, { onExcessProperty: "error" }).pipe(
+    SchemaStrict.decodeUnknownEffect(OAuthErrorResponse)(value, { onExcessProperty: "error" }).pipe(
       Effect.map((failure) =>
         OAuthDeviceError.make({
           code: failure.error,
@@ -163,7 +160,7 @@ export function makeOAuthDeviceClient(options: OAuthDeviceClientOptions) {
             status >= 500,
         }),
       ),
-      Effect.catchAll(() =>
+      Effect.catch(() =>
         Effect.succeed(OAuthDeviceError.make({ code: "oauth_response_invalid", retryable: false })),
       ),
     );
@@ -180,7 +177,9 @@ export function makeOAuthDeviceClient(options: OAuthDeviceClientOptions) {
         catch: (cause) => ToolingTransportError.make({ operation: "oauth.device.response", cause }),
       });
       if (!response.ok) return yield* yield* decodeError(response.status, value);
-      return yield* Schema.decodeUnknown(TokenResponse)(value, { onExcessProperty: "error" }).pipe(
+      return yield* SchemaStrict.decodeUnknownEffect(TokenResponse)(value, {
+        onExcessProperty: "error",
+      }).pipe(
         Effect.mapError(() =>
           OAuthDeviceError.make({ code: "oauth_response_invalid", retryable: false }),
         ),
@@ -199,7 +198,7 @@ export function makeOAuthDeviceClient(options: OAuthDeviceClientOptions) {
         catch: (cause) => ToolingTransportError.make({ operation: "oauth.device.response", cause }),
       });
       if (!response.ok) return yield* yield* decodeError(response.status, value);
-      return yield* Schema.decodeUnknown(DeviceAuthorization)(value, {
+      return yield* SchemaStrict.decodeUnknownEffect(DeviceAuthorization)(value, {
         onExcessProperty: "error",
       }).pipe(
         Effect.mapError(() =>
@@ -252,9 +251,9 @@ export const loginWithDeviceAuthorization = Effect.fn("OAuthDevice.login")(funct
       return yield* OAuthDeviceError.make({ code: "expired_token", retryable: false });
     }
     yield* Effect.sleep(Duration.seconds(intervalSeconds));
-    const result = yield* Effect.either(client.poll(authorization.device_code));
-    if (result._tag === "Right") {
-      const token = result.right;
+    const result = yield* Effect.result(client.poll(authorization.device_code));
+    if (result._tag === "Success") {
+      const token = result.success;
       const currentEpochSeconds = Math.floor((yield* Clock.currentTimeMillis) / 1_000);
       const authority = StoredOAuthAuthority.make({
         version: 1,
@@ -265,7 +264,7 @@ export const loginWithDeviceAuthorization = Effect.fn("OAuthDevice.login")(funct
       yield* (yield* CredentialStore).save(options.apiOrigin, authority);
       return { expiresAtEpochSeconds: authority.accessExpiresAtEpochSeconds };
     }
-    const failure = result.left;
+    const failure = result.failure;
     if (failure._tag !== "OAuthDeviceError") return yield* failure;
     if (failure.code === "authorization_pending") continue;
     if (failure.code === "slow_down") {

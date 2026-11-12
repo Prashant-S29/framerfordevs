@@ -1,7 +1,7 @@
 // Translates one fully identity-resolved code collection into existing M6 field definitions.
 
 import type { CollectionSchema, FieldSchema, ListItemSchema } from "@framerfordevs/schema";
-import { Either, ParseResult, Schema } from "effect";
+import { Result } from "effect";
 
 import {
   CollectionFieldDefinition,
@@ -12,6 +12,7 @@ import {
 import { flattenFieldTree } from "../../field/tree";
 import type { StructureIdentityMap } from "../hash";
 
+import * as SchemaStrict from "../../schema-strict";
 export interface CodeSchemaCandidateIssue {
   readonly path: string;
   readonly code: "source_identity_missing" | "candidate_field_invalid";
@@ -165,18 +166,18 @@ function compileSiblings(
       configuration: compileConfiguration(node, fieldId, context, nodePath),
       children,
     };
-    const decoded = Schema.decodeUnknownEither(CollectionFieldDefinition, {
+    const decoded = SchemaStrict.decodeUnknownResult(CollectionFieldDefinition, {
       errors: "all",
       onExcessProperty: "error",
     })(candidate);
-    if (Either.isLeft(decoded)) {
+    if (Result.isFailure(decoded)) {
       context.issues.push({
         path: nodePath,
         code: "candidate_field_invalid",
-        message: ParseResult.TreeFormatter.formatErrorSync(decoded.left).slice(0, 512),
+        message: decoded.failure.message.slice(0, 512),
       });
     } else {
-      compiled.push(decoded.right);
+      compiled.push(decoded.success);
     }
   }
   return compiled;

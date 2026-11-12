@@ -1,12 +1,12 @@
 // Verifies deterministic editor-layout coverage, ordering, role narrowing, and identity rules.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import type { ProjectRole } from "../../../contracts/access";
 import { EditorLayout, FieldEditorMetadata } from "../../../contracts/field";
 import { type LayoutFieldDefinition, validateEditorLayout } from "./index";
 
+import * as SchemaStrict from "../../schema-strict";
 const firstFieldId = "019fd0d2-e52b-7488-b062-e25722913e01";
 const secondFieldId = "019fd0d2-e52b-7488-b062-e25722913e02";
 const tabId = "019fd0d2-e52b-7488-b062-e25722913e03";
@@ -14,7 +14,7 @@ const groupId = "019fd0d2-e52b-7488-b062-e25722913e04";
 const firstPlacementId = "019fd0d2-e52b-7488-b062-e25722913e05";
 const secondPlacementId = "019fd0d2-e52b-7488-b062-e25722913e06";
 
-const editableMetadata = Schema.decodeUnknownSync(FieldEditorMetadata)({
+const editableMetadata = SchemaStrict.decodeUnknownSync(FieldEditorMetadata)({
   helpText: null,
   placeholder: null,
   visibleToRoles: ["owner", "developer", "content_admin", "editor"],
@@ -31,7 +31,7 @@ function layoutFixture(
   secondField = secondFieldId,
   visibleToRoles: ReadonlyArray<ProjectRole> = ["owner", "developer", "content_admin", "editor"],
 ) {
-  return Schema.decodeUnknownSync(EditorLayout)({
+  return SchemaStrict.decodeUnknownSync(EditorLayout)({
     version: 1,
     tabs: [
       {
@@ -91,7 +91,7 @@ describe("editor layout validation", () => {
   });
 
   it("prevents placements from widening field visibility", () => {
-    const restrictedMetadata = Schema.decodeUnknownSync(FieldEditorMetadata)({
+    const restrictedMetadata = SchemaStrict.decodeUnknownSync(FieldEditorMetadata)({
       helpText: null,
       placeholder: null,
       visibleToRoles: ["owner", "developer"],

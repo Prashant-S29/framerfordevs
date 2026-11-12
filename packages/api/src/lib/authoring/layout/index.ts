@@ -1,10 +1,11 @@
 // Reconciles GUI-owned editor layout around code-added and code-removed root fields.
 
-import { Either, ParseResult, Schema } from "effect";
+import { Result } from "effect";
 
 import { EditorLayout, type EditorLayoutNodeId } from "../../../contracts/field";
 import type { CollectionFieldDefinition } from "../../../contracts/schema";
 
+import * as SchemaStrict from "../../schema-strict";
 export interface CodeLayoutAllocations {
   readonly tabId: EditorLayoutNodeId | null;
   readonly groupId: EditorLayoutNodeId | null;
@@ -32,19 +33,19 @@ const allRoles = [
 ] as const;
 
 function decodeLayout(value: unknown): ReconcileCodeEditorLayoutResult {
-  const decoded = Schema.decodeUnknownEither(EditorLayout, {
+  const decoded = SchemaStrict.decodeUnknownResult(EditorLayout, {
     errors: "all",
     onExcessProperty: "error",
   })(value);
-  return Either.isRight(decoded)
-    ? { valid: true, editorLayout: decoded.right }
+  return Result.isSuccess(decoded)
+    ? { valid: true, editorLayout: decoded.success }
     : {
         valid: false,
         issues: [
           {
             path: "editorLayout",
             code: "layout_candidate_invalid",
-            message: ParseResult.TreeFormatter.formatErrorSync(decoded.left).slice(0, 512),
+            message: decoded.failure.message.slice(0, 512),
           },
         ],
       };

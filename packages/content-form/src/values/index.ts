@@ -86,36 +86,97 @@ export function stableIdValuesToApiKeys(
   return result;
 }
 
-function fieldDefault(field: ContentFormField): unknown {
+export type ContentDefaultKeying = "api_key" | "field_id";
+
+function projectedDefaultValue(
+  field: ContentFormField,
+  value: unknown,
+  keying: ContentDefaultKeying,
+  editableFieldIds?: ReadonlySet<string>,
+): unknown {
+  if (field.kind === "object" && isRecord(value)) {
+    const result: Record<string, unknown> = {};
+    for (const child of field.children) {
+      if (editableFieldIds !== undefined && !hasEditableDefaultAuthority(child, editableFieldIds)) {
+        continue;
+      }
+      const sourceKey = keying === "field_id" ? child.id : child.apiKey;
+      if (sourceKey === null) continue;
+      const childValue = Reflect.get(value, sourceKey);
+      if (childValue !== undefined) {
+        Reflect.set(
+          result,
+          child.id,
+          projectedDefaultValue(child, childValue, keying, editableFieldIds),
+        );
+      }
+    }
+    return result;
+  }
+  const item = field.children[0];
+  if (field.kind === "list" && Array.isArray(value) && item) {
+    return value.map((itemValue) =>
+      projectedDefaultValue(item, itemValue, keying, editableFieldIds),
+    );
+  }
+  return value;
+}
+
+function fieldDefault(
+  field: ContentFormField,
+  keying: ContentDefaultKeying,
+  editableFieldIds?: ReadonlySet<string>,
+): unknown {
   const configured = Reflect.get(field.configuration, "default");
   if (configured !== undefined)
-    return mapNestedValue(
-      field,
-      configured,
-      (child) => child.apiKey,
-      (child) => child.id,
-    );
+    return projectedDefaultValue(field, configured, keying, editableFieldIds);
   if (field.kind !== "object") return undefined;
   const result: Record<string, unknown> = {};
   for (const child of field.children) {
-    const childValue = fieldDefault(child);
+    if (editableFieldIds !== undefined && !hasEditableDefaultAuthority(child, editableFieldIds)) {
+      continue;
+    }
+    const childValue = fieldDefault(child, keying, editableFieldIds);
     if (childValue !== undefined) Reflect.set(result, child.id, childValue);
   }
   return Object.keys(result).length > 0 ? result : undefined;
+}
+
+export interface ContentDefaultOptions {
+  readonly keying?: ContentDefaultKeying;
+  readonly editableFieldIds?: ReadonlySet<string>;
 }
 
 /** Applies configured defaults only where no stable-ID root value exists. */
 export function applyGeneratedFormDefaults(
   fields: ReadonlyArray<ContentFormField>,
   values: Readonly<Record<string, unknown>>,
+  options: ContentDefaultOptions = {},
 ): Readonly<Record<string, unknown>> {
   const result: Record<string, unknown> = { ...values };
+  const keying = options.keying ?? "api_key";
   for (const field of fields) {
-    if (Reflect.get(result, field.id) !== undefined) continue;
-    const value = fieldDefault(field);
+    if (
+      Reflect.get(result, field.id) !== undefined ||
+      (options.editableFieldIds !== undefined &&
+        !hasEditableDefaultAuthority(field, options.editableFieldIds))
+    ) {
+      continue;
+    }
+    const value = fieldDefault(field, keying, options.editableFieldIds);
     if (value !== undefined) Reflect.set(result, field.id, value);
   }
   return result;
+}
+
+function hasEditableDefaultAuthority(
+  field: ContentFormField,
+  editableFieldIds: ReadonlySet<string>,
+): boolean {
+  return (
+    editableFieldIds.has(field.id) ||
+    field.children.some((child) => hasEditableDefaultAuthority(child, editableFieldIds))
+  );
 }
 
 /** Applies defaults only before the first persisted partition revision exists. */
@@ -123,8 +184,9 @@ export function applyNewEntryPartitionDefaults(
   fields: ReadonlyArray<ContentFormField>,
   values: Readonly<Record<string, unknown>>,
   version: number,
+  options: ContentDefaultOptions = {},
 ): Readonly<Record<string, unknown>> {
-  return version === 0 ? applyGeneratedFormDefaults(fields, values) : values;
+  return version === 0 ? applyGeneratedFormDefaults(fields, values, options) : values;
 }
 
 function withChildren(

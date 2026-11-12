@@ -28,21 +28,20 @@ export const rateLimitPolicyValues = [
   "webhook.replay.user",
 ] as const;
 
-export const RateLimitPolicy = Schema.Literal(...rateLimitPolicyValues);
+export const RateLimitPolicy = Schema.Literals(rateLimitPolicyValues);
 export type RateLimitPolicy = typeof RateLimitPolicy.Type;
 
-export const RateLimitEnforcementMode = Schema.Literal("redis", "memory", "degraded_memory");
+export const RateLimitEnforcementMode = Schema.Literals(["redis", "memory", "degraded_memory"]);
 export type RateLimitEnforcementMode = typeof RateLimitEnforcementMode.Type;
 
-export const RateLimitCost = Schema.Number.pipe(
-  Schema.int(),
-  Schema.between(1, 100),
-  Schema.brand("RateLimitCost"),
-);
+export const RateLimitCost = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isBetween({ minimum: 1, maximum: 100 }),
+).pipe(Schema.brand("RateLimitCost"));
 export type RateLimitCost = typeof RateLimitCost.Type;
 
-const NonNegativeInteger = Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0));
-const PositiveInteger = Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(1));
+const NonNegativeInteger = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0));
+const PositiveInteger = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1));
 
 export class RateLimitDecision extends Schema.Class<RateLimitDecision>("RateLimitDecision")({
   allowed: Schema.Boolean,

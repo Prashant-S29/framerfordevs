@@ -16,7 +16,7 @@ import {
 } from "@framerfordevs/db/schema/cms";
 import { projectLocale } from "@framerfordevs/db/schema/locale";
 import { environment, project, projectCapability } from "@framerfordevs/db/schema/platform";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import { DeliveryItem, DeliveryPage, DeliveryQueryScalarKind } from "../../contracts/delivery";
 import {
@@ -39,6 +39,7 @@ import {
 import { DeliveryCursorSigner } from "./cursor-signer";
 import type { ApplicationDb, ApplicationExecutor, ApplicationTransaction } from "../project-access";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 export interface DeliveryRouteScopeInput {
   readonly projectId: string;
   readonly environmentKey: string;
@@ -260,7 +261,7 @@ async function loadCapabilities(
           {
             fieldId: row.fieldId,
             fieldKey: row.fieldKey,
-            kind: Schema.decodeUnknownSync(DeliveryQueryScalarKind)(row.kind),
+            kind: SchemaStrict.decodeUnknownSync(DeliveryQueryScalarKind)(row.kind),
             filterable: row.filterable,
             sortable: row.sortable,
           },
@@ -302,7 +303,7 @@ async function loadUniqueCapability(
     ? null
     : {
         fieldId: row.fieldId,
-        kind: Schema.decodeUnknownSync(DeliveryQueryScalarKind)(row.kind),
+        kind: SchemaStrict.decodeUnknownSync(DeliveryQueryScalarKind)(row.kind),
       };
 }
 
@@ -441,7 +442,7 @@ function replaceConcretePath(root: unknown, path: string, replacement: unknown):
 
 /** Builds the stable nested Delivery object from one authorized pinned publication artifact. */
 function expandedTargetValue(row: DeliveryArtifactRow, data: unknown) {
-  return Schema.decodeUnknownSync(DeliveryItem)({
+  return SchemaStrict.decodeUnknownSync(DeliveryItem)({
     id: row.entryId,
     collectionId: row.collectionId,
     collection: row.collectionKey,
@@ -704,7 +705,7 @@ async function expandArtifacts<A extends DeliveryArtifactRow>(
 /** Reconstructs only the public immutable outer contract from persisted snapshot data. */
 function decodeItem(row: DeliveryArtifactRow) {
   const data = Reflect.get(row.document, "data");
-  return Schema.decodeUnknown(DeliveryItem)({
+  return SchemaStrict.decodeUnknownEffect(DeliveryItem)({
     id: row.entryId,
     collectionId: row.collectionId,
     collection: row.collectionKey,
@@ -1250,7 +1251,7 @@ export function makeDeliveryReadRepository(
               finalEntryId: final.entryId,
             })
           : null;
-      return yield* Schema.decodeUnknown(DeliveryPage)({
+      return yield* SchemaStrict.decodeUnknownEffect(DeliveryPage)({
         items,
         page: { limit: parsed.value.limit, nextCursor, hasMore },
       }).pipe(Effect.mapError((cause) => databaseFailure("delivery.list.decode", cause)));
@@ -1258,10 +1259,10 @@ export function makeDeliveryReadRepository(
   };
 }
 
-export class DeliveryReadRepository extends Context.Tag("DeliveryReadRepository")<
+export class DeliveryReadRepository extends Context.Service<
   DeliveryReadRepository,
   DeliveryReadRepositoryService
->() {}
+>()("DeliveryReadRepository") {}
 
 export const DeliveryReadRepositoryLive = Layer.succeed(
   DeliveryReadRepository,

@@ -25,12 +25,13 @@ import {
   StudioContentRepository,
 } from "@framerfordevs/api/services/studio-content/repository/index";
 import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 import request from "supertest";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { createApp, encodeStudioContentResponse } from "../../../src/app";
 
+import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const projectId = "019fae8b-1234-7000-8000-000000000002";
 const environmentId = "019fae8b-1234-7000-8000-000000000003";
 const collectionId = "019fae8b-1234-7000-8000-000000000004";
@@ -52,7 +53,7 @@ const principal: StudioOAuthPrincipal = {
   scopes: ["studio:session", "offline_access"],
   expiresAtEpochSeconds: 1_800_000_000,
 };
-const bootstrap = Schema.decodeUnknownSync(StudioBootstrap)({
+const bootstrap = SchemaStrict.decodeUnknownSync(StudioBootstrap)({
   formatVersion: 1,
   registration: {
     id: registrationId,
@@ -90,11 +91,12 @@ const contentRepository: ReturnType<typeof makeStudioContentRepository> = {
   },
   getContext: () => Effect.die("Unexpected context call."),
   listEntries: () => Effect.die("Nested work must not run after the projection gate."),
+  resolveEntryLabels: () => Effect.die("Nested work must not run after the projection gate."),
 };
 const rateLimitManager: RateLimitManagerService = {
   evaluate: (input) =>
     Effect.succeed(
-      Schema.decodeUnknownSync(RateLimitDecision)({
+      SchemaStrict.decodeUnknownSync(RateLimitDecision)({
         allowed: rateLimitAllowed,
         policy: input.policy,
         cost: input.cost,

@@ -246,7 +246,7 @@ async function approveAuthorization() {
   return { attempt, callback: harness.callback(String(approval.body.url), attempt) };
 }
 
-describe.sequential("M18A Studio OAuth provider compatibility", () => {
+describe("M18A Studio OAuth provider compatibility", () => {
   it("drives a public Code + S256 PKCE grant through forced acknowledgement", async () => {
     const attempt = harness.begin();
     const authorizationUrl = new URL(attempt.authorizationUrl);
@@ -472,8 +472,9 @@ describe.sequential("M18A Studio OAuth provider compatibility", () => {
       .type("form")
       .send(Object.fromEntries(wrongVerifier));
 
-    expect(denied.status).toBe(401);
-    expect(denied.body.error).toBe("invalid_request");
+    // Better Auth 1.7.21 returns the RFC 6749 section 5.2 response for a failed PKCE check.
+    expect(denied.status).toBe(400);
+    expect(denied.body.error).toBe("invalid_grant");
   });
 
   it("blocks token bytes and refresh persistence when current policy denies issuance", async () => {

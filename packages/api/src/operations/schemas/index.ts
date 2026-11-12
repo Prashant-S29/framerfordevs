@@ -1,4 +1,4 @@
-import { Clock, Effect, Exit, Schema } from "effect";
+import { Clock, Effect, Exit } from "effect";
 
 import { AuthoringPublishPresentationRequest } from "../../contracts/authoring/presentation";
 import { UnauthorizedFailure } from "../../contracts/response/errors";
@@ -20,8 +20,11 @@ import { Telemetry } from "../../observability/telemetry";
 import { AuthoringPresentationRepository } from "../../services/authoring/presentation-repository";
 import { SchemaRepository } from "../../services/schema/repository";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const decodeActorId = (actorId: string) =>
-  Schema.decodeUnknown(AuthUserId)(actorId).pipe(Effect.mapError(() => UnauthorizedFailure.make()));
+  SchemaStrict.decodeUnknownEffect(AuthUserId)(actorId).pipe(
+    Effect.mapError(() => UnauthorizedFailure.make()),
+  );
 
 function fieldCountBucket(count: number): "1-10" | "11-50" | "51-100" {
   if (count <= 10) return "1-10";

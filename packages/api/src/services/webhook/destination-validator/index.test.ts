@@ -1,7 +1,8 @@
 // Verifies DNS resolution remains replaceable and all-address failures are typed and closed.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit, Fiber, TestClock } from "effect";
+import { Effect, Exit, Fiber } from "effect";
+import { TestClock } from "effect/testing";
 
 import { makeWebhookDestinationValidator } from "./index";
 
@@ -38,7 +39,7 @@ describe("WebhookDestinationValidator", () => {
       const validator = makeWebhookDestinationValidator(
         () => new Promise<ReadonlyArray<string>>(() => undefined),
       );
-      const fiber = yield* Effect.fork(
+      const fiber = yield* Effect.forkChild(
         Effect.flip(validator.validate("https://hooks.example.com/opaque")),
       );
       yield* TestClock.adjust("2 seconds");

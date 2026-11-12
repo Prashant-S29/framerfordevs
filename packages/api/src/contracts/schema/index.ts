@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Schema, SchemaTransformation } from "effect";
 
 import { ApiSuccessSchema } from "../response/api";
 import { ApiCredentialId, ProjectRole, projectRoleValues } from "../access";
@@ -26,6 +26,8 @@ import {
   WorkspaceId,
 } from "../platform";
 
+import * as SchemaStrict from "../../lib/schema-strict";
+import { UuidValue } from "../uuid";
 const apiKeyPattern = /^[a-z][a-z0-9_]{0,62}$/u;
 const digestPattern = /^[0-9a-f]{64}$/u;
 
@@ -40,17 +42,20 @@ function hasControlCharacter(value: string): boolean {
 }
 
 const NormalizedString = Schema.String.pipe(
-  Schema.transform(Schema.String, {
-    decode: (value) => value.trim().normalize("NFC"),
-    encode: (value) => value,
-  }),
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transform({
+      decode: (value) => value.trim().normalize("NFC"),
+      encode: (value) => value,
+    }),
+  ),
 );
 
-const SafeName = NormalizedString.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(100),
-  Schema.filter((value) => !hasControlCharacter(value), {
-    message: () => "Names cannot contain control characters.",
+const SafeName = NormalizedString.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(100),
+  Schema.makeFilter((value) => !hasControlCharacter(value), {
+    message: "Names cannot contain control characters.",
   }),
 );
 
@@ -73,34 +78,34 @@ export const reservedCmsApiKeyValues = [
 
 const reservedCmsApiKeys = new Set<string>(reservedCmsApiKeyValues);
 
-const CmsApiKey = NormalizedString.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(63),
-  Schema.filter(
+const CmsApiKey = NormalizedString.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(63),
+  Schema.makeFilter(
     (value) =>
       apiKeyPattern.test(value) &&
       !value.includes("__") &&
       !value.endsWith("_") &&
       !reservedCmsApiKeys.has(value),
     {
-      message: () => "Use a non-reserved lowercase snake-case key beginning with a letter.",
+      message: "Use a non-reserved lowercase snake-case key beginning with a letter.",
     },
   ),
 );
 
-export const CollectionId = Schema.UUID.pipe(Schema.brand("CollectionId"));
+export const CollectionId = UuidValue.pipe(Schema.brand("CollectionId"));
 export type CollectionId = typeof CollectionId.Type;
 
-export const CollectionFieldId = Schema.UUID.pipe(Schema.brand("CollectionFieldId"));
+export const CollectionFieldId = UuidValue.pipe(Schema.brand("CollectionFieldId"));
 export type CollectionFieldId = typeof CollectionFieldId.Type;
 
-export const SchemaRevisionId = Schema.UUID.pipe(Schema.brand("SchemaRevisionId"));
+export const SchemaRevisionId = UuidValue.pipe(Schema.brand("SchemaRevisionId"));
 export type SchemaRevisionId = typeof SchemaRevisionId.Type;
 
-export const OutboxEventId = Schema.UUID.pipe(Schema.brand("OutboxEventId"));
+export const OutboxEventId = UuidValue.pipe(Schema.brand("OutboxEventId"));
 export type OutboxEventId = typeof OutboxEventId.Type;
 
-export const SchemaPublicationCommandId = Schema.UUID.pipe(
+export const SchemaPublicationCommandId = UuidValue.pipe(
   Schema.brand("SchemaPublicationCommandId"),
 );
 export type SchemaPublicationCommandId = typeof SchemaPublicationCommandId.Type;
@@ -114,13 +119,12 @@ export type CollectionFieldApiKey = typeof CollectionFieldApiKey.Type;
 export const CollectionDisplayName = SafeName.pipe(Schema.brand("CollectionDisplayName"));
 export type CollectionDisplayName = typeof CollectionDisplayName.Type;
 
-export const CollectionDescription = NormalizedString.pipe(
-  Schema.maxLength(500),
-  Schema.filter((value) => !hasControlCharacter(value), {
-    message: () => "Collection descriptions cannot contain control characters.",
+export const CollectionDescription = NormalizedString.check(
+  Schema.isMaxLength(500),
+  Schema.makeFilter((value) => !hasControlCharacter(value), {
+    message: "Collection descriptions cannot contain control characters.",
   }),
-  Schema.brand("CollectionDescription"),
-);
+).pipe(Schema.brand("CollectionDescription"));
 export type CollectionDescription = typeof CollectionDescription.Type;
 
 export const CollectionFieldDisplayLabel = SafeName.pipe(
@@ -134,38 +138,39 @@ export type CollectionFieldKind = M6CollectionFieldKindType;
 export const CollectionFieldLocalization = FieldLocalization;
 export type CollectionFieldLocalization = typeof CollectionFieldLocalization.Type;
 
-export const CollectionFieldPosition = Schema.Number.pipe(Schema.int(), Schema.between(0, 99));
+export const CollectionFieldPosition = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isBetween({ minimum: 0, maximum: 99 }),
+);
 export type CollectionFieldPosition = typeof CollectionFieldPosition.Type;
 
-export const SchemaFormatVersion = Schema.Literal(1, 2);
+export const SchemaFormatVersion = Schema.Literals([1, 2]);
 export type SchemaFormatVersion = typeof SchemaFormatVersion.Type;
 
-export const SchemaValidationProfile = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(64),
-  Schema.pattern(/^[a-z0-9][a-z0-9@._-]{0,63}$/u),
+export const SchemaValidationProfile = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(64),
+  Schema.isPattern(/^[a-z0-9][a-z0-9@._-]{0,63}$/u),
 );
 export type SchemaValidationProfile = typeof SchemaValidationProfile.Type;
 
-export const CurrencyRegistryProfile = Schema.String.pipe(
-  Schema.length(19),
-  Schema.pattern(/^iso-4217@[0-9]{4}-[0-9]{2}-[0-9]{2}$/u),
+export const CurrencyRegistryProfile = Schema.String.check(
+  Schema.isBetweenLength(19, 19),
+  Schema.isPattern(/^iso-4217@[0-9]{4}-[0-9]{2}-[0-9]{2}$/u),
 );
 export type CurrencyRegistryProfile = typeof CurrencyRegistryProfile.Type;
 export const currentCurrencyRegistryProfile = CurrencyRegistryProfile.make(iso4217RegistryProfile);
 
-export const SchemaHash = Schema.String.pipe(
-  Schema.length(64),
-  Schema.pattern(digestPattern),
-  Schema.brand("SchemaHash"),
-);
+export const SchemaHash = Schema.String.check(
+  Schema.isBetweenLength(64, 64),
+  Schema.isPattern(digestPattern),
+).pipe(Schema.brand("SchemaHash"));
 export type SchemaHash = typeof SchemaHash.Type;
 
-export const ContractHash = Schema.String.pipe(
-  Schema.length(64),
-  Schema.pattern(digestPattern),
-  Schema.brand("ContractHash"),
-);
+export const ContractHash = Schema.String.check(
+  Schema.isBetweenLength(64, 64),
+  Schema.isPattern(digestPattern),
+).pipe(Schema.brand("ContractHash"));
 export type ContractHash = typeof ContractHash.Type;
 
 export const defaultFieldEditorMetadata = FieldEditorMetadata.make({
@@ -175,7 +180,7 @@ export const defaultFieldEditorMetadata = FieldEditorMetadata.make({
   editableByRoles: ["owner", "developer", "content_admin", "editor", "client_editor"],
 });
 
-export const CollectionFieldConfiguration = Schema.Union(
+export const CollectionFieldConfiguration = Schema.Union([
   fieldConfigurationSchemas.short_text,
   fieldConfigurationSchemas.long_text,
   fieldConfigurationSchemas.rich_text,
@@ -194,34 +199,32 @@ export const CollectionFieldConfiguration = Schema.Union(
   fieldConfigurationSchemas.list,
   fieldConfigurationSchemas.reference,
   fieldConfigurationSchemas.external_asset,
-);
+]);
 export type CollectionFieldConfiguration = typeof CollectionFieldConfiguration.Type;
 
-export const SchemaChangeId = Schema.String.pipe(
-  Schema.length(64),
-  Schema.pattern(digestPattern),
-  Schema.brand("SchemaChangeId"),
-);
+export const SchemaChangeId = Schema.String.check(
+  Schema.isBetweenLength(64, 64),
+  Schema.isPattern(digestPattern),
+).pipe(Schema.brand("SchemaChangeId"));
 export type SchemaChangeId = typeof SchemaChangeId.Type;
 
-export const SchemaPublicationFingerprint = Schema.String.pipe(
-  Schema.length(64),
-  Schema.pattern(digestPattern),
-  Schema.brand("SchemaPublicationFingerprint"),
-);
+export const SchemaPublicationFingerprint = Schema.String.check(
+  Schema.isBetweenLength(64, 64),
+  Schema.isPattern(digestPattern),
+).pipe(Schema.brand("SchemaPublicationFingerprint"));
 export type SchemaPublicationFingerprint = typeof SchemaPublicationFingerprint.Type;
 
-export const SchemaRevisionSequence = Schema.Number.pipe(
-  Schema.int(),
-  Schema.greaterThanOrEqualTo(1),
+export const SchemaRevisionSequence = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isGreaterThanOrEqualTo(1),
 );
 export type SchemaRevisionSequence = typeof SchemaRevisionSequence.Type;
 
-export const SchemaChangeClassification = Schema.Literal(
+export const SchemaChangeClassification = Schema.Literals([
   "non_breaking",
   "potentially_breaking",
   "breaking",
-);
+]);
 export type SchemaChangeClassification = typeof SchemaChangeClassification.Type;
 
 export const schemaChangeCodeValues = [
@@ -246,13 +249,13 @@ export const schemaChangeCodeValues = [
   "field.editor.updated",
   "field.removed",
 ] as const;
-export const SchemaChangeCode = Schema.Literal(...schemaChangeCodeValues);
+export const SchemaChangeCode = Schema.Literals(schemaChangeCodeValues);
 export type SchemaChangeCode = typeof SchemaChangeCode.Type;
 
-export const SchemaValidationIssueCode = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(64),
-  Schema.pattern(/^[a-z][a-z0-9_]*$/u),
+export const SchemaValidationIssueCode = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(64),
+  Schema.isPattern(/^[a-z][a-z0-9_]*$/u),
 );
 export type SchemaValidationIssueCode = typeof SchemaValidationIssueCode.Type;
 
@@ -279,7 +282,7 @@ export type CollectionFieldDefinition = {
 
 type FieldConfigurationSchemaByKind = typeof fieldConfigurationSchemas;
 export type FieldConfigurationEncodedByKind = {
-  readonly [Kind in CollectionFieldKind]: Schema.Schema.Encoded<
+  readonly [Kind in CollectionFieldKind]: Schema.Codec.Encoded<
     FieldConfigurationSchemaByKind[Kind]
   >;
 };
@@ -294,7 +297,7 @@ export interface CollectionFieldDefinitionEncodedBase {
   readonly localization: CollectionFieldLocalization | null;
   readonly deprecated: boolean;
   readonly position: number;
-  readonly editor: Schema.Schema.Encoded<typeof FieldEditorMetadata>;
+  readonly editor: Schema.Codec.Encoded<typeof FieldEditorMetadata>;
   readonly children: ReadonlyArray<CollectionFieldDefinitionEncoded>;
 }
 
@@ -307,15 +310,15 @@ export type CollectionFieldDefinitionEncoded = {
 
 const CollectionFieldChildren = Schema.Array(
   Schema.suspend(
-    (): Schema.Schema<CollectionFieldDefinition, CollectionFieldDefinitionEncoded> =>
+    (): Schema.Codec<CollectionFieldDefinition, CollectionFieldDefinitionEncoded> =>
       CollectionFieldDefinition,
-  ).annotations({ identifier: "CollectionFieldDefinition" }),
-).pipe(Schema.maxItems(fieldSystemLimits.directObjectProperties));
+  ).annotate({ identifier: "CollectionFieldDefinition" }),
+).check(Schema.isMaxLength(fieldSystemLimits.directObjectProperties));
 
 /** Builds one strict kind-correlated recursive field-definition variant. */
 function collectionFieldVariant<Kind extends CollectionFieldKind, Encoded, Requirements>(
   kind: Kind,
-  configuration: Schema.Schema<FieldConfigurationByKind[Kind], Encoded, Requirements>,
+  configuration: Schema.Codec<FieldConfigurationByKind[Kind], Encoded, Requirements>,
 ) {
   return Schema.Struct({
     id: CollectionFieldId,
@@ -331,13 +334,13 @@ function collectionFieldVariant<Kind extends CollectionFieldKind, Encoded, Requi
     editor: FieldEditorMetadata,
     configuration,
     children: CollectionFieldChildren,
-  }).annotations({ parseOptions: { onExcessProperty: "error" } });
+  }).annotate({ closedObject: true });
 }
 
-export const CollectionFieldDefinition: Schema.Schema<
+export const CollectionFieldDefinition: Schema.Codec<
   CollectionFieldDefinition,
   CollectionFieldDefinitionEncoded
-> = Schema.Union(
+> = Schema.Union([
   collectionFieldVariant("short_text", fieldConfigurationSchemas.short_text),
   collectionFieldVariant("long_text", fieldConfigurationSchemas.long_text),
   collectionFieldVariant("rich_text", fieldConfigurationSchemas.rich_text),
@@ -356,10 +359,10 @@ export const CollectionFieldDefinition: Schema.Schema<
   collectionFieldVariant("list", fieldConfigurationSchemas.list),
   collectionFieldVariant("reference", fieldConfigurationSchemas.reference),
   collectionFieldVariant("external_asset", fieldConfigurationSchemas.external_asset),
-);
+]);
 
-export const CollectionFieldDefinitions = Schema.Array(CollectionFieldDefinition).pipe(
-  Schema.maxItems(fieldSystemLimits.fieldNodes),
+export const CollectionFieldDefinitions = Schema.Array(CollectionFieldDefinition).check(
+  Schema.isMaxLength(fieldSystemLimits.fieldNodes),
 );
 export type CollectionFieldDefinitions = typeof CollectionFieldDefinitions.Type;
 
@@ -386,7 +389,7 @@ export type CollectionFieldMutationEncoded = {
     readonly required: boolean | null;
     readonly localization: CollectionFieldLocalization | null;
     readonly deprecated: boolean;
-    readonly editor: Schema.Schema.Encoded<typeof FieldEditorMetadata>;
+    readonly editor: Schema.Codec.Encoded<typeof FieldEditorMetadata>;
     readonly kind: Kind;
     readonly configuration: FieldConfigurationEncodedByKind[Kind];
   };
@@ -395,7 +398,7 @@ export type CollectionFieldMutationEncoded = {
 /** Builds one strict kind-correlated field-mutation variant. */
 function collectionFieldMutationVariant<Kind extends CollectionFieldKind, Encoded, Requirements>(
   kind: Kind,
-  configuration: Schema.Schema<FieldConfigurationByKind[Kind], Encoded, Requirements>,
+  configuration: Schema.Codec<FieldConfigurationByKind[Kind], Encoded, Requirements>,
 ) {
   return Schema.Struct({
     apiKey: Schema.NullOr(CollectionFieldApiKey),
@@ -406,13 +409,13 @@ function collectionFieldMutationVariant<Kind extends CollectionFieldKind, Encode
     deprecated: Schema.Boolean,
     editor: FieldEditorMetadata,
     configuration,
-  }).annotations({ parseOptions: { onExcessProperty: "error" } });
+  }).annotate({ closedObject: true });
 }
 
-export const CollectionFieldMutation: Schema.Schema<
+export const CollectionFieldMutation: Schema.Codec<
   CollectionFieldMutation,
   CollectionFieldMutationEncoded
-> = Schema.Union(
+> = Schema.Union([
   collectionFieldMutationVariant("short_text", fieldConfigurationSchemas.short_text),
   collectionFieldMutationVariant("long_text", fieldConfigurationSchemas.long_text),
   collectionFieldMutationVariant("rich_text", fieldConfigurationSchemas.rich_text),
@@ -431,7 +434,7 @@ export const CollectionFieldMutation: Schema.Schema<
   collectionFieldMutationVariant("list", fieldConfigurationSchemas.list),
   collectionFieldMutationVariant("reference", fieldConfigurationSchemas.reference),
   collectionFieldMutationVariant("external_asset", fieldConfigurationSchemas.external_asset),
-);
+]);
 
 interface CollectionFieldAuthoringNodeBase extends CollectionFieldMutationBase {
   readonly id: CollectionFieldId | null;
@@ -452,7 +455,7 @@ interface CollectionFieldAuthoringNodeEncodedBase {
   readonly required: boolean | null;
   readonly localization: CollectionFieldLocalization | null;
   readonly deprecated: boolean;
-  readonly editor: Schema.Schema.Encoded<typeof FieldEditorMetadata>;
+  readonly editor: Schema.Codec.Encoded<typeof FieldEditorMetadata>;
   readonly children: ReadonlyArray<CollectionFieldAuthoringNodeEncoded>;
 }
 
@@ -465,15 +468,15 @@ export type CollectionFieldAuthoringNodeEncoded = {
 
 const CollectionFieldAuthoringChildren = Schema.Array(
   Schema.suspend(
-    (): Schema.Schema<CollectionFieldAuthoringNode, CollectionFieldAuthoringNodeEncoded> =>
+    (): Schema.Codec<CollectionFieldAuthoringNode, CollectionFieldAuthoringNodeEncoded> =>
       CollectionFieldAuthoringNode,
-  ).annotations({ identifier: "CollectionFieldAuthoringNode" }),
-).pipe(Schema.maxItems(fieldSystemLimits.directObjectProperties));
+  ).annotate({ identifier: "CollectionFieldAuthoringNode" }),
+).check(Schema.isMaxLength(fieldSystemLimits.directObjectProperties));
 
 /** Builds one strict kind-correlated recursive field-authoring variant. */
 function collectionFieldAuthoringVariant<Kind extends CollectionFieldKind, Encoded, Requirements>(
   kind: Kind,
-  configuration: Schema.Schema<FieldConfigurationByKind[Kind], Encoded, Requirements>,
+  configuration: Schema.Codec<FieldConfigurationByKind[Kind], Encoded, Requirements>,
 ) {
   return Schema.Struct({
     id: Schema.NullOr(CollectionFieldId),
@@ -486,13 +489,13 @@ function collectionFieldAuthoringVariant<Kind extends CollectionFieldKind, Encod
     editor: FieldEditorMetadata,
     configuration,
     children: CollectionFieldAuthoringChildren,
-  }).annotations({ parseOptions: { onExcessProperty: "error" } });
+  }).annotate({ closedObject: true });
 }
 
-export const CollectionFieldAuthoringNode: Schema.Schema<
+export const CollectionFieldAuthoringNode: Schema.Codec<
   CollectionFieldAuthoringNode,
   CollectionFieldAuthoringNodeEncoded
-> = Schema.Union(
+> = Schema.Union([
   collectionFieldAuthoringVariant("short_text", fieldConfigurationSchemas.short_text),
   collectionFieldAuthoringVariant("long_text", fieldConfigurationSchemas.long_text),
   collectionFieldAuthoringVariant("rich_text", fieldConfigurationSchemas.rich_text),
@@ -511,10 +514,10 @@ export const CollectionFieldAuthoringNode: Schema.Schema<
   collectionFieldAuthoringVariant("list", fieldConfigurationSchemas.list),
   collectionFieldAuthoringVariant("reference", fieldConfigurationSchemas.reference),
   collectionFieldAuthoringVariant("external_asset", fieldConfigurationSchemas.external_asset),
-);
+]);
 
-export const CollectionFieldAuthoringNodes = Schema.Array(CollectionFieldAuthoringNode).pipe(
-  Schema.maxItems(fieldSystemLimits.fieldNodes),
+export const CollectionFieldAuthoringNodes = Schema.Array(CollectionFieldAuthoringNode).check(
+  Schema.isMaxLength(fieldSystemLimits.fieldNodes),
 );
 export type CollectionFieldAuthoringNodes = typeof CollectionFieldAuthoringNodes.Type;
 
@@ -530,7 +533,7 @@ export class CmsCollection extends Schema.Class<CmsCollection>("CmsCollection")(
   draftVersion: ResourceVersion,
   draftBaseRevisionId: Schema.NullOr(SchemaRevisionId),
   currentPublishedRevisionId: Schema.NullOr(SchemaRevisionId),
-  currentPublishedSequence: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
+  currentPublishedSequence: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 }) {}
@@ -550,9 +553,9 @@ export class CollectionDraftSchema extends Schema.Class<CollectionDraftSchema>(
 export const PublishedSchemaField = CollectionFieldDefinition;
 export type PublishedSchemaField = CollectionFieldDefinition;
 
-export const PublishedSchemaFields = Schema.Array(PublishedSchemaField).pipe(
-  Schema.minItems(1),
-  Schema.maxItems(fieldSystemLimits.fieldNodes),
+export const PublishedSchemaFields = Schema.Array(PublishedSchemaField).check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(fieldSystemLimits.fieldNodes),
 );
 
 export class PublishedSchemaRevision extends Schema.Class<PublishedSchemaRevision>(
@@ -574,9 +577,12 @@ export class PublishedSchemaRevision extends Schema.Class<PublishedSchemaRevisio
   schemaHash: SchemaHash,
   contractHash: ContractHash,
   commandId: SchemaPublicationCommandId,
-  nonBreakingChangeCount: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
-  potentiallyBreakingChangeCount: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
-  breakingChangeCount: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
+  nonBreakingChangeCount: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  potentiallyBreakingChangeCount: Schema.Number.check(
+    Schema.isInt(),
+    Schema.isGreaterThanOrEqualTo(0),
+  ),
+  breakingChangeCount: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   publishedByUserId: Schema.NullOr(AuthUserId),
   publishedByCredentialId: Schema.NullOr(ApiCredentialId),
   publishedAt: IsoDateTime,
@@ -587,14 +593,14 @@ export class PublishedSchemaRevision extends Schema.Class<PublishedSchemaRevisio
 export class SchemaValidationIssue extends Schema.Class<SchemaValidationIssue>(
   "SchemaValidationIssue",
 )({
-  path: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
   code: SchemaValidationIssueCode,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
-export const SchemaValidationIssues = Schema.Array(SchemaValidationIssue).pipe(
-  Schema.minItems(1),
-  Schema.maxItems(50),
+export const SchemaValidationIssues = Schema.Array(SchemaValidationIssue).check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(50),
 );
 export type SchemaValidationIssues = typeof SchemaValidationIssues.Type;
 
@@ -603,17 +609,17 @@ export class SchemaChange extends Schema.Class<SchemaChange>("SchemaChange")({
   code: SchemaChangeCode,
   classification: SchemaChangeClassification,
   fieldId: Schema.NullOr(CollectionFieldId),
-  summary: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
+  summary: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
 }) {}
 
-export const SchemaChanges = Schema.Array(SchemaChange).pipe(Schema.maxItems(701));
+export const SchemaChanges = Schema.Array(SchemaChange).check(Schema.isMaxLength(701));
 export type SchemaChanges = typeof SchemaChanges.Type;
 
 export class SchemaChangeSet extends Schema.Class<SchemaChangeSet>("SchemaChangeSet")({
   items: SchemaChanges,
-  nonBreakingCount: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
-  potentiallyBreakingCount: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
-  breakingCount: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
+  nonBreakingCount: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  potentiallyBreakingCount: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  breakingCount: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   requiresAcknowledgement: Schema.Boolean,
 }) {}
 
@@ -621,7 +627,7 @@ export class CollectionSchemaValidation extends Schema.Class<CollectionSchemaVal
   "CollectionSchemaValidation",
 )({
   valid: Schema.Boolean,
-  issues: Schema.Array(SchemaValidationIssue).pipe(Schema.maxItems(50)),
+  issues: Schema.Array(SchemaValidationIssue).check(Schema.isMaxLength(50)),
   schemaHash: Schema.NullOr(SchemaHash),
   contractHash: Schema.NullOr(ContractHash),
   changes: SchemaChangeSet,
@@ -715,10 +721,10 @@ export class RemoveCollectionFieldInput extends Schema.Class<RemoveCollectionFie
   draftVersion: ResourceVersion,
 }) {}
 
-export const CollectionFieldOrder = Schema.Array(CollectionFieldId).pipe(
-  Schema.maxItems(100),
-  Schema.filter((fieldIds) => new Set(fieldIds).size === fieldIds.length, {
-    message: () => "Field order must contain unique field IDs.",
+export const CollectionFieldOrder = Schema.Array(CollectionFieldId).check(
+  Schema.isMaxLength(100),
+  Schema.makeFilter((fieldIds) => new Set(fieldIds).size === fieldIds.length, {
+    message: "Field order must contain unique field IDs.",
   }),
 );
 export type CollectionFieldOrder = typeof CollectionFieldOrder.Type;
@@ -752,10 +758,10 @@ export class ValidateCollectionSchemaInput extends Schema.Class<ValidateCollecti
   collectionId: CollectionId,
 }) {}
 
-export const AcknowledgedSchemaChangeIds = Schema.Array(SchemaChangeId).pipe(
-  Schema.maxItems(400),
-  Schema.filter((changeIds) => new Set(changeIds).size === changeIds.length, {
-    message: () => "Acknowledged schema change IDs must be unique.",
+export const AcknowledgedSchemaChangeIds = Schema.Array(SchemaChangeId).check(
+  Schema.isMaxLength(400),
+  Schema.makeFilter((changeIds) => new Set(changeIds).size === changeIds.length, {
+    message: "Acknowledged schema change IDs must be unique.",
   }),
 );
 export type AcknowledgedSchemaChangeIds = typeof AcknowledgedSchemaChangeIds.Type;
@@ -806,17 +812,17 @@ export class GetPublishedGeneratedFormInput extends Schema.Class<GetPublishedGen
   revisionId: Schema.NullOr(SchemaRevisionId),
 }) {}
 
-export const GeneratedFormEditableFieldIds = Schema.Array(CollectionFieldId).pipe(
-  Schema.maxItems(fieldSystemLimits.fieldNodes),
-  Schema.filter((fieldIds) => new Set(fieldIds).size === fieldIds.length, {
-    message: () => "Editable generated-form field IDs must be unique.",
+export const GeneratedFormEditableFieldIds = Schema.Array(CollectionFieldId).check(
+  Schema.isMaxLength(fieldSystemLimits.fieldNodes),
+  Schema.makeFilter((fieldIds) => new Set(fieldIds).size === fieldIds.length, {
+    message: "Editable generated-form field IDs must be unique.",
   }),
 );
 
 export class GeneratedFormDefinition extends Schema.Class<GeneratedFormDefinition>(
   "GeneratedFormDefinition",
 )({
-  source: Schema.Literal("draft", "published"),
+  source: Schema.Literals(["draft", "published"]),
   collectionId: CollectionId,
   revisionId: Schema.NullOr(SchemaRevisionId),
   formatVersion: SchemaFormatVersion,
@@ -828,10 +834,10 @@ export class GeneratedFormDefinition extends Schema.Class<GeneratedFormDefinitio
   fields: CollectionFieldDefinitions,
   editableFieldIds: GeneratedFormEditableFieldIds,
   editorLayout: EditorLayout,
-  currencyMinorUnits: Schema.Record({
-    key: Schema.String.pipe(Schema.length(3)),
-    value: Schema.Number.pipe(Schema.int(), Schema.between(0, 4)),
-  }),
+  currencyMinorUnits: Schema.Record(
+    Schema.String.check(Schema.isBetweenLength(3, 3)),
+    Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 4 })),
+  ),
 }) {}
 
 export class CmsCollectionPage extends Schema.Class<CmsCollectionPage>("CmsCollectionPage")({
@@ -839,30 +845,35 @@ export class CmsCollectionPage extends Schema.Class<CmsCollectionPage>("CmsColle
   nextCursor: Schema.NullOr(Cursor),
 }) {}
 
-export const ListCollectionsInputSchema = Schema.standardSchemaV1(ListCollectionsInput);
-export const GetCollectionInputSchema = Schema.standardSchemaV1(GetCollectionInput);
-export const GetCollectionDraftInputSchema = Schema.standardSchemaV1(GetCollectionDraftInput);
-export const GetLatestPublishedSchemaInputSchema = Schema.standardSchemaV1(
+export const ListCollectionsInputSchema = SchemaStrict.toStandardSchemaV1(ListCollectionsInput);
+export const GetCollectionInputSchema = SchemaStrict.toStandardSchemaV1(GetCollectionInput);
+export const GetCollectionDraftInputSchema =
+  SchemaStrict.toStandardSchemaV1(GetCollectionDraftInput);
+export const GetLatestPublishedSchemaInputSchema = SchemaStrict.toStandardSchemaV1(
   GetLatestPublishedSchemaInput,
 );
-export const GetPublishedSchemaRevisionInputSchema = Schema.standardSchemaV1(
+export const GetPublishedSchemaRevisionInputSchema = SchemaStrict.toStandardSchemaV1(
   GetPublishedSchemaRevisionInput,
 );
-export const GetDraftGeneratedFormInputSchema = Schema.standardSchemaV1(GetDraftGeneratedFormInput);
-export const GetPublishedGeneratedFormInputSchema = Schema.standardSchemaV1(
+export const GetDraftGeneratedFormInputSchema = SchemaStrict.toStandardSchemaV1(
+  GetDraftGeneratedFormInput,
+);
+export const GetPublishedGeneratedFormInputSchema = SchemaStrict.toStandardSchemaV1(
   GetPublishedGeneratedFormInput,
 );
 
-export const CmsCollectionOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(CmsCollection));
-export const CmsCollectionPageOutputSchema = Schema.standardSchemaV1(
+export const CmsCollectionOutputSchema = SchemaStrict.toStandardSchemaV1(
+  ApiSuccessSchema(CmsCollection),
+);
+export const CmsCollectionPageOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(CmsCollectionPage),
 );
-export const CollectionDraftSchemaOutputSchema = Schema.standardSchemaV1(
+export const CollectionDraftSchemaOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(CollectionDraftSchema),
 );
-export const PublishedSchemaRevisionOutputSchema = Schema.standardSchemaV1(
+export const PublishedSchemaRevisionOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(PublishedSchemaRevision),
 );
-export const GeneratedFormDefinitionOutputSchema = Schema.standardSchemaV1(
+export const GeneratedFormDefinitionOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(GeneratedFormDefinition),
 );

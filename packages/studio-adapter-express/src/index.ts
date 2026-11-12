@@ -9,7 +9,9 @@ import type {
 import type { StudioFetchHandler } from "@framerfordevs/studio-server";
 import { parseStudioRawTarget } from "@framerfordevs/studio-server/raw-target";
 
-const maximumAdapterBodyBytes = 1_024;
+// The adapter must accommodate the largest finite Studio Content mutation body;
+// operation-specific limits are enforced again by the core before parsing.
+const maximumAdapterBodyBytes = 1 * 1_024 * 1_024;
 
 async function readBody(request: ExpressRequest): Promise<Uint8Array> {
   const declared = request.headers["content-length"];

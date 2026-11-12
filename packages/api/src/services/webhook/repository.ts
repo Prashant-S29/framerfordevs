@@ -14,7 +14,7 @@ import {
   webhookEndpointSecret,
   webhookEndpointSubscription,
 } from "@framerfordevs/db/schema/webhooks";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import {
   ConflictFailure,
@@ -71,6 +71,7 @@ import type { WebhookCiphertext } from "./crypto";
 import type { ApplicationDb } from "../project-access";
 import { authorizeCmsActorProject } from "../project-access";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 export interface CreateWebhookEndpointPersistence {
   readonly endpointId: string;
   readonly destinationId: string;
@@ -156,7 +157,7 @@ function endpointValue(
   subscriptions: ReadonlyArray<string>,
   summary: EndpointSummary,
 ) {
-  return Schema.decodeUnknownSync(WebhookEndpoint)({
+  return SchemaStrict.decodeUnknownSync(WebhookEndpoint)({
     id: row.id,
     projectId: row.projectId,
     environmentId: row.environmentId,
@@ -577,7 +578,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
               endpointId: last.id,
             })
           : null;
-      return Schema.decodeUnknownSync(WebhookEndpointPage)({ items, nextCursor });
+      return SchemaStrict.decodeUnknownSync(WebhookEndpointPage)({ items, nextCursor });
     }),
 
     updateEndpoint: Effect.fn("WebhookRepository.updateEndpoint")(function* (
@@ -1298,7 +1299,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       if (result.kind === "command_conflict")
         return yield* ControlPlaneCommandConflictFailure.make();
       if (result.kind === "limit") return yield* ConflictFailure.make();
-      return Schema.decodeUnknownSync(InvalidationRouteMapping)({
+      return SchemaStrict.decodeUnknownSync(InvalidationRouteMapping)({
         id: result.mapping.id,
         projectId: result.mapping.projectId,
         environmentId: result.mapping.environmentId,
@@ -1392,7 +1393,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
       if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
       if (result.kind === "version") return yield* VersionConflictFailure.make();
-      return Schema.decodeUnknownSync(InvalidationRouteMapping)({
+      return SchemaStrict.decodeUnknownSync(InvalidationRouteMapping)({
         id: result.mapping.id,
         projectId: result.mapping.projectId,
         environmentId: result.mapping.environmentId,
@@ -1501,7 +1502,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
       if (result.kind === "version") return yield* VersionConflictFailure.make();
       if (result.kind === "limit") return yield* ConflictFailure.make();
-      return Schema.decodeUnknownSync(InvalidationRouteMapping)({
+      return SchemaStrict.decodeUnknownSync(InvalidationRouteMapping)({
         id: result.mapping.id,
         projectId: result.mapping.projectId,
         environmentId: result.mapping.environmentId,
@@ -1575,7 +1576,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       });
       const visibleRows = rows.slice(0, input.limit);
       const items = visibleRows.map((row) =>
-        Schema.decodeUnknownSync(InvalidationRouteMapping)({
+        SchemaStrict.decodeUnknownSync(InvalidationRouteMapping)({
           id: row.id,
           projectId: row.projectId,
           environmentId: row.environmentId,
@@ -1765,7 +1766,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       });
       const visibleRows = rows.slice(0, input.limit);
       const items = visibleRows.map(({ delivery, canonicalBody }) =>
-        Schema.decodeUnknownSync(WebhookDelivery)({
+        SchemaStrict.decodeUnknownSync(WebhookDelivery)({
           id: delivery.id,
           eventId: delivery.eventId,
           endpointId: delivery.endpointId,
@@ -1841,7 +1842,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       if (row === undefined) {
         return yield* NotFoundFailure.make({ resource: "webhook delivery" });
       }
-      return Schema.decodeUnknownSync(WebhookDelivery)({
+      return SchemaStrict.decodeUnknownSync(WebhookDelivery)({
         id: row.delivery.id,
         eventId: row.delivery.eventId,
         endpointId: row.delivery.endpointId,
@@ -1899,7 +1900,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       });
       const visibleRows = rows.slice(0, input.limit);
       const items = visibleRows.map((attempt) =>
-        Schema.decodeUnknownSync(WebhookDeliveryAttempt)({
+        SchemaStrict.decodeUnknownSync(WebhookDeliveryAttempt)({
           id: attempt.id,
           deliveryId: attempt.deliveryId,
           eventId: attempt.eventId,
@@ -2042,7 +2043,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
       if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
       if (result.kind === "not_allowed") return yield* WebhookReplayNotAllowedFailure.make();
       if (result.kind === "conflict") return yield* VersionConflictFailure.make();
-      return Schema.decodeUnknownSync(WebhookDelivery)({
+      return SchemaStrict.decodeUnknownSync(WebhookDelivery)({
         id: result.delivery.id,
         eventId: result.delivery.eventId,
         endpointId: result.delivery.endpointId,
@@ -2060,9 +2061,9 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
   };
 }
 
-export class WebhookRepository extends Context.Tag("WebhookRepository")<
+export class WebhookRepository extends Context.Service<
   WebhookRepository,
   ReturnType<typeof makeWebhookRepository>
->() {}
+>()("WebhookRepository") {}
 
 export const WebhookRepositoryLive = Layer.succeed(WebhookRepository, makeWebhookRepository());

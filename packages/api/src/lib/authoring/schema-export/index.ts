@@ -1,13 +1,14 @@
 // Reconstructs the complete code-owned project schema from published stable-ID authority.
 
 import type { ProjectSchema } from "@framerfordevs/schema";
-import { Either, Schema } from "effect";
+import { Result } from "effect";
 
 import { AuthoringProjectSchemaDocument } from "../../../contracts/authoring/schema";
 import type { PublishedSchemaRevision, CollectionFieldDefinition } from "../../../contracts/schema";
 import { compareCanonicalText } from "../../field/document";
 import type { PersistedProjectSourceIdentities } from "../sources";
 
+import * as SchemaStrict from "../../schema-strict";
 export interface AuthoringSchemaExportCollection {
   readonly sourceKey: string;
   readonly collectionId: string;
@@ -198,11 +199,11 @@ export function buildAuthoringSchemaExport(options: {
     return { sourceKey: collection.sourceKey, apiKey: collection.apiKey, fields };
   });
   collections.sort((left, right) => compareCanonicalText(left.sourceKey, right.sourceKey));
-  const decoded = Schema.decodeUnknownEither(AuthoringProjectSchemaDocument)({ collections });
-  if (Either.isLeft(decoded)) {
+  const decoded = SchemaStrict.decodeUnknownResult(AuthoringProjectSchemaDocument)({ collections });
+  if (Result.isFailure(decoded)) {
     context.issues.push({ path: "$", code: "export_document_invalid" });
   }
-  return context.issues.length > 0 || Either.isLeft(decoded)
+  return context.issues.length > 0 || Result.isFailure(decoded)
     ? { valid: false, issues: context.issues.slice(0, 50) }
-    : { valid: true, project: decoded.right };
+    : { valid: true, project: decoded.success };
 }

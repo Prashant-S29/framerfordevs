@@ -95,6 +95,8 @@ import { authorizeCmsActorProject, selectUserProjectAccess } from "../project-ac
 import { PublicationEngine } from "./engine";
 import { hashSchemaContract } from "../schema/engine";
 
+import * as SchemaStrict from "../../lib/schema-strict";
+import { Uuid } from "../../contracts/uuid";
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
 }
@@ -253,13 +255,11 @@ async function incrementDeliveryGeneration(
 }
 
 function entryValues(value: unknown): EntryValues {
-  return Schema.decodeUnknownSync(Schema.Record({ key: Schema.UUID, value: Schema.Unknown }))(
-    value,
-  );
+  return SchemaStrict.decodeUnknownSync(Schema.Record(Uuid, Schema.Unknown))(value);
 }
 
 function fieldValue(row: typeof cmsSchemaRevisionField.$inferSelect): CollectionField {
-  return Schema.decodeUnknownSync(CollectionFieldDefinition)({
+  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
     id: row.fieldId,
     parentFieldId: row.parentFieldId,
     nodeRole: row.nodeRole,
@@ -446,7 +446,7 @@ async function authorizeScope(
 
 async function allocatePublicationId(executor: ApplicationExecutor): Promise<string> {
   const result = await executor.execute(sql`select uuidv7()::text as id`);
-  const decoded = Schema.decodeUnknownSync(
+  const decoded = SchemaStrict.decodeUnknownSync(
     Schema.Struct({ rows: Schema.Array(Schema.Struct({ id: Schema.String })) }),
   )(result);
   const row = decoded.rows[0];
@@ -802,7 +802,7 @@ function publicationSummary(
   locale: typeof projectLocale.$inferSelect,
   current: boolean,
 ) {
-  return Schema.decodeUnknownSync(EntryPublicationSummary)({
+  return SchemaStrict.decodeUnknownSync(EntryPublicationSummary)({
     id: row.publication.id,
     snapshotId: row.snapshot.publicationId,
     entryId: row.publication.entryId,
@@ -921,7 +921,7 @@ function publicIssues(
     });
   return result
     .slice(0, 50)
-    .map((issue) => Schema.decodeUnknownSync(EntryPublicationValidationIssue)(issue));
+    .map((issue) => SchemaStrict.decodeUnknownSync(EntryPublicationValidationIssue)(issue));
 }
 
 interface AuthorityState {
@@ -1072,7 +1072,7 @@ function planValue(
       ? canonicalizeEntryValue(state.current.snapshot.referenceManifest) !==
         candidate.canonicalReferenceManifest
       : candidate !== null && candidate.referenceManifest.length > 0;
-  return Schema.decodeUnknownSync(EntryPublicationPlan)({
+  return SchemaStrict.decodeUnknownSync(EntryPublicationPlan)({
     entryId: state.entry.id,
     localeId: access.locale.id,
     locale: access.locale.tag,
@@ -1258,7 +1258,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
         current !== null &&
         (current.schemaRevisionId !== state.contract.revision.id ||
           current.contractHash !== state.contract.contractHash);
-      return Schema.decodeUnknownSync(EntryPublicationStatus)({
+      return SchemaStrict.decodeUnknownSync(EntryPublicationStatus)({
         entryId: state.entry.id,
         localeId: access.locale.id,
         locale: access.locale.tag,
@@ -1468,7 +1468,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
                     fieldId:
                       issue.fieldId === null
                         ? null
-                        : Schema.decodeUnknownSync(CollectionFieldId)(issue.fieldId),
+                        : SchemaStrict.decodeUnknownSync(CollectionFieldId)(issue.fieldId),
                     path: issue.path,
                     code: issue.code,
                     message: issue.message,
@@ -1762,7 +1762,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
       const stateVersion =
         result.kind === "replay" ? result.receipt.resultHeadVersion : result.stateVersion;
       const resultKind = result.kind === "replay" ? result.receipt.resultKind : result.resultKind;
-      return Schema.decodeUnknownSync(PublishEntryResult)({
+      return SchemaStrict.decodeUnknownSync(PublishEntryResult)({
         entryId: result.artifact.publication.entryId,
         localeId: result.access.locale.id,
         locale: result.access.locale.tag,
@@ -2059,7 +2059,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
         result.kind === "replay" ? result.receipt.resultHeadVersion : result.stateVersion;
       const finalResultKind =
         result.kind === "replay" ? result.receipt.resultKind : result.resultKind;
-      return Schema.decodeUnknownSync(UnpublishEntryResult)({
+      return SchemaStrict.decodeUnknownSync(UnpublishEntryResult)({
         entryId: input.entryId,
         localeId: result.access.locale.id,
         locale: result.access.locale.tag,
@@ -2141,10 +2141,12 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               collectionId: input.collectionId,
               entryId: input.entryId,
               locale: input.locale,
-              sequence: Schema.decodeUnknownSync(EntryPublicationSequence)(
+              sequence: SchemaStrict.decodeUnknownSync(EntryPublicationSequence)(
                 last.publication.publicationSequence,
               ),
-              publicationId: Schema.decodeUnknownSync(EntryPublicationId)(last.publication.id),
+              publicationId: SchemaStrict.decodeUnknownSync(EntryPublicationId)(
+                last.publication.id,
+              ),
             })
           : null;
       return EntryPublicationPage.make({ items, nextCursor });
@@ -2152,10 +2154,10 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
   };
 }
 
-export class PublicationRepository extends Context.Tag("PublicationRepository")<
+export class PublicationRepository extends Context.Service<
   PublicationRepository,
   ReturnType<typeof makePublicationRepository>
->() {}
+>()("PublicationRepository") {}
 
 export const PublicationRepositoryLive = Layer.effect(
   PublicationRepository,

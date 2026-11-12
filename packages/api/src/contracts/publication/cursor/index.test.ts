@@ -1,13 +1,14 @@
 // Verifies publication-history cursors are opaque, bounded, and exact-scope bound.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit } from "effect";
 
 import { Cursor } from "../../platform";
 import { decodePublicationCursor, encodePublicationCursor } from "./index";
 import { EntryPublicationId, EntryPublicationSequence, GetEntryPublicationStatusInput } from "..";
 
-const scope = Schema.decodeUnknownSync(GetEntryPublicationStatusInput)({
+import * as SchemaStrict from "../../../lib/schema-strict";
+const scope = SchemaStrict.decodeUnknownSync(GetEntryPublicationStatusInput)({
   projectId: "019fae8b-1234-7000-8000-000000000001",
   environmentId: "019fae8b-1234-7000-8000-000000000002",
   collectionId: "019fae8b-1234-7000-8000-000000000003",
@@ -15,10 +16,10 @@ const scope = Schema.decodeUnknownSync(GetEntryPublicationStatusInput)({
   locale: "hi",
 });
 
-const publicationId = Schema.decodeUnknownSync(EntryPublicationId)(
+const publicationId = SchemaStrict.decodeUnknownSync(EntryPublicationId)(
   "019fae8b-1234-7000-8000-000000000005",
 );
-const sequence = Schema.decodeUnknownSync(EntryPublicationSequence)(3);
+const sequence = SchemaStrict.decodeUnknownSync(EntryPublicationSequence)(3);
 
 describe("publication cursor", () => {
   it.effect("round trips immutable ordering authority", () =>
@@ -33,13 +34,16 @@ describe("publication cursor", () => {
 
   it.effect("rejects malformed and cross-locale cursors uniformly", () =>
     Effect.gen(function* () {
-      const malformed = Schema.decodeUnknownSync(Cursor)("not-json");
+      const malformed = SchemaStrict.decodeUnknownSync(Cursor)("not-json");
       const cursor = yield* encodePublicationCursor({ ...scope, sequence, publicationId });
       const malformedExit = yield* Effect.exit(decodePublicationCursor(malformed, scope));
       const wrongScopeExit = yield* Effect.exit(
         decodePublicationCursor(
           cursor,
-          Schema.decodeUnknownSync(GetEntryPublicationStatusInput)({ ...scope, locale: "en" }),
+          SchemaStrict.decodeUnknownSync(GetEntryPublicationStatusInput)({
+            ...scope,
+            locale: "en",
+          }),
         ),
       );
 

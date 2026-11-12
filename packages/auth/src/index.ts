@@ -756,6 +756,12 @@ export function createAuth(options: CreateAuthOptions = {}) {
             accessTokenExpiresIn: TOOLING_ACCESS_TOKEN_LIFETIME_SECONDS,
             refreshTokenExpiresIn: CLI_REFRESH_TOKEN_LIFETIME_SECONDS,
             refreshTokenReuseInterval: 0,
+            // M18 Studio web clients may use exact loopback HTTP for local development; every other HTTP redirect stays rejected.
+            allowInsecureRedirectUri: (url) =>
+              url.protocol === "http:" &&
+              (url.hostname === "localhost" ||
+                url.hostname === "127.0.0.1" ||
+                url.hostname === "[::1]"),
             allowDynamicClientRegistration: false,
             allowUnauthenticatedClientRegistration: false,
             allowPublicClientPrelogin: true,

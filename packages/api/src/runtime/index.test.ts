@@ -1,5 +1,6 @@
 import { afterAll, assert, beforeEach, describe, expect, it } from "@effect/vitest";
-import { Context, Effect, Layer, ManagedRuntime, TestClock } from "effect";
+import { Context, Effect, Layer, ManagedRuntime } from "effect";
+import { TestClock } from "effect/testing";
 
 import { UnauthorizedFailure } from "../contracts/response/errors";
 import { ApplicationLogger, type LogRecord, redactFields } from "../observability/logger";
@@ -280,12 +281,11 @@ describe("ManagedRuntime lifecycle", () => {
     let initialized = 0;
     let released = 0;
 
-    class LifecycleResource extends Context.Tag("LifecycleResource")<
-      LifecycleResource,
-      { readonly ready: true }
-    >() {}
+    class LifecycleResource extends Context.Service<LifecycleResource, { readonly ready: true }>()(
+      "LifecycleResource",
+    ) {}
 
-    const LifecycleLive = Layer.scoped(
+    const LifecycleLive = Layer.effect(
       LifecycleResource,
       Effect.acquireRelease(
         Effect.sync(() => {

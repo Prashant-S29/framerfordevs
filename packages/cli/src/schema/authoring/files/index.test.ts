@@ -77,7 +77,7 @@ it.live("atomically bootstraps owned Tier 1 source and refuses modified export o
         const lockBytes = yield* Effect.promise(() =>
           readFile(join(root, ".framerfordevs/schema.lock.json"), "utf8"),
         );
-        assert.deepStrictEqual(JSON.parse(lockBytes), second.lock);
+        assert.deepStrictEqual(JSON.parse(lockBytes), JSON.parse(JSON.stringify(second.lock)));
         const environmentAuthority = yield* readAuthoringEnvironmentAuthority({
           projectRoot: root,
           projectId: input.authority.projectId,

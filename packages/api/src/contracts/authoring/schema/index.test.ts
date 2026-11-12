@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit } from "effect";
 
 import {
   AcknowledgedAuthoringSchemaChangeIds,
@@ -9,6 +9,7 @@ import {
   AuthoringSchemaPlanRequest,
 } from "./index";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const collectionId = "019fae8b-1234-7000-8000-000000000301";
 const revisionId = "019fae8b-1234-7000-8000-000000000302";
 const structureHash = "a".repeat(64);
@@ -45,9 +46,11 @@ function project() {
 describe("Authoring schema plan/apply contracts", () => {
   it.effect("uses the complete shared project validator at the public contract boundary", () =>
     Effect.gen(function* () {
-      const accepted = yield* Schema.decodeUnknown(AuthoringProjectSchemaDocument)(project());
+      const accepted = yield* SchemaStrict.decodeUnknownEffect(AuthoringProjectSchemaDocument)(
+        project(),
+      );
       const excess = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringProjectSchemaDocument)({
+        SchemaStrict.decodeUnknownEffect(AuthoringProjectSchemaDocument)({
           collections: [{ ...project().collections[0], displayName: "Posts" }],
         }),
       );
@@ -59,11 +62,11 @@ describe("Authoring schema plan/apply contracts", () => {
 
   it.effect("rejects internal scope and excess properties in the public plan body", () =>
     Effect.gen(function* () {
-      const accepted = yield* Schema.decodeUnknown(AuthoringSchemaPlanRequest)({
+      const accepted = yield* SchemaStrict.decodeUnknownEffect(AuthoringSchemaPlanRequest)({
         project: project(),
       });
       const excess = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringSchemaPlanRequest)({
+        SchemaStrict.decodeUnknownEffect(AuthoringSchemaPlanRequest)({
           project: project(),
           workspaceId: "internal",
         }),
@@ -84,16 +87,16 @@ describe("Authoring schema plan/apply contracts", () => {
         candidateStructureHash: null,
         candidateContractHash: null,
       };
-      const accepted = yield* Schema.decodeUnknown(AuthoringSchemaCandidate)(candidate);
+      const accepted = yield* SchemaStrict.decodeUnknownEffect(AuthoringSchemaCandidate)(candidate);
       const omitted = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringSchemaCandidate)(
+        SchemaStrict.decodeUnknownEffect(AuthoringSchemaCandidate)(
           Object.fromEntries(
             Object.entries(candidate).filter(([key]) => key !== "candidateStructureHash"),
           ),
         ),
       );
       const falseHash = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringSchemaCandidate)({
+        SchemaStrict.decodeUnknownEffect(AuthoringSchemaCandidate)({
           ...candidate,
           candidateStructureHash: structureHash,
         }),
@@ -107,7 +110,7 @@ describe("Authoring schema plan/apply contracts", () => {
 
   it.effect("requires a real candidate hash when every identity is allocated", () =>
     Effect.gen(function* () {
-      const accepted = yield* Schema.decodeUnknown(AuthoringSchemaCandidate)({
+      const accepted = yield* SchemaStrict.decodeUnknownEffect(AuthoringSchemaCandidate)({
         collectionSourceKey: "posts",
         collectionId,
         currentRevisionId: revisionId,
@@ -116,7 +119,7 @@ describe("Authoring schema plan/apply contracts", () => {
         candidateContractHash: contractHash,
       });
       const missingHash = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringSchemaCandidate)({
+        SchemaStrict.decodeUnknownEffect(AuthoringSchemaCandidate)({
           ...accepted,
           candidateStructureHash: null,
         }),
@@ -129,7 +132,7 @@ describe("Authoring schema plan/apply contracts", () => {
 
   it.effect("correlates valid plans with a plan hash and invalid plans with explicit issues", () =>
     Effect.gen(function* () {
-      const valid = yield* Schema.decodeUnknown(AuthoringSchemaPlan)({
+      const valid = yield* SchemaStrict.decodeUnknownEffect(AuthoringSchemaPlan)({
         valid: true,
         current,
         planHash,
@@ -137,7 +140,7 @@ describe("Authoring schema plan/apply contracts", () => {
         changes: [],
         candidates: [],
       });
-      const invalid = yield* Schema.decodeUnknown(AuthoringSchemaPlan)({
+      const invalid = yield* SchemaStrict.decodeUnknownEffect(AuthoringSchemaPlan)({
         valid: false,
         current,
         planHash: null,
@@ -146,7 +149,7 @@ describe("Authoring schema plan/apply contracts", () => {
         candidates: [],
       });
       const ambiguous = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringSchemaPlan)({
+        SchemaStrict.decodeUnknownEffect(AuthoringSchemaPlan)({
           valid: true,
           current,
           planHash: null,
@@ -165,9 +168,14 @@ describe("Authoring schema plan/apply contracts", () => {
   it.effect("rejects duplicate risky-change acknowledgements", () =>
     Effect.gen(function* () {
       const changeId = "e".repeat(64);
-      const unique = yield* Schema.decodeUnknown(AcknowledgedAuthoringSchemaChangeIds)([changeId]);
+      const unique = yield* SchemaStrict.decodeUnknownEffect(AcknowledgedAuthoringSchemaChangeIds)([
+        changeId,
+      ]);
       const duplicate = yield* Effect.exit(
-        Schema.decodeUnknown(AcknowledgedAuthoringSchemaChangeIds)([changeId, changeId]),
+        SchemaStrict.decodeUnknownEffect(AcknowledgedAuthoringSchemaChangeIds)([
+          changeId,
+          changeId,
+        ]),
       );
 
       assert.strictEqual(unique[0], changeId);

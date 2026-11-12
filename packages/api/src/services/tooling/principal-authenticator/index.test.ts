@@ -1,9 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Option, Schema } from "effect";
+import { Cause, Effect, Exit, Option } from "effect";
 
 import { CredentialPrincipal } from "../../../contracts/access";
 import { makeToolingOAuthTokenVerifier, makeToolingPrincipalAuthenticator } from "./index";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const unusedManagementVerifier = () => Effect.never;
 const allowInvalidAttempt = () => Effect.void;
 
@@ -17,7 +18,7 @@ describe("Tooling principal authentication", () => {
 
       assert.isTrue(Exit.isFailure(result));
       if (Exit.isFailure(result)) {
-        const error = Option.getOrUndefined(Cause.failureOption(result.cause));
+        const error = Option.getOrUndefined(Cause.findErrorOption(result.cause));
         assert.strictEqual(error?._tag, "AuthSessionFailure");
       }
     }),
@@ -54,7 +55,7 @@ describe("Tooling principal authentication", () => {
         Effect.sync(() => {
           assert.isTrue(Exit.isFailure(result));
           if (Exit.isFailure(result)) {
-            const error = Option.getOrUndefined(Cause.failureOption(result.cause));
+            const error = Option.getOrUndefined(Cause.findErrorOption(result.cause));
             assert.strictEqual(error?._tag, "CredentialInvalidFailure");
           }
         }),
@@ -98,7 +99,7 @@ describe("Tooling principal authentication", () => {
   });
 
   it.effect("requires every declared management scope after one credential verification", () => {
-    const principal = Schema.decodeUnknownSync(CredentialPrincipal)({
+    const principal = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
       credentialId: "019fae8b-1234-7000-8000-000000000001",
       workspaceId: "019fae8b-1234-7000-8000-000000000002",
       projectId: "019fae8b-1234-7000-8000-000000000003",
@@ -128,7 +129,7 @@ describe("Tooling principal authentication", () => {
           assert.strictEqual(verificationCalls, 1);
           assert.isTrue(Exit.isFailure(result));
           if (Exit.isFailure(result)) {
-            const error = Option.getOrUndefined(Cause.failureOption(result.cause));
+            const error = Option.getOrUndefined(Cause.findErrorOption(result.cause));
             assert.strictEqual(error?._tag, "CredentialInvalidFailure");
           }
         }),
@@ -186,7 +187,7 @@ describe("Tooling principal authentication", () => {
           for (const result of results) {
             assert.isTrue(Exit.isFailure(result));
             if (Exit.isFailure(result)) {
-              const error = Option.getOrUndefined(Cause.failureOption(result.cause));
+              const error = Option.getOrUndefined(Cause.findErrorOption(result.cause));
               assert.strictEqual(error?._tag, "CredentialInvalidFailure");
             }
           }
@@ -216,7 +217,7 @@ describe("Tooling principal authentication", () => {
           for (const result of results) {
             assert.isTrue(Exit.isFailure(result));
             if (Exit.isFailure(result)) {
-              const error = Option.getOrUndefined(Cause.failureOption(result.cause));
+              const error = Option.getOrUndefined(Cause.findErrorOption(result.cause));
               assert.strictEqual(error?._tag, "CredentialInvalidFailure");
             }
           }

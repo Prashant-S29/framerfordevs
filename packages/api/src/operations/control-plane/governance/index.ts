@@ -55,6 +55,7 @@ import {
   encodeProjectMemberCursor,
 } from "../../../contracts/access/page-cursor";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const currentDate = Effect.map(Clock.currentTimeMillis, (millis) => new Date(millis));
 
 function requireUser(actor: ControlPlaneActor) {
@@ -62,15 +63,15 @@ function requireUser(actor: ControlPlaneActor) {
 }
 
 function decodeSignedCursor(value: string) {
-  return Schema.decodeUnknown(ControlPlaneCursor)(value).pipe(
+  return SchemaStrict.decodeUnknownEffect(ControlPlaneCursor)(value).pipe(
     Effect.mapError((cause) =>
       SecurityServiceFailure.make({ operation: "control-plane.cursor.output", cause }),
     ),
   );
 }
 
-function decodeCursorId<A, I>(schema: Schema.Schema<A, I, never>, value: string) {
-  return Schema.decodeUnknown(schema)(value).pipe(
+function decodeCursorId<A, I>(schema: Schema.Codec<A, I, never>, value: string) {
+  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
     Effect.mapError((cause) =>
       SecurityServiceFailure.make({ operation: "control-plane.cursor.position", cause }),
     ),

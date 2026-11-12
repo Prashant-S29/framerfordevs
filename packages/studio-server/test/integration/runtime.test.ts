@@ -265,6 +265,9 @@ function studioContentSuccessData(url: string, method: string): Readonly<Record<
       configurationNotices: [],
     };
   }
+  if (pathname.endsWith("/resolve") && method === "POST") {
+    return { items: [{ id: contentEntryId, displayName: "Article" }] };
+  }
   if (pathname.endsWith("/search") || (pathname.endsWith("/entries") && method === "GET")) {
     return {
       items: [contentEntry],
@@ -473,7 +476,7 @@ function percentile95(values: ReadonlyArray<number>) {
 }
 
 describe("Studio Fetch runtime", () => {
-  it("adapts only the seven finite Studio Content operation families without exposing bearer authority", async () => {
+  it("adapts only the nine finite Studio Content v2 operation families without exposing bearer authority", async () => {
     const setup = config();
     const baseFetch = setup.value.fetch;
     const contentCalls: Array<{
@@ -488,7 +491,7 @@ describe("Studio Fetch runtime", () => {
     const contentFetch: typeof globalThis.fetch = async (input, init) => {
       const url =
         typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      if (url.includes("/api/studio-content/v1/")) {
+      if (url.includes("/api/studio-content/v2/")) {
         const headers = new Headers(init?.headers);
         contentCalls.push({
           url,
@@ -529,6 +532,11 @@ describe("Studio Fetch runtime", () => {
         method: "POST",
         headers: { ...browserHeaders, "Content-Type": "application/json" },
         body: JSON.stringify({ query: "ar", cursor: null, limit: 25 }),
+      }),
+      new Request(`http://localhost:4100${routeBase}/resolve`, {
+        method: "POST",
+        headers: { ...browserHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ entryIds: [entryId] }),
       }),
       new Request(`http://localhost:4100${routeBase}/new`, { headers: browserHeaders }),
       new Request(`http://localhost:4100${routeBase}/${entryId}`, { headers: browserHeaders }),
@@ -578,6 +586,7 @@ describe("Studio Fetch runtime", () => {
       ["collections", "configurationNotices", "locales"],
       ["count", "hasMore", "items", "nextCursor"],
       ["count", "hasMore", "items", "nextCursor"],
+      ["items"],
       ["capabilities", "form", "locale", "localeId"],
       ["capabilities", "draft", "form", "locale", "localeId"],
       [
@@ -602,7 +611,7 @@ describe("Studio Fetch runtime", () => {
         "validation",
       ],
     ]);
-    expect(contentCalls).toHaveLength(8);
+    expect(contentCalls).toHaveLength(9);
     expect(contentCalls.every((call) => call.authorization === "Bearer access-1")).toBe(true);
     expect(
       contentCalls.every((call) =>
@@ -623,6 +632,7 @@ describe("Studio Fetch runtime", () => {
     expect(contentCalls.map(({ method }) => method)).toEqual([
       "GET",
       "GET",
+      "POST",
       "POST",
       "GET",
       "GET",
@@ -659,7 +669,7 @@ describe("Studio Fetch runtime", () => {
       });
       expect([400, 401, 403, 404]).toContain(response.status);
     }
-    expect(contentCalls).toHaveLength(8);
+    expect(contentCalls).toHaveLength(9);
     const excessMutation = new Request(`http://localhost:4100${routeBase}`, {
       method: "POST",
       headers: { ...browserHeaders, "Content-Type": "application/json" },
@@ -683,7 +693,7 @@ describe("Studio Fetch runtime", () => {
       rawTarget: new URL(excessMutation.url).pathname,
     });
     expect(excessResponse.status).toBe(400);
-    expect(contentCalls).toHaveLength(8);
+    expect(contentCalls).toHaveLength(9);
     let deepValue: unknown = "blocked";
     for (let depth = 0; depth < 25; depth += 1) deepValue = { child: deepValue };
     const deepMutation = new Request(`http://localhost:4100${routeBase}`, {
@@ -702,7 +712,7 @@ describe("Studio Fetch runtime", () => {
       rawTarget: new URL(deepMutation.url).pathname,
     });
     expect(deepResponse.status).toBe(400);
-    expect(contentCalls).toHaveLength(8);
+    expect(contentCalls).toHaveLength(9);
 
     const boundedMutationRequest = (value: unknown) =>
       new Request(`http://localhost:4100${routeBase}`, {
@@ -772,7 +782,7 @@ describe("Studio Fetch runtime", () => {
         })
       ).status,
     ).toBe(400);
-    expect(contentCalls).toHaveLength(11);
+    expect(contentCalls).toHaveLength(12);
 
     const browserBodies = await Promise.all(
       requests.map(async (request) =>
@@ -809,7 +819,7 @@ describe("Studio Fetch runtime", () => {
       fetch: async (input, init) => {
         const url =
           typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-        if (!url.includes("/api/studio-content/v1/")) return baseFetch(input, init);
+        if (!url.includes("/api/studio-content/v2/")) return baseFetch(input, init);
         return Response.json({
           ok: true,
           data: {
@@ -895,14 +905,14 @@ describe("Studio Fetch runtime", () => {
     await handler.dispose();
   });
 
-  it("preserves both closed configuration reasons across all seven nested operations", async () => {
+  it("preserves both closed configuration reasons across all eight v2 nested operations", async () => {
     let reason: "empty_schema" | "projection_invalid" = "empty_schema";
     const setup = config();
     const baseFetch = setup.value.fetch;
     const contentFetch: typeof globalThis.fetch = async (input, init) => {
       const url =
         typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      if (!url.includes("/api/studio-content/v1/")) return baseFetch(input, init);
+      if (!url.includes("/api/studio-content/v2/")) return baseFetch(input, init);
       return Response.json(
         {
           ok: false,
@@ -942,6 +952,11 @@ describe("Studio Fetch runtime", () => {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify({ query: "ar", cursor: null, limit: 25 }),
+      }),
+      new Request(`http://localhost:4100${routeBase}/resolve`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ entryIds: [entryId] }),
       }),
       new Request(`http://localhost:4100${routeBase}/new`, { headers }),
       new Request(`http://localhost:4100${routeBase}/${entryId}`, { headers }),
@@ -1011,7 +1026,7 @@ describe("Studio Fetch runtime", () => {
       const contentFetch: typeof globalThis.fetch = async (input, init) => {
         const url =
           typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-        if (url.includes("/api/studio-content/v1/")) {
+        if (url.includes("/api/studio-content/v2/")) {
           return Response.json({
             ok: true,
             data: studioContentSuccessData(url, init?.method ?? "GET"),
@@ -1082,7 +1097,7 @@ describe("Studio Fetch runtime", () => {
     let responseBody = JSON.stringify({
       ok: true,
       data: studioContentSuccessData(
-        `http://localhost:3000/api/studio-content/v1/projects/${projectId}/environments/${environmentId}/collections/${collectionId}/locales/en/entries`,
+        `http://localhost:3000/api/studio-content/v2/projects/${projectId}/environments/${environmentId}/collections/${collectionId}/locales/en/entries`,
         "POST",
       ),
       error: null,
@@ -1092,7 +1107,7 @@ describe("Studio Fetch runtime", () => {
       fetch: async (input, init) => {
         const url =
           typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-        if (url.includes("/api/studio-content/v1/")) {
+        if (url.includes("/api/studio-content/v2/")) {
           upstreamBodyBytes = Buffer.byteLength(String(init?.body ?? ""), "utf8");
           return new Response(responseBody, {
             status: 200,
@@ -1186,6 +1201,45 @@ describe("Studio Fetch runtime", () => {
       ).status,
     ).toBe(413);
     expect(upstreamBodyBytes).toBe(2 * 1_024);
+
+    responseBody = JSON.stringify({
+      ok: true,
+      data: { items: [] },
+      error: null,
+      message: "Content operation completed.",
+    });
+    const resolveRoute = `${route}/resolve`;
+    const resolutionIds = Array.from(
+      { length: 100 },
+      (_, index) => `019fae8b-1234-7000-8000-${String(index).padStart(12, "0")}`,
+    );
+    const resolutionBody = JSON.stringify({ entryIds: resolutionIds });
+    const maximumResolutionRequest = new Request(`http://localhost:4100${resolveRoute}`, {
+      method: "POST",
+      headers,
+      body: resolutionBody,
+    });
+    expect(
+      (
+        await handler.fetch(maximumResolutionRequest, {
+          rawTarget: resolveRoute,
+        })
+      ).status,
+    ).toBe(200);
+    expect(upstreamBodyBytes).toBe(Buffer.byteLength(resolutionBody, "utf8"));
+    const excessResolutionRequest = new Request(`http://localhost:4100${resolveRoute}`, {
+      method: "POST",
+      headers,
+      body: paddedJson({ entryIds: [fieldId] }, 8 * 1_024 + 1),
+    });
+    expect(
+      (
+        await handler.fetch(excessResolutionRequest, {
+          rawTarget: resolveRoute,
+        })
+      ).status,
+    ).toBe(413);
+    expect(upstreamBodyBytes).toBe(Buffer.byteLength(resolutionBody, "utf8"));
 
     const envelope = {
       ok: true,
@@ -1283,7 +1337,7 @@ describe("Studio Fetch runtime", () => {
       fetch: async (input, init) => {
         const url =
           typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-        if (!url.includes("/api/studio-content/v1/")) return baseFetch(input, init);
+        if (!url.includes("/api/studio-content/v2/")) return baseFetch(input, init);
         const fixture = fixtures[index++];
         if (fixture === undefined) throw new Error("Missing failure fixture.");
         const [status, code] = fixture;
@@ -1387,7 +1441,7 @@ describe("Studio Fetch runtime", () => {
           ok: true,
           data: {
             ...studioContentSuccessData(
-              `http://localhost:3000/api/studio-content/v1/projects/${projectId}/environments/${environmentId}/context`,
+              `http://localhost:3000/api/studio-content/v2/projects/${projectId}/environments/${environmentId}/context`,
               "GET",
             ),
             unexpected: true,
@@ -1528,7 +1582,7 @@ describe("Studio Fetch runtime", () => {
     const contentFetch: typeof globalThis.fetch = async (input, init) => {
       const url =
         typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      if (!url.includes("/api/studio-content/v1/")) return baseFetch(input, init);
+      if (!url.includes("/api/studio-content/v2/")) return baseFetch(input, init);
       const response = invalid[index];
       index += 1;
       if (response === undefined) throw new Error("Missing invalid response fixture.");
@@ -1591,6 +1645,9 @@ describe("Studio Fetch runtime", () => {
         nextCursor: null,
         count: { value: 1, relation: "exact" },
       },
+      {
+        items: [{ id: contentCollectionId, displayName: "Unrequested entry" }],
+      },
     ];
     let index = 0;
     const handler = createStudioFetchHandler({
@@ -1598,7 +1655,7 @@ describe("Studio Fetch runtime", () => {
       fetch: async (input, init) => {
         const url =
           typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-        if (!url.includes("/api/studio-content/v1/")) return baseFetch(input, init);
+        if (!url.includes("/api/studio-content/v2/")) return baseFetch(input, init);
         const data = invalidData[index++];
         if (data === undefined) throw new Error("Missing invalid nested DTO fixture.");
         return Response.json({
@@ -1616,13 +1673,20 @@ describe("Studio Fetch runtime", () => {
       "Sec-Fetch-Site": "same-origin",
     };
     const base = `/studio/api/content/collections/${contentCollectionId}/locales/en/entries`;
-    for (const route of [`${base}/new`, base]) {
-      const response = await handler.fetch(
-        new Request(`http://localhost:4100${route}`, { headers }),
-        {
-          rawTarget: route,
-        },
-      );
+    const requests = [
+      new Request(`http://localhost:4100${base}/new`, { headers }),
+      new Request(`http://localhost:4100${base}`, { headers }),
+      new Request(`http://localhost:4100${base}/resolve`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ entryIds: [contentEntryId] }),
+      }),
+    ];
+    for (const request of requests) {
+      const route = new URL(request.url).pathname;
+      const response = await handler.fetch(request, {
+        rawTarget: route,
+      });
       expect(response.status).toBe(502);
       expect(await response.text()).toContain("STUDIO_UPSTREAM_UNAVAILABLE");
     }
@@ -1657,6 +1721,36 @@ describe("Studio Fetch runtime", () => {
     );
     expect(head.status).toBe(200);
     expect(await head.text()).toBe("");
+    const contentShellRoutes = [
+      "/studio/content",
+      `/studio/content/${contentCollectionId}/locales/en`,
+      `/studio/content/${contentCollectionId}/locales/en/entries/new`,
+      `/studio/content/${contentCollectionId}/locales/en/entries/${contentEntryId}`,
+    ];
+    for (const route of contentShellRoutes) {
+      const response = await handler.fetch(new Request(`http://localhost:4100${route}`), {
+        rawTarget: route,
+      });
+      expect(response.status, route).toBe(200);
+      expect(await response.text()).toBe(shellBody);
+    }
+    const contentMethod = await handler.fetch(
+      new Request("http://localhost:4100/studio/content", { method: "POST" }),
+      { rawTarget: "/studio/content" },
+    );
+    expect(contentMethod.status).toBe(405);
+    expect(contentMethod.headers.get("allow")).toBe("GET, HEAD");
+    for (const route of [
+      "/studio/content/",
+      `/studio/content/${contentCollectionId}/locales/en/entries`,
+      `/studio/content/not-a-uuid/locales/en`,
+      `/studio/content/${contentCollectionId}/locales/en?search=secret`,
+    ]) {
+      const response = await handler.fetch(new Request(`http://localhost:4100${route}`), {
+        rawTarget: route,
+      });
+      expect(response.status, route).toBe(404);
+    }
     const asset = await handler.fetch(
       new Request("http://localhost:4100/studio/assets/studio-test.js"),
       { rawTarget: "/studio/assets/studio-test.js" },
@@ -1975,7 +2069,7 @@ describe("Studio Fetch runtime", () => {
         fetch: async (input, init) => {
           const url =
             typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-          if (!url.includes("/api/studio-content/v1/")) return baseFetch(input, init);
+          if (!url.includes("/api/studio-content/v2/")) return baseFetch(input, init);
           markUpstreamStarted?.();
           return new Promise<Response>((_resolve, reject) => {
             init?.signal?.addEventListener(
@@ -2815,6 +2909,10 @@ describe("raw target guard", () => {
     expect(parseStudioRawTarget("/studio/assets/app-123.js", "/studio")?.route).toBe(
       "/assets/app-123.js",
     );
+    expect(parseStudioRawTarget("/studio/assets/chunk/form-123.js", "/studio")?.route).toBe(
+      "/assets/chunk/form-123.js",
+    );
+    expect(parseStudioRawTarget("/studio/assets/chunk/nested/form.js", "/studio")).toBeNull();
     const exact = `/studio/missing?${"x".repeat(8 * 1_024 - "/studio/missing?".length)}`;
     expect(exact).toHaveLength(8 * 1_024);
     expect(parseStudioRawTarget(exact, "/studio")).not.toBeNull();

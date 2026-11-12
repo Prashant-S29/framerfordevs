@@ -1,16 +1,16 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import { ApiCredentialId } from "../../contracts/access";
 import { CmsActor } from "../../contracts/authoring";
 import { AuthUserId } from "../../contracts/platform";
 import { cmsActorMatches, cmsActorReferences, cmsAuditActor, normalizeCmsActor } from "./index";
 
-const userId = Schema.decodeUnknownSync(AuthUserId)("m13-actor-user");
-const credentialId = Schema.decodeUnknownSync(ApiCredentialId)(
+import * as SchemaStrict from "../../lib/schema-strict";
+const userId = SchemaStrict.decodeUnknownSync(AuthUserId)("m13-actor-user");
+const credentialId = SchemaStrict.decodeUnknownSync(ApiCredentialId)(
   "019fae8b-1234-7000-8000-000000000301",
 );
-const credential = Schema.decodeUnknownSync(CmsActor)({
+const credential = SchemaStrict.decodeUnknownSync(CmsActor)({
   kind: "credential",
   id: credentialId,
 });

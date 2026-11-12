@@ -235,7 +235,7 @@ it.live("clears a receipt journal after a deterministic HTTP failure", () =>
     ({ root, originalFetch }) =>
       Effect.sync(() => {
         globalThis.fetch = originalFetch;
-      }).pipe(Effect.zipRight(Effect.promise(() => rm(root, { recursive: true, force: true })))),
+      }).pipe(Effect.andThen(Effect.promise(() => rm(root, { recursive: true, force: true })))),
   ),
 );
 
@@ -298,7 +298,7 @@ it.live("reuses a journaled Control Plane command after an ambiguous response", 
     ({ root, originalFetch }) =>
       Effect.sync(() => {
         globalThis.fetch = originalFetch;
-      }).pipe(Effect.zipRight(Effect.promise(() => rm(root, { recursive: true, force: true })))),
+      }).pipe(Effect.andThen(Effect.promise(() => rm(root, { recursive: true, force: true })))),
   ),
 );
 
@@ -573,6 +573,6 @@ it.live(
       ({ root, originalFetch }) =>
         Effect.sync(() => {
           globalThis.fetch = originalFetch;
-        }).pipe(Effect.zipRight(Effect.promise(() => rm(root, { recursive: true, force: true })))),
+        }).pipe(Effect.andThen(Effect.promise(() => rm(root, { recursive: true, force: true })))),
     ),
 );

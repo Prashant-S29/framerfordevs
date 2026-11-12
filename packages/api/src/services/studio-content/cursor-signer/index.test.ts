@@ -1,11 +1,13 @@
 import { createHmac } from "node:crypto";
 
 import { assert, describe, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Option, Schema, TestClock } from "effect";
+import { Cause, Effect, Exit, Option } from "effect";
+import { TestClock } from "effect/testing";
 
 import { StudioContentCursor } from "../../../contracts/studio-content";
 import { makeStudioContentCursorSigner } from ".";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const authority = {
   mode: "search" as const,
   projectId: "019fae8b-1234-7000-8000-000000000001",
@@ -18,7 +20,7 @@ const authority = {
 
 function failureTag(exit: Exit.Exit<unknown, unknown>): string | undefined {
   if (Exit.isSuccess(exit)) return undefined;
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   return typeof failure === "object" &&
     failure !== null &&
     "_tag" in failure &&
@@ -80,7 +82,7 @@ describe("Studio Content cursor signer", () => {
           entryId: "019fae8b-1234-7000-8000-000000000005",
         },
       });
-      const tampered = Schema.decodeUnknownSync(StudioContentCursor)(
+      const tampered = SchemaStrict.decodeUnknownSync(StudioContentCursor)(
         `${cursor.slice(0, -1)}${cursor.endsWith("a") ? "b" : "a"}`,
       );
 
@@ -180,7 +182,7 @@ describe("Studio Content cursor signer", () => {
       const secret = "studio-content-cursor-malformed-secret-at-least-32-bytes";
       const signer = makeStudioContentCursorSigner({ activeSecret: secret });
       for (const value of ["a".repeat(43), "a".repeat(44), "a".repeat(1_024)]) {
-        const cursor = Schema.decodeUnknownSync(StudioContentCursor)(value);
+        const cursor = SchemaStrict.decodeUnknownSync(StudioContentCursor)(value);
         assert.strictEqual(
           failureTag(yield* Effect.exit(signer.verify(cursor, authority))),
           "StudioContentCursorInvalidFailure",
@@ -206,7 +208,7 @@ describe("Studio Content cursor signer", () => {
       const signature = createHmac("sha256", secret)
         .update(`ffd:studio-content-cursor:v1:${payload}`, "utf8")
         .digest("base64url");
-      const excess = Schema.decodeUnknownSync(StudioContentCursor)(`${payload}${signature}`);
+      const excess = SchemaStrict.decodeUnknownSync(StudioContentCursor)(`${payload}${signature}`);
       assert.strictEqual(
         failureTag(yield* Effect.exit(signer.verify(excess, authority))),
         "StudioContentCursorInvalidFailure",

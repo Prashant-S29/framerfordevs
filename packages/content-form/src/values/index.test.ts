@@ -118,14 +118,29 @@ describe("content-form values", () => {
     });
   });
 
-  it("applies stable-ID defaults only to new unsaved partitions", () => {
+  it("applies explicitly keyed defaults only to editable new-entry authority", () => {
     expect(applyGeneratedFormDefaults([root], {})).toEqual({
       root: { child: "Default title" },
     });
+    expect(
+      applyGeneratedFormDefaults(
+        [{ ...root, configuration: { default: { child: "Stable", "shared-child": "Hidden" } } }],
+        {},
+        { keying: "field_id", editableFieldIds: new Set([child.id]) },
+      ),
+    ).toEqual({ root: { child: "Stable" } });
     expect(applyGeneratedFormDefaults([root], { root: { child: "Saved" } })).toEqual({
       root: { child: "Saved" },
     });
     expect(applyNewEntryPartitionDefaults([root], {}, 1)).toEqual({});
+    expect(
+      applyNewEntryPartitionDefaults(
+        [{ ...root, configuration: { default: { child: "Stable" } } }],
+        {},
+        0,
+        { keying: "field_id", editableFieldIds: new Set([child.id]) },
+      ),
+    ).toEqual({ root: { child: "Stable" } });
   });
 
   it("partitions mixed objects, editable IDs, and layouts by exact scope", () => {

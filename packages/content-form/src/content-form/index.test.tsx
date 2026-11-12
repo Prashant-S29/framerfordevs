@@ -214,7 +214,10 @@ const placement = (fieldId: string, position: number, helpTextOverride: string |
 const definition: ContentFormDefinition = {
   canEdit: true,
   fields,
-  editableFieldIds: fields.map((field) => field.id),
+  editableFieldIds: fields.flatMap((field) => [
+    field.id,
+    ...field.children.map((child) => child.id),
+  ]),
   editorLayout: {
     version: 1,
     tabs: [
@@ -366,14 +369,83 @@ describe("content form", () => {
     });
   });
 
-  it("honors form-wide and field-specific read-only authority", () => {
+  it("honors form-wide and nested field-specific read-only authority", async () => {
+    const user = userEvent.setup();
     render(
       <ContentForm
-        definition={{ ...definition, editableFieldIds: ["short"] }}
-        values={{ short: "Editable", long: "Read only" }}
+        definition={{
+          ...definition,
+          editableFieldIds: ["short", "object-child", "list-item"],
+        }}
+        values={{
+          short: "Editable",
+          long: "Read only",
+          object: { "object-child": "Nested editable" },
+          list: ["Read only item"],
+        }}
       />,
     );
     expect(screen.getByLabelText("Short text (required)").hasAttribute("disabled")).toBe(false);
     expect(screen.getByLabelText("Long text").hasAttribute("disabled")).toBe(true);
+    expect(screen.getAllByText("Read only.").length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("tab", { name: "Structured" }));
+    expect(screen.getByLabelText("Object child").hasAttribute("disabled")).toBe(false);
+    expect(screen.getByLabelText("List item").hasAttribute("disabled")).toBe(false);
+    expect(screen.getByRole("button", { name: "Add item" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "Remove" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("renders sidebar-only forms, structured issues, external submit ownership, and a reference port", async () => {
+    const ReferencePicker = ({
+      controlId,
+      value,
+      disabled,
+      onChange,
+    }: {
+      readonly controlId: string;
+      readonly value: string | null;
+      readonly disabled: boolean;
+      readonly onChange: (value: string | undefined) => void;
+    }) => (
+      <button id={controlId} type="button" disabled={disabled} onClick={() => onChange("selected")}>
+        {value ?? "Choose reference"}
+      </button>
+    );
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+    render(
+      <ContentForm
+        definition={{
+          ...definition,
+          fields: fields.filter((field) => field.id === "reference"),
+          editableFieldIds: ["reference"],
+          editorLayout: {
+            version: 1,
+            tabs: [],
+            sidebarGroups: [
+              {
+                id: "sidebar-only",
+                title: "Only sidebar",
+                description: null,
+                position: 0,
+                columns: 1,
+                fields: [placement("reference", 0)],
+              },
+            ],
+          },
+        }}
+        values={{}}
+        onValuesChange={onValuesChange}
+        serverIssues={[{ fieldId: "reference", message: "Choose an available reference." }]}
+        showSubmitAction={false}
+        referencePicker={ReferencePicker}
+      />,
+    );
+
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Validate preview" })).toBeNull();
+    expect(screen.getByText("Choose an available reference.")).toBeTruthy();
+    await user.click(screen.getByLabelText("Reference"));
+    expect(onValuesChange).toHaveBeenCalledWith({ reference: "selected" });
   });
 });

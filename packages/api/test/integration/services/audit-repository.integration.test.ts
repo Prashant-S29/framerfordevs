@@ -15,7 +15,7 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Cause, Effect, Exit, Layer, Option, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, Option } from "effect";
 
 import { ControlPlaneProjectAuditQuery } from "../../../src/contracts/control-plane";
 import {
@@ -30,10 +30,11 @@ import { AuditRepositoryLive } from "../../../src/services/audit/repository";
 import { makeControlPlaneCursorSignerLive } from "../../../src/services/control-plane/cursor-signer";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 
+import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ownerId = `m16-audit-owner-${suffix}`;
 const restrictedDeveloperId = `m16-audit-restricted-${suffix}`;
-const ownerActor = Schema.decodeUnknownSync(AuthUserId)(ownerId);
+const ownerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(ownerId);
 const platform = makePlatformRepository();
 const AuditLayer = Layer.mergeAll(
   AuditRepositoryLive,
@@ -49,7 +50,7 @@ function required<A>(value: A | undefined, label: string): A {
 
 function failureTag(exit: Exit.Exit<unknown, unknown>): string | undefined {
   if (Exit.isSuccess(exit)) return undefined;
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   return typeof failure === "object" && failure !== null && "_tag" in failure
     ? String(failure._tag)
     : undefined;
@@ -73,14 +74,14 @@ beforeAll(async () => {
   workspaceModel = await Effect.runPromise(
     platform.createWorkspace(
       ownerActor,
-      Schema.decodeUnknownSync(CreateWorkspaceInput)({ name: "M16 Audit Workspace" }),
+      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M16 Audit Workspace" }),
       `m16-audit-workspace-${suffix}`,
     ),
   );
   projectModel = await Effect.runPromise(
     platform.createProject(
       ownerActor,
-      Schema.decodeUnknownSync(CreateProjectInput)({
+      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
         workspaceId: required(workspaceModel, "workspace").id,
         name: "M16 Audit Project",
         key: `m16-audit-${suffix.slice(0, 8)}`,
@@ -155,7 +156,7 @@ afterAll(async () => {
   await db.$client.end();
 });
 
-describe.sequential("audit repository PostgreSQL integration", () => {
+describe("audit repository PostgreSQL integration", () => {
   layer(AuditLayer, { excludeTestServices: true })((it) => {
     it.effect("denies project-global audit history to a locale-restricted developer", () =>
       Effect.gen(function* () {
@@ -165,7 +166,7 @@ describe.sequential("audit repository PostgreSQL integration", () => {
             restrictedDeveloperId,
             `oauth:cli:${restrictedDeveloperId}`,
             current.id,
-            yield* Schema.decodeUnknown(ControlPlaneProjectAuditQuery)({
+            yield* SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
               environmentId: null,
               category: "all",
               actorKind: "all",
@@ -206,7 +207,7 @@ describe.sequential("audit repository PostgreSQL integration", () => {
           ownerId,
           `oauth:cli:${ownerId}`,
           current.id,
-          yield* Schema.decodeUnknown(ControlPlaneProjectAuditQuery)({
+          yield* SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
             environmentId: current.environment.id,
             category: "webhook",
             actorKind: "credential",
@@ -280,7 +281,10 @@ describe.sequential("audit repository PostgreSQL integration", () => {
           ownerId,
           `oauth:cli:${ownerId}`,
           current.id,
-          yield* Schema.decodeUnknown(ControlPlaneProjectAuditQuery)({ ...base, cursor: null }),
+          yield* SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
+            ...base,
+            cursor: null,
+          }),
           `m16-audit-read-a-${suffix}`,
         );
         assert.lengthOf(first.items, 1);
@@ -289,7 +293,7 @@ describe.sequential("audit repository PostgreSQL integration", () => {
           ownerId,
           `oauth:cli:${ownerId}`,
           current.id,
-          yield* Schema.decodeUnknown(ControlPlaneProjectAuditQuery)({
+          yield* SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
             ...base,
             cursor: first.nextCursor,
           }),
@@ -323,7 +327,7 @@ describe.sequential("audit repository PostgreSQL integration", () => {
             ownerId,
             `oauth:cli:${ownerId}`,
             current.id,
-            yield* Schema.decodeUnknown(ControlPlaneProjectAuditQuery)({
+            yield* SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
               ...base,
               cursor: tampered,
             }),

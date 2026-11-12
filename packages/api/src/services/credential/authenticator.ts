@@ -1,6 +1,6 @@
 // Verifies credential secrets and lifecycle before applying optional tenant/resource scope policy.
 
-import { Clock, Context, Effect, Either, Layer, Schema } from "effect";
+import { Clock, Context, Effect, Result, Layer } from "effect";
 
 import {
   CredentialPrincipal,
@@ -16,6 +16,7 @@ import { CredentialRepository } from "./repository";
 import { PolicyService } from "../policy";
 import { SecretGenerator, parseCredentialKey } from "../secret-generator";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 export interface VerifyCredentialInput {
   readonly key: string;
   readonly expectedFamily: CredentialFamily;
@@ -40,15 +41,15 @@ export function makeCredentialAuthenticator() {
     const repository = yield* CredentialRepository;
     const policy = yield* PolicyService;
     const telemetry = yield* Telemetry;
-    const attemptLimit = yield* Effect.either(limiter.assertAllowed(input.source));
+    const attemptLimit = yield* Effect.result(limiter.assertAllowed(input.source));
 
     const reject = Effect.fn("CredentialAuthenticator.reject")(function* () {
-      if (Either.isLeft(attemptLimit)) {
+      if (Result.isFailure(attemptLimit)) {
         yield* telemetry.recordCredentialVerification({
           family: input.expectedFamily,
           outcome: "rate_limited",
         });
-        return yield* attemptLimit.left;
+        return yield* attemptLimit.failure;
       }
       yield* limiter.recordFailure(input.source);
       yield* telemetry.recordCredentialVerification({
@@ -93,7 +94,7 @@ export function makeCredentialAuthenticator() {
     });
     if (!decision.allowed) return yield* reject();
 
-    const principal = yield* Schema.decodeUnknown(CredentialPrincipal)({
+    const principal = yield* SchemaStrict.decodeUnknownEffect(CredentialPrincipal)({
       credentialId: record.credential.id,
       workspaceId: record.credential.workspaceId,
       projectId: record.credential.projectId,
@@ -155,10 +156,10 @@ export function makeCredentialAuthenticator() {
   };
 }
 
-export class CredentialAuthenticator extends Context.Tag("CredentialAuthenticator")<
+export class CredentialAuthenticator extends Context.Service<
   CredentialAuthenticator,
   ReturnType<typeof makeCredentialAuthenticator>
->() {}
+>()("CredentialAuthenticator") {}
 
 export const CredentialAuthenticatorLive = Layer.succeed(
   CredentialAuthenticator,

@@ -46,9 +46,8 @@ export function makeEntryEngine() {
   };
 }
 
-export class EntryEngine extends Context.Tag("EntryEngine")<
-  EntryEngine,
-  ReturnType<typeof makeEntryEngine>
->() {}
+export class EntryEngine extends Context.Service<EntryEngine, ReturnType<typeof makeEntryEngine>>()(
+  "EntryEngine",
+) {}
 
 export const EntryEngineLive = Layer.succeed(EntryEngine, makeEntryEngine());

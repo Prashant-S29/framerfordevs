@@ -18,7 +18,7 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Cause, Effect, Exit, Option, Schema } from "effect";
+import { Cause, Effect, Exit, Option } from "effect";
 
 import {
   ListProjectMembersInput,
@@ -46,6 +46,7 @@ import { makeAccessRepository } from "../../../src/services/access-repository";
 import { makeLocaleRepository } from "../../../src/services/locale/repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 
+import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ownerId = `m4-locale-owner-${suffix}`;
 const developerId = `m4-locale-developer-${suffix}`;
@@ -53,18 +54,18 @@ const foreignId = `m4-locale-foreign-${suffix}`;
 const credentialId = randomUUID();
 const secondaryEnvironmentId = randomUUID();
 const wrongEnvironmentCredentialId = randomUUID();
-const ownerActor = Schema.decodeUnknownSync(AuthUserId)(ownerId);
-const developerActor = Schema.decodeUnknownSync(AuthUserId)(developerId);
-const foreignActor = Schema.decodeUnknownSync(AuthUserId)(foreignId);
-const credentialActor = Schema.decodeUnknownSync(ProjectActor)({
+const ownerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(ownerId);
+const developerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(developerId);
+const foreignActor = SchemaStrict.decodeUnknownSync(AuthUserId)(foreignId);
+const credentialActor = SchemaStrict.decodeUnknownSync(ProjectActor)({
   kind: "credential",
   id: credentialId,
 });
-const wrongEnvironmentCredentialActor = Schema.decodeUnknownSync(ProjectActor)({
+const wrongEnvironmentCredentialActor = SchemaStrict.decodeUnknownSync(ProjectActor)({
   kind: "credential",
   id: wrongEnvironmentCredentialId,
 });
-const localeCreateCommandId = Schema.decodeUnknownSync(ControlPlaneCommandId)(randomUUID());
+const localeCreateCommandId = SchemaStrict.decodeUnknownSync(ControlPlaneCommandId)(randomUUID());
 const platform = makePlatformRepository();
 const locales = makeLocaleRepository();
 const access = makeAccessRepository();
@@ -84,7 +85,7 @@ function required<A>(value: A | undefined, label: string): A {
 
 function failureTag(exit: Exit.Exit<unknown, unknown>): string | undefined {
   if (Exit.isSuccess(exit)) return undefined;
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   if (typeof failure === "object" && failure !== null && "_tag" in failure) {
     return typeof failure._tag === "string" ? failure._tag : undefined;
   }
@@ -115,14 +116,14 @@ beforeAll(async () => {
   workspaceModel = await Effect.runPromise(
     platform.createWorkspace(
       ownerActor,
-      Schema.decodeUnknownSync(CreateWorkspaceInput)({ name: "M4 Locale Workspace" }),
+      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M4 Locale Workspace" }),
       "request-m4-locale-workspace",
     ),
   );
   projectModel = await Effect.runPromise(
     platform.createProject(
       ownerActor,
-      Schema.decodeUnknownSync(CreateProjectInput)({
+      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
         workspaceId: required(workspaceModel, "workspace").id,
         name: "M4 Locale Project",
         key: `locale-${suffix.slice(0, 8)}`,
@@ -134,14 +135,14 @@ beforeAll(async () => {
   foreignWorkspace = await Effect.runPromise(
     platform.createWorkspace(
       foreignActor,
-      Schema.decodeUnknownSync(CreateWorkspaceInput)({ name: "M4 Foreign Workspace" }),
+      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M4 Foreign Workspace" }),
       "request-m4-foreign-workspace",
     ),
   );
   foreignProject = await Effect.runPromise(
     platform.createProject(
       foreignActor,
-      Schema.decodeUnknownSync(CreateProjectInput)({
+      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
         workspaceId: required(foreignWorkspace, "foreign workspace").id,
         name: "M4 Foreign Project",
         key: `foreign-${suffix.slice(0, 8)}`,
@@ -234,7 +235,7 @@ beforeAll(async () => {
   developerMember = await Effect.runPromise(
     access.listMembers(
       ownerActor,
-      Schema.decodeUnknownSync(ListProjectMembersInput)({
+      SchemaStrict.decodeUnknownSync(ListProjectMembersInput)({
         projectId: required(projectModel, "project").id,
         cursor: null,
         limit: 20,
@@ -307,13 +308,13 @@ afterAll(async () => {
   await db.$client.end();
 });
 
-describe.sequential("locale repository PostgreSQL integration", () => {
+describe("locale repository PostgreSQL integration", () => {
   it.effect("starts with exactly one enabled English locale and creates canonical locales", () =>
     Effect.gen(function* () {
       const currentProject = required(projectModel, "project");
       const initial = yield* locales.listLocales(
         ownerActor,
-        yield* Schema.decodeUnknown(ListProjectLocalesInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ListProjectLocalesInput)({
           projectId: currentProject.id,
           view: "settings",
           includeRemoved: true,
@@ -326,7 +327,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
 
       hindi = yield* locales.createLocale(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateProjectLocaleInput)({
           projectId: currentProject.id,
           tag: "HI",
           displayName: "Hindi",
@@ -336,7 +337,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       );
       gujarati = yield* locales.createLocale(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateProjectLocaleInput)({
           projectId: currentProject.id,
           tag: "gu",
           displayName: "Gujarati",
@@ -351,7 +352,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       const duplicate = yield* Effect.exit(
         locales.createLocale(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectLocaleInput)({
             projectId: currentProject.id,
             tag: "hi",
             displayName: "Duplicate Hindi",
@@ -370,7 +371,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       const currentHindi = required(hindi, "Hindi locale");
       const updated = yield* locales.updateDisplayName(
         ownerActor,
-        yield* Schema.decodeUnknown(UpdateProjectLocaleDisplayNameInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleDisplayNameInput)({
           projectId: currentProject.id,
           localeId: currentHindi.id,
           version: currentHindi.version,
@@ -381,7 +382,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       );
       const noOp = yield* locales.updateDisplayName(
         ownerActor,
-        yield* Schema.decodeUnknown(UpdateProjectLocaleDisplayNameInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleDisplayNameInput)({
           projectId: currentProject.id,
           localeId: updated.id,
           version: updated.version,
@@ -393,7 +394,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       const stale = yield* Effect.exit(
         locales.updateDisplayName(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateProjectLocaleDisplayNameInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleDisplayNameInput)({
             projectId: currentProject.id,
             localeId: updated.id,
             version: currentHindi.version,
@@ -422,7 +423,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       const currentProject = required(projectModel, "project");
       const before = yield* locales.listLocales(
         ownerActor,
-        yield* Schema.decodeUnknown(ListProjectLocalesInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ListProjectLocalesInput)({
           projectId: currentProject.id,
           view: "settings",
           includeRemoved: false,
@@ -431,7 +432,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       const requested = [...before.items].reverse();
       const reordered = yield* locales.reorderLocales(
         ownerActor,
-        yield* Schema.decodeUnknown(ReorderProjectLocalesInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ReorderProjectLocalesInput)({
           projectId: currentProject.id,
           locales: requested.map((locale) => ({
             localeId: locale.id,
@@ -460,7 +461,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       const incomplete = yield* Effect.exit(
         locales.reorderLocales(
           ownerActor,
-          yield* Schema.decodeUnknown(ReorderProjectLocalesInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ReorderProjectLocalesInput)({
             projectId: currentProject.id,
             locales: reordered.items.slice(0, 2).map((locale) => ({
               localeId: locale.id,
@@ -482,7 +483,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
         const currentProject = required(projectModel, "project");
         const settings = yield* locales.listLocales(
           ownerActor,
-          yield* Schema.decodeUnknown(ListProjectLocalesInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectLocalesInput)({
             projectId: currentProject.id,
             view: "settings",
             includeRemoved: true,
@@ -492,7 +493,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
         const englishExit = yield* Effect.exit(
           locales.updateStatus(
             ownerActor,
-            yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+            yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleStatusInput)({
               projectId: currentProject.id,
               localeId: required(english, "English locale").id,
               version: required(english, "English locale").version,
@@ -508,7 +509,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
         const currentGujarati = required(gujarati, "Gujarati locale");
         const removed = yield* locales.updateStatus(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleStatusInput)({
             projectId: currentProject.id,
             localeId: currentGujarati.id,
             version: currentGujarati.version,
@@ -520,7 +521,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
         );
         const restored = yield* locales.updateStatus(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleStatusInput)({
             projectId: currentProject.id,
             localeId: removed.id,
             version: removed.version,
@@ -550,7 +551,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
         const currentHindi = required(hindi, "Hindi locale");
         developerMember = yield* access.updateMemberPolicy(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
             projectId: currentProject.id,
             membershipId: currentMember.id,
             version: currentMember.version,
@@ -563,7 +564,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
 
         const selected = yield* locales.listLocales(
           developerActor,
-          yield* Schema.decodeUnknown(ListProjectLocalesInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectLocalesInput)({
             projectId: currentProject.id,
             view: "enabled",
             includeRemoved: false,
@@ -597,7 +598,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
 
         const disabled = yield* locales.updateStatus(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleStatusInput)({
             projectId: currentProject.id,
             localeId: currentHindi.id,
             version: currentHindi.version,
@@ -609,7 +610,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
         );
         const unavailable = yield* locales.listLocales(
           developerActor,
-          yield* Schema.decodeUnknown(ListProjectLocalesInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectLocalesInput)({
             projectId: currentProject.id,
             view: "enabled",
             includeRemoved: false,
@@ -631,7 +632,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
 
         hindi = yield* locales.updateStatus(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleStatusInput)({
             projectId: currentProject.id,
             localeId: disabled.id,
             version: disabled.version,
@@ -643,7 +644,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
         );
         const restored = yield* locales.listLocales(
           developerActor,
-          yield* Schema.decodeUnknown(ListProjectLocalesInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectLocalesInput)({
             projectId: currentProject.id,
             view: "enabled",
             includeRemoved: false,
@@ -662,7 +663,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       const denied = yield* Effect.exit(
         locales.createLocale(
           developerActor,
-          yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectLocaleInput)({
             projectId: currentProject.id,
             tag: "fr",
             displayName: "French",
@@ -674,7 +675,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       const foreign = yield* Effect.exit(
         locales.listLocales(
           foreignActor,
-          yield* Schema.decodeUnknown(ListProjectLocalesInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectLocalesInput)({
             projectId: currentProject.id,
             view: "enabled",
             includeRemoved: false,
@@ -684,7 +685,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       const ownerForeign = yield* Effect.exit(
         locales.listLocales(
           ownerActor,
-          yield* Schema.decodeUnknown(ListProjectLocalesInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectLocalesInput)({
             projectId: required(foreignProject, "foreign project").id,
             view: "settings",
             includeRemoved: true,
@@ -701,7 +702,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
   it.effect("serializes same-tag creation and uses intended locale indexes", () =>
     Effect.gen(function* () {
       const currentProject = required(projectModel, "project");
-      const input = yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+      const input = yield* SchemaStrict.decodeUnknownEffect(CreateProjectLocaleInput)({
         projectId: currentProject.id,
         tag: "en-GB",
         displayName: "British English",
@@ -746,7 +747,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       const list = yield* Effect.exit(
         locales.listLocales(
           wrongEnvironmentCredentialActor,
-          yield* Schema.decodeUnknown(ListProjectLocalesInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectLocalesInput)({
             projectId: currentProject.id,
             view: "settings",
             includeRemoved: true,
@@ -756,7 +757,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       const create = yield* Effect.exit(
         locales.createLocale(
           wrongEnvironmentCredentialActor,
-          yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectLocaleInput)({
             projectId: currentProject.id,
             tag: "de",
             displayName: "German",
@@ -774,7 +775,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
   it.effect("attributes management-credential locale mutations to the exact credential", () =>
     Effect.gen(function* () {
       const currentProject = required(projectModel, "project");
-      const createInput = yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+      const createInput = yield* SchemaStrict.decodeUnknownEffect(CreateProjectLocaleInput)({
         projectId: currentProject.id,
         tag: "es",
         displayName: "Spanish",
@@ -801,7 +802,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       const conflict = yield* Effect.exit(
         locales.createLocale(
           credentialActor,
-          yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectLocaleInput)({
             projectId: currentProject.id,
             tag: "es-MX",
             displayName: "Spanish (Mexico)",
@@ -813,7 +814,7 @@ describe.sequential("locale repository PostgreSQL integration", () => {
       );
       const updated = yield* locales.updateDisplayName(
         credentialActor,
-        yield* Schema.decodeUnknown(UpdateProjectLocaleDisplayNameInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleDisplayNameInput)({
           projectId: currentProject.id,
           localeId: created.id,
           version: created.version,

@@ -1,6 +1,6 @@
 // Orchestrates strict public Preview authority, bearer verification, quotas, and audited reads.
 
-import { Clock, Effect, Schema } from "effect";
+import { Clock, Effect } from "effect";
 
 import type { CredentialPrincipal } from "../../contracts/access";
 import { ApiErrorDetail } from "../../contracts/response/api";
@@ -21,6 +21,7 @@ import { PreviewRepository } from "../../services/preview/repository";
 import { RateLimitManager } from "../../services/rate-limit/manager";
 import { observePreviewRead } from "./observation";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const bearerPattern = /^Bearer ([^\s,]+)$/u;
 const currentDate = Effect.map(Clock.currentTimeMillis, (millis) => new Date(millis));
 
@@ -46,7 +47,7 @@ export function makeCurrentPreviewRouteScope(input: {
   return Effect.gen(function* () {
     const parsed = parseCurrentPreviewQuery(input.rawQuery);
     if (!parsed.ok) return yield* queryFailure(parsed.issues);
-    return yield* Schema.decodeUnknown(PreviewRouteScope)({
+    return yield* SchemaStrict.decodeUnknownEffect(PreviewRouteScope)({
       ...input,
       locale: parsed.value.locale,
     }).pipe(
@@ -72,7 +73,7 @@ export function makeRevisionPreviewRouteScope(input: {
   return Effect.gen(function* () {
     const parsed = parseRevisionPreviewQuery(input.rawQuery);
     if (!parsed.ok) return yield* queryFailure(parsed.issues);
-    return yield* Schema.decodeUnknown(GetRevisionCredentialPreviewInput)({
+    return yield* SchemaStrict.decodeUnknownEffect(GetRevisionCredentialPreviewInput)({
       ...input,
       locale: parsed.value.locale,
       sharedRevisionId: parsed.value.sharedRevision === "none" ? null : parsed.value.sharedRevision,

@@ -1,7 +1,7 @@
 // Verifies canonical Control Plane decoding, authority requirements, and transport principal adaptation.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import { CredentialPrincipal } from "../../../contracts/access";
 import {
@@ -17,6 +17,7 @@ import {
   decodeControlPlaneListWorkspacesQuery,
 } from "./index";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const oauthPrincipal = {
   kind: "oauth_user" as const,
   userId: "user-1",
@@ -24,7 +25,7 @@ const oauthPrincipal = {
   scopes: ["control-plane:read"],
   expiresAtEpochSeconds: 1_800_000_000,
 };
-const credential = Schema.decodeUnknownSync(CredentialPrincipal)({
+const credential = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
   credentialId: "019fae8b-1234-7000-8000-000000000001",
   workspaceId: "019fae8b-1234-7000-8000-000000000002",
   projectId: "019fae8b-1234-7000-8000-000000000003",

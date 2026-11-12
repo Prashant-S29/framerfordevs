@@ -184,9 +184,9 @@ export function makeWebhookTransport(
   };
 }
 
-export class WebhookTransport extends Context.Tag("WebhookTransport")<
+export class WebhookTransport extends Context.Service<
   WebhookTransport,
   ReturnType<typeof makeWebhookTransport>
->() {}
+>()("WebhookTransport") {}
 
 export const WebhookTransportLive = Layer.succeed(WebhookTransport, makeWebhookTransport());

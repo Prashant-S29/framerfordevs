@@ -1,5 +1,5 @@
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer } from "effect";
 
 import {
   ControlPlaneEnableCapabilityInput,
@@ -24,7 +24,8 @@ import {
   putStudioRegistrationForSession,
 } from "./index";
 
-const registration = Schema.decodeUnknownSync(StudioRegistration)({
+import * as SchemaStrict from "../../lib/schema-strict";
+const registration = SchemaStrict.decodeUnknownSync(StudioRegistration)({
   id: "019fae8b-1234-7000-8000-000000000001",
   projectId: "019fae8b-1234-7000-8000-000000000002",
   environmentId: "019fae8b-1234-7000-8000-000000000003",
@@ -37,14 +38,14 @@ const registration = Schema.decodeUnknownSync(StudioRegistration)({
   createdAt: "2026-08-14T00:00:00.000Z",
   updatedAt: "2026-08-14T00:00:00.000Z",
 });
-const capability = Schema.decodeUnknownSync(Capability)({
+const capability = SchemaStrict.decodeUnknownSync(Capability)({
   id: "019fae8b-1234-7000-8000-000000000005",
   key: "cms",
   status: "enabled",
   version: 1,
   changedAt: "2026-08-14T00:00:00.000Z",
 });
-const workspace = Schema.decodeUnknownSync(ControlPlaneWorkspace)({
+const workspace = SchemaStrict.decodeUnknownSync(ControlPlaneWorkspace)({
   id: "019fae8b-1234-7000-8000-000000000007",
   name: "Workspace",
   version: 1,
@@ -112,7 +113,9 @@ describe("Control Plane operations", () => {
         assert.isNotNull(first.nextCursor);
         assert.isNull(workspaceListPosition);
 
-        const cursor = yield* Schema.decodeUnknown(ControlPlaneCursorInput)(first.nextCursor);
+        const cursor = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCursorInput)(
+          first.nextCursor,
+        );
         const second = yield* listWorkspaces(actor, "oauth:cli:user-1", {
           cursor,
           limit: 1,
@@ -133,15 +136,19 @@ describe("Control Plane operations", () => {
     it.effect("adapts dashboard sessions to the same branded actor operations", () =>
       Effect.gen(function* () {
         calls.length = 0;
-        const scope = yield* Schema.decodeUnknown(ControlPlaneStudioRegistrationScope)({
+        const scope = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneStudioRegistrationScope)({
           projectId: registration.projectId,
           environmentId: registration.environmentId,
         });
-        const capabilityInput = yield* Schema.decodeUnknown(ControlPlaneEnableCapabilityInput)({
+        const capabilityInput = yield* SchemaStrict.decodeUnknownEffect(
+          ControlPlaneEnableCapabilityInput,
+        )({
           projectId: registration.projectId,
           commandId: "019fae8b-1234-7000-8000-000000000006",
         });
-        const input = yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationInput)({
+        const input = yield* SchemaStrict.decodeUnknownEffect(
+          ControlPlanePutStudioRegistrationInput,
+        )({
           ...scope,
           commandId: "019fae8b-1234-7000-8000-000000000004",
           expectedVersion: registration.version,

@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
-import { Schema } from "effect";
+
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -169,6 +169,7 @@ import {
   WebhookEndpointActions,
 } from "./index";
 
+import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 function renderWithQueryClient(component: ReactNode) {
   return render(
     <QueryClientProvider
@@ -179,7 +180,7 @@ function renderWithQueryClient(component: ReactNode) {
   );
 }
 
-const endpoint = Schema.decodeUnknownSync(WebhookEndpoint)({
+const endpoint = SchemaStrict.decodeUnknownSync(WebhookEndpoint)({
   id: ids.endpoint,
   projectId: ids.project,
   environmentId: ids.environment,

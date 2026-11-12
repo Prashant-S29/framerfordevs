@@ -1,6 +1,8 @@
 // Generates the tenant-neutral public Delivery OpenAPI contract from Effect response schemas and protocol metadata.
 
-import { JSONSchema, Schema } from "effect";
+import { Schema } from "effect";
+
+import { make as makeJsonSchema } from "../../response/json-schema";
 
 import { ApiSuccessSchema } from "../../response/api";
 import { DeliveryApiFailure, DeliveryItem, DeliveryPage } from "..";
@@ -34,9 +36,9 @@ function rewriteSchemaReferences(value: unknown): unknown {
 function addEffectSchema(
   components: Record<string, unknown>,
   name: string,
-  schema: Schema.Schema.Any,
+  schema: Schema.Top,
 ): void {
-  const generated = JSONSchema.make(schema);
+  const generated = makeJsonSchema(schema);
   const definitions = Reflect.get(generated, "$defs");
   if (isRecord(definitions)) {
     for (const [definitionName, definition] of Object.entries(definitions)) {

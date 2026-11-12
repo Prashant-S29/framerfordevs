@@ -53,6 +53,7 @@ import {
 import { classifyCollectionSchemaChanges } from "../schema/engine";
 import { decodePublishedSchemaRevisionSync, loadPublishedRevisionRows } from "../schema/repository";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 export type AuthoringPresentationFailureStage =
   | "revision"
   | "active_presentation"
@@ -65,10 +66,10 @@ interface RepositoryOptions {
   readonly testFailAfter?: AuthoringPresentationFailureStage;
 }
 
-const JsonObject = Schema.Record({ key: Schema.String, value: Schema.Unknown });
+const JsonObject = Schema.Record(Schema.String, Schema.Unknown);
 
 function jsonObject(value: unknown): Readonly<Record<string, unknown>> {
-  return Schema.decodeUnknownSync(JsonObject)(JSON.parse(JSON.stringify(value)));
+  return SchemaStrict.decodeUnknownSync(JsonObject)(JSON.parse(JSON.stringify(value)));
 }
 
 function databaseFailure(operation: string, cause: unknown) {
@@ -129,7 +130,7 @@ function presentationRevision(options: {
   readonly revision: typeof cmsSchemaRevision.$inferSelect;
   readonly contractHash: string;
 }) {
-  return Schema.decodeUnknownSync(AuthoringPresentationRevision)({
+  return SchemaStrict.decodeUnknownSync(AuthoringPresentationRevision)({
     collectionId: options.collectionId,
     revisionId: options.revision.id,
     previousRevisionId: options.revision.previousRevisionId,
@@ -660,10 +661,10 @@ export function makeAuthoringPresentationRepository(options: RepositoryOptions =
   };
 }
 
-export class AuthoringPresentationRepository extends Context.Tag("AuthoringPresentationRepository")<
+export class AuthoringPresentationRepository extends Context.Service<
   AuthoringPresentationRepository,
   ReturnType<typeof makeAuthoringPresentationRepository>
->() {}
+>()("AuthoringPresentationRepository") {}
 
 export const AuthoringPresentationRepositoryLive = Layer.succeed(
   AuthoringPresentationRepository,

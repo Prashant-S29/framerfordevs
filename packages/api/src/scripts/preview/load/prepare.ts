@@ -4,6 +4,8 @@ import { readFile, writeFile } from "node:fs/promises";
 
 import { Effect, Schema } from "effect";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
+import { Uuid } from "../../../contracts/uuid";
 const help = process.argv.includes("--help") || process.argv.includes("-h");
 if (help) {
   process.stdout.write(
@@ -43,7 +45,7 @@ const requestedCredentialCount = Number(
 const lifetimeDays = Number(
   process.argv.find((argument) => argument.startsWith("--days="))?.slice("--days=".length) ?? "1",
 );
-if (!Schema.is(Schema.UUID)(projectId)) throw new Error("PREVIEW_PROJECT_ID must be a UUID.");
+if (!Schema.is(Uuid)(projectId)) throw new Error("PREVIEW_PROJECT_ID must be a UUID.");
 if (!/^[a-z][a-z0-9_]{0,62}$/u.test(environmentKey)) {
   throw new Error("PREVIEW_ENVIRONMENT_KEY must be a canonical environment key.");
 }
@@ -148,7 +150,7 @@ if (activeExisting.length > 0 && !replaceExisting) {
 }
 
 await ensureRuntimeEnvironment();
-const actorId = Schema.decodeUnknownSync(AuthUserId)(authority.actorId);
+const actorId = SchemaStrict.decodeUnknownSync(AuthUserId)(authority.actorId);
 const credentials = makeCredentialRepository();
 const secrets = makeSecretGenerator();
 const issuedKeys: Array<string> = [];
@@ -168,7 +170,7 @@ for (let index = 1; index <= requestedCredentialCount; index += 1) {
   await Effect.runPromise(
     credentials.issueCredential(
       actorId,
-      Schema.decodeUnknownSync(accessContracts.IssueApiCredentialInput)({
+      SchemaStrict.decodeUnknownSync(accessContracts.IssueApiCredentialInput)({
         projectId,
         environmentId: authority.environmentId,
         family: "preview",

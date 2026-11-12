@@ -1,9 +1,16 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createRootRoute, createRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import {
+  createRootRoute,
+  createRoute,
+  createRouter,
+  lazyRouteComponent,
+  Outlet,
+  RouterProvider,
+} from "@tanstack/react-router";
 
-import { StudioNotFound, StudioShell } from "./shell";
+import { StudioHome, StudioNotFound, StudioShell, useStudioBootstrap } from "./shell";
 import "./styles.css";
 
 function configuredMount(): string {
@@ -30,17 +37,54 @@ function configuredDashboardOrigin(): string {
   return content;
 }
 
+function StudioIndex() {
+  return <StudioHome bootstrap={useStudioBootstrap()} />;
+}
+
 const mountPath = configuredMount();
 const dashboardOrigin = configuredDashboardOrigin();
-const rootRoute = createRootRoute();
+const rootRoute = createRootRoute({
+  component: () => (
+    <StudioShell mountPath={mountPath} dashboardOrigin={dashboardOrigin}>
+      <Outlet />
+    </StudioShell>
+  ),
+});
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: () => <StudioShell mountPath={mountPath} dashboardOrigin={dashboardOrigin} />,
+  component: StudioIndex,
+});
+const contentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/content",
+  component: lazyRouteComponent(() => import("./content/navigation"), "ContentIndex"),
+});
+const collectionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/content/$collectionId/locales/$locale",
+  component: lazyRouteComponent(() => import("./content/navigation"), "CollectionContent"),
+});
+const newEntryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/content/$collectionId/locales/$locale/entries/new",
+  component: lazyRouteComponent(() => import("./content/workspace"), "NewEntryWorkspace"),
+});
+const entryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/content/$collectionId/locales/$locale/entries/$entryId",
+  component: lazyRouteComponent(() => import("./content/workspace"), "EntryWorkspace"),
 });
 const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute]),
+  routeTree: rootRoute.addChildren([
+    indexRoute,
+    contentRoute,
+    collectionRoute,
+    newEntryRoute,
+    entryRoute,
+  ]),
   basepath: mountPath,
+  defaultPreload: "intent",
   defaultNotFoundComponent: () => <StudioNotFound dashboardOrigin={dashboardOrigin} />,
 });
 

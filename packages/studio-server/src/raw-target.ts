@@ -2,7 +2,7 @@
 
 const portableMount = /^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/u;
 const safeTarget = /^[\x21-\x7e]+$/u;
-const assetName = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+const assetRoute = /^\/assets\/(?:chunk\/)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 const maximumRawTargetBytes = 8 * 1_024;
 
 export interface ParsedStudioTarget {
@@ -39,9 +39,6 @@ export function parseStudioRawTarget(
   if (path.includes("//") || path.split("/").some((part) => part === "." || part === ".."))
     return null;
   const route = path.slice(mountPath.length) || "/";
-  if (route.startsWith("/assets/")) {
-    const name = route.slice("/assets/".length);
-    if (!assetName.test(name)) return null;
-  }
+  if (route.startsWith("/assets/") && !assetRoute.test(route)) return null;
   return { path, query, route };
 }

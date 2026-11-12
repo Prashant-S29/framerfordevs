@@ -3,9 +3,28 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioNotFound, StudioShell } from "../../src/app/shell";
+
+vi.mock("@tanstack/react-router", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@tanstack/react-router")>();
+  return {
+    ...original,
+    Link: ({
+      children,
+      className,
+    }: {
+      readonly children: ReactNode;
+      readonly className?: string;
+    }) => (
+      <a className={className} href="/content">
+        {children}
+      </a>
+    ),
+  };
+});
 
 const response = {
   ok: true,

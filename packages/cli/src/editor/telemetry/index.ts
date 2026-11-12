@@ -1,6 +1,6 @@
 // Records closed local-editor proxy metrics without retaining request bodies or hosted authority.
 
-import { Effect, Metric, MetricBoundaries } from "effect";
+import { Effect, Metric } from "effect";
 
 import type { EditorOperationRequest } from "../protocol";
 
@@ -23,11 +23,10 @@ const proxyCount = Metric.counter("editor_proxy_operations_total", {
   incremental: true,
 });
 
-const proxyLatency = Metric.histogram(
-  "editor_proxy_operation_duration_ms",
-  MetricBoundaries.exponential({ start: 1, factor: 2, count: 14 }),
-  "Local-editor proxy duration by closed operation and outcome",
-);
+const proxyLatency = Metric.histogram("editor_proxy_operation_duration_ms", {
+  description: "Local-editor proxy duration by closed operation and outcome",
+  boundaries: Metric.exponentialBoundaries({ start: 1, factor: 2, count: 14 }),
+});
 
 const proxyRequestSize = Metric.counter("editor_proxy_request_sizes_total", {
   description: "Local-editor proxy request size buckets by closed operation",
@@ -50,28 +49,22 @@ export function editorProxySizeBucket(bytes: number): EditorProxySizeBucket {
 export const recordEditorProxyMetric = Effect.fn("cli.editor.proxy.observe")(function* (
   event: EditorProxyMetric,
 ) {
-  const count = Metric.tagged(
-    Metric.tagged(
-      Metric.tagged(
-        Metric.tagged(proxyCount, "operation", event.operation),
-        "mutation",
-        event.mutation ? "true" : "false",
-      ),
-      "outcome",
-      event.outcome,
+  const count = Metric.withAttributes(
+    Metric.withAttributes(
+      Metric.withAttributes(Metric.withAttributes(proxyCount, { operation: event.operation }), {
+        mutation: event.mutation ? "true" : "false",
+      }),
+      { outcome: event.outcome },
     ),
-    "status_family",
-    event.statusFamily,
+    { status_family: event.statusFamily },
   );
-  const latency = Metric.tagged(
-    Metric.tagged(proxyLatency, "operation", event.operation),
-    "outcome",
-    event.outcome,
+  const latency = Metric.withAttributes(
+    Metric.withAttributes(proxyLatency, { operation: event.operation }),
+    { outcome: event.outcome },
   );
-  const size = Metric.tagged(
-    Metric.tagged(proxyRequestSize, "operation", event.operation),
-    "request_size",
-    event.requestSizeBucket,
+  const size = Metric.withAttributes(
+    Metric.withAttributes(proxyRequestSize, { operation: event.operation }),
+    { request_size: event.requestSizeBucket },
   );
   yield* Effect.all([
     Metric.update(count, 1),

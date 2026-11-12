@@ -1,5 +1,4 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import { ControlPlaneActor } from "../../../contracts/control-plane";
 import { EnvironmentId, ProjectId, WorkspaceId } from "../../../contracts/platform";
@@ -9,8 +8,9 @@ import {
   type ControlPlaneCommandFingerprintInput,
 } from "./index";
 
-const userActor = Schema.decodeUnknownSync(ControlPlaneActor)({ kind: "user", id: "user-1" });
-const credentialActor = Schema.decodeUnknownSync(ControlPlaneActor)({
+import * as SchemaStrict from "../../schema-strict";
+const userActor = SchemaStrict.decodeUnknownSync(ControlPlaneActor)({ kind: "user", id: "user-1" });
+const credentialActor = SchemaStrict.decodeUnknownSync(ControlPlaneActor)({
   kind: "credential",
   id: "019fae8b-1234-7000-8000-000000000001",
 });

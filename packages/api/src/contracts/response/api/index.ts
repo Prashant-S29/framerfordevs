@@ -2,7 +2,8 @@
 
 import { Schema } from "effect";
 
-export const ApiErrorCodeSchema = Schema.Literal(
+import { Uuid } from "../../uuid";
+export const ApiErrorCodeSchema = Schema.Literals([
   "VALIDATION_ERROR",
   "UNAUTHORIZED",
   "FORBIDDEN",
@@ -66,41 +67,39 @@ export const ApiErrorCodeSchema = Schema.Literal(
   "RATE_LIMITED",
   "SERVICE_UNAVAILABLE",
   "INTERNAL_ERROR",
-);
+]);
 
 export type ApiErrorCode = typeof ApiErrorCodeSchema.Type;
 
-export const RequestIdSchema = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(128),
-  Schema.pattern(/^[A-Za-z0-9._:-]+$/),
+export const RequestIdSchema = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(128),
+  Schema.isPattern(/^[A-Za-z0-9._:-]+$/),
 );
 
 export class ApiErrorDetail extends Schema.Class<ApiErrorDetail>("ApiErrorDetail")({
-  path: Schema.optionalWith(Schema.String.pipe(Schema.maxLength(256)), { exact: true }),
-  code: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
-  scope: Schema.optionalWith(Schema.Literal("shared", "localized"), { exact: true }),
-  expectedVersion: Schema.optionalWith(
-    Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
-    { exact: true },
+  path: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(256))),
+  code: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  scope: Schema.optionalKey(Schema.Literals(["shared", "localized"])),
+  expectedVersion: Schema.optionalKey(
+    Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   ),
-  currentVersion: Schema.optionalWith(
-    Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
-    { exact: true },
+  currentVersion: Schema.optionalKey(
+    Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   ),
-  currentRevisionId: Schema.optionalWith(Schema.NullOr(Schema.UUID), { exact: true }),
+  currentRevisionId: Schema.optionalKey(Schema.NullOr(Uuid)),
 }) {}
 
-const ApiErrorDetailsSchema = Schema.Array(ApiErrorDetail).pipe(
-  Schema.minItems(1),
-  Schema.maxItems(50),
+const ApiErrorDetailsSchema = Schema.Array(ApiErrorDetail).check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(50),
 );
 
 export class ApiError extends Schema.Class<ApiError>("ApiError")({
   code: ApiErrorCodeSchema,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
-  details: Schema.optionalWith(ApiErrorDetailsSchema, { exact: true }),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  details: Schema.optionalKey(ApiErrorDetailsSchema),
   retryable: Schema.Boolean,
   requestId: RequestIdSchema,
 }) {}
@@ -109,7 +108,7 @@ export class ApiFailure extends Schema.Class<ApiFailure>("ApiFailure")({
   ok: Schema.Literal(false),
   data: Schema.Null,
   error: ApiError,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
 export interface ApiSuccess<A> {
@@ -155,15 +154,15 @@ export function apiFailure(options: {
   });
 }
 
-export function ApiSuccessSchema<A extends ApiData, I>(data: Schema.Schema<A, I, never>) {
+export function ApiSuccessSchema<A extends ApiData, I>(data: Schema.Codec<A, I, never>) {
   return Schema.Struct({
     ok: Schema.Literal(true),
     data,
     error: Schema.Null,
-    message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+    message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
   });
 }
 
-export function ApiResponseSchema<A extends ApiData, I>(data: Schema.Schema<A, I, never>) {
-  return Schema.Union(ApiSuccessSchema(data), ApiFailure);
+export function ApiResponseSchema<A extends ApiData, I>(data: Schema.Codec<A, I, never>) {
+  return Schema.Union([ApiSuccessSchema(data), ApiFailure]);
 }

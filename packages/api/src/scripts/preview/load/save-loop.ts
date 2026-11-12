@@ -3,8 +3,9 @@
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const serverEnvironmentPath = "../../apps/server/.env";
 const loadEnvironmentPath = "../../preview-load.env";
 process.loadEnvFile(serverEnvironmentPath);
@@ -93,7 +94,7 @@ const [authority] = await db
   .limit(1);
 if (authority === undefined) throw new Error("The current Preview fixture scope was not found.");
 
-const actorId = Schema.decodeUnknownSync(AuthUserId)(authority.actorId);
+const actorId = SchemaStrict.decodeUnknownSync(AuthUserId)(authority.actorId);
 const entries = makeEntryRepository();
 const run = Effect.runPromise;
 const scope = {
@@ -104,7 +105,10 @@ const scope = {
   locale: decodeURIComponent(locale),
 };
 const original = await run(
-  entries.getDraft(actorId, Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput)(scope)),
+  entries.getDraft(
+    actorId,
+    SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)(scope),
+  ),
 );
 const mutableFieldId = Object.keys(original.localizedValues)[0];
 if (mutableFieldId === undefined)
@@ -124,13 +128,16 @@ let iteration = 0;
 try {
   while (Date.now() < deadline) {
     const draft = await run(
-      entries.getDraft(actorId, Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput)(scope)),
+      entries.getDraft(
+        actorId,
+        SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)(scope),
+      ),
     );
     const value = iteration % 2 === 0 ? `${originalValue} [coherence]` : originalValue;
     const result = await run(
       entries.saveDraft(
         actorId,
-        Schema.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
+        SchemaStrict.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
           ...scope,
           schemaRevisionId: draft.schemaRevisionId,
           contractHash: draft.contractHash,
@@ -152,13 +159,16 @@ try {
   }
 } finally {
   const draft = await run(
-    entries.getDraft(actorId, Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput)(scope)),
+    entries.getDraft(
+      actorId,
+      SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)(scope),
+    ),
   );
   if (Reflect.get(draft.localizedValues, mutableFieldId) !== originalValue) {
     const result = await run(
       entries.saveDraft(
         actorId,
-        Schema.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
+        SchemaStrict.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
           ...scope,
           schemaRevisionId: draft.schemaRevisionId,
           contractHash: draft.contractHash,

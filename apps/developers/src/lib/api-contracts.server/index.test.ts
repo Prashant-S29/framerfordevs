@@ -6,6 +6,7 @@ import deliveryDocument from "@framerfordevs/public-contracts/artifacts/delivery
 import previewDocument from "@framerfordevs/public-contracts/artifacts/preview/v1/openapi.json";
 import studioDocument from "@framerfordevs/public-contracts/artifacts/studio/v1/openapi.json";
 import studioContentDocument from "@framerfordevs/public-contracts/artifacts/studio-content/v1/openapi.json";
+import studioContentV2Document from "@framerfordevs/public-contracts/artifacts/studio-content/v2/openapi.json";
 import toolingDocument from "@framerfordevs/public-contracts/artifacts/tooling/v1/openapi.json";
 import { describe, expect, it } from "vitest";
 
@@ -18,11 +19,12 @@ const references = [
   { document: previewDocument, slugs: ["preview", "v1"] },
   { document: studioDocument, slugs: ["studio", "v1"] },
   { document: studioContentDocument, slugs: ["studio-content", "v1"] },
+  { document: studioContentV2Document, slugs: ["studio-content", "v2"] },
   { document: toolingDocument, slugs: ["tooling", "v1"] },
 ];
 
 describe("canonical API contract source", () => {
-  it("contains exactly the seven public OpenAPI families", () => {
+  it("contains exactly the eight registered public OpenAPI artifacts", () => {
     expect(
       apiContractSource
         .getPages()
@@ -34,6 +36,7 @@ describe("canonical API contract source", () => {
       "/api-reference/delivery/v1",
       "/api-reference/preview/v1",
       "/api-reference/studio-content/v1",
+      "/api-reference/studio-content/v2",
       "/api-reference/studio/v1",
       "/api-reference/tooling/v1",
     ]);

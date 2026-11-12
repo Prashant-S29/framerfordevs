@@ -70,8 +70,11 @@ import {
 } from "../../../services/control-plane/cursor-signer";
 import { WebhookRepository } from "../../../services/webhook/repository";
 
-const decode = <A, I>(schema: Schema.Schema<A, I, never>, value: unknown) =>
-  Schema.decodeUnknown(schema)(value).pipe(Effect.mapError(() => UnauthorizedFailure.make()));
+import * as SchemaStrict from "../../../lib/schema-strict";
+const decode = <A, I>(schema: Schema.Codec<A, I, never>, value: unknown) =>
+  SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
+    Effect.mapError(() => UnauthorizedFailure.make()),
+  );
 
 function authority(options: {
   readonly route: "webhook_endpoints" | "invalidation_mappings" | "webhook_deliveries";
@@ -107,7 +110,7 @@ function deliverySummary(delivery: {
   readonly createdAt: string;
   readonly updatedAt: string;
 }) {
-  return Schema.decodeUnknownSync(ControlPlaneWebhookDeliverySummary)({
+  return SchemaStrict.decodeUnknownSync(ControlPlaneWebhookDeliverySummary)({
     id: delivery.id,
     eventId: delivery.eventId,
     endpointId: delivery.endpointId,

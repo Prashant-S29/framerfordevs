@@ -1,10 +1,78 @@
 // Redacts role and source-key schema authority from the browser-visible Studio form projection.
 
-import { Schema } from "effect";
-
 import { EntryValues } from "../../../contracts/entry";
 import type { CollectionFieldDefinition, GeneratedFormDefinition } from "../../../contracts/schema";
 import { StudioFormField, StudioFormProjection } from "../../../contracts/studio-content";
+
+import * as SchemaStrict from "../../schema-strict";
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function projectConfiguredDefault(
+  source: CollectionFieldDefinition,
+  projected: StudioFormField,
+  value: unknown,
+): unknown {
+  if (source.kind === "object" && projected.kind === "object" && isRecord(value)) {
+    const result: Record<string, unknown> = {};
+    for (const projectedChild of projected.children) {
+      const sourceChild = source.children.find((child) => child.id === projectedChild.id);
+      if (sourceChild?.apiKey === null || sourceChild === undefined) continue;
+      const childValue = Reflect.get(value, sourceChild.apiKey);
+      if (childValue !== undefined) {
+        Reflect.set(
+          result,
+          projectedChild.id,
+          projectConfiguredDefault(sourceChild, projectedChild, childValue),
+        );
+      }
+    }
+    return result;
+  }
+  if (source.kind === "list" && projected.kind === "list" && Array.isArray(value)) {
+    const sourceItem = source.children[0];
+    const projectedItem = projected.children[0];
+    if (sourceItem === undefined || projectedItem === undefined) return [];
+    return value.map((item) => projectConfiguredDefault(sourceItem, projectedItem, item));
+  }
+  return value;
+}
+
+function projectFieldConfiguration(
+  field: CollectionFieldDefinition,
+  projectedChildren: ReadonlyArray<StudioFormField>,
+): unknown {
+  if (
+    (field.kind !== "object" && field.kind !== "list") ||
+    !Object.hasOwn(field.configuration, "default")
+  ) {
+    return field.configuration;
+  }
+  const projectedField = SchemaStrict.decodeUnknownSync(StudioFormField)({
+    id: field.id,
+    parentFieldId: field.parentFieldId,
+    nodeRole: field.nodeRole,
+    displayLabel: field.displayLabel,
+    kind: field.kind,
+    required: field.required,
+    localization: field.localization,
+    position: field.position,
+    helpText: field.editor.helpText,
+    placeholder: field.editor.placeholder,
+    configuration: {},
+    children: projectedChildren,
+  });
+  return {
+    ...field.configuration,
+    default: projectConfiguredDefault(
+      field,
+      projectedField,
+      Reflect.get(field.configuration, "default"),
+    ),
+  };
+}
 
 function projectField(
   field: CollectionFieldDefinition,
@@ -17,7 +85,7 @@ function projectField(
     if (projected !== null) children.push(projected);
   }
   if ((field.kind === "object" || field.kind === "list") && children.length === 0) return null;
-  return Schema.decodeUnknownSync(StudioFormField)({
+  return SchemaStrict.decodeUnknownSync(StudioFormField)({
     id: field.id,
     parentFieldId: field.parentFieldId,
     nodeRole: field.nodeRole,
@@ -28,7 +96,7 @@ function projectField(
     position: field.position,
     helpText: field.editor.helpText,
     placeholder: field.editor.placeholder,
-    configuration: field.configuration,
+    configuration: projectFieldConfiguration(field, children),
     children,
   });
 }
@@ -69,7 +137,7 @@ export function projectStudioValues(
     const value = projectField(field, Reflect.get(values, field.id));
     if (value !== undefined) Reflect.set(projected, field.id, value);
   }
-  return Schema.decodeUnknownSync(EntryValues)(projected);
+  return SchemaStrict.decodeUnknownSync(EntryValues)(projected);
 }
 
 export function projectStudioForm(form: GeneratedFormDefinition): StudioFormProjection {
@@ -160,7 +228,7 @@ export function projectStudioForm(form: GeneratedFormDefinition): StudioFormProj
     return projected === null ? [] : [projected];
   });
 
-  return Schema.decodeUnknownSync(StudioFormProjection)({
+  return SchemaStrict.decodeUnknownSync(StudioFormProjection)({
     collectionId: form.collectionId,
     schemaRevisionId: form.revisionId,
     contractHash: form.contractHash,

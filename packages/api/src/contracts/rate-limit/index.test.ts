@@ -1,7 +1,6 @@
 // Verifies the closed policy registry and transport-neutral rate-limit decision contract.
 
 import { describe, expect, it } from "vitest";
-import { Schema } from "effect";
 
 import {
   RateLimitCost,
@@ -11,13 +10,14 @@ import {
   rateLimitPolicyValues,
 } from "./index";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 describe("rate-limit contracts", () => {
   it("keeps every registered policy source-controlled and configured", () => {
     expect(Object.keys(rateLimitPolicies).sort()).toEqual([...rateLimitPolicyValues].sort());
-    expect(Schema.decodeUnknownSync(RateLimitPolicy)("delivery.credential")).toBe(
+    expect(SchemaStrict.decodeUnknownSync(RateLimitPolicy)("delivery.credential")).toBe(
       "delivery.credential",
     );
-    expect(() => Schema.decodeUnknownSync(RateLimitPolicy)("caller.policy")).toThrow();
+    expect(() => SchemaStrict.decodeUnknownSync(RateLimitPolicy)("caller.policy")).toThrow();
   });
 
   it("keeps approved Control Plane budgets closed and source-controlled", () => {
@@ -108,15 +108,15 @@ describe("rate-limit contracts", () => {
   });
 
   it("bounds weighted costs before store evaluation", () => {
-    expect(Schema.decodeUnknownSync(RateLimitCost)(1)).toBe(1);
-    expect(Schema.decodeUnknownSync(RateLimitCost)(100)).toBe(100);
-    expect(() => Schema.decodeUnknownSync(RateLimitCost)(0)).toThrow();
-    expect(() => Schema.decodeUnknownSync(RateLimitCost)(101)).toThrow();
-    expect(() => Schema.decodeUnknownSync(RateLimitCost)(1.5)).toThrow();
+    expect(SchemaStrict.decodeUnknownSync(RateLimitCost)(1)).toBe(1);
+    expect(SchemaStrict.decodeUnknownSync(RateLimitCost)(100)).toBe(100);
+    expect(() => SchemaStrict.decodeUnknownSync(RateLimitCost)(0)).toThrow();
+    expect(() => SchemaStrict.decodeUnknownSync(RateLimitCost)(101)).toThrow();
+    expect(() => SchemaStrict.decodeUnknownSync(RateLimitCost)(1.5)).toThrow();
   });
 
   it("decodes a complete decision without identifiers or provider details", () => {
-    const decision = Schema.decodeUnknownSync(RateLimitDecision)({
+    const decision = SchemaStrict.decodeUnknownSync(RateLimitDecision)({
       allowed: false,
       policy: "delivery.anonymous",
       cost: 6,

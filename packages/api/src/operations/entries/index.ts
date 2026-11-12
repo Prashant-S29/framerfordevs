@@ -1,6 +1,6 @@
 // Defines named M7 entry workflows at the Effect/application boundary.
 
-import { Clock, Effect, Schema } from "effect";
+import { Clock, Effect } from "effect";
 
 import type {
   CreateEntryInput,
@@ -15,8 +15,11 @@ import { UnauthorizedFailure } from "../../contracts/response/errors";
 import { AuthUserId } from "../../contracts/platform";
 import { EntryRepository } from "../../services/entry/repository";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const decodeActorId = (actorId: string) =>
-  Schema.decodeUnknown(AuthUserId)(actorId).pipe(Effect.mapError(() => UnauthorizedFailure.make()));
+  SchemaStrict.decodeUnknownEffect(AuthUserId)(actorId).pipe(
+    Effect.mapError(() => UnauthorizedFailure.make()),
+  );
 
 const currentDate = Effect.map(Clock.currentTimeMillis, (millis) => new Date(millis));
 

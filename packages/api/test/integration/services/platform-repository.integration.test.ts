@@ -28,7 +28,7 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Cause, Effect, Exit, Option, Schema } from "effect";
+import { Cause, Effect, Exit, Option } from "effect";
 
 import {
   ControlPlaneCommandId,
@@ -61,14 +61,15 @@ import {
 import { studioClientId } from "../../../src/lib/studio/authority";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 
+import * as SchemaStrict from "../../../src/lib/schema-strict";
 const repository = makePlatformRepository();
 const suffix = randomUUID();
 const firstUserId = `m2-owner-a-${suffix}`;
 const secondUserId = `m2-owner-b-${suffix}`;
 const firstEmail = `m2-owner-a-${suffix}@example.test`;
 const secondEmail = `m2-owner-b-${suffix}@example.test`;
-const firstActor = Schema.decodeUnknownSync(AuthUserId)(firstUserId);
-const secondActor = Schema.decodeUnknownSync(AuthUserId)(secondUserId);
+const firstActor = SchemaStrict.decodeUnknownSync(AuthUserId)(firstUserId);
+const secondActor = SchemaStrict.decodeUnknownSync(AuthUserId)(secondUserId);
 const studioCredentialId = randomUUID();
 const studioKillCredentialId = randomUUID();
 
@@ -83,7 +84,7 @@ function required<A>(value: A | undefined, label: string): A {
 
 function failureTag(exit: Exit.Exit<unknown, unknown>): string | undefined {
   if (Exit.isSuccess(exit)) return undefined;
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   if (typeof failure === "object" && failure !== null && "_tag" in failure) {
     return typeof failure._tag === "string" ? failure._tag : undefined;
   }
@@ -215,17 +216,17 @@ afterAll(async () => {
   await db.$client.end();
 });
 
-describe.sequential("platform repository PostgreSQL integration", () => {
+describe("platform repository PostgreSQL integration", () => {
   it.effect("atomically creates a workspace, owner membership, and safe audit events", () =>
     Effect.gen(function* () {
       firstWorkspace = yield* repository.createWorkspace(
         firstActor,
-        yield* Schema.decodeUnknown(CreateWorkspaceInput)({ name: "Agency Workspace" }),
+        yield* SchemaStrict.decodeUnknownEffect(CreateWorkspaceInput)({ name: "Agency Workspace" }),
         "request-m2-workspace-a",
       );
       secondWorkspace = yield* repository.createWorkspace(
         secondActor,
-        yield* Schema.decodeUnknown(CreateWorkspaceInput)({ name: "Client Workspace" }),
+        yield* SchemaStrict.decodeUnknownEffect(CreateWorkspaceInput)({ name: "Client Workspace" }),
         "request-m2-workspace-b",
       );
 
@@ -256,7 +257,9 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const exit = yield* Effect.exit(
         repository.createWorkspace(
           firstActor,
-          yield* Schema.decodeUnknown(CreateWorkspaceInput)({ name: "Rollback Workspace" }),
+          yield* SchemaStrict.decodeUnknownEffect(CreateWorkspaceInput)({
+            name: "Rollback Workspace",
+          }),
           "invalid request id",
         ),
       );
@@ -274,25 +277,27 @@ describe.sequential("platform repository PostgreSQL integration", () => {
     Effect.gen(function* () {
       const additionalWorkspace = yield* repository.createWorkspace(
         firstActor,
-        yield* Schema.decodeUnknown(CreateWorkspaceInput)({ name: "Second Agency Workspace" }),
+        yield* SchemaStrict.decodeUnknownEffect(CreateWorkspaceInput)({
+          name: "Second Agency Workspace",
+        }),
         "request-m2-workspace-additional",
       );
       const firstPage = yield* repository.listWorkspaces(
         firstActor,
-        yield* Schema.decodeUnknown(ListWorkspacesInput)({ cursor: null, limit: 1 }),
+        yield* SchemaStrict.decodeUnknownEffect(ListWorkspacesInput)({ cursor: null, limit: 1 }),
       );
       assert.isNotNull(firstPage.nextCursor);
       if (!firstPage.nextCursor) return;
       const secondPage = yield* repository.listWorkspaces(
         firstActor,
-        yield* Schema.decodeUnknown(ListWorkspacesInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ListWorkspacesInput)({
           cursor: firstPage.nextCursor,
           limit: 1,
         }),
       );
       const foreignPage = yield* repository.listWorkspaces(
         secondActor,
-        yield* Schema.decodeUnknown(ListWorkspacesInput)({ cursor: null, limit: 50 }),
+        yield* SchemaStrict.decodeUnknownEffect(ListWorkspacesInput)({ cursor: null, limit: 50 }),
       );
 
       assert.strictEqual(firstPage.items.length, 1);
@@ -309,7 +314,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
   it.effect("creates and exactly replays one Control Plane workspace command", () =>
     Effect.gen(function* () {
       const actor = { kind: "user" as const, id: firstActor };
-      const input = yield* Schema.decodeUnknown(ControlPlaneCreateWorkspaceRequest)({
+      const input = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCreateWorkspaceRequest)({
         commandId: randomUUID(),
         name: "Control Plane Workspace",
       });
@@ -326,7 +331,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const conflict = yield* Effect.exit(
         repository.createControlPlaneWorkspace(
           actor,
-          yield* Schema.decodeUnknown(ControlPlaneCreateWorkspaceRequest)({
+          yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCreateWorkspaceRequest)({
             ...input,
             name: "Changed Control Plane Workspace",
           }),
@@ -382,7 +387,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         const ownerWorkspace = required(firstWorkspace, "first workspace");
         primaryProject = yield* repository.createProject(
           firstActor,
-          yield* Schema.decodeUnknown(CreateProjectInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
             workspaceId: ownerWorkspace.id,
             name: "Marketing Site",
             key: "marketing-site",
@@ -430,7 +435,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
   it.effect("creates initial CMS authority and exactly replays one Control Plane project", () =>
     Effect.gen(function* () {
       const actor = { kind: "user" as const, id: firstActor };
-      const input = yield* Schema.decodeUnknown(ControlPlaneCreateProjectRequest)({
+      const input = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCreateProjectRequest)({
         commandId: randomUUID(),
         name: "Control Plane Project",
         key: "control-plane-project",
@@ -458,7 +463,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         repository.createControlPlaneProject(
           actor,
           required(firstWorkspace, "first workspace").id,
-          yield* Schema.decodeUnknown(ControlPlaneCreateProjectRequest)({
+          yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCreateProjectRequest)({
             ...input,
             name: "Changed Control Plane Project",
           }),
@@ -596,7 +601,9 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const created = required(primaryProject, "primary project");
       const actor = { kind: "user" as const, id: firstActor };
       const createCommandId = randomUUID();
-      const createInput = yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+      const createInput = yield* SchemaStrict.decodeUnknownEffect(
+        ControlPlanePutStudioRegistrationRequest,
+      )({
         commandId: createCommandId,
         expectedVersion: null,
         applicationOrigin: "https://studio.example.test",
@@ -621,7 +628,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           actor,
           created.id,
           created.environment.id,
-          yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+          yield* SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
             ...createInput,
             mountPath: "/changed",
           }),
@@ -633,7 +640,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           actor,
           created.id,
           created.environment.id,
-          yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+          yield* SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
             ...createInput,
             commandId: randomUUID(),
           }),
@@ -644,7 +651,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         actor,
         created.id,
         created.environment.id,
-        yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+        yield* SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
           ...createInput,
           commandId: randomUUID(),
           expectedVersion: initial.registration.version,
@@ -655,7 +662,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         actor,
         created.id,
         created.environment.id,
-        yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+        yield* SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
           ...createInput,
           commandId: randomUUID(),
           expectedVersion: initial.registration.version,
@@ -668,7 +675,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           actor,
           created.id,
           created.environment.id,
-          yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+          yield* SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
             ...createInput,
             commandId: randomUUID(),
             expectedVersion: initial.registration.version,
@@ -747,7 +754,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const ownerWorkspace = required(firstWorkspace, "first workspace");
       const created = yield* repository.createProject(
         firstActor,
-        yield* Schema.decodeUnknown(CreateProjectInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
           workspaceId: ownerWorkspace.id,
           name: "Legacy Studio Mount Project",
           key: `legacy-studio-mount-${suffix}`,
@@ -757,7 +764,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       );
       yield* repository.enableCapability(
         firstActor,
-        yield* Schema.decodeUnknown(EnableCapabilityInput)({
+        yield* SchemaStrict.decodeUnknownEffect(EnableCapabilityInput)({
           projectId: created.id,
           capability: "cms",
         }),
@@ -767,7 +774,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         { kind: "user", id: firstActor },
         created.id,
         created.environment.id,
-        yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+        yield* SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
           commandId: randomUUID(),
           expectedVersion: null,
           applicationOrigin: "https://legacy-runtime.example.test",
@@ -780,7 +787,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           { kind: "user", id: firstActor },
           created.id,
           created.environment.id,
-          yield* Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+          yield* SchemaStrict.decodeUnknownEffect(ControlPlaneSetStudioRuntimeRequest)({
             commandId: randomUUID(),
             expectedVersion: registered.registration.version,
             enabled: true,
@@ -823,7 +830,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         const ownerWorkspace = required(firstWorkspace, "first workspace");
         const created = yield* repository.createProject(
           firstActor,
-          yield* Schema.decodeUnknown(CreateProjectInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
             workspaceId: ownerWorkspace.id,
             name: "Studio Runtime Project",
             key: `studio-runtime-${suffix}`,
@@ -833,7 +840,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         );
         yield* repository.enableCapability(
           firstActor,
-          yield* Schema.decodeUnknown(EnableCapabilityInput)({
+          yield* SchemaStrict.decodeUnknownEffect(EnableCapabilityInput)({
             projectId: created.id,
             capability: "cms",
           }),
@@ -843,7 +850,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           { kind: "user", id: firstActor },
           created.id,
           created.environment.id,
-          yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+          yield* SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
             commandId: randomUUID(),
             expectedVersion: null,
             applicationOrigin: "https://runtime.example.test",
@@ -851,7 +858,9 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           }),
           "request-m18-studio-runtime-register",
         );
-        const activationInput = yield* Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+        const activationInput = yield* SchemaStrict.decodeUnknownEffect(
+          ControlPlaneSetStudioRuntimeRequest,
+        )({
           commandId: randomUUID(),
           expectedVersion: registered.registration.version,
           enabled: true,
@@ -930,7 +939,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           { kind: "user", id: firstActor },
           created.id,
           created.environment.id,
-          yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+          yield* SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
             commandId: randomUUID(),
             expectedVersion: activated.registration.version,
             applicationOrigin: "https://runtime-next.example.test",
@@ -989,7 +998,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const ownerWorkspace = required(firstWorkspace, "first workspace");
       const isolatedProject = yield* repository.createProject(
         firstActor,
-        yield* Schema.decodeUnknown(CreateProjectInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
           workspaceId: ownerWorkspace.id,
           name: "Concurrent Studio Project",
           key: "concurrent-studio-project",
@@ -1001,7 +1010,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const createInputs = yield* Effect.forEach(
         [ControlPlaneCommandId.make(randomUUID()), ControlPlaneCommandId.make(randomUUID())],
         (commandId, index) =>
-          Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+          SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
             commandId,
             expectedVersion: null,
             applicationOrigin: `https://studio-${index}.example.test`,
@@ -1035,7 +1044,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const updateInputs = yield* Effect.forEach(
         [ControlPlaneCommandId.make(randomUUID()), ControlPlaneCommandId.make(randomUUID())],
         (commandId, index) =>
-          Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+          SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
             commandId,
             expectedVersion: created.value.registration.version,
             applicationOrigin: `https://updated-studio-${index}.example.test`,
@@ -1130,7 +1139,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         actor,
         created.id,
         created.environment.id,
-        yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+        yield* SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
           commandId: randomUUID(),
           expectedVersion: before.version,
           applicationOrigin: before.applicationOrigin,
@@ -1156,7 +1165,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const updatedProject = yield* repository.updateControlPlaneProject(
         actor,
         created.id,
-        yield* Schema.decodeUnknown(ControlPlaneUpdateProjectRequest)({
+        yield* SchemaStrict.decodeUnknownEffect(ControlPlaneUpdateProjectRequest)({
           expectedVersion: currentProject.version,
           name: "Credential-updated Marketing Site",
           description: currentProject.description,
@@ -1172,7 +1181,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       );
       primaryProject = yield* repository.getProject(
         firstActor,
-        yield* Schema.decodeUnknown(GetProjectInput)({ projectId: created.id }),
+        yield* SchemaStrict.decodeUnknownEffect(GetProjectInput)({ projectId: created.id }),
       );
 
       assert.strictEqual(result.registration.mountPath, "/credential-studio");
@@ -1194,7 +1203,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const ownerWorkspace = required(firstWorkspace, "first workspace");
       const created = yield* repository.createProject(
         firstActor,
-        yield* Schema.decodeUnknown(CreateProjectInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
           workspaceId: ownerWorkspace.id,
           name: "Studio Credential Kill Switch",
           key: `studio-credential-kill-${suffix}`,
@@ -1204,7 +1213,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       );
       yield* repository.enableCapability(
         firstActor,
-        yield* Schema.decodeUnknown(EnableCapabilityInput)({
+        yield* SchemaStrict.decodeUnknownEffect(EnableCapabilityInput)({
           projectId: created.id,
           capability: "cms",
         }),
@@ -1214,7 +1223,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         { kind: "user", id: firstActor },
         created.id,
         created.environment.id,
-        yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+        yield* SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
           commandId: randomUUID(),
           expectedVersion: null,
           applicationOrigin: "https://credential-kill.example.test",
@@ -1226,7 +1235,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         { kind: "user", id: firstActor },
         created.id,
         created.environment.id,
-        yield* Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+        yield* SchemaStrict.decodeUnknownEffect(ControlPlaneSetStudioRuntimeRequest)({
           commandId: randomUUID(),
           expectedVersion: registered.registration.version,
           enabled: true,
@@ -1274,7 +1283,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           actor,
           created.id,
           created.environment.id,
-          yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+          yield* SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
             commandId: randomUUID(),
             expectedVersion: activated.registration.version,
             applicationOrigin: "https://credential-repoint-denied.example.test",
@@ -1288,7 +1297,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           actor,
           created.id,
           created.environment.id,
-          yield* Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+          yield* SchemaStrict.decodeUnknownEffect(ControlPlaneSetStudioRuntimeRequest)({
             commandId: randomUUID(),
             expectedVersion: activated.registration.version,
             enabled: true,
@@ -1300,7 +1309,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         actor,
         created.id,
         created.environment.id,
-        yield* Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+        yield* SchemaStrict.decodeUnknownEffect(ControlPlaneSetStudioRuntimeRequest)({
           commandId: randomUUID(),
           expectedVersion: activated.registration.version,
           enabled: false,
@@ -1311,7 +1320,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         actor,
         created.id,
         created.environment.id,
-        yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+        yield* SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
           commandId: randomUUID(),
           expectedVersion: deactivated.registration.version,
           applicationOrigin: "https://credential-inactive-edit.example.test",
@@ -1363,7 +1372,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const exit = yield* Effect.exit(
         repository.createProject(
           firstActor,
-          yield* Schema.decodeUnknown(CreateProjectInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
             workspaceId: ownerWorkspace.id,
             name: "Rollback Project",
             key: "rollback-project",
@@ -1389,7 +1398,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
   it.effect("enforces project-key uniqueness under concurrency but permits another workspace", () =>
     Effect.gen(function* () {
       const ownerWorkspace = required(firstWorkspace, "first workspace");
-      const input = yield* Schema.decodeUnknown(CreateProjectInput)({
+      const input = yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
         workspaceId: ownerWorkspace.id,
         name: "Concurrent Project",
         key: "concurrent-project",
@@ -1405,7 +1414,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       );
       const sameKeyElsewhere = yield* repository.createProject(
         secondActor,
-        yield* Schema.decodeUnknown(CreateProjectInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
           workspaceId: required(secondWorkspace, "second workspace").id,
           name: "Concurrent Project",
           key: "concurrent-project",
@@ -1433,13 +1442,13 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           Effect.exit(
             repository.getProject(
               secondActor,
-              yield* Schema.decodeUnknown(GetProjectInput)({ projectId: created.id }),
+              yield* SchemaStrict.decodeUnknownEffect(GetProjectInput)({ projectId: created.id }),
             ),
           ),
           Effect.exit(
             repository.listProjects(
               secondActor,
-              yield* Schema.decodeUnknown(ListProjectsInput)({
+              yield* SchemaStrict.decodeUnknownEffect(ListProjectsInput)({
                 workspaceId: foreignWorkspace.id,
                 status: "active",
                 cursor: null,
@@ -1450,7 +1459,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           Effect.exit(
             repository.updateProject(
               secondActor,
-              yield* Schema.decodeUnknown(UpdateProjectInput)({
+              yield* SchemaStrict.decodeUnknownEffect(UpdateProjectInput)({
                 projectId: created.id,
                 version: created.version,
                 name: "Foreign Update",
@@ -1462,7 +1471,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           Effect.exit(
             repository.archiveProject(
               secondActor,
-              yield* Schema.decodeUnknown(ArchiveProjectInput)({
+              yield* SchemaStrict.decodeUnknownEffect(ArchiveProjectInput)({
                 projectId: created.id,
                 version: created.version,
               }),
@@ -1472,7 +1481,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           Effect.exit(
             repository.restoreProject(
               secondActor,
-              yield* Schema.decodeUnknown(RestoreProjectInput)({
+              yield* SchemaStrict.decodeUnknownEffect(RestoreProjectInput)({
                 projectId: created.id,
                 version: created.version,
               }),
@@ -1482,7 +1491,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
           Effect.exit(
             repository.enableCapability(
               secondActor,
-              yield* Schema.decodeUnknown(EnableCapabilityInput)({
+              yield* SchemaStrict.decodeUnknownEffect(EnableCapabilityInput)({
                 projectId: created.id,
                 capability: "cms",
               }),
@@ -1500,13 +1509,13 @@ describe.sequential("platform repository PostgreSQL integration", () => {
     () =>
       Effect.gen(function* () {
         const created = required(primaryProject, "primary project");
-        const firstInput = yield* Schema.decodeUnknown(UpdateProjectInput)({
+        const firstInput = yield* SchemaStrict.decodeUnknownEffect(UpdateProjectInput)({
           projectId: created.id,
           version: created.version,
           name: "Updated Marketing Site",
           description: created.description,
         });
-        const secondInput = yield* Schema.decodeUnknown(UpdateProjectInput)({
+        const secondInput = yield* SchemaStrict.decodeUnknownEffect(UpdateProjectInput)({
           projectId: created.id,
           version: created.version,
           name: "Competing Update",
@@ -1536,7 +1545,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
         );
         const noOp = yield* repository.updateProject(
           firstActor,
-          yield* Schema.decodeUnknown(UpdateProjectInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectInput)({
             projectId: winner.value.id,
             version: winner.value.version,
             name: winner.value.name,
@@ -1569,7 +1578,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
   it.effect("enables CMS exactly once under concurrency and records one audit event", () =>
     Effect.gen(function* () {
       const created = required(primaryProject, "primary project");
-      const input = yield* Schema.decodeUnknown(EnableCapabilityInput)({
+      const input = yield* SchemaStrict.decodeUnknownEffect(EnableCapabilityInput)({
         projectId: created.id,
         capability: "cms",
       });
@@ -1610,7 +1619,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
     Effect.gen(function* () {
       const capabilityProject = yield* repository.createProject(
         firstActor,
-        yield* Schema.decodeUnknown(CreateProjectInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
           workspaceId: required(firstWorkspace, "first workspace").id,
           name: "Control Plane capability project",
           key: "control-plane-capability",
@@ -1682,7 +1691,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const ownerWorkspace = required(firstWorkspace, "first workspace");
       const firstPage = yield* repository.listProjects(
         firstActor,
-        yield* Schema.decodeUnknown(ListProjectsInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ListProjectsInput)({
           workspaceId: ownerWorkspace.id,
           status: "active",
           cursor: null,
@@ -1693,7 +1702,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       if (!firstPage.nextCursor) return;
       const secondPage = yield* repository.listProjects(
         firstActor,
-        yield* Schema.decodeUnknown(ListProjectsInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ListProjectsInput)({
           workspaceId: ownerWorkspace.id,
           status: "active",
           cursor: firstPage.nextCursor,
@@ -1711,7 +1720,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const current = required(primaryProject, "primary project");
       const archived = yield* repository.archiveProject(
         firstActor,
-        yield* Schema.decodeUnknown(ArchiveProjectInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ArchiveProjectInput)({
           projectId: current.id,
           version: current.version,
         }),
@@ -1727,7 +1736,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const duplicate = yield* Effect.exit(
         repository.createProject(
           firstActor,
-          yield* Schema.decodeUnknown(CreateProjectInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
             workspaceId: archived.workspaceId,
             name: "Replacement",
             key: archived.key,
@@ -1739,7 +1748,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const repeatedArchive = yield* Effect.exit(
         repository.archiveProject(
           firstActor,
-          yield* Schema.decodeUnknown(ArchiveProjectInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ArchiveProjectInput)({
             projectId: archived.id,
             version: archived.version,
           }),
@@ -1761,7 +1770,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const stale = yield* Effect.exit(
         repository.restoreProject(
           firstActor,
-          yield* Schema.decodeUnknown(RestoreProjectInput)({
+          yield* SchemaStrict.decodeUnknownEffect(RestoreProjectInput)({
             projectId: archived.id,
             version: archived.version - 1,
           }),
@@ -1770,7 +1779,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       );
       const restored = yield* repository.restoreProject(
         firstActor,
-        yield* Schema.decodeUnknown(RestoreProjectInput)({
+        yield* SchemaStrict.decodeUnknownEffect(RestoreProjectInput)({
           projectId: archived.id,
           version: archived.version,
         }),
@@ -1791,7 +1800,7 @@ describe.sequential("platform repository PostgreSQL integration", () => {
       const repeated = yield* Effect.exit(
         repository.restoreProject(
           firstActor,
-          yield* Schema.decodeUnknown(RestoreProjectInput)({
+          yield* SchemaStrict.decodeUnknownEffect(RestoreProjectInput)({
             projectId: restored.id,
             version: restored.version,
           }),

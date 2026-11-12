@@ -1,12 +1,13 @@
 // Reconciles two complete Tooling manifest passes around exact immutable revision fetches.
 
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import { canonicalizeJson } from "./canonical";
 import { ToolingAuthorityChangedError, ToolingPaginationError } from "./errors";
 import { type JsonValue, ToolingCollectionRevision, ToolingManifestPage } from "./schema";
 import { ToolingHttpClient, type ToolingRequestOptions } from "./tooling-http-client";
 
+import * as SchemaStrict from "./schema-strict";
 const pageSize = 50;
 const maximumPages = 200;
 
@@ -81,7 +82,7 @@ export const readCompleteManifest = Effect.fn("ToolingPull.readCompleteManifest"
       collections.push(collection);
     }
     if (current.nextCursor === null) {
-      return yield* Schema.decodeUnknown(ToolingManifestPage)({
+      return yield* SchemaStrict.decodeUnknownEffect(ToolingManifestPage)({
         projectId: current.projectId,
         environmentId: current.environmentId,
         environmentKey: current.environmentKey,

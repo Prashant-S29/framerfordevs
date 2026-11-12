@@ -5,6 +5,8 @@ import { readFile, writeFile } from "node:fs/promises";
 
 import { Effect, Schema } from "effect";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
+import { Uuid } from "../../../contracts/uuid";
 const serverEnvironmentPath = "../../apps/server/.env";
 const loadEnvironmentPath = "../../delivery-load.env";
 process.loadEnvFile(serverEnvironmentPath);
@@ -30,7 +32,7 @@ const concurrency = Number(
 );
 const credentialsOnly = process.argv.includes("--credentials-only");
 
-if (!Schema.is(Schema.UUID)(projectId)) throw new Error("DELIVERY_PROJECT_ID must be a UUID.");
+if (!Schema.is(Uuid)(projectId)) throw new Error("DELIVERY_PROJECT_ID must be a UUID.");
 if (!/^[a-z][a-z0-9_]{0,62}$/u.test(collectionKey)) {
   throw new Error("DELIVERY_COLLECTION_KEY must be a canonical collection key.");
 }
@@ -172,7 +174,7 @@ try {
   if (authority?.revisionId === null || authority === undefined) {
     throw new Error("The configured collection must have a published schema.");
   }
-  const actorId = Schema.decodeUnknownSync(AuthUserId)(authority.actorId);
+  const actorId = SchemaStrict.decodeUnknownSync(AuthUserId)(authority.actorId);
   const scope = {
     projectId,
     environmentId: authority.environmentId,
@@ -229,7 +231,7 @@ try {
   const targetDraft = await run(
     entries.getDraft(
       actorId,
-      Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
+      SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
         ...scope,
         entryId: targetEntryId,
       }),
@@ -245,7 +247,7 @@ try {
     await run(
       credentials.issueCredential(
         actorId,
-        Schema.decodeUnknownSync(accessContracts.IssueApiCredentialInput)({
+        SchemaStrict.decodeUnknownSync(accessContracts.IssueApiCredentialInput)({
           projectId,
           environmentId: authority.environmentId,
           family: "delivery",
@@ -290,7 +292,7 @@ try {
       const created = await run(
         entries.createEntry(
           actorId,
-          Schema.decodeUnknownSync(entryContracts.CreateEntryInput)({
+          SchemaStrict.decodeUnknownSync(entryContracts.CreateEntryInput)({
             ...scope,
             displayName: `M9 Load ${String(index).padStart(5, "0")}`,
             schemaRevisionId: targetDraft.schemaRevisionId,
@@ -304,7 +306,7 @@ try {
       let draft = await run(
         entries.getDraft(
           actorId,
-          Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
+          SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
             ...scope,
             entryId: created.id,
           }),
@@ -323,7 +325,7 @@ try {
         await run(
           entries.saveDraft(
             actorId,
-            Schema.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
+            SchemaStrict.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
               ...scope,
               entryId: created.id,
               schemaRevisionId: draft.schemaRevisionId,
@@ -341,14 +343,14 @@ try {
         draft = await run(
           entries.getDraft(
             actorId,
-            Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
+            SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
               ...scope,
               entryId: created.id,
             }),
           ),
         );
       }
-      const publicationScope = Schema.decodeUnknownSync(
+      const publicationScope = SchemaStrict.decodeUnknownSync(
         publicationContracts.ValidateEntryPublicationInput,
       )({ ...scope, entryId: created.id });
       const plan = await run(publications.validate(actorId, publicationScope, new Date()));
@@ -360,7 +362,7 @@ try {
         await run(
           publications.publish(
             actorId,
-            Schema.decodeUnknownSync(publicationContracts.PublishEntryInput)({
+            SchemaStrict.decodeUnknownSync(publicationContracts.PublishEntryInput)({
               ...scope,
               entryId: created.id,
               commandId: deterministicUuid(`entry:${index}:publish`),

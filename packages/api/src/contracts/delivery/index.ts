@@ -10,10 +10,11 @@ import { AuthUserId, EnvironmentId, IsoDateTime, ProjectId, ResourceVersion } fr
 import { EntryPublicationId, EntryPublicationSequence } from "../publication";
 import { CollectionApiKey, CollectionFieldId, CollectionId, SchemaRevisionId } from "../schema";
 
-export const DeliveryAccess = Schema.Literal("protected", "public");
+import * as SchemaStrict from "../../lib/schema-strict";
+export const DeliveryAccess = Schema.Literals(["protected", "public"]);
 export type DeliveryAccess = typeof DeliveryAccess.Type;
 
-export const DeliveryApiErrorCode = Schema.Literal(
+export const DeliveryApiErrorCode = Schema.Literals([
   "VALIDATION_ERROR",
   "UNAUTHORIZED",
   "FORBIDDEN",
@@ -27,16 +28,13 @@ export const DeliveryApiErrorCode = Schema.Literal(
   "RATE_LIMITED",
   "SERVICE_UNAVAILABLE",
   "INTERNAL_ERROR",
-);
+]);
 
 export class DeliveryApiError extends Schema.Class<DeliveryApiError>("DeliveryApiError")({
   code: DeliveryApiErrorCode,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
-  details: Schema.optionalWith(
-    Schema.Array(ApiErrorDetail).pipe(Schema.minItems(1), Schema.maxItems(50)),
-    {
-      exact: true,
-    },
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  details: Schema.optionalKey(
+    Schema.Array(ApiErrorDetail).check(Schema.isMinLength(1), Schema.isMaxLength(50)),
   ),
   retryable: Schema.Boolean,
   requestId: RequestIdSchema,
@@ -46,10 +44,10 @@ export class DeliveryApiFailure extends Schema.Class<DeliveryApiFailure>("Delive
   ok: Schema.Literal(false),
   data: Schema.Null,
   error: DeliveryApiError,
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
-export const DeliveryQueryScalarKind = Schema.Literal(
+export const DeliveryQueryScalarKind = Schema.Literals([
   "short_text",
   "slug",
   "email",
@@ -60,23 +58,23 @@ export const DeliveryQueryScalarKind = Schema.Literal(
   "date",
   "date_time",
   "reference",
-);
+]);
 export type DeliveryQueryScalarKind = typeof DeliveryQueryScalarKind.Type;
 
-export const DeliveryFilterOperator = Schema.Literal("eq", "ne", "gt", "gte", "lt", "lte");
+export const DeliveryFilterOperator = Schema.Literals(["eq", "ne", "gt", "gte", "lt", "lte"]);
 export type DeliveryFilterOperator = typeof DeliveryFilterOperator.Type;
 
-export const DeliverySortDirection = Schema.Literal("asc", "desc");
+export const DeliverySortDirection = Schema.Literals(["asc", "desc"]);
 export type DeliverySortDirection = typeof DeliverySortDirection.Type;
 
 export class DeliveryFieldCapability extends Schema.Class<DeliveryFieldCapability>(
   "DeliveryFieldCapability",
 )({
   fieldId: CollectionFieldId,
-  fieldKey: Schema.String.pipe(
-    Schema.minLength(1),
-    Schema.maxLength(63),
-    Schema.pattern(/^[a-z][a-z0-9_]{0,62}$/u),
+  fieldKey: Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(63),
+    Schema.isPattern(/^[a-z][a-z0-9_]{0,62}$/u),
   ),
   kind: DeliveryQueryScalarKind,
   filterable: Schema.Boolean,
@@ -84,9 +82,9 @@ export class DeliveryFieldCapability extends Schema.Class<DeliveryFieldCapabilit
   uniqueLookup: Schema.Boolean,
 }) {}
 
-export const DeliveryFieldCapabilities = Schema.Array(DeliveryFieldCapability).pipe(
-  Schema.maxItems(100),
-  Schema.filter(
+export const DeliveryFieldCapabilities = Schema.Array(DeliveryFieldCapability).check(
+  Schema.isMaxLength(100),
+  Schema.makeFilter(
     (fields) =>
       new Set(fields.map((field) => field.fieldId)).size === fields.length &&
       new Set(fields.map((field) => field.fieldKey)).size === fields.length &&
@@ -95,7 +93,7 @@ export const DeliveryFieldCapabilities = Schema.Array(DeliveryFieldCapability).p
           (field.filterable || field.sortable || field.uniqueLookup) &&
           (!field.uniqueLookup || field.filterable),
       ),
-    { message: () => "Delivery capabilities must be unique, enabled, and internally valid." },
+    { message: "Delivery capabilities must be unique, enabled, and internally valid." },
   ),
 );
 
@@ -143,7 +141,7 @@ export class DeliveryPublicationMetadata extends Schema.Class<DeliveryPublicatio
   publishedAt: IsoDateTime,
 }) {}
 
-const DeliveryData = Schema.Record({ key: Schema.String, value: Schema.Unknown });
+const DeliveryData = Schema.Record(Schema.String, Schema.Unknown);
 
 export class DeliveryItem extends Schema.Class<DeliveryItem>("DeliveryItem")({
   id: EntryId,
@@ -157,19 +155,19 @@ export class DeliveryItem extends Schema.Class<DeliveryItem>("DeliveryItem")({
 export class DeliveryPageMetadata extends Schema.Class<DeliveryPageMetadata>(
   "DeliveryPageMetadata",
 )({
-  limit: Schema.Number.pipe(Schema.int(), Schema.between(1, 50)),
+  limit: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 50 })),
   nextCursor: Schema.NullOr(
-    Schema.String.pipe(
-      Schema.minLength(1),
-      Schema.maxLength(1_024),
-      Schema.pattern(/^[A-Za-z0-9_-]+$/u),
+    Schema.String.check(
+      Schema.isMinLength(1),
+      Schema.isMaxLength(1_024),
+      Schema.isPattern(/^[A-Za-z0-9_-]+$/u),
     ),
   ),
   hasMore: Schema.Boolean,
 }) {}
 
 export class DeliveryPage extends Schema.Class<DeliveryPage>("DeliveryPage")({
-  items: Schema.Array(DeliveryItem).pipe(Schema.maxItems(50)),
+  items: Schema.Array(DeliveryItem).check(Schema.isMaxLength(50)),
   page: DeliveryPageMetadata,
 }) {}
 
@@ -187,10 +185,10 @@ export class CredentialDeliveryPrincipal extends Schema.Class<CredentialDelivery
   credentialId: ApiCredentialId,
 }) {}
 
-export const DeliveryAccessPrincipal = Schema.Union(
+export const DeliveryAccessPrincipal = Schema.Union([
   AnonymousDeliveryPrincipal,
   CredentialDeliveryPrincipal,
-);
+]);
 export type DeliveryAccessPrincipal = typeof DeliveryAccessPrincipal.Type;
 
 export class DeliveryResolvedScope extends Schema.Class<DeliveryResolvedScope>(
@@ -204,12 +202,12 @@ export class DeliveryResolvedScope extends Schema.Class<DeliveryResolvedScope>(
   locale: LocaleTag,
 }) {}
 
-export const GetDeliveryConfigurationInputSchema = Schema.standardSchemaV1(
+export const GetDeliveryConfigurationInputSchema = SchemaStrict.toStandardSchemaV1(
   GetDeliveryConfigurationInput,
 );
-export const UpdateDeliveryConfigurationInputSchema = Schema.standardSchemaV1(
+export const UpdateDeliveryConfigurationInputSchema = SchemaStrict.toStandardSchemaV1(
   UpdateDeliveryConfigurationInput,
 );
-export const DeliveryConfigurationOutputSchema = Schema.standardSchemaV1(
+export const DeliveryConfigurationOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(DeliveryCollectionConfiguration),
 );

@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit } from "effect";
 
 import {
   AuthoringCreateEntryRequest,
@@ -9,15 +9,20 @@ import {
   AuthoringRenameEntryRequest,
 } from "./index";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 describe("authoring content contracts", () => {
   it.effect("accepts bounded entry pages and rejects excess query authority", () =>
     Effect.gen(function* () {
-      const query = yield* Schema.decodeUnknown(AuthoringListEntriesQuery)({
+      const query = yield* SchemaStrict.decodeUnknownEffect(AuthoringListEntriesQuery)({
         cursor: null,
         limit: 20,
       });
       const excess = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringListEntriesQuery)({ cursor: null, limit: 20, force: true }),
+        SchemaStrict.decodeUnknownEffect(AuthoringListEntriesQuery)({
+          cursor: null,
+          limit: 20,
+          force: true,
+        }),
       );
       assert.strictEqual(query.limit, 20);
       assert.isTrue(Exit.isFailure(excess));
@@ -26,7 +31,7 @@ describe("authoring content contracts", () => {
 
   it.effect("accepts optional initial mutations but rejects create authority excess", () =>
     Effect.gen(function* () {
-      const request = yield* Schema.decodeUnknown(AuthoringCreateEntryRequest)({
+      const request = yield* SchemaStrict.decodeUnknownEffect(AuthoringCreateEntryRequest)({
         displayName: "Post",
         schemaRevisionId: "019fae8b-1234-7000-8000-000000000001",
         contractHash: "a".repeat(64),
@@ -34,7 +39,7 @@ describe("authoring content contracts", () => {
         mutations: [],
       });
       const excess = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringCreateEntryRequest)({ ...request, force: true }),
+        SchemaStrict.decodeUnknownEffect(AuthoringCreateEntryRequest)({ ...request, force: true }),
       );
       assert.deepStrictEqual(request.mutations, []);
       assert.isTrue(Exit.isFailure(excess));
@@ -43,12 +48,12 @@ describe("authoring content contracts", () => {
 
   it.effect("normalizes bounded optimistic renames and rejects injected authority", () =>
     Effect.gen(function* () {
-      const request = yield* Schema.decodeUnknown(AuthoringRenameEntryRequest)({
+      const request = yield* SchemaStrict.decodeUnknownEffect(AuthoringRenameEntryRequest)({
         displayName: "  Renamed post  ",
         expectedNameVersion: 2,
       });
       const excess = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringRenameEntryRequest)({
+        SchemaStrict.decodeUnknownEffect(AuthoringRenameEntryRequest)({
           ...request,
           expectedNameVersion: 2,
           force: true,
@@ -99,9 +104,9 @@ describe("authoring content contracts", () => {
         },
         currencyMinorUnits: {},
       };
-      const decoded = yield* Schema.decodeUnknown(AuthoringGeneratedForm)(form);
+      const decoded = yield* SchemaStrict.decodeUnknownEffect(AuthoringGeneratedForm)(form);
       const draft = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringGeneratedForm)({ ...form, source: "draft" }),
+        SchemaStrict.decodeUnknownEffect(AuthoringGeneratedForm)({ ...form, source: "draft" }),
       );
       assert.strictEqual(decoded.source, "published");
       assert.isTrue(Exit.isFailure(draft));
@@ -110,7 +115,7 @@ describe("authoring content contracts", () => {
 
   it.effect("keeps actor and tenant metadata out of projected drafts", () =>
     Effect.gen(function* () {
-      const draft = yield* Schema.decodeUnknown(AuthoringEntryDraft)({
+      const draft = yield* SchemaStrict.decodeUnknownEffect(AuthoringEntryDraft)({
         entry: {
           id: "019fae8b-1234-7000-8000-000000000001",
           displayName: "Post",

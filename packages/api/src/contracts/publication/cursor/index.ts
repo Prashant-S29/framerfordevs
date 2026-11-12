@@ -10,6 +10,7 @@ import { Cursor, EnvironmentId, ProjectId } from "../../platform";
 import { EntryPublicationId, EntryPublicationSequence } from "..";
 import { CollectionId } from "../../schema";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 class PublicationCursorPayload extends Schema.Class<PublicationCursorPayload>(
   "PublicationCursorPayload",
 )({
@@ -43,7 +44,7 @@ export function encodePublicationCursor(
     JSON.stringify({ version: 1, kind: "cms_entry_publication", ...payload }),
     "utf8",
   ).toString("base64url");
-  return Schema.decodeUnknown(Cursor)(encoded).pipe(
+  return SchemaStrict.decodeUnknownEffect(Cursor)(encoded).pipe(
     Effect.mapError(() => invalidPublicationCursor()),
   );
 }
@@ -59,9 +60,9 @@ export const decodePublicationCursor = Effect.fn("publicationCursor.decode")(fun
     try: (): unknown => JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")),
     catch: () => invalidPublicationCursor(),
   });
-  const payload = yield* Schema.decodeUnknown(PublicationCursorPayload)(unknownPayload).pipe(
-    Effect.mapError(() => invalidPublicationCursor()),
-  );
+  const payload = yield* SchemaStrict.decodeUnknownEffect(PublicationCursorPayload)(
+    unknownPayload,
+  ).pipe(Effect.mapError(() => invalidPublicationCursor()));
   if (
     payload.projectId !== scope.projectId ||
     payload.environmentId !== scope.environmentId ||

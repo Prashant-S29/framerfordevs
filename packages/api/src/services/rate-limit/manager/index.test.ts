@@ -1,7 +1,8 @@
 // Proves central policy enforcement, opaque identities, refill, bounded storage, and degraded recovery.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, TestClock } from "effect";
+import { Effect } from "effect";
+import { TestClock } from "effect/testing";
 
 import type { RateLimitPolicyConfiguration } from "../../../contracts/rate-limit";
 import type {

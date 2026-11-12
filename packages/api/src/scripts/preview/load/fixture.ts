@@ -5,6 +5,8 @@ import { readFile, writeFile } from "node:fs/promises";
 
 import { Effect, Schema } from "effect";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
+import { Uuid } from "../../../contracts/uuid";
 const serverEnvironmentPath = "../../apps/server/.env";
 const loadEnvironmentPath = "../../preview-load.env";
 process.loadEnvFile(serverEnvironmentPath);
@@ -21,7 +23,7 @@ const projectId = process.env.PREVIEW_PROJECT_ID ?? "";
 const environmentKey = process.env.PREVIEW_ENVIRONMENT_KEY ?? "main";
 const collectionKey = "m10_preview_boundary_v2";
 const locale = "en";
-if (!Schema.is(Schema.UUID)(projectId)) throw new Error("PREVIEW_PROJECT_ID must be a UUID.");
+if (!Schema.is(Uuid)(projectId)) throw new Error("PREVIEW_PROJECT_ID must be a UUID.");
 
 function encodeEnvironmentValue(value: string): string {
   return JSON.stringify(value);
@@ -90,7 +92,7 @@ const [localeRow] = await db
   .limit(1);
 if (localeRow === undefined) throw new Error("The fixture requires enabled English.");
 
-const actorId = Schema.decodeUnknownSync(AuthUserId)(authority.actorId);
+const actorId = SchemaStrict.decodeUnknownSync(AuthUserId)(authority.actorId);
 const schemas = makeSchemaRepository();
 const entries = makeEntryRepository();
 const run = Effect.runPromise;
@@ -110,7 +112,7 @@ if (mode === "prepare" && collection === undefined) {
   const created = await run(
     schemas.createCollection(
       actorId,
-      Schema.decodeUnknownSync(schemaContracts.CreateCollectionInput)({
+      SchemaStrict.decodeUnknownSync(schemaContracts.CreateCollectionInput)({
         projectId,
         environmentId: authority.environmentId,
         apiKey: collectionKey,
@@ -128,7 +130,7 @@ if (mode === "prepare" && collection !== undefined) {
   let draft = await run(
     schemas.getDraft(
       actorId,
-      Schema.decodeUnknownSync(schemaContracts.GetCollectionDraftInput)({
+      SchemaStrict.decodeUnknownSync(schemaContracts.GetCollectionDraftInput)({
         projectId,
         environmentId: authority.environmentId,
         collectionId: collection.id,
@@ -144,7 +146,7 @@ if (mode === "prepare" && collection !== undefined) {
     draft = await run(
       schemas.createField(
         actorId,
-        Schema.decodeUnknownSync(schemaContracts.CreateCollectionFieldInput)({
+        SchemaStrict.decodeUnknownSync(schemaContracts.CreateCollectionFieldInput)({
           projectId,
           environmentId: authority.environmentId,
           collectionId: collection.id,
@@ -174,20 +176,20 @@ if (mode === "prepare" && collection !== undefined) {
   draft = await run(
     schemas.getDraft(
       actorId,
-      Schema.decodeUnknownSync(schemaContracts.GetCollectionDraftInput)(scope),
+      SchemaStrict.decodeUnknownSync(schemaContracts.GetCollectionDraftInput)(scope),
     ),
   );
   const validation = await run(
     schemas.validateSchema(
       actorId,
-      Schema.decodeUnknownSync(schemaContracts.ValidateCollectionSchemaInput)(scope),
+      SchemaStrict.decodeUnknownSync(schemaContracts.ValidateCollectionSchemaInput)(scope),
     ),
   );
   if (!validation.valid) throw new Error("The Preview boundary schema did not validate.");
   await run(
     schemas.publishSchema(
       actorId,
-      Schema.decodeUnknownSync(schemaContracts.PublishCollectionSchemaInput)({
+      SchemaStrict.decodeUnknownSync(schemaContracts.PublishCollectionSchemaInput)({
         ...scope,
         draftVersion: draft.collection.draftVersion,
         expectedPublishedRevisionId: draft.collection.currentPublishedRevisionId,
@@ -211,7 +213,7 @@ if (collection === undefined) {
 const draft = await run(
   schemas.getDraft(
     actorId,
-    Schema.decodeUnknownSync(schemaContracts.GetCollectionDraftInput)({
+    SchemaStrict.decodeUnknownSync(schemaContracts.GetCollectionDraftInput)({
       projectId,
       environmentId: authority.environmentId,
       collectionId: collection.id,
@@ -232,7 +234,7 @@ if (mode === "prepare" && entry === undefined) {
   const created = await run(
     entries.createEntry(
       actorId,
-      Schema.decodeUnknownSync(entryContracts.CreateEntryInput)({
+      SchemaStrict.decodeUnknownSync(entryContracts.CreateEntryInput)({
         projectId,
         environmentId: authority.environmentId,
         collectionId: collection.id,
@@ -254,7 +256,7 @@ if (mode === "prepare") {
   const entryDraft = await run(
     entries.getDraft(
       actorId,
-      Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
+      SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
         projectId,
         environmentId: authority.environmentId,
         collectionId: collection.id,
@@ -277,7 +279,7 @@ if (mode === "prepare") {
     await run(
       entries.saveDraft(
         actorId,
-        Schema.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
+        SchemaStrict.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
           projectId,
           environmentId: authority.environmentId,
           collectionId: collection.id,

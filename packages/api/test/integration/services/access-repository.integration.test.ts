@@ -17,7 +17,7 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Cause, Effect, Exit, Option, Schema } from "effect";
+import { Cause, Effect, Exit, Option } from "effect";
 
 import {
   CanonicalEmail,
@@ -50,6 +50,7 @@ import { makePlatformRepository } from "../../../src/services/platform-repositor
 import { makeAccessRepository } from "../../../src/services/access-repository";
 import { makeLocaleRepository } from "../../../src/services/locale/repository";
 
+import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ownerId = `m3-owner-${suffix}`;
 const developerId = `m3-developer-${suffix}`;
@@ -63,17 +64,18 @@ const secondOwnerEmail = `m3-second-owner-${suffix}@example.test`;
 const foreignEmail = `m3-foreign-${suffix}@example.test`;
 const terminalRaceEmail = `m3-terminal-race-${suffix}@example.test`;
 const localeRaceEmail = `m3-locale-race-${suffix}@example.test`;
-const ownerActor = Schema.decodeUnknownSync(AuthUserId)(ownerId);
-const developerActor = Schema.decodeUnknownSync(AuthUserId)(developerId);
-const secondOwnerActor = Schema.decodeUnknownSync(AuthUserId)(secondOwnerId);
-const foreignActor = Schema.decodeUnknownSync(AuthUserId)(foreignId);
-const terminalRaceActor = Schema.decodeUnknownSync(AuthUserId)(terminalRaceId);
-const localeRaceActor = Schema.decodeUnknownSync(AuthUserId)(localeRaceId);
-const developerCanonicalEmail = Schema.decodeUnknownSync(CanonicalEmail)(developerEmail);
-const secondOwnerCanonicalEmail = Schema.decodeUnknownSync(CanonicalEmail)(secondOwnerEmail);
-const foreignCanonicalEmail = Schema.decodeUnknownSync(CanonicalEmail)(foreignEmail);
-const terminalRaceCanonicalEmail = Schema.decodeUnknownSync(CanonicalEmail)(terminalRaceEmail);
-const localeRaceCanonicalEmail = Schema.decodeUnknownSync(CanonicalEmail)(localeRaceEmail);
+const ownerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(ownerId);
+const developerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(developerId);
+const secondOwnerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(secondOwnerId);
+const foreignActor = SchemaStrict.decodeUnknownSync(AuthUserId)(foreignId);
+const terminalRaceActor = SchemaStrict.decodeUnknownSync(AuthUserId)(terminalRaceId);
+const localeRaceActor = SchemaStrict.decodeUnknownSync(AuthUserId)(localeRaceId);
+const developerCanonicalEmail = SchemaStrict.decodeUnknownSync(CanonicalEmail)(developerEmail);
+const secondOwnerCanonicalEmail = SchemaStrict.decodeUnknownSync(CanonicalEmail)(secondOwnerEmail);
+const foreignCanonicalEmail = SchemaStrict.decodeUnknownSync(CanonicalEmail)(foreignEmail);
+const terminalRaceCanonicalEmail =
+  SchemaStrict.decodeUnknownSync(CanonicalEmail)(terminalRaceEmail);
+const localeRaceCanonicalEmail = SchemaStrict.decodeUnknownSync(CanonicalEmail)(localeRaceEmail);
 const platform = makePlatformRepository();
 const access = makeAccessRepository();
 const locales = makeLocaleRepository();
@@ -97,7 +99,7 @@ function digest(value: string): string {
 
 function failureTag(exit: Exit.Exit<unknown, unknown>): string | undefined {
   if (Exit.isSuccess(exit)) return undefined;
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   if (typeof failure === "object" && failure !== null && "_tag" in failure) {
     return typeof failure._tag === "string" ? failure._tag : undefined;
   }
@@ -173,17 +175,17 @@ afterAll(async () => {
   await db.$client.end();
 });
 
-describe.sequential("access repository PostgreSQL integration", () => {
+describe("access repository PostgreSQL integration", () => {
   it.effect("creates a project with its explicit owner membership", () =>
     Effect.gen(function* () {
       workspaceModel = yield* platform.createWorkspace(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateWorkspaceInput)({ name: "M3 Workspace" }),
+        yield* SchemaStrict.decodeUnknownEffect(CreateWorkspaceInput)({ name: "M3 Workspace" }),
         "request-m3-workspace",
       );
       projectModel = yield* platform.createProject(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateProjectInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
           workspaceId: required(workspaceModel, "workspace").id,
           name: "M3 Project",
           key: `m3-${suffix.slice(0, 8)}`,
@@ -216,7 +218,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       if (!english) return;
       frenchLocale = yield* locales.createLocale(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateProjectLocaleInput)({
           projectId: currentProject.id,
           tag: "fr",
           displayName: "French",
@@ -224,7 +226,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
         new Date(),
         "request-m15-create-fr",
       );
-      const input = yield* Schema.decodeUnknown(CreateProjectInvitationInput)({
+      const input = yield* SchemaStrict.decodeUnknownEffect(CreateProjectInvitationInput)({
         projectId: currentProject.id,
         email: developerEmail,
         role: "developer",
@@ -364,7 +366,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const activeMemberInvite = yield* Effect.exit(
         access.createInvitation(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateProjectInvitationInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectInvitationInput)({
             projectId: currentProject.id,
             email: developerEmail,
             role: "developer",
@@ -389,7 +391,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
         const terminalTokenDigest = digest(`terminal-race-${suffix}`);
         const terminalInvitation = yield* access.createInvitation(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateProjectInvitationInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectInvitationInput)({
             projectId: currentProject.id,
             email: terminalRaceEmail,
             role: "editor",
@@ -414,7 +416,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
             Effect.exit(
               access.revokeInvitation(
                 ownerActor,
-                yield* Schema.decodeUnknown(RevokeProjectInvitationInput)({
+                yield* SchemaStrict.decodeUnknownEffect(RevokeProjectInvitationInput)({
                   projectId: currentProject.id,
                   invitationId: terminalInvitation.id,
                   version: terminalInvitation.version,
@@ -455,7 +457,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
 
         const german = yield* locales.createLocale(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateProjectLocaleInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectLocaleInput)({
             projectId: currentProject.id,
             tag: "de",
             displayName: "German",
@@ -466,7 +468,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
         const localeTokenDigest = digest(`locale-race-${suffix}`);
         yield* access.createInvitation(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateProjectInvitationInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectInvitationInput)({
             projectId: currentProject.id,
             email: localeRaceEmail,
             role: "editor",
@@ -491,7 +493,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
             Effect.exit(
               locales.updateStatus(
                 ownerActor,
-                yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+                yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleStatusInput)({
                   projectId: currentProject.id,
                   localeId: german.id,
                   version: german.version,
@@ -531,21 +533,23 @@ describe.sequential("access repository PostgreSQL integration", () => {
         const currentProject = required(projectModel, "project");
         const loaded = yield* platform.getProject(
           developerActor,
-          yield* Schema.decodeUnknown(GetProjectInput)({ projectId: currentProject.id }),
+          yield* SchemaStrict.decodeUnknownEffect(GetProjectInput)({
+            projectId: currentProject.id,
+          }),
         );
         const currentAccess = yield* access.getCurrentAccess(
           developerActor,
-          yield* Schema.decodeUnknown(GetCurrentProjectAccessInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetCurrentProjectAccessInput)({
             projectId: currentProject.id,
           }),
         );
         const workspaces = yield* platform.listWorkspaces(
           developerActor,
-          yield* Schema.decodeUnknown(ListWorkspacesInput)({ cursor: null, limit: 20 }),
+          yield* SchemaStrict.decodeUnknownEffect(ListWorkspacesInput)({ cursor: null, limit: 20 }),
         );
         const projects = yield* platform.listProjects(
           developerActor,
-          yield* Schema.decodeUnknown(ListProjectsInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectsInput)({
             workspaceId: currentProject.workspaceId,
             status: "active",
             cursor: null,
@@ -554,7 +558,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
         );
         const updated = yield* platform.updateProject(
           developerActor,
-          yield* Schema.decodeUnknown(UpdateProjectInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectInput)({
             projectId: currentProject.id,
             version: currentProject.version,
             name: "M3 Project Updated By Developer",
@@ -566,7 +570,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
         const archiveDenied = yield* Effect.exit(
           platform.archiveProject(
             developerActor,
-            yield* Schema.decodeUnknown(ArchiveProjectInput)({
+            yield* SchemaStrict.decodeUnknownEffect(ArchiveProjectInput)({
               projectId: updated.id,
               version: updated.version,
             }),
@@ -615,7 +619,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const currentProject = required(projectModel, "project");
       const developerList = yield* access.listMembers(
         developerActor,
-        yield* Schema.decodeUnknown(ListProjectMembersInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ListProjectMembersInput)({
           projectId: currentProject.id,
           cursor: null,
           limit: 20,
@@ -624,7 +628,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const deniedInvite = yield* Effect.exit(
         access.createInvitation(
           developerActor,
-          yield* Schema.decodeUnknown(CreateProjectInvitationInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectInvitationInput)({
             projectId: currentProject.id,
             email: foreignEmail,
             role: "editor",
@@ -639,7 +643,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const foreignList = yield* Effect.exit(
         access.listMembers(
           foreignActor,
-          yield* Schema.decodeUnknown(ListProjectMembersInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectMembersInput)({
             projectId: currentProject.id,
             cursor: null,
             limit: 20,
@@ -664,7 +668,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const currentFrench = required(frenchLocale, "French locale");
       frenchLocale = yield* locales.updateStatus(
         ownerActor,
-        yield* Schema.decodeUnknown(UpdateProjectLocaleStatusInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleStatusInput)({
           projectId,
           localeId: currentFrench.id,
           version: currentFrench.version,
@@ -677,7 +681,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const unavailable = yield* Effect.exit(
         access.updateMemberPolicy(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
             projectId,
             membershipId,
             version,
@@ -693,7 +697,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       );
       const unchangedAfterUnavailable = yield* access.listMembers(
         ownerActor,
-        yield* Schema.decodeUnknown(ListProjectMembersInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ListProjectMembersInput)({
           projectId,
           cursor: null,
           limit: 20,
@@ -709,7 +713,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
 
       const updated = yield* access.updateMemberPolicy(
         ownerActor,
-        yield* Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
           projectId,
           membershipId,
           version,
@@ -733,7 +737,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       );
       const noOp = yield* access.updateMemberPolicy(
         ownerActor,
-        yield* Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
           projectId,
           membershipId,
           version: updated.version,
@@ -760,7 +764,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const deniedList = yield* Effect.exit(
         access.listMembers(
           developerActor,
-          yield* Schema.decodeUnknown(ListProjectMembersInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectMembersInput)({
             projectId: required(projectModel, "project").id,
             cursor: null,
             limit: 20,
@@ -770,7 +774,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const stale = yield* Effect.exit(
         access.updateMemberPolicy(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
             projectId,
             membershipId,
             version,
@@ -786,7 +790,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const deniedProjectUpdate = yield* Effect.exit(
         platform.updateProject(
           developerActor,
-          yield* Schema.decodeUnknown(UpdateProjectInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectInput)({
             projectId: required(projectModel, "project").id,
             version: required(projectModel, "project").version,
             name: "Denied editor update",
@@ -800,7 +804,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
 
       const removed = yield* access.removeMember(
         ownerActor,
-        yield* Schema.decodeUnknown(RemoveProjectMemberInput)({
+        yield* SchemaStrict.decodeUnknownEffect(RemoveProjectMemberInput)({
           projectId,
           membershipId,
           version: updated.version,
@@ -812,7 +816,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const removedAccess = yield* Effect.exit(
         access.listMembers(
           developerActor,
-          yield* Schema.decodeUnknown(ListProjectMembersInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectMembersInput)({
             projectId: required(projectModel, "project").id,
             cursor: null,
             limit: 20,
@@ -834,7 +838,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const tokenDigest = digest(`developer-reinvite-${suffix}`);
       yield* access.createInvitation(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateProjectInvitationInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateProjectInvitationInput)({
           projectId: currentProject.id,
           email: developerEmail,
           role: "reviewer",
@@ -875,7 +879,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       if (!english) return;
       const selected = yield* access.updateMemberPolicy(
         ownerActor,
-        yield* Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
           projectId: currentProject.id,
           membershipId,
           version: required(developerMembershipVersion, "developer version"),
@@ -887,7 +891,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       );
       const promoted = yield* access.updateMemberPolicy(
         ownerActor,
-        yield* Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
           projectId: currentProject.id,
           membershipId,
           version: selected.version,
@@ -905,7 +909,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       );
       const demoted = yield* access.updateMemberPolicy(
         ownerActor,
-        yield* Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
           projectId: currentProject.id,
           membershipId,
           version: promoted.version,
@@ -930,7 +934,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const tokenDigest = digest(`second-owner-${suffix}`);
       yield* access.createInvitation(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateProjectInvitationInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateProjectInvitationInput)({
           projectId: currentProject.id,
           email: secondOwnerEmail,
           role: "owner",
@@ -966,7 +970,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       if (!originalOwner) return;
       yield* access.updateMemberPolicy(
         ownerActor,
-        yield* Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
           projectId: currentProject.id,
           membershipId: originalOwner.id,
           version: originalOwner.version,
@@ -979,7 +983,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const lastOwnerRemoval = yield* Effect.exit(
         access.removeMember(
           ownerActor,
-          yield* Schema.decodeUnknown(RemoveProjectMemberInput)({
+          yield* SchemaStrict.decodeUnknownEffect(RemoveProjectMemberInput)({
             projectId: currentProject.id,
             membershipId: required(secondOwnerMembershipId, "second owner membership"),
             version: required(secondOwnerMembershipVersion, "second owner version"),
@@ -1009,7 +1013,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const currentWorkspace = required(workspaceModel, "workspace");
       const concurrentProject = yield* platform.createProject(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateProjectInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
           workspaceId: currentWorkspace.id,
           name: "M15 Concurrent Owner Project",
           key: `m15-owners-${suffix.slice(0, 8)}`,
@@ -1021,7 +1025,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
       const tokenDigest = digest(`concurrent-owner-${suffix}`);
       yield* access.createInvitation(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateProjectInvitationInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateProjectInvitationInput)({
           projectId: concurrentProject.id,
           email: secondOwnerEmail,
           role: "owner",
@@ -1059,7 +1063,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
           Effect.exit(
             access.updateMemberPolicy(
               ownerActor,
-              yield* Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+              yield* SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
                 projectId: concurrentProject.id,
                 membershipId: creatingOwner.id,
                 version: creatingOwner.version,
@@ -1073,7 +1077,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
           Effect.exit(
             access.updateMemberPolicy(
               ownerActor,
-              yield* Schema.decodeUnknown(UpdateProjectMemberPolicyInput)({
+              yield* SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
                 projectId: concurrentProject.id,
                 membershipId: invitedOwner.id,
                 version: invitedOwner.version,
@@ -1139,7 +1143,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
         const currentProject = required(projectModel, "project");
         const memberPage = yield* access.listMembers(
           ownerActor,
-          yield* Schema.decodeUnknown(ListProjectMembersInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectMembersInput)({
             projectId: currentProject.id,
             cursor: null,
             limit: 1,
@@ -1147,7 +1151,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
         );
         const invitationPage = yield* access.listInvitations(
           ownerActor,
-          yield* Schema.decodeUnknown(ListProjectInvitationsInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectInvitationsInput)({
             projectId: currentProject.id,
             cursor: null,
             limit: 1,
@@ -1159,7 +1163,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
 
         const filteredMembers = yield* access.listMembers(
           ownerActor,
-          yield* Schema.decodeUnknown(ListProjectMembersInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectMembersInput)({
             projectId: currentProject.id,
             role: "owner",
             search: `  M3-SECOND-OWNER-${suffix.slice(0, 8)}  `,
@@ -1169,7 +1173,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
         );
         const filteredInvitations = yield* access.listInvitations(
           ownerActor,
-          yield* Schema.decodeUnknown(ListProjectInvitationsInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectInvitationsInput)({
             projectId: currentProject.id,
             status: "accepted",
             search: `  M3-SECOND-OWNER-${suffix.slice(0, 8)}  `,
@@ -1192,7 +1196,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
         const expiredEmail = `expired-${suffix}@example.test`;
         yield* access.createInvitation(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateProjectInvitationInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateProjectInvitationInput)({
             projectId: currentProject.id,
             email: expiredEmail,
             role: "read_only",
@@ -1205,7 +1209,7 @@ describe.sequential("access repository PostgreSQL integration", () => {
         );
         const expiredInvitations = yield* access.listInvitations(
           ownerActor,
-          yield* Schema.decodeUnknown(ListProjectInvitationsInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListProjectInvitationsInput)({
             projectId: currentProject.id,
             status: "expired",
             search: expiredEmail,

@@ -13,6 +13,7 @@
     "./artifacts/preview/v1/openapi.json": "./artifacts/preview/v1/openapi.json",
     "./artifacts/studio/v1/openapi.json": "./artifacts/studio/v1/openapi.json",
     "./artifacts/studio-content/v1/openapi.json": "./artifacts/studio-content/v1/openapi.json",
+    "./artifacts/studio-content/v2/openapi.json": "./artifacts/studio-content/v2/openapi.json",
     "./artifacts/tooling/v1/openapi.json": "./artifacts/tooling/v1/openapi.json",
     "./artifacts/webhooks/v1/events.schema.json": "./artifacts/webhooks/v1/events.schema.json"
   },
@@ -26,14 +27,14 @@
   },
   "dependencies": {
     "@framerfordevs/api": "workspace:*",
-    "effect": "3.22.0"
+    "effect": "4.1.4"
   },
   "devDependencies": {
     "@framerfordevs/config": "workspace:*",
     "@types/node": "catalog:",
-    "@vitest/coverage-v8": "3.2.7",
-    "tsx": "4.23.1",
+    "@vitest/coverage-v8": "5.1.0",
+    "tsx": "4.23.15",
     "typescript": "catalog:",
-    "vitest": "3.2.7"
+    "vitest": "5.1.0"
   }
 }

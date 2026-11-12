@@ -34,6 +34,7 @@ import { toolingLimits } from "@framerfordevs/api/contracts/tooling/index";
 import { studioLimits } from "@framerfordevs/api/contracts/studio/index";
 import { studioContentLimits } from "@framerfordevs/api/contracts/studio-content/index";
 import { studioContentOpenApiJson } from "@framerfordevs/api/contracts/studio-content/openapi/index";
+import { studioContentV2OpenApiJson } from "@framerfordevs/api/contracts/studio-content/openapi/v2";
 import { studioOpenApiJson } from "@framerfordevs/api/contracts/studio/openapi/index";
 import {
   generatePublicArtifacts,
@@ -90,12 +91,14 @@ import {
   decodeStudioEntryId,
   decodeStudioListEntriesQuery,
   decodeStudioRenameEntryRequest,
+  decodeStudioResolveEntriesRequest,
   decodeStudioSaveEntryDraftRequest,
   decodeStudioSearchEntriesRequest,
   getStudioContentContext,
   getStudioEntryWorkspace,
   getStudioNewEntryWorkspace,
   renameStudioEntry,
+  resolveStudioEntryLabels,
   saveStudioEntryDraft,
   searchStudioEntries,
 } from "@framerfordevs/api/operations/studio-content-public/index";
@@ -1353,7 +1356,10 @@ function sendStudioContentSuccess(
   res.end(body);
 }
 
-function createStudioContentRouter(transformEffect?: ApplicationEffectTransform): Router {
+function createStudioContentRouter(
+  major: "v1" | "v2",
+  transformEffect?: ApplicationEffectTransform,
+): Router {
   const router = express.Router({ caseSensitive: true, strict: true });
   router.use((req, res, next) => {
     setStudioHeaders(res);
@@ -1424,7 +1430,9 @@ function createStudioContentRouter(transformEffect?: ApplicationEffectTransform)
     const contentLength = req.headers["content-length"];
     const maximumRequestBytes = req.path.endsWith("/entries/search")
       ? studioContentLimits.searchRequestBytes
-      : studioContentLimits.requestBytes;
+      : req.path.endsWith("/entries/resolve")
+        ? studioContentLimits.resolveRequestBytes
+        : studioContentLimits.requestBytes;
     if (
       req.headers["transfer-encoding"] !== undefined ||
       (typeof contentLength === "string" &&
@@ -1466,7 +1474,9 @@ function createStudioContentRouter(transformEffect?: ApplicationEffectTransform)
 
   router.get("/openapi.json", (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=300");
-    res.type("application/json").send(studioContentOpenApiJson);
+    res
+      .type("application/json")
+      .send(major === "v1" ? studioContentOpenApiJson : studioContentV2OpenApiJson);
   });
   router.get(
     "/docs",
@@ -1476,7 +1486,7 @@ function createStudioContentRouter(transformEffect?: ApplicationEffectTransform)
     },
     apiReference({
       pageTitle: "Framer for Devs Studio Content API",
-      url: "/api/studio-content/v1/openapi.json",
+      url: `/api/studio-content/${major}/openapi.json`,
     }),
   );
 
@@ -1489,7 +1499,7 @@ function createStudioContentRouter(transformEffect?: ApplicationEffectTransform)
           operation: "studio_content.request_aborted",
           cause: new Error("Studio Content request aborted."),
         });
-      const abortEffect = Effect.async<never, DatabaseFailure>((resume) => {
+      const abortEffect = Effect.callback<never, DatabaseFailure>((resume) => {
         const abort = () => resume(Effect.fail(requestAborted()));
         if (req.aborted || req.socket.destroyed) abort();
         else {
@@ -1502,13 +1512,15 @@ function createStudioContentRouter(transformEffect?: ApplicationEffectTransform)
         });
       });
       return Effect.raceFirst(transformed, abortEffect).pipe(
-        Effect.timeoutFail({
+        Effect.timeoutOrElse({
           duration: Math.max(1, deadlineEpochMs - Date.now()),
-          onTimeout: () =>
-            DatabaseFailure.make({
-              operation: "studio_content.deadline",
-              cause: new Error("Studio Content request deadline exceeded."),
-            }),
+          orElse: () =>
+            Effect.fail(
+              DatabaseFailure.make({
+                operation: "studio_content.deadline",
+                cause: new Error("Studio Content request deadline exceeded."),
+              }),
+            ),
         }),
       );
     };
@@ -1627,6 +1639,40 @@ function createStudioContentRouter(transformEffect?: ApplicationEffectTransform)
       else sendStudioContentSuccess(req, res, result.response);
     },
   );
+
+  if (major === "v2") {
+    router.post(
+      `${entriesPath}/resolve`,
+      express.json({
+        limit: studioContentLimits.resolveRequestBytes,
+        strict: true,
+        type: "application/json",
+      }),
+      async (req, res) => {
+        const context = makeContext(req);
+        const principal = await authenticate(req, res, context);
+        if (principal === null) return;
+        const scope = await decodeScope(req, res, context);
+        if (scope === null) return;
+        const request = await context.execute(
+          "api.studio_content.entries.resolve.request",
+          decodeStudioResolveEntriesRequest(req.body),
+          "Studio Content resolution request decoded.",
+        );
+        if (!request.response.ok) {
+          sendStudioResponse(req, res, request.status, request.response);
+          return;
+        }
+        const result = await context.execute(
+          "api.studio_content.entries.resolve",
+          resolveStudioEntryLabels(principal, scope, request.response.data, new Date()),
+          "Studio Content entry labels resolved.",
+        );
+        if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+        else sendStudioContentSuccess(req, res, result.response);
+      },
+    );
+  }
 
   router.get(`${entriesPath}/new`, async (req, res) => {
     const context = makeContext(req);
@@ -3249,7 +3295,8 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use("/api/preview/v1", createPreviewRouter(previewApiEnabled));
   app.use("/api/tooling/v1", createToolingRouter());
   app.use("/api/studio/v1", createStudioRouter(options.studioEffectTransform));
-  app.use("/api/studio-content/v1", createStudioContentRouter(options.studioEffectTransform));
+  app.use("/api/studio-content/v1", createStudioContentRouter("v1", options.studioEffectTransform));
+  app.use("/api/studio-content/v2", createStudioContentRouter("v2", options.studioEffectTransform));
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;

@@ -17,40 +17,40 @@ import { Option, Schema } from "effect";
 
 import type { RichTextConfiguration } from "../model";
 
-const portableTextKey = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(64),
-  Schema.pattern(/^[A-Za-z0-9_-]+$/u),
+const portableTextKey = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(64),
+  Schema.isPattern(/^[A-Za-z0-9_-]+$/u),
 );
 const portableTextSpan = Schema.Struct({
   _key: portableTextKey,
   _type: Schema.Literal("span"),
-  text: Schema.String.pipe(Schema.maxLength(100_000)),
-  marks: Schema.Array(Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64))).pipe(
-    Schema.maxItems(32),
+  text: Schema.String.check(Schema.isMaxLength(100_000)),
+  marks: Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))).check(
+    Schema.isMaxLength(32),
   ),
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
+}).annotate({ closedObject: true });
 const portableTextLink = Schema.Struct({
   _key: portableTextKey,
   _type: Schema.Literal("link"),
-  href: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(2_048)),
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
+  href: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)),
+}).annotate({ closedObject: true });
 const portableTextBlock = Schema.Struct({
   _key: portableTextKey,
   _type: Schema.Literal("block"),
-  style: Schema.Literal("normal", "h2", "h3", "h4", "h5", "h6", "blockquote"),
-  listItem: Schema.optionalWith(Schema.Literal("bullet", "number"), { exact: true }),
-  level: Schema.optionalWith(Schema.Number.pipe(Schema.int(), Schema.between(1, 3)), {
-    exact: true,
-  }),
-  children: Schema.Array(portableTextSpan).pipe(Schema.maxItems(5_000)),
-  markDefs: Schema.Array(portableTextLink).pipe(Schema.maxItems(1_000)),
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
+  style: Schema.Literals(["normal", "h2", "h3", "h4", "h5", "h6", "blockquote"]),
+  listItem: Schema.optionalKey(Schema.Literals(["bullet", "number"])),
+  level: Schema.optionalKey(
+    Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 3 })),
+  ),
+  children: Schema.Array(portableTextSpan).check(Schema.isMaxLength(5_000)),
+  markDefs: Schema.Array(portableTextLink).check(Schema.isMaxLength(1_000)),
+}).annotate({ closedObject: true });
 const portableTextDocument = Schema.Struct({
   version: Schema.Literal(1),
   profile: Schema.Literal("ffd-portable-text"),
-  blocks: Schema.Array(portableTextBlock).pipe(Schema.maxItems(500)),
-}).annotations({ parseOptions: { onExcessProperty: "error" } });
+  blocks: Schema.Array(portableTextBlock).check(Schema.isMaxLength(500)),
+}).annotate({ closedObject: true });
 
 const defaultDecorators = ["strong", "em", "underline", "strike-through", "code"] as const;
 const defaultStyles = ["normal", "h2", "h3", "h4", "h5", "h6", "blockquote"] as const;
@@ -180,7 +180,10 @@ export default function PortableTextField({
   ariaDescribedBy,
   onChange,
 }: PortableTextFieldProps) {
-  const decoded = Schema.decodeUnknownOption(portableTextDocument)(value);
+  // Every struct in the document is closed, so parse-wide strictness matches the v3 closed-object contract.
+  const decoded = Schema.decodeUnknownOption(portableTextDocument, { onExcessProperty: "error" })(
+    value,
+  );
   const initialValue: Array<EditorPortableTextBlock> | undefined = Option.isSome(decoded)
     ? decoded.value.blocks.map((block) => ({
         ...block,

@@ -1,7 +1,7 @@
 // Verifies bounded Preview metric buckets and non-authoritative telemetry behavior.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer } from "effect";
 
 import { DatabaseFailure } from "../../../contracts/response/errors";
 import { PreviewItem, PreviewValidationIssue } from "../../../contracts/preview";
@@ -12,6 +12,7 @@ import {
 } from "../../../observability/telemetry";
 import { observePreviewRead } from "./index";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const ids = {
   entry: "019fae8b-1234-7000-8000-000000000001",
   collection: "019fae8b-1234-7000-8000-000000000002",
@@ -25,7 +26,7 @@ const issue = PreviewValidationIssue.make({
 });
 
 function item(options: { readonly bytes: number; readonly issues: number }) {
-  return Schema.decodeUnknownSync(PreviewItem)({
+  return SchemaStrict.decodeUnknownSync(PreviewItem)({
     id: ids.entry,
     collectionId: ids.collection,
     collection: "articles",

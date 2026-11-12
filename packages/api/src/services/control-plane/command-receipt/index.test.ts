@@ -1,11 +1,11 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import { ControlPlaneActor, ControlPlaneCommandId } from "../../../contracts/control-plane";
 import { EnvironmentId, ProjectId, WorkspaceId } from "../../../contracts/platform";
 import { controlPlaneReceiptMatches, type ControlPlaneReceiptExpectation } from "./index";
 
-const actor = Schema.decodeUnknownSync(ControlPlaneActor)({ kind: "user", id: "user-1" });
+import * as SchemaStrict from "../../../lib/schema-strict";
+const actor = SchemaStrict.decodeUnknownSync(ControlPlaneActor)({ kind: "user", id: "user-1" });
 const expectation: ControlPlaneReceiptExpectation = {
   commandId: ControlPlaneCommandId.make("019fae8b-1234-7000-8000-000000000001"),
   operation: "studio_registration.put",

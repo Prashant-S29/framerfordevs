@@ -6,11 +6,12 @@ import { GeneratedFormDefinition } from "@framerfordevs/api/contracts/schema/ind
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
-import { Schema } from "effect";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GeneratedForm } from "./index";
 
+import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const editor = {
   helpText: "Generated from the schema contract.",
   placeholder: "Enter a value",
@@ -95,7 +96,7 @@ const fields = [
   },
 ];
 
-const definition = Schema.decodeUnknownSync(GeneratedFormDefinition)({
+const definition = SchemaStrict.decodeUnknownSync(GeneratedFormDefinition)({
   source: "draft",
   collectionId: "019fae8b-1234-7000-8000-000000000040",
   revisionId: null,

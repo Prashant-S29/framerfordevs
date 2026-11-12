@@ -2,7 +2,7 @@
 
 import { createHmac } from "node:crypto";
 
-import { Cause, Clock, Context, Effect, Layer, Option, Schema } from "effect";
+import { Cause, Clock, Context, Effect, Layer, Option } from "effect";
 
 import {
   RateLimitCost,
@@ -21,6 +21,7 @@ import {
   type RateLimitStoreService,
 } from "../store";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 export interface EvaluateRateLimitInput {
   readonly policy: RateLimitPolicy;
   readonly identity: string;
@@ -78,7 +79,7 @@ function makeDecision(
   result: RateLimitStoreResult,
   mode: RateLimitEnforcementMode,
 ): Effect.Effect<RateLimitDecision, SecurityServiceFailure> {
-  return Schema.decodeUnknown(RateLimitDecision)({
+  return SchemaStrict.decodeUnknownEffect(RateLimitDecision)({
     allowed: result.allowed,
     policy: input.policy,
     cost: input.cost,
@@ -103,7 +104,7 @@ export function makeRateLimitManager(
 
   return {
     evaluate: Effect.fn("RateLimitManager.evaluate")(function* (input) {
-      const cost = yield* Schema.decodeUnknown(RateLimitCost)(input.cost).pipe(
+      const cost = yield* SchemaStrict.decodeUnknownEffect(RateLimitCost)(input.cost).pipe(
         Effect.mapError((cause) => managerFailure("rate_limit.cost.decode", cause)),
       );
       const key = yield* opaqueIdentity(options.fingerprintSecret, input.policy, input.identity);
@@ -131,7 +132,7 @@ export function makeRateLimitManager(
         return decision;
       }
 
-      const primaryFailure = Option.getOrUndefined(Cause.failureOption(primaryExit.cause));
+      const primaryFailure = Option.getOrUndefined(Cause.findErrorOption(primaryExit.cause));
       const result =
         primaryFailure === undefined || primaryFailure._tag !== "RateLimitStoreFailure"
           ? "command"
@@ -172,10 +173,9 @@ export function makeRateLimitManager(
   };
 }
 
-export class RateLimitManager extends Context.Tag("RateLimitManager")<
-  RateLimitManager,
-  RateLimitManagerService
->() {}
+export class RateLimitManager extends Context.Service<RateLimitManager, RateLimitManagerService>()(
+  "RateLimitManager",
+) {}
 
 export interface RateLimitManagerLiveOptions {
   readonly fingerprintSecret: string;

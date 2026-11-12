@@ -1,5 +1,4 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import {
   AuthoringSchemaAuthority,
@@ -25,6 +24,7 @@ import {
   qualifyProjectSchemaChanges,
 } from "./index";
 
+import * as SchemaStrict from "../../schema-strict";
 const fieldId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000701");
 const collectionChangeId = SchemaChangeId.make("a".repeat(64));
 
@@ -77,9 +77,9 @@ describe("Authoring project apply authority", () => {
     if (!qualified.valid) throw new Error("Expected qualified changes.");
     const changeId = qualified.changes[0]?.changeId;
     if (!changeId) throw new Error("Expected one qualified change.");
-    const exact = Schema.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([changeId]);
-    const missing = Schema.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([]);
-    const extra = Schema.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([
+    const exact = SchemaStrict.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([changeId]);
+    const missing = SchemaStrict.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([]);
+    const extra = SchemaStrict.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([
       changeId,
       SchemaChangeId.make("b".repeat(64)),
     ]);
@@ -110,19 +110,19 @@ describe("Authoring project apply authority", () => {
     const expectedPlanHash = SchemaPlanHash.make("d".repeat(64));
     const firstChange = SchemaChangeId.make("e".repeat(64));
     const secondChange = SchemaChangeId.make("f".repeat(64));
-    const forward = Schema.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([
+    const forward = SchemaStrict.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([
       firstChange,
       secondChange,
     ]);
-    const reversed = Schema.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([
+    const reversed = SchemaStrict.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([
       secondChange,
       firstChange,
     ]);
-    const user = Schema.decodeUnknownSync(CmsActor)({
+    const user = SchemaStrict.decodeUnknownSync(CmsActor)({
       kind: "user",
       id: AuthUserId.make("user-apply"),
     });
-    const credential = Schema.decodeUnknownSync(CmsActor)({
+    const credential = SchemaStrict.decodeUnknownSync(CmsActor)({
       kind: "credential",
       id: ApiCredentialId.make("019fae8b-1234-7000-8000-000000000706"),
     });

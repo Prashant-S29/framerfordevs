@@ -32,10 +32,10 @@ export function makeCredentialAttemptLimiter(manager: RateLimitManagerService) {
   };
 }
 
-export class CredentialAttemptLimiter extends Context.Tag("CredentialAttemptLimiter")<
+export class CredentialAttemptLimiter extends Context.Service<
   CredentialAttemptLimiter,
   ReturnType<typeof makeCredentialAttemptLimiter>
->() {}
+>()("CredentialAttemptLimiter") {}
 
 export const CredentialAttemptLimiterLive = Layer.effect(
   CredentialAttemptLimiter,

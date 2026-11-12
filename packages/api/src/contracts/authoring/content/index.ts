@@ -37,39 +37,39 @@ export class AuthoringEntrySummary extends Schema.Class<AuthoringEntrySummary>(
 }) {}
 
 export class AuthoringEntryPage extends Schema.Class<AuthoringEntryPage>("AuthoringEntryPage")({
-  items: Schema.Array(AuthoringEntrySummary).pipe(Schema.maxItems(50)),
+  items: Schema.Array(AuthoringEntrySummary).check(Schema.isMaxLength(50)),
   nextCursor: Schema.NullOr(Cursor),
 }) {}
 
-export const AuthoringEntryValues = Schema.Record({
-  key: Schema.String.pipe(
-    Schema.minLength(1),
-    Schema.maxLength(63),
-    Schema.pattern(/^[a-z][a-z0-9_]{0,62}$/u),
+export const AuthoringEntryValues = Schema.Record(
+  Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(63),
+    Schema.isPattern(/^[a-z][a-z0-9_]{0,62}$/u),
   ),
-  value: AuthoringJsonValue,
-});
+  AuthoringJsonValue,
+);
 export type AuthoringEntryValues = typeof AuthoringEntryValues.Type;
 
 export class AuthoringEntryValidationIssue extends Schema.Class<AuthoringEntryValidationIssue>(
   "AuthoringEntryValidationIssue",
 )({
-  path: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
-  scope: Schema.Literal("shared", "localized"),
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  scope: Schema.Literals(["shared", "localized"]),
   locale: Schema.NullOr(LocaleTag),
-  code: Schema.String.pipe(
-    Schema.minLength(1),
-    Schema.maxLength(64),
-    Schema.pattern(/^[a-z][a-z0-9_]{0,63}$/u),
+  code: Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(64),
+    Schema.isPattern(/^[a-z][a-z0-9_]{0,63}$/u),
   ),
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
 export class AuthoringEntryValidation extends Schema.Class<AuthoringEntryValidation>(
   "AuthoringEntryValidation",
 )({
   valid: Schema.Boolean,
-  issues: Schema.Array(AuthoringEntryValidationIssue).pipe(Schema.maxItems(50)),
+  issues: Schema.Array(AuthoringEntryValidationIssue).check(Schema.isMaxLength(50)),
   capped: Schema.Boolean,
 }) {}
 
@@ -99,9 +99,9 @@ export class AuthoringEntryDraft extends Schema.Class<AuthoringEntryDraft>("Auth
 export const AuthoringListEntriesQuery = Schema.Struct({
   cursor: Schema.NullOr(Cursor),
   limit: PageLimit,
-}).annotations({
+}).annotate({
   identifier: "AuthoringListEntriesQuery",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type AuthoringListEntriesQuery = typeof AuthoringListEntriesQuery.Type;
 
@@ -110,19 +110,19 @@ export const AuthoringCreateEntryRequest = Schema.Struct({
   schemaRevisionId: SchemaRevisionId,
   contractHash: ContractHash,
   commandId: EntryCommandId,
-  mutations: Schema.Array(AuthoringValueMutation).pipe(Schema.maxItems(500)),
-}).annotations({
+  mutations: Schema.Array(AuthoringValueMutation).check(Schema.isMaxLength(500)),
+}).annotate({
   identifier: "AuthoringCreateEntryRequest",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type AuthoringCreateEntryRequest = typeof AuthoringCreateEntryRequest.Type;
 
 export const AuthoringRenameEntryRequest = Schema.Struct({
   displayName: EntryDisplayName,
   expectedNameVersion: EntryNameVersion,
-}).annotations({
+}).annotate({
   identifier: "AuthoringRenameEntryRequest",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type AuthoringRenameEntryRequest = typeof AuthoringRenameEntryRequest.Type;
 
@@ -133,9 +133,9 @@ export const AuthoringSaveEntryDraftRequest = Schema.Struct({
   expectedSharedVersion: EntryDraftVersion,
   expectedLocalizedVersion: EntryDraftVersion,
   mutations: AuthoringValueMutations,
-}).annotations({
+}).annotate({
   identifier: "AuthoringSaveEntryDraftRequest",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type AuthoringSaveEntryDraftRequest = typeof AuthoringSaveEntryDraftRequest.Type;
 

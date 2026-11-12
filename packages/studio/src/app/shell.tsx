@@ -1,6 +1,17 @@
 import { AlertTriangle, Braces, ExternalLink, LogOut, RefreshCw } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  lazy,
+  Suspense,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { Button, buttonVariants } from "@framerfordevs/ui/components/button";
 import {
   Card,
@@ -19,13 +30,28 @@ import {
 } from "@framerfordevs/ui/components/empty";
 import { Alert, AlertDescription } from "@framerfordevs/ui/components/alert";
 
-import { decodeStudioBrowserResponse, type StudioBrowserErrorCode } from "../contracts";
+import {
+  decodeStudioBrowserResponse,
+  type StudioBrowserBootstrap,
+  type StudioBrowserErrorCode,
+} from "../contracts";
 
+const DirtySignOutDialog = lazy(() => import("./content/dirty-sign-out-dialog"));
 const maximumResponseBytes = 262_144;
+interface StudioRuntimeContext {
+  readonly bootstrap: StudioBrowserBootstrap;
+  readonly mountPath: string;
+  readonly setWorkspaceDirty: (dirty: boolean) => void;
+  readonly allowWorkspaceNavigation: () => void;
+  readonly disallowWorkspaceNavigation: () => void;
+  readonly isWorkspaceNavigationAllowed: () => boolean;
+}
+const StudioBootstrapContext = createContext<StudioRuntimeContext | null>(null);
 
 export interface StudioShellProps {
   readonly mountPath: string;
   readonly dashboardOrigin: string;
+  readonly children?: ReactNode;
 }
 
 class BootstrapFailure extends Error {
@@ -153,9 +179,64 @@ export function StudioNotFound({ dashboardOrigin }: { readonly dashboardOrigin: 
   );
 }
 
-export function StudioShell({ mountPath, dashboardOrigin }: StudioShellProps) {
+export function useStudioRuntime(): StudioRuntimeContext {
+  const runtime = useContext(StudioBootstrapContext);
+  if (runtime === null) throw new Error("Studio bootstrap context is unavailable.");
+  return runtime;
+}
+
+export function useStudioBootstrap(): StudioBrowserBootstrap {
+  return useStudioRuntime().bootstrap;
+}
+
+export function StudioHome({ bootstrap }: { readonly bootstrap: StudioBrowserBootstrap }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{bootstrap.project.name}</CardTitle>
+        <CardDescription>
+          {bootstrap.environment.name} · {bootstrap.role} · {bootstrap.user.name}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Braces aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle>Studio is connected</EmptyTitle>
+            <EmptyDescription>
+              Your project authority is ready. Choose Content to begin exact-locale authoring.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <p className="studio-muted">
+              Current access expires {new Date(bootstrap.session.expiresAt).toLocaleTimeString()}.
+            </p>
+            <p className="studio-muted">
+              Signing out here leaves your dashboard session active. Your next Studio login requires
+              acknowledgement but may not require credentials.
+            </p>
+          </EmptyContent>
+        </Empty>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function StudioShell({ mountPath, dashboardOrigin, children }: StudioShellProps) {
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
+  const [workspaceDirty, setWorkspaceDirty] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const workspaceNavigationAllowed = useRef(false);
+  const allowWorkspaceNavigation = useCallback(() => {
+    workspaceNavigationAllowed.current = true;
+  }, []);
+  const disallowWorkspaceNavigation = useCallback(() => {
+    workspaceNavigationAllowed.current = false;
+  }, []);
+  const isWorkspaceNavigationAllowed = useCallback(() => workspaceNavigationAllowed.current, []);
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["studio", "bootstrap"],
@@ -198,6 +279,8 @@ export function StudioShell({ mountPath, dashboardOrigin }: StudioShellProps) {
       if (response.type !== "opaqueredirect" && response.status !== 303)
         throw new Error("STUDIO_LOGOUT_FAILED");
       queryClient.removeQueries({ queryKey: ["studio"] });
+      allowWorkspaceNavigation();
+      setWorkspaceDirty(false);
       window.location.assign(mountPath);
     } catch {
       setSignOutError(true);
@@ -205,62 +288,61 @@ export function StudioShell({ mountPath, dashboardOrigin }: StudioShellProps) {
     }
   };
   return (
-    <div className="studio-layout">
-      <header className="studio-header">
-        <div>
-          <p className="studio-eyebrow">Framer for Developers</p>
-          <h1>Studio</h1>
-        </div>
-        <nav aria-label="Studio account actions">
-          <DashboardLink dashboardOrigin={dashboardOrigin} />
-          <Button
-            type="button"
-            variant="outline"
-            disabled={signingOut}
-            onClick={() => void signOut()}
-          >
-            <LogOut aria-hidden="true" /> {signingOut ? "Signing out…" : "Sign out"}
-          </Button>
-          {signOutError ? (
-            <p className="studio-muted" role="status">
-              Sign out could not be completed. Try again.
-            </p>
-          ) : null}
-        </nav>
-      </header>
-      <main className="studio-main" id="main-content">
-        <Card>
-          <CardHeader>
-            <CardTitle>{bootstrap.project.name}</CardTitle>
-            <CardDescription>
-              {bootstrap.environment.name} · {bootstrap.role} · {bootstrap.user.name}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <Braces aria-hidden="true" />
-                </EmptyMedia>
-                <EmptyTitle>Studio is connected</EmptyTitle>
-                <EmptyDescription>
-                  Your project authority is ready. Content editing arrives in the next milestone.
-                </EmptyDescription>
-              </EmptyHeader>
-              <EmptyContent>
-                <p className="studio-muted">
-                  Current access expires{" "}
-                  {new Date(bootstrap.session.expiresAt).toLocaleTimeString()}.
-                </p>
-                <p className="studio-muted">
-                  Signing out here leaves your dashboard session active. Your next Studio login
-                  requires acknowledgement but may not require credentials.
-                </p>
-              </EmptyContent>
-            </Empty>
-          </CardContent>
-        </Card>
-      </main>
-    </div>
+    <StudioBootstrapContext.Provider
+      value={{
+        bootstrap,
+        mountPath,
+        setWorkspaceDirty,
+        allowWorkspaceNavigation,
+        disallowWorkspaceNavigation,
+        isWorkspaceNavigationAllowed,
+      }}
+    >
+      <div className="studio-layout">
+        <header className="studio-header">
+          <div>
+            <p className="studio-eyebrow">Framer for Developers</p>
+            <h1>Studio</h1>
+          </div>
+          <nav aria-label="Studio navigation and account actions">
+            <Link className={buttonVariants({ variant: "outline" })} to="/content">
+              Content
+            </Link>
+            <DashboardLink dashboardOrigin={dashboardOrigin} />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={signingOut}
+              onClick={() => {
+                if (workspaceDirty) setConfirmSignOut(true);
+                else void signOut();
+              }}
+            >
+              <LogOut aria-hidden="true" /> {signingOut ? "Signing out…" : "Sign out"}
+            </Button>
+            {signOutError ? (
+              <p className="studio-muted" role="status">
+                Sign out could not be completed. Try again.
+              </p>
+            ) : null}
+          </nav>
+        </header>
+        <main className="studio-main" id="main-content">
+          {children ?? <StudioHome bootstrap={bootstrap} />}
+        </main>
+      </div>
+      {confirmSignOut ? (
+        <Suspense fallback={null}>
+          <DirtySignOutDialog
+            open
+            onCancel={() => setConfirmSignOut(false)}
+            onConfirm={() => {
+              setConfirmSignOut(false);
+              void signOut();
+            }}
+          />
+        </Suspense>
+      ) : null}
+    </StudioBootstrapContext.Provider>
   );
 }

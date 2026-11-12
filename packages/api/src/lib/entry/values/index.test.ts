@@ -1,7 +1,6 @@
 // Exercises atomic stable-path draft mutations, resource bounds, canonical no-ops, and sparse-fragment merging.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import { CollectionFieldId } from "../../../contracts/schema";
 import {
@@ -12,6 +11,7 @@ import {
   validateEntryDocument,
 } from "./index";
 
+import * as SchemaStrict from "../../schema-strict";
 const sharedFieldId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000001");
 const localizedFieldId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000002");
 const objectFieldId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000003");
@@ -192,6 +192,6 @@ describe("entry value kernel", () => {
   });
 
   it.effect("keeps stable field IDs schema-backed in fixtures", () =>
-    Schema.decodeUnknown(CollectionFieldId)(sharedFieldId),
+    SchemaStrict.decodeUnknownEffect(CollectionFieldId)(sharedFieldId),
   );
 });

@@ -57,6 +57,7 @@ import {
 } from "./project-access";
 import { projectPolicyProjection } from "./policy";
 
+import * as SchemaStrict from "../lib/schema-strict";
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
 }
@@ -87,10 +88,10 @@ function hasConstraint(cause: unknown, constraint: string, depth = 0): boolean {
 
 function decodeDatabaseValue<A, I>(
   operation: string,
-  schema: Schema.Schema<A, I, never>,
+  schema: Schema.Codec<A, I, never>,
   value: unknown,
 ) {
-  return Schema.decodeUnknown(schema)(value).pipe(
+  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
     Effect.mapError((cause) => databaseFailure(`${operation}.decode`, cause)),
   );
 }
@@ -1364,9 +1365,9 @@ export function makeAccessRepository(options: RepositoryOptions = {}) {
   };
 }
 
-export class AccessRepository extends Context.Tag("AccessRepository")<
+export class AccessRepository extends Context.Service<
   AccessRepository,
   ReturnType<typeof makeAccessRepository>
->() {}
+>()("AccessRepository") {}
 
 export const AccessRepositoryLive = Layer.succeed(AccessRepository, makeAccessRepository());

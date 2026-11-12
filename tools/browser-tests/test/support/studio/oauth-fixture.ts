@@ -2,10 +2,11 @@ import { randomUUID } from "node:crypto";
 
 import { createStudioOAuthHarness } from "@framerfordevs/studio-oauth-harness";
 import { config as loadEnv } from "dotenv";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import { browserTestOrigins } from "../preflight";
 
+import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const apiOrigin = "http://localhost:3000";
 const applicationOrigin = "http://127.0.0.1:43219";
 const password = "M18-Studio-Browser-Authority-123!";
@@ -77,7 +78,7 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
   const createdWorkspace = await Effect.runPromise(
     repository.createWorkspace(
       actorId,
-      Schema.decodeUnknownSync(contracts.CreateWorkspaceInput)({
+      SchemaStrict.decodeUnknownSync(contracts.CreateWorkspaceInput)({
         name: `Studio Browser ${suffix}`,
       }),
       `m18-browser-workspace-${suffix}`,
@@ -86,7 +87,7 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
   const createdProject = await Effect.runPromise(
     repository.createProject(
       actorId,
-      Schema.decodeUnknownSync(contracts.CreateProjectInput)({
+      SchemaStrict.decodeUnknownSync(contracts.CreateProjectInput)({
         workspaceId: createdWorkspace.id,
         name: "Browser Customer Site",
         key: `studio-browser-${suffix}`,
@@ -98,7 +99,7 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
   await Effect.runPromise(
     repository.enableCapability(
       actorId,
-      Schema.decodeUnknownSync(contracts.EnableCapabilityInput)({
+      SchemaStrict.decodeUnknownSync(contracts.EnableCapabilityInput)({
         projectId: createdProject.id,
         capability: "cms",
       }),
@@ -110,7 +111,9 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
       { kind: "user", id: actorId },
       createdProject.id,
       createdProject.environment.id,
-      Schema.decodeUnknownSync(controlPlaneContracts.ControlPlanePutStudioRegistrationRequest)({
+      SchemaStrict.decodeUnknownSync(
+        controlPlaneContracts.ControlPlanePutStudioRegistrationRequest,
+      )({
         commandId: randomUUID(),
         expectedVersion: null,
         applicationOrigin,
@@ -124,7 +127,7 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
       { kind: "user", id: actorId },
       createdProject.id,
       createdProject.environment.id,
-      Schema.decodeUnknownSync(controlPlaneContracts.ControlPlaneSetStudioRuntimeRequest)({
+      SchemaStrict.decodeUnknownSync(controlPlaneContracts.ControlPlaneSetStudioRuntimeRequest)({
         commandId: randomUUID(),
         expectedVersion: registered.registration.version,
         enabled: true,
@@ -213,7 +216,9 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
           { kind: "user", id: actorId },
           createdProject.id,
           createdProject.environment.id,
-          Schema.decodeUnknownSync(controlPlaneContracts.ControlPlanePutStudioRegistrationRequest)({
+          SchemaStrict.decodeUnknownSync(
+            controlPlaneContracts.ControlPlanePutStudioRegistrationRequest,
+          )({
             commandId: randomUUID(),
             expectedVersion: registrationVersion,
             applicationOrigin: "http://127.0.0.1:43220",

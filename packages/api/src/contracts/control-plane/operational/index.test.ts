@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit } from "effect";
 
 import {
   ControlPlaneCredentialListQuery,
@@ -8,18 +8,19 @@ import {
   ControlPlaneWebhookDeliveryPage,
 } from "./index";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const cursor = null;
 
 describe("Control Plane operational contracts", () => {
   it.effect("keeps credential filters and one-time issue intent closed", () =>
     Effect.gen(function* () {
-      const query = yield* Schema.decodeUnknown(ControlPlaneCredentialListQuery)({
+      const query = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCredentialListQuery)({
         family: "management",
         status: "active",
         cursor,
         limit: 50,
       });
-      const issue = yield* Schema.decodeUnknown(ControlPlaneIssueCredentialRequest)({
+      const issue = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneIssueCredentialRequest)({
         family: "management",
         name: "CI",
         scopes: ["project.read"],
@@ -28,7 +29,7 @@ describe("Control Plane operational contracts", () => {
         previewAuthorityAcknowledged: false,
       });
       const excess = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneIssueCredentialRequest)({
+        SchemaStrict.decodeUnknownEffect(ControlPlaneIssueCredentialRequest)({
           ...issue,
           rawKey: "forbidden",
         }),
@@ -53,18 +54,20 @@ describe("Control Plane operational contracts", () => {
         cursor,
         limit: 20,
       } as const;
-      const valid = yield* Effect.exit(Schema.decodeUnknown(ControlPlaneProjectAuditQuery)(base));
+      const valid = yield* Effect.exit(
+        SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)(base),
+      );
       const missingActor = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneProjectAuditQuery)({ ...base, actorId: null }),
+        SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({ ...base, actorId: null }),
       );
       const excessiveWindow = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneProjectAuditQuery)({
+        SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
           ...base,
           to: "2026-11-01T00:00:00.000Z",
         }),
       );
       const reversed = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneProjectAuditQuery)({
+        SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
           ...base,
           from: "2026-10-02T00:00:00.000Z",
         }),
@@ -80,12 +83,12 @@ describe("Control Plane operational contracts", () => {
   it.effect("bounds delivery summaries without accepting embedded event bodies", () =>
     Effect.gen(function* () {
       const oversized = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneWebhookDeliveryPage)({
+        SchemaStrict.decodeUnknownEffect(ControlPlaneWebhookDeliveryPage)({
           items: Array.from({ length: 51 }, (_, index) => ({ id: index })),
           nextCursor: null,
         }),
       );
-      const maximumPage = yield* Schema.decodeUnknown(ControlPlaneWebhookDeliveryPage)({
+      const maximumPage = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneWebhookDeliveryPage)({
         items: Array.from({ length: 50 }, () => ({
           id: "019fae8b-1234-7000-8000-000000000001",
           eventId: "019fae8b-1234-7000-8000-000000000002",

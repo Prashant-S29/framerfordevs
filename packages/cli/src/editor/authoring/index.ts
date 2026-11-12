@@ -188,7 +188,7 @@ function commandFingerprint(
 async function runJournalEffect<A, E>(effect: Effect.Effect<A, E>): Promise<A> {
   const exit = await Effect.runPromiseExit(effect);
   if (Exit.isSuccess(exit)) return exit.value;
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   if (failure !== undefined) throw failure;
   throw new Error("EDITOR_JOURNAL_DEFECT");
 }

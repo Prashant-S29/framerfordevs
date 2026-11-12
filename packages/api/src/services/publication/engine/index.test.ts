@@ -1,14 +1,15 @@
 // Verifies the replaceable publication engine delegates to the deterministic compiler.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import { EntryValues } from "../../../contracts/entry";
 import { CollectionFieldDefinition } from "../../../contracts/schema";
 import { PublicationEngine, PublicationEngineLive } from "./index";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const fieldId = "019fae8b-1234-7000-8000-000000000001";
-const field = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+const field = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   id: fieldId,
   parentFieldId: null,
   nodeRole: "root",
@@ -29,7 +30,7 @@ const field = Schema.decodeUnknownSync(CollectionFieldDefinition)({
   children: [],
 });
 
-const values = (value: unknown) => Schema.decodeUnknownSync(EntryValues)(value);
+const values = (value: unknown) => SchemaStrict.decodeUnknownSync(EntryValues)(value);
 
 describe("PublicationEngine", () => {
   it.effect("compiles and compares immutable delivery roots through named operations", () =>

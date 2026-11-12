@@ -19,7 +19,7 @@ import {
   webhookEndpointSecret,
   webhookEndpointSubscription,
 } from "@framerfordevs/db/schema/webhooks";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import { DatabaseFailure, WebhookEventInvalidFailure } from "../../contracts/response/errors";
 import type { WebhookAttemptOutcome } from "../../lib/webhook/retry";
@@ -32,6 +32,7 @@ import { CollectionFieldDefinition, defaultFieldEditorMetadata } from "../../con
 import { hashSchemaContract } from "../schema/engine";
 import type { ApplicationDb } from "../project-access";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const externalTypes = [
   "cms.schema.published",
   "cms.entry.published",
@@ -44,7 +45,7 @@ const externalTypeSet = new Set<string>(externalTypes);
 const internalTypeSet = new Set<string>(internalTypes);
 
 function revisionFieldValue(row: typeof cmsSchemaRevisionField.$inferSelect) {
-  return Schema.decodeUnknownSync(CollectionFieldDefinition)({
+  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
     id: row.fieldId,
     parentFieldId: row.parentFieldId,
     nodeRole: row.nodeRole,
@@ -702,10 +703,10 @@ export function makeWebhookWorkerRepository(database: ApplicationDb = db) {
   };
 }
 
-export class WebhookWorkerRepository extends Context.Tag("WebhookWorkerRepository")<
+export class WebhookWorkerRepository extends Context.Service<
   WebhookWorkerRepository,
   ReturnType<typeof makeWebhookWorkerRepository>
->() {}
+>()("WebhookWorkerRepository") {}
 
 export const WebhookWorkerRepositoryLive = Layer.succeed(
   WebhookWorkerRepository,

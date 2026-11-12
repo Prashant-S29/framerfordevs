@@ -1,7 +1,7 @@
 // Verifies named M7 Effect operations remain replaceable and forward every repository workflow.
 
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer } from "effect";
 
 import {
   CmsEntry,
@@ -29,6 +29,7 @@ import {
   saveEntryDraft,
 } from "./index";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const collectionId = "019fae8b-1234-7000-8000-000000000003";
@@ -41,7 +42,7 @@ const workspaceId = "019fae8b-1234-7000-8000-000000000009";
 const timestamp = "2026-08-08T12:00:00.000Z";
 const contractHash = "a".repeat(64);
 const validation = EntryValidation.make({ valid: true, issues: [], capped: false });
-const entry = Schema.decodeUnknownSync(CmsEntry)({
+const entry = SchemaStrict.decodeUnknownSync(CmsEntry)({
   id: entryId,
   workspaceId,
   projectId,
@@ -57,7 +58,7 @@ const entry = Schema.decodeUnknownSync(CmsEntry)({
   updatedAt: timestamp,
 });
 const page = CmsEntryPage.make({ items: [], nextCursor: null });
-const draft = Schema.decodeUnknownSync(CmsEntryDraft)({
+const draft = SchemaStrict.decodeUnknownSync(CmsEntryDraft)({
   entry,
   localeId,
   locale: "en",
@@ -72,7 +73,7 @@ const draft = Schema.decodeUnknownSync(CmsEntryDraft)({
   canEditShared: true,
   validation,
 });
-const saveResult = Schema.decodeUnknownSync(SaveEntryDraftResult)({
+const saveResult = SchemaStrict.decodeUnknownSync(SaveEntryDraftResult)({
   entryId,
   commandId,
   sharedChanged: false,
@@ -104,11 +105,15 @@ describe("entry operations", () => {
         const scope = { projectId, environmentId, collectionId, locale: "en" };
         yield* listEntries(
           "user-1",
-          yield* Schema.decodeUnknown(ListEntriesInput)({ ...scope, cursor: null, limit: 25 }),
+          yield* SchemaStrict.decodeUnknownEffect(ListEntriesInput)({
+            ...scope,
+            cursor: null,
+            limit: 25,
+          }),
         );
         yield* createEntry(
           "user-1",
-          yield* Schema.decodeUnknown(CreateEntryInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
             ...scope,
             displayName: "Test entry",
             schemaRevisionId,
@@ -119,7 +124,7 @@ describe("entry operations", () => {
         );
         yield* renameEntry(
           "user-1",
-          yield* Schema.decodeUnknown(RenameEntryInput)({
+          yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
             ...scope,
             entryId,
             displayName: "Renamed entry",
@@ -129,11 +134,11 @@ describe("entry operations", () => {
         );
         yield* getEntryDraft(
           "user-1",
-          yield* Schema.decodeUnknown(GetEntryDraftInput)({ ...scope, entryId }),
+          yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({ ...scope, entryId }),
         );
         yield* saveEntryDraft(
           "user-1",
-          yield* Schema.decodeUnknown(SaveEntryDraftInput)({
+          yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
             ...scope,
             entryId,
             schemaRevisionId,
@@ -148,7 +153,7 @@ describe("entry operations", () => {
         );
         yield* listEntryRevisions(
           "user-1",
-          yield* Schema.decodeUnknown(ListEntryRevisionsInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ListEntryRevisionsInput)({
             ...scope,
             entryId,
             scope: "localized",
@@ -158,7 +163,7 @@ describe("entry operations", () => {
         );
         yield* restoreEntryRevision(
           "user-1",
-          yield* Schema.decodeUnknown(RestoreEntryRevisionInput)({
+          yield* SchemaStrict.decodeUnknownEffect(RestoreEntryRevisionInput)({
             ...scope,
             entryId,
             scope: "localized",

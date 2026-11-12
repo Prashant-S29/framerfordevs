@@ -1,5 +1,6 @@
 import { assert, describe, it, layer } from "@effect/vitest";
-import { Effect, TestClock } from "effect";
+import { Effect } from "effect";
+import { TestClock } from "effect/testing";
 
 import { ApiCredentialId, type CredentialFamily } from "../contracts/access";
 import { makeCredentialAttemptLimiter } from "./credential/attempt-limiter";

@@ -1,4 +1,4 @@
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit } from "effect";
 import { assert, describe, it } from "@effect/vitest";
 
 import {
@@ -11,6 +11,7 @@ import {
   StructureHash,
 } from "./index";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const userId = "019fae8b-1234-7000-8000-000000000001";
 const credentialId = "019fae8b-1234-7000-8000-000000000002";
 
@@ -20,13 +21,13 @@ describe("authoring contracts", () => {
     () =>
       Effect.gen(function* () {
         const accepted = yield* Effect.all([
-          Schema.decodeUnknown(CollectionSourceKey)("blog-posts"),
-          Schema.decodeUnknown(FieldSourceKey)("seo_title"),
-          Schema.decodeUnknown(EnumOptionSourceKey)("in-review"),
+          SchemaStrict.decodeUnknownEffect(CollectionSourceKey)("blog-posts"),
+          SchemaStrict.decodeUnknownEffect(FieldSourceKey)("seo_title"),
+          SchemaStrict.decodeUnknownEffect(EnumOptionSourceKey)("in-review"),
         ]);
         const rejected = yield* Effect.all(
           ["id", "BadKey", "double--dash", "double__underscore", "trailing-"].map((value) =>
-            Effect.exit(Schema.decodeUnknown(CollectionSourceKey)(value)),
+            Effect.exit(SchemaStrict.decodeUnknownEffect(CollectionSourceKey)(value)),
           ),
         );
 
@@ -37,13 +38,17 @@ describe("authoring contracts", () => {
 
   it.effect("keeps user and credential actor attribution explicit", () =>
     Effect.gen(function* () {
-      const user = yield* Schema.decodeUnknown(CmsActor)({ kind: "user", id: userId });
-      const credential = yield* Schema.decodeUnknown(CmsActor)({
+      const user = yield* SchemaStrict.decodeUnknownEffect(CmsActor)({ kind: "user", id: userId });
+      const credential = yield* SchemaStrict.decodeUnknownEffect(CmsActor)({
         kind: "credential",
         id: credentialId,
       });
       const impersonation = yield* Effect.exit(
-        Schema.decodeUnknown(CmsActor)({ kind: "credential", id: credentialId, userId }),
+        SchemaStrict.decodeUnknownEffect(CmsActor)({
+          kind: "credential",
+          id: credentialId,
+          userId,
+        }),
       );
 
       assert.strictEqual(user.kind, "user");
@@ -54,7 +59,7 @@ describe("authoring contracts", () => {
 
   it.effect("accepts only finite JSON mutations and canonical digest authorities", () =>
     Effect.gen(function* () {
-      const mutations = yield* Schema.decodeUnknown(AuthoringValueMutations)([
+      const mutations = yield* SchemaStrict.decodeUnknownEffect(AuthoringValueMutations)([
         {
           operation: "set",
           scope: "localized",
@@ -63,11 +68,11 @@ describe("authoring contracts", () => {
         },
       ]);
       const invalidNumber = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringValueMutations)([
+        SchemaStrict.decodeUnknownEffect(AuthoringValueMutations)([
           { operation: "set", scope: "localized", path: ["title"], value: Infinity },
         ]),
       );
-      const hash = yield* Schema.decodeUnknown(StructureHash)("a".repeat(64));
+      const hash = yield* SchemaStrict.decodeUnknownEffect(StructureHash)("a".repeat(64));
 
       assert.strictEqual(mutations.length, 1);
       assert.isTrue(Exit.isFailure(invalidNumber));
@@ -77,9 +82,11 @@ describe("authoring contracts", () => {
 
   it.effect("defines a closed content-safe Authoring error vocabulary", () =>
     Effect.gen(function* () {
-      const known = yield* Schema.decodeUnknown(AuthoringApiErrorCode)("SOURCE_IDENTITY_CONFLICT");
+      const known = yield* SchemaStrict.decodeUnknownEffect(AuthoringApiErrorCode)(
+        "SOURCE_IDENTITY_CONFLICT",
+      );
       const unknown = yield* Effect.exit(
-        Schema.decodeUnknown(AuthoringApiErrorCode)("DATABASE_CONSTRAINT_FAILED"),
+        SchemaStrict.decodeUnknownEffect(AuthoringApiErrorCode)("DATABASE_CONSTRAINT_FAILED"),
       );
 
       assert.strictEqual(known, "SOURCE_IDENTITY_CONFLICT");

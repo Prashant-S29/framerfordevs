@@ -20,6 +20,7 @@ import { StudioBootstrap } from "@framerfordevs/api/contracts/studio/index";
 import {
   StudioContentContext,
   StudioEntryPage,
+  StudioResolvedEntryLabel,
 } from "@framerfordevs/api/contracts/studio-content/index";
 import {
   RateLimitDecision,
@@ -48,12 +49,13 @@ import {
   StudioContentRepository,
 } from "@framerfordevs/api/services/studio-content/repository/index";
 import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 import request from "supertest";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../../../src/app";
 
+import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const ids = {
   workspace: "019fae8b-1234-7000-8000-000000000001",
   project: "019fae8b-1234-7000-8000-000000000002",
@@ -91,7 +93,7 @@ const principal: StudioOAuthPrincipal = {
   scopes: ["studio:session", "offline_access"],
   expiresAtEpochSeconds: 1_900_000_000,
 };
-const bootstrap = Schema.decodeUnknownSync(StudioBootstrap)({
+const bootstrap = SchemaStrict.decodeUnknownSync(StudioBootstrap)({
   formatVersion: 1,
   registration: {
     id: ids.registration,
@@ -106,7 +108,7 @@ const bootstrap = Schema.decodeUnknownSync(StudioBootstrap)({
   effectiveActions: ["project.read", "project.update"],
   session: { expiresAt: "2027-01-15T08:00:00.000Z" },
 });
-const field = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+const field = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   id: ids.field,
   parentFieldId: null,
   nodeRole: "root",
@@ -126,7 +128,7 @@ const field = Schema.decodeUnknownSync(CollectionFieldDefinition)({
   configuration: { maxLength: 100 },
   children: [],
 });
-const layout = Schema.decodeUnknownSync(EditorLayout)({
+const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
   version: 1,
   tabs: [
     {
@@ -158,7 +160,7 @@ const layout = Schema.decodeUnknownSync(EditorLayout)({
   ],
   sidebarGroups: [],
 });
-const form = Schema.decodeUnknownSync(GeneratedFormDefinition)({
+const form = SchemaStrict.decodeUnknownSync(GeneratedFormDefinition)({
   source: "published",
   collectionId: ids.collection,
   revisionId: ids.revision,
@@ -173,7 +175,7 @@ const form = Schema.decodeUnknownSync(GeneratedFormDefinition)({
   editorLayout: layout,
   currencyMinorUnits: {},
 });
-const entry = Schema.decodeUnknownSync(CmsEntry)({
+const entry = SchemaStrict.decodeUnknownSync(CmsEntry)({
   id: ids.entry,
   workspaceId: ids.workspace,
   projectId: ids.project,
@@ -189,7 +191,7 @@ const entry = Schema.decodeUnknownSync(CmsEntry)({
   updatedAt: now,
 });
 const validation = { valid: true, issues: [], capped: false } as const;
-const draft = Schema.decodeUnknownSync(CmsEntryDraft)({
+const draft = SchemaStrict.decodeUnknownSync(CmsEntryDraft)({
   entry,
   localeId: ids.locale,
   locale: "en",
@@ -204,7 +206,7 @@ const draft = Schema.decodeUnknownSync(CmsEntryDraft)({
   canEditShared: true,
   validation,
 });
-const context = Schema.decodeUnknownSync(StudioContentContext)({
+const context = SchemaStrict.decodeUnknownSync(StudioContentContext)({
   locales: [{ id: ids.locale, tag: "en", displayName: "English", canRead: true, canWrite: true }],
   collections: [
     {
@@ -220,7 +222,7 @@ const context = Schema.decodeUnknownSync(StudioContentContext)({
   ],
   configurationNotices: [],
 });
-const page = Schema.decodeUnknownSync(StudioEntryPage)({
+const page = SchemaStrict.decodeUnknownSync(StudioEntryPage)({
   items: [
     {
       id: ids.entry,
@@ -245,11 +247,11 @@ const studioRepository: ReturnType<typeof makeStudioRepository> = {
 const contentRepository: ReturnType<typeof makeStudioContentRepository> = {
   authorizeCollection: () =>
     Effect.succeed({
-      workspaceId: Schema.decodeUnknownSync(WorkspaceId)(ids.workspace),
+      workspaceId: SchemaStrict.decodeUnknownSync(WorkspaceId)(ids.workspace),
       role: "developer" as const,
-      localeId: Schema.decodeUnknownSync(ProjectLocaleId)(ids.locale),
-      locale: Schema.decodeUnknownSync(LocaleTag)("en"),
-      schemaRevisionId: Schema.decodeUnknownSync(SchemaRevisionId)(ids.revision),
+      localeId: SchemaStrict.decodeUnknownSync(ProjectLocaleId)(ids.locale),
+      locale: SchemaStrict.decodeUnknownSync(LocaleTag)("en"),
+      schemaRevisionId: SchemaStrict.decodeUnknownSync(SchemaRevisionId)(ids.revision),
       canCreate: true,
       canRename: true,
       canWriteLocalized: true,
@@ -261,11 +263,18 @@ const contentRepository: ReturnType<typeof makeStudioContentRepository> = {
       page,
       finalBrowseOrder:
         input.search === null
-          ? { createdAt: Schema.decodeUnknownSync(IsoDateTime)(now), entryId: ids.entry }
+          ? { createdAt: SchemaStrict.decodeUnknownSync(IsoDateTime)(now), entryId: ids.entry }
           : null,
       finalSearchOrder:
         input.search === null ? null : { foldedDisplayName: "article", entryId: ids.entry },
     }),
+  resolveEntryLabels: () =>
+    Effect.succeed([
+      SchemaStrict.decodeUnknownSync(StudioResolvedEntryLabel)({
+        id: ids.entry,
+        displayName: "Article",
+      }),
+    ]),
 };
 const schemaRepository = {
   ...makeSchemaRepository(),
@@ -276,7 +285,7 @@ const entryRepository = {
   getDraft: () => Effect.succeed(draft),
   createEntryWithDraft: () =>
     Effect.succeed(
-      Schema.decodeUnknownSync(CreateEntryWithDraftResult)({
+      SchemaStrict.decodeUnknownSync(CreateEntryWithDraftResult)({
         entry,
         commandId: ids.command,
         sharedVersion: 1,
@@ -289,7 +298,7 @@ const entryRepository = {
   renameEntry: () => Effect.succeed(entry),
   saveDraft: () =>
     Effect.succeed(
-      Schema.decodeUnknownSync(SaveEntryDraftResult)({
+      SchemaStrict.decodeUnknownSync(SaveEntryDraftResult)({
         entryId: ids.entry,
         commandId: ids.command,
         sharedChanged: false,
@@ -305,7 +314,7 @@ const entryRepository = {
 const rateLimitManager: RateLimitManagerService = {
   evaluate: (input) =>
     Effect.succeed(
-      Schema.decodeUnknownSync(RateLimitDecision)({
+      SchemaStrict.decodeUnknownSync(RateLimitDecision)({
         allowed: true,
         policy: input.policy,
         cost: input.cost,
@@ -331,6 +340,8 @@ const api = request(createApp({ hostRoutingEnabled: false, studioEffectTransform
 const headers = { Authorization: `Bearer ${token}` };
 const root = `/api/studio-content/v1/projects/${ids.project}/environments/${ids.environment}`;
 const entries = `${root}/collections/${ids.collection}/locales/en/entries`;
+const rootV2 = `/api/studio-content/v2/projects/${ids.project}/environments/${ids.environment}`;
+const entriesV2 = `${rootV2}/collections/${ids.collection}/locales/en/entries`;
 
 function mutationBody() {
   return {
@@ -396,6 +407,23 @@ describe("Studio Content HTTP success surface", () => {
     expect(responses[7]?.body.data.localizedVersion).toBe(2);
   });
 
+  it("serves bounded v2 reference labels while immutable v1 has no resolution route", async () => {
+    const v2 = await api
+      .post(`${entriesV2}/resolve`)
+      .set(headers)
+      .send({ entryIds: [ids.entry] });
+    expect(v2.status, JSON.stringify(v2.body)).toBe(200);
+    expect(v2.body.data).toEqual({ items: [{ id: ids.entry, displayName: "Article" }] });
+    expect(v2.headers["cache-control"]).toContain("no-store");
+
+    const v1 = await api
+      .post(`${entries}/resolve`)
+      .set(headers)
+      .send({ entryIds: [ids.entry] });
+    expect(v1.status).toBe(404);
+    expect(v1.body.error.code).toBe("NOT_FOUND");
+  });
+
   it("interrupts platform work when the caller aborts the request", async () => {
     let markStarted: (() => void) | undefined;
     let markInterrupted: (() => void) | undefined;
@@ -409,7 +437,7 @@ describe("Studio Content HTTP success surface", () => {
       ...contentRepository,
       getContext: () =>
         Effect.sync(() => markStarted?.()).pipe(
-          Effect.zipRight(Effect.never),
+          Effect.andThen(Effect.never),
           Effect.ensuring(Effect.sync(() => markInterrupted?.())),
         ),
     };
@@ -463,7 +491,7 @@ describe("Studio Content HTTP success surface", () => {
       });
       const slowContentRepository = {
         ...contentRepository,
-        getContext: () => Effect.sync(() => markStarted?.()).pipe(Effect.zipRight(Effect.never)),
+        getContext: () => Effect.sync(() => markStarted?.()).pipe(Effect.andThen(Effect.never)),
       };
       const slowTransform: ApplicationEffectTransform = (effect) =>
         Effect.provideService(effect, StudioOAuthTokenVerifier, verifier).pipe(

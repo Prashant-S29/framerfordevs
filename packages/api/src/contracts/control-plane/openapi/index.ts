@@ -1,6 +1,8 @@
 // Generates the canonical bearer-only Control Plane v1 OpenAPI contract.
 
-import { JSONSchema, Schema } from "effect";
+import { Schema } from "effect";
+
+import { make as makeJsonSchema } from "../../response/json-schema";
 
 import {
   ControlPlaneApiFailure,
@@ -95,9 +97,9 @@ function rewriteSchemaReferences(value: unknown): unknown {
 function addEffectSchema(
   components: Record<string, unknown>,
   name: string,
-  schema: Schema.Schema.Any,
+  schema: Schema.Top,
 ): void {
-  const generated = JSONSchema.make(schema);
+  const generated = makeJsonSchema(schema);
   const definitions = Reflect.get(generated, "$defs");
   if (isRecord(definitions)) {
     for (const [definitionName, definition] of Object.entries(definitions)) {

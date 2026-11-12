@@ -43,7 +43,7 @@ export const runWebhookDispatcher = Effect.fn("webhook.worker.dispatcher")(funct
 export const runWebhookAttemptLoop = Effect.fn("webhook.worker.attempt_loop")(function* () {
   while (true) {
     const claimed = yield* runOneWebhookAttempt();
-    if (claimed) yield* Effect.yieldNow();
+    if (claimed) yield* Effect.yieldNow;
     else yield* Effect.sleep("500 millis");
   }
 });

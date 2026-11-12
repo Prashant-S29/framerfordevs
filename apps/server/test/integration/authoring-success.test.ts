@@ -66,12 +66,13 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createApp } from "../../src/app";
 
+import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const suffix = randomUUID();
 const email = `m13-authoring-http-${suffix}@example.test`;
 const password = "M13-Authoring-HTTP-Password-123!";
@@ -90,7 +91,7 @@ let toolingPrincipalAuthenticatorOverride: typeof downgradedOAuthAuthenticator |
 const permissiveRateLimitManager: RateLimitManagerService = {
   evaluate: (input) =>
     Effect.succeed(
-      Schema.decodeUnknownSync(RateLimitDecision)({
+      SchemaStrict.decodeUnknownSync(RateLimitDecision)({
         allowed: true,
         policy: input.policy,
         cost: input.cost,
@@ -522,7 +523,7 @@ afterAll(async () => {
   }
 }, 60_000);
 
-describe.sequential("Authoring successful HTTP lifecycles", () => {
+describe("Authoring successful HTTP lifecycles", () => {
   it("applies, replays, no-ops, and rejects stale, conflicting, and unacknowledged schema commands", async () => {
     rateLimitManagerOverride = permissiveRateLimitManager;
     const schemaBase = `/api/authoring/v1/projects/${requireValue(projectId, "project")}/environments/${requireValue(environmentId, "environment")}/schema`;

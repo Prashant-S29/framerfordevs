@@ -26,7 +26,7 @@ import {
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
 import { env } from "@framerfordevs/env/server";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import { CanonicalEmail, ProjectRole } from "../../contracts/access";
 import {
@@ -58,6 +58,7 @@ import { studioResource } from "../../lib/studio/authority";
 import { buildStudioBootstrap } from "../../lib/studio/bootstrap";
 import type { ApplicationDb } from "../project-access";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 interface StudioBootstrapInput {
   readonly principal: StudioOAuthPrincipal;
   readonly projectId: ProjectId;
@@ -428,7 +429,7 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
         case "grant_invalid":
           return yield* StudioGrantInvalidFailure.make();
         case "success": {
-          const role = yield* Schema.decodeUnknown(ProjectRole)(result.role).pipe(
+          const role = yield* SchemaStrict.decodeUnknownEffect(ProjectRole)(result.role).pipe(
             Effect.mapError((cause) => failure("studio.bootstrap.role.decode", cause)),
           );
           const bootstrap = buildStudioBootstrap({
@@ -460,7 +461,7 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
               new Date(input.principal.expiresAtEpochSeconds * 1_000).toISOString(),
             ),
           });
-          return yield* Schema.decodeUnknown(StudioBootstrap)(bootstrap).pipe(
+          return yield* SchemaStrict.decodeUnknownEffect(StudioBootstrap)(bootstrap).pipe(
             Effect.mapError((cause) => failure("studio.bootstrap.decode", cause)),
           );
         }
@@ -469,9 +470,9 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
   };
 }
 
-export class StudioRepository extends Context.Tag("StudioRepository")<
+export class StudioRepository extends Context.Service<
   StudioRepository,
   ReturnType<typeof makeStudioRepository>
->() {}
+>()("StudioRepository") {}
 
 export const StudioRepositoryLive = Layer.succeed(StudioRepository, makeStudioRepository());

@@ -1,5 +1,5 @@
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Exit, Layer, Schema } from "effect";
+import { Effect, Exit, Layer } from "effect";
 
 import {
   AuthoringCollectionPresentation,
@@ -32,6 +32,7 @@ import {
   publishCollectionPresentation,
 } from "./index";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const collectionId = "019fae8b-1234-7000-8000-000000000003";
@@ -87,7 +88,7 @@ const editorLayout = {
   sidebarGroups: [],
 };
 
-const draft = Schema.decodeUnknownSync(CollectionDraftSchema)({
+const draft = SchemaStrict.decodeUnknownSync(CollectionDraftSchema)({
   formatVersion: 2,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
@@ -128,7 +129,7 @@ const draft = Schema.decodeUnknownSync(CollectionDraftSchema)({
   ],
 });
 
-const revision = Schema.decodeUnknownSync(PublishedSchemaRevision)({
+const revision = SchemaStrict.decodeUnknownSync(PublishedSchemaRevision)({
   id: revisionId,
   workspaceId,
   projectId,
@@ -155,7 +156,7 @@ const revision = Schema.decodeUnknownSync(PublishedSchemaRevision)({
   editorLayout,
 });
 
-const presentation = Schema.decodeUnknownSync(AuthoringCollectionPresentation)({
+const presentation = SchemaStrict.decodeUnknownSync(AuthoringCollectionPresentation)({
   displayName: "Articles",
   description: null,
   fields: [
@@ -169,7 +170,7 @@ const presentation = Schema.decodeUnknownSync(AuthoringCollectionPresentation)({
   ],
   editorLayout,
 });
-const presentationRevision = Schema.decodeUnknownSync(AuthoringPresentationRevision)({
+const presentationRevision = SchemaStrict.decodeUnknownSync(AuthoringPresentationRevision)({
   collectionId,
   revisionId,
   previousRevisionId: null,
@@ -213,15 +214,15 @@ describe("schema operations", () => {
         const scope = { projectId, environmentId, collectionId };
         yield* getCollectionDraft(
           "user-1",
-          yield* Schema.decodeUnknown(GetCollectionDraftInput)(scope),
+          yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)(scope),
         );
         yield* getCollectionPresentation(
           "user-1",
-          yield* Schema.decodeUnknown(GetCollectionPresentationInput)(scope),
+          yield* SchemaStrict.decodeUnknownEffect(GetCollectionPresentationInput)(scope),
         );
         yield* publishCollectionPresentation(
           "user-1",
-          yield* Schema.decodeUnknown(PublishCollectionPresentationInput)({
+          yield* SchemaStrict.decodeUnknownEffect(PublishCollectionPresentationInput)({
             ...scope,
             commandId,
             expectedRevisionId: revisionId,
@@ -232,11 +233,14 @@ describe("schema operations", () => {
         );
         yield* getLatestPublishedSchema(
           "user-1",
-          yield* Schema.decodeUnknown(GetLatestPublishedSchemaInput)(scope),
+          yield* SchemaStrict.decodeUnknownEffect(GetLatestPublishedSchemaInput)(scope),
         );
         yield* getPublishedSchemaRevision(
           "user-1",
-          yield* Schema.decodeUnknown(GetPublishedSchemaRevisionInput)({ ...scope, revisionId }),
+          yield* SchemaStrict.decodeUnknownEffect(GetPublishedSchemaRevisionInput)({
+            ...scope,
+            revisionId,
+          }),
         );
 
         assert.deepEqual(calls, [
@@ -257,7 +261,7 @@ describe("schema operations", () => {
         const exit = yield* Effect.exit(
           getCollectionDraft(
             "",
-            yield* Schema.decodeUnknown(GetCollectionDraftInput)({
+            yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)({
               projectId,
               environmentId,
               collectionId,

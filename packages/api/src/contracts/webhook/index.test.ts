@@ -1,7 +1,7 @@
 // Verifies bounded M11 webhook inputs, event discrimination, invalidation rules, and OpenAPI conversion.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit } from "effect";
 
 import { EffectSchemaToJsonSchemaConverter } from "../response/effect-schema-converter";
 import {
@@ -38,6 +38,7 @@ import {
   InvalidationRoutePath,
 } from "./index";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const collectionId = "019fae8b-1234-7000-8000-000000000003";
@@ -62,7 +63,7 @@ const commonEvent = {
 describe("webhook contracts", () => {
   it.effect("accepts bounded endpoint authority and normalizes human metadata", () =>
     Effect.gen(function* () {
-      const decoded = yield* Schema.decodeUnknown(CreateWebhookEndpointInput)({
+      const decoded = yield* SchemaStrict.decodeUnknownEffect(CreateWebhookEndpointInput)({
         projectId,
         environmentId,
         name: "  Production rebuild  ",
@@ -79,13 +80,17 @@ describe("webhook contracts", () => {
   it.effect("rejects unsafe destination syntax before the DNS security service", () =>
     Effect.gen(function* () {
       const http = yield* Effect.exit(
-        Schema.decodeUnknown(WebhookDestinationUrl)("http://hooks.example.com/build"),
+        SchemaStrict.decodeUnknownEffect(WebhookDestinationUrl)("http://hooks.example.com/build"),
       );
       const customPort = yield* Effect.exit(
-        Schema.decodeUnknown(WebhookDestinationUrl)("https://hooks.example.com:8443/build"),
+        SchemaStrict.decodeUnknownEffect(WebhookDestinationUrl)(
+          "https://hooks.example.com:8443/build",
+        ),
       );
       const credentials = yield* Effect.exit(
-        Schema.decodeUnknown(WebhookDestinationUrl)("https://user:pass@hooks.example.com/build"),
+        SchemaStrict.decodeUnknownEffect(WebhookDestinationUrl)(
+          "https://user:pass@hooks.example.com/build",
+        ),
       );
 
       assert.isTrue(Exit.isFailure(http));
@@ -97,21 +102,26 @@ describe("webhook contracts", () => {
   it.effect("rejects duplicate subscriptions, reserved semantic tags, and unsafe routes", () =>
     Effect.gen(function* () {
       const duplicateTypes = yield* Effect.exit(
-        Schema.decodeUnknown(WebhookEventTypes)(["cms.entry.published", "cms.entry.published"]),
+        SchemaStrict.decodeUnknownEffect(WebhookEventTypes)([
+          "cms.entry.published",
+          "cms.entry.published",
+        ]),
       );
       const reservedTag = yield* Effect.exit(
-        Schema.decodeUnknown(SemanticInvalidationTag)("entry:homepage"),
+        SchemaStrict.decodeUnknownEffect(SemanticInvalidationTag)("entry:homepage"),
       );
       const traversal = yield* Effect.exit(
-        Schema.decodeUnknown(InvalidationRoutePath)("/posts/../admin"),
+        SchemaStrict.decodeUnknownEffect(InvalidationRoutePath)("/posts/../admin"),
       );
       const query = yield* Effect.exit(
-        Schema.decodeUnknown(InvalidationRoutePath)("/posts?draft=true"),
+        SchemaStrict.decodeUnknownEffect(InvalidationRoutePath)("/posts?draft=true"),
       );
       const encodedTraversal = yield* Effect.exit(
-        Schema.decodeUnknown(InvalidationRoutePath)("/posts/%2e%2e/admin"),
+        SchemaStrict.decodeUnknownEffect(InvalidationRoutePath)("/posts/%2e%2e/admin"),
       );
-      const wildcard = yield* Effect.exit(Schema.decodeUnknown(InvalidationRoutePath)("/posts/*"));
+      const wildcard = yield* Effect.exit(
+        SchemaStrict.decodeUnknownEffect(InvalidationRoutePath)("/posts/*"),
+      );
 
       assert.isTrue(Exit.isFailure(duplicateTypes));
       assert.isTrue(Exit.isFailure(reservedTag));
@@ -128,10 +138,12 @@ describe("webhook contracts", () => {
         { length: 1_001 },
         (_, index) => `00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`,
       );
-      const acceptedChanges = yield* Schema.decodeUnknown(WebhookChangeAuthority)({
+      const acceptedChanges = yield* SchemaStrict.decodeUnknownEffect(WebhookChangeAuthority)({
         fieldIds: fieldIds.slice(0, 1_000),
       });
-      const acceptedInvalidation = yield* Schema.decodeUnknown(WebhookInvalidationAuthority)({
+      const acceptedInvalidation = yield* SchemaStrict.decodeUnknownEffect(
+        WebhookInvalidationAuthority,
+      )({
         systemTags: fieldIds.slice(0, 1_000).map((id) => `field:${id}`),
         semanticTags: [],
         routes: [],
@@ -140,7 +152,9 @@ describe("webhook contracts", () => {
       assert.strictEqual(acceptedInvalidation.systemTags.length, 1_000);
       assert.isTrue(
         Exit.isFailure(
-          yield* Effect.exit(Schema.decodeUnknown(WebhookChangeAuthority)({ fieldIds })),
+          yield* Effect.exit(
+            SchemaStrict.decodeUnknownEffect(WebhookChangeAuthority)({ fieldIds }),
+          ),
         ),
       );
     }),
@@ -148,7 +162,7 @@ describe("webhook contracts", () => {
 
   it.effect("keeps event type and event data as one discriminated authority", () =>
     Effect.gen(function* () {
-      const valid = yield* Schema.decodeUnknown(PublicationWebhookEvent)({
+      const valid = yield* SchemaStrict.decodeUnknownEffect(PublicationWebhookEvent)({
         ...commonEvent,
         type: "cms.schema.published",
         data: {
@@ -167,7 +181,7 @@ describe("webhook contracts", () => {
         },
       });
       const mismatched = yield* Effect.exit(
-        Schema.decodeUnknown(PublicationWebhookEvent)({
+        SchemaStrict.decodeUnknownEffect(PublicationWebhookEvent)({
           ...valid,
           type: "cms.entry.published",
         }),

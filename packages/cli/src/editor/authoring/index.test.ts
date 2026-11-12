@@ -28,12 +28,10 @@ function gateway() {
     entryGet: vi.fn(async () => ({ status: 200, body: { ok: true, data: { draft: true } } })),
     entryCreate: vi.fn(async () => ({ status: 201, body: { ok: true, data: { created: true } } })),
     entryRename: vi.fn(async () => ({ status: 200, body: { ok: true, data: { renamed: true } } })),
-    entrySave: vi.fn(
-      async (): Promise<{ readonly status: number; readonly body: unknown }> => ({
-        status: 200,
-        body: { ok: true, data: { saved: true } },
-      }),
-    ),
+    entrySave: vi.fn(async (): Promise<{ readonly status: number; readonly body: unknown }> => ({
+      status: 200,
+      body: { ok: true, data: { saved: true } },
+    })),
     publicationStatus: vi.fn(async () => ({ status: 200, body: { ok: true, data: {} } })),
     publicationValidate: vi.fn(async () => ({ status: 200, body: { ok: true, data: {} } })),
     publicationPublish: vi.fn(async () => ({ status: 201, body: { ok: true, data: {} } })),

@@ -6,6 +6,7 @@ import { ProjectRole } from "../access";
 import { fieldSystemLimits, fieldSystemValidationProfile } from "../../lib/field/profile";
 import { iso4217MinorUnits, iso4217RegistryProfile } from "../../registry/iso-4217.generated";
 
+import { Uuid, UuidValue } from "../uuid";
 export const collectionFieldKindValues = [
   "short_text",
   "long_text",
@@ -27,91 +28,81 @@ export const collectionFieldKindValues = [
   "external_asset",
 ] as const;
 
-export const CollectionFieldKind = Schema.Literal(...collectionFieldKindValues);
+export const CollectionFieldKind = Schema.Literals(collectionFieldKindValues);
 export type CollectionFieldKind = typeof CollectionFieldKind.Type;
 
 export const fieldNodeRoleValues = ["root", "object_property", "list_item"] as const;
-export const FieldNodeRole = Schema.Literal(...fieldNodeRoleValues);
+export const FieldNodeRole = Schema.Literals(fieldNodeRoleValues);
 export type FieldNodeRole = typeof FieldNodeRole.Type;
 
 export const fieldLocalizationValues = ["localized", "shared", "mixed"] as const;
-export const FieldLocalization = Schema.Literal(...fieldLocalizationValues);
+export const FieldLocalization = Schema.Literals(fieldLocalizationValues);
 export type FieldLocalization = typeof FieldLocalization.Type;
 
 /** Builds an exact optional bounded string property for field defaults. */
 const OptionalStringDefault = (maximum: number) =>
-  Schema.optionalWith(Schema.String.pipe(Schema.maxLength(maximum)), { exact: true });
-const OptionalNumberDefault = Schema.optionalWith(Schema.Number, { exact: true });
-const OptionalBooleanDefault = Schema.optionalWith(Schema.Boolean, { exact: true });
-const OptionalInteger = Schema.optionalWith(Schema.Number.pipe(Schema.int()), { exact: true });
+  Schema.optionalKey(Schema.String.check(Schema.isMaxLength(maximum)));
+const OptionalNumberDefault = Schema.optionalKey(Schema.Number);
+const OptionalBooleanDefault = Schema.optionalKey(Schema.Boolean);
+const OptionalInteger = Schema.optionalKey(Schema.Number.check(Schema.isInt()));
 
-const SafePattern = Schema.String.pipe(Schema.maxLength(256));
-const OptionalSafePattern = Schema.optionalWith(SafePattern, { exact: true });
-const DateValue = Schema.String.pipe(
-  Schema.length(10),
-  Schema.pattern(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/u),
+const SafePattern = Schema.String.check(Schema.isMaxLength(256));
+const OptionalSafePattern = Schema.optionalKey(SafePattern);
+const DateValue = Schema.String.check(
+  Schema.isBetweenLength(10, 10),
+  Schema.isPattern(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/u),
 );
-const DateTimeValue = Schema.String.pipe(Schema.minLength(20), Schema.maxLength(35));
-const ExactDecimalValue = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(58),
-  Schema.pattern(/^(?:0|-[1-9][0-9]*|[1-9][0-9]*)(?:\.[0-9]*[1-9])?$/u),
-  Schema.brand("ExactDecimalValue"),
-);
+const DateTimeValue = Schema.String.check(Schema.isMinLength(20), Schema.isMaxLength(35));
+const ExactDecimalValue = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(58),
+  Schema.isPattern(/^(?:0|-[1-9][0-9]*|[1-9][0-9]*)(?:\.[0-9]*[1-9])?$/u),
+).pipe(Schema.brand("ExactDecimalValue"));
 export type ExactDecimalValue = typeof ExactDecimalValue.Type;
 
-const Iso4217CurrencyCode = Schema.String.pipe(
-  Schema.length(3),
-  Schema.filter(
-    /** Restricts money values to the pinned generated registry. */
-    (value) => Object.hasOwn(iso4217MinorUnits, value),
-    {
-      /** Describes an unsupported or retired currency without leaking input. */
-      message: () => "Use a supported active ISO 4217 currency code.",
-    },
-  ),
-  Schema.brand("Iso4217CurrencyCode"),
-);
+const Iso4217CurrencyCode = Schema.String.check(
+  Schema.isBetweenLength(3, 3),
+  Schema.makeFilter((value) => Object.hasOwn(iso4217MinorUnits, value), {
+    /** Describes an unsupported or retired currency without leaking input. */
+    message: "Use a supported active ISO 4217 currency code.",
+  }),
+).pipe(Schema.brand("Iso4217CurrencyCode"));
 export type Iso4217CurrencyCode = typeof Iso4217CurrencyCode.Type;
 
-const UniqueProjectRoles = Schema.Array(ProjectRole).pipe(
-  Schema.maxItems(7),
-  Schema.filter(
-    /** Prevents ambiguous duplicate role metadata. */
-    (roles) => new Set(roles).size === roles.length,
-    {
-      /** Describes duplicate role metadata. */
-      message: () => "Project roles must be unique.",
-    },
-  ),
+const UniqueProjectRoles = Schema.Array(ProjectRole).check(
+  Schema.isMaxLength(7),
+  Schema.makeFilter((roles) => new Set(roles).size === roles.length, {
+    /** Describes duplicate role metadata. */
+    message: "Project roles must be unique.",
+  }),
 );
 
 export class FieldEditorMetadata extends Schema.Class<FieldEditorMetadata>("FieldEditorMetadata")(
   Schema.Struct({
-    helpText: Schema.NullOr(Schema.String.pipe(Schema.maxLength(500))),
-    placeholder: Schema.NullOr(Schema.String.pipe(Schema.maxLength(200))),
+    helpText: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
+    placeholder: Schema.NullOr(Schema.String.check(Schema.isMaxLength(200))),
     visibleToRoles: UniqueProjectRoles,
     editableByRoles: UniqueProjectRoles,
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+  }).annotate({ closedObject: true }),
 ) {}
 
-export const EditorLayoutNodeId = Schema.UUID.pipe(Schema.brand("EditorLayoutNodeId"));
+export const EditorLayoutNodeId = UuidValue.pipe(Schema.brand("EditorLayoutNodeId"));
 export type EditorLayoutNodeId = typeof EditorLayoutNodeId.Type;
 
-const LayoutTitle = Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100));
-const LayoutDescription = Schema.NullOr(Schema.String.pipe(Schema.maxLength(500)));
-const VisibleProjectRoles = UniqueProjectRoles.pipe(Schema.minItems(1));
+const LayoutTitle = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100));
+const LayoutDescription = Schema.NullOr(Schema.String.check(Schema.isMaxLength(500)));
+const VisibleProjectRoles = UniqueProjectRoles.check(Schema.isMinLength(1));
 
 export class EditorFieldPlacement extends Schema.Class<EditorFieldPlacement>(
   "EditorFieldPlacement",
 )(
   Schema.Struct({
     id: EditorLayoutNodeId,
-    fieldId: Schema.UUID,
-    position: Schema.Number.pipe(Schema.int(), Schema.between(0, 99)),
-    helpTextOverride: Schema.NullOr(Schema.String.pipe(Schema.maxLength(500))),
+    fieldId: Uuid,
+    position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 99 })),
+    helpTextOverride: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
     visibleToRoles: VisibleProjectRoles,
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+  }).annotate({ closedObject: true }),
 ) {}
 
 export class EditorLayoutGroup extends Schema.Class<EditorLayoutGroup>("EditorLayoutGroup")(
@@ -119,11 +110,11 @@ export class EditorLayoutGroup extends Schema.Class<EditorLayoutGroup>("EditorLa
     id: EditorLayoutNodeId,
     title: LayoutTitle,
     description: LayoutDescription,
-    position: Schema.Number.pipe(Schema.int(), Schema.between(0, 19)),
-    columns: Schema.Literal(1, 2),
+    position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 19 })),
+    columns: Schema.Literals([1, 2]),
     visibleToRoles: VisibleProjectRoles,
-    fields: Schema.Array(EditorFieldPlacement).pipe(Schema.maxItems(100)),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+    fields: Schema.Array(EditorFieldPlacement).check(Schema.isMaxLength(100)),
+  }).annotate({ closedObject: true }),
 ) {}
 
 export class EditorLayoutTab extends Schema.Class<EditorLayoutTab>("EditorLayoutTab")(
@@ -131,18 +122,18 @@ export class EditorLayoutTab extends Schema.Class<EditorLayoutTab>("EditorLayout
     id: EditorLayoutNodeId,
     title: LayoutTitle,
     description: LayoutDescription,
-    position: Schema.Number.pipe(Schema.int(), Schema.between(0, 9)),
+    position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 9 })),
     visibleToRoles: VisibleProjectRoles,
-    groups: Schema.Array(EditorLayoutGroup).pipe(Schema.minItems(1), Schema.maxItems(20)),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+    groups: Schema.Array(EditorLayoutGroup).check(Schema.isMinLength(1), Schema.isMaxLength(20)),
+  }).annotate({ closedObject: true }),
 ) {}
 
 export class EditorLayout extends Schema.Class<EditorLayout>("EditorLayout")(
   Schema.Struct({
     version: Schema.Literal(1),
-    tabs: Schema.Array(EditorLayoutTab).pipe(Schema.minItems(1), Schema.maxItems(10)),
-    sidebarGroups: Schema.Array(EditorLayoutGroup).pipe(Schema.maxItems(10)),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+    tabs: Schema.Array(EditorLayoutTab).check(Schema.isMinLength(1), Schema.isMaxLength(10)),
+    sidebarGroups: Schema.Array(EditorLayoutGroup).check(Schema.isMaxLength(10)),
+  }).annotate({ closedObject: true }),
 ) {}
 
 export const ShortTextConfiguration = Schema.Struct({
@@ -150,9 +141,9 @@ export const ShortTextConfiguration = Schema.Struct({
   maxLength: OptionalInteger,
   pattern: OptionalSafePattern,
   default: OptionalStringDefault(500),
-}).annotations({
+}).annotate({
   identifier: "ShortTextConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type ShortTextConfiguration = typeof ShortTextConfiguration.Type;
 
@@ -161,36 +152,36 @@ export const LongTextConfiguration = Schema.Struct({
   maxLength: OptionalInteger,
   pattern: OptionalSafePattern,
   default: OptionalStringDefault(50_000),
-}).annotations({
+}).annotate({
   identifier: "LongTextConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type LongTextConfiguration = typeof LongTextConfiguration.Type;
 
 export const NumberConfiguration = Schema.Struct({
-  mode: Schema.optionalWith(Schema.Literal("integer", "floating_point"), { exact: true }),
+  mode: Schema.optionalKey(Schema.Literals(["integer", "floating_point"])),
   minimum: OptionalNumberDefault,
   maximum: OptionalNumberDefault,
   default: OptionalNumberDefault,
-}).annotations({
+}).annotate({
   identifier: "NumberConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type NumberConfiguration = typeof NumberConfiguration.Type;
 
 export const DecimalConfiguration = Schema.Struct({
-  precision: Schema.optionalWith(Schema.Number.pipe(Schema.int(), Schema.between(1, 38)), {
-    exact: true,
-  }),
-  scale: Schema.optionalWith(Schema.Number.pipe(Schema.int(), Schema.between(0, 18)), {
-    exact: true,
-  }),
-  minimum: Schema.optionalWith(ExactDecimalValue, { exact: true }),
-  maximum: Schema.optionalWith(ExactDecimalValue, { exact: true }),
-  default: Schema.optionalWith(ExactDecimalValue, { exact: true }),
-}).annotations({
+  precision: Schema.optionalKey(
+    Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 38 })),
+  ),
+  scale: Schema.optionalKey(
+    Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 18 })),
+  ),
+  minimum: Schema.optionalKey(ExactDecimalValue),
+  maximum: Schema.optionalKey(ExactDecimalValue),
+  default: Schema.optionalKey(ExactDecimalValue),
+}).annotate({
   identifier: "DecimalConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type DecimalConfiguration = typeof DecimalConfiguration.Type;
 
@@ -198,103 +189,98 @@ export class MoneyValue extends Schema.Class<MoneyValue>("MoneyValue")(
   Schema.Struct({
     amount: ExactDecimalValue,
     currency: Iso4217CurrencyCode,
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+  }).annotate({ closedObject: true }),
 ) {}
 
-export const MoneyCurrencies = Schema.Array(Iso4217CurrencyCode).pipe(
-  Schema.minItems(1),
-  Schema.maxItems(50),
-  Schema.filter(
-    /** Prevents duplicate currency options in generated money controls. */
-    (currencies) => new Set(currencies).size === currencies.length,
-    {
-      /** Describes duplicate money currency configuration. */
-      message: () => "Money currencies must be unique.",
-    },
-  ),
+export const MoneyCurrencies = Schema.Array(Iso4217CurrencyCode).check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(50),
+  Schema.makeFilter((currencies) => new Set(currencies).size === currencies.length, {
+    /** Describes duplicate money currency configuration. */
+    message: "Money currencies must be unique.",
+  }),
 );
 export type MoneyCurrencies = typeof MoneyCurrencies.Type;
 
 export const MoneyConfiguration = Schema.Struct({
   currencies: MoneyCurrencies,
-  allowNegative: Schema.optionalWith(Schema.Boolean, { exact: true }),
-  default: Schema.optionalWith(MoneyValue, { exact: true }),
-}).annotations({
+  allowNegative: Schema.optionalKey(Schema.Boolean),
+  default: Schema.optionalKey(MoneyValue),
+}).annotate({
   identifier: "MoneyConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type MoneyConfiguration = typeof MoneyConfiguration.Type;
 
 export const BooleanConfiguration = Schema.Struct({
   default: OptionalBooleanDefault,
-}).annotations({
+}).annotate({
   identifier: "BooleanConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type BooleanConfiguration = typeof BooleanConfiguration.Type;
 
 export const DateConfiguration = Schema.Struct({
-  minimum: Schema.optionalWith(DateValue, { exact: true }),
-  maximum: Schema.optionalWith(DateValue, { exact: true }),
-  default: Schema.optionalWith(DateValue, { exact: true }),
-}).annotations({
+  minimum: Schema.optionalKey(DateValue),
+  maximum: Schema.optionalKey(DateValue),
+  default: Schema.optionalKey(DateValue),
+}).annotate({
   identifier: "DateConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type DateConfiguration = typeof DateConfiguration.Type;
 
 export const DateTimeConfiguration = Schema.Struct({
-  minimum: Schema.optionalWith(DateTimeValue, { exact: true }),
-  maximum: Schema.optionalWith(DateTimeValue, { exact: true }),
-  default: Schema.optionalWith(DateTimeValue, { exact: true }),
-}).annotations({
+  minimum: Schema.optionalKey(DateTimeValue),
+  maximum: Schema.optionalKey(DateTimeValue),
+  default: Schema.optionalKey(DateTimeValue),
+}).annotate({
   identifier: "DateTimeConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type DateTimeConfiguration = typeof DateTimeConfiguration.Type;
 
-export const EnumOptionId = Schema.UUID.pipe(Schema.brand("EnumOptionId"));
+export const EnumOptionId = UuidValue.pipe(Schema.brand("EnumOptionId"));
 export type EnumOptionId = typeof EnumOptionId.Type;
 
-export const EnumOptionValue = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(63),
-  Schema.pattern(/^[a-z][a-z0-9_]{0,62}$/u),
-  Schema.brand("EnumOptionValue"),
-);
+export const EnumOptionValue = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(63),
+  Schema.isPattern(/^[a-z][a-z0-9_]{0,62}$/u),
+).pipe(Schema.brand("EnumOptionValue"));
 export type EnumOptionValue = typeof EnumOptionValue.Type;
 
 export class EnumOption extends Schema.Class<EnumOption>("EnumOption")(
   Schema.Struct({
     id: EnumOptionId,
     value: EnumOptionValue,
-    label: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
-    position: Schema.Number.pipe(Schema.int(), Schema.between(0, 99)),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+    label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+    position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 99 })),
+  }).annotate({ closedObject: true }),
 ) {}
 
 export const EnumConfiguration = Schema.Struct({
-  options: Schema.Array(EnumOption).pipe(Schema.minItems(1), Schema.maxItems(100)),
-  default: Schema.optionalWith(EnumOptionValue, { exact: true }),
-}).annotations({
+  options: Schema.Array(EnumOption).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+  default: Schema.optionalKey(EnumOptionValue),
+}).annotate({
   identifier: "EnumConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type EnumConfiguration = typeof EnumConfiguration.Type;
 
 export const UrlConfiguration = Schema.Struct({
   default: OptionalStringDefault(2_048),
-}).annotations({
+}).annotate({
   identifier: "UrlConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type UrlConfiguration = typeof UrlConfiguration.Type;
 
 export const EmailConfiguration = Schema.Struct({
   default: OptionalStringDefault(254),
-}).annotations({
+}).annotate({
   identifier: "EmailConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type EmailConfiguration = typeof EmailConfiguration.Type;
 
@@ -303,94 +289,97 @@ export const SlugConfiguration = Schema.Struct({
   maxLength: OptionalInteger,
   pattern: OptionalSafePattern,
   default: OptionalStringDefault(200),
-}).annotations({
+}).annotate({
   identifier: "SlugConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type SlugConfiguration = typeof SlugConfiguration.Type;
 
 export const JsonConfiguration = Schema.Struct({
   maxBytes: OptionalInteger,
   maxDepth: OptionalInteger,
-  default: Schema.optionalWith(Schema.Unknown, { exact: true }),
-}).annotations({
+  default: Schema.optionalKey(Schema.Unknown),
+}).annotate({
   identifier: "JsonConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type JsonConfiguration = typeof JsonConfiguration.Type;
 
 export const ObjectConfiguration = Schema.Struct({
-  default: Schema.optionalWith(Schema.Unknown, { exact: true }),
-}).annotations({
+  default: Schema.optionalKey(Schema.Unknown),
+}).annotate({
   identifier: "ObjectConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type ObjectConfiguration = typeof ObjectConfiguration.Type;
 
 export const ListConfiguration = Schema.Struct({
   minItems: OptionalInteger,
   maxItems: OptionalInteger,
-  uniqueItems: Schema.optionalWith(Schema.Boolean, { exact: true }),
-  default: Schema.optionalWith(Schema.Unknown, { exact: true }),
-}).annotations({
+  uniqueItems: Schema.optionalKey(Schema.Boolean),
+  default: Schema.optionalKey(Schema.Unknown),
+}).annotate({
   identifier: "ListConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type ListConfiguration = typeof ListConfiguration.Type;
 
 export const ReferenceConfiguration = Schema.Struct({
-  targetCollectionId: Schema.UUID,
-}).annotations({
+  targetCollectionId: Uuid,
+}).annotate({
   identifier: "ReferenceConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type ReferenceConfiguration = typeof ReferenceConfiguration.Type;
 
-export const ExternalAssetKind = Schema.Literal(
+export const ExternalAssetKind = Schema.Literals([
   "image",
   "video",
   "audio",
   "document",
   "archive",
   "other",
-);
+]);
 export type ExternalAssetKind = typeof ExternalAssetKind.Type;
 
 export class ExternalAssetValue extends Schema.Class<ExternalAssetValue>("ExternalAssetValue")(
   Schema.Struct({
     source: Schema.Literal("external"),
-    url: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(2_048)),
+    url: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)),
     kind: ExternalAssetKind,
-    title: Schema.NullOr(Schema.String.pipe(Schema.maxLength(500))),
-    alt: Schema.NullOr(Schema.String.pipe(Schema.maxLength(500))),
-    width: Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.between(1, 100_000))),
-    height: Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.between(1, 100_000))),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+    title: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
+    alt: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
+    width: Schema.NullOr(
+      Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 100_000 })),
+    ),
+    height: Schema.NullOr(
+      Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 100_000 })),
+    ),
+  }).annotate({ closedObject: true }),
 ) {}
 
 export const ExternalAssetConfiguration = Schema.Struct({
-  default: Schema.optionalWith(ExternalAssetValue, { exact: true }),
-}).annotations({
+  default: Schema.optionalKey(ExternalAssetValue),
+}).annotate({
   identifier: "ExternalAssetConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type ExternalAssetConfiguration = typeof ExternalAssetConfiguration.Type;
 
-export const PortableTextKey = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(64),
-  Schema.pattern(/^[A-Za-z0-9_-]+$/u),
-  Schema.brand("PortableTextKey"),
-);
+export const PortableTextKey = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(64),
+  Schema.isPattern(/^[A-Za-z0-9_-]+$/u),
+).pipe(Schema.brand("PortableTextKey"));
 export type PortableTextKey = typeof PortableTextKey.Type;
 
-export const PortableTextDecorator = Schema.Literal(
+export const PortableTextDecorator = Schema.Literals([
   "strong",
   "em",
   "underline",
   "strike-through",
   "code",
-);
+]);
 export type PortableTextDecorator = typeof PortableTextDecorator.Type;
 
 export class PortableTextLinkMark extends Schema.Class<PortableTextLinkMark>(
@@ -399,33 +388,33 @@ export class PortableTextLinkMark extends Schema.Class<PortableTextLinkMark>(
   Schema.Struct({
     _key: PortableTextKey,
     _type: Schema.Literal("link"),
-    href: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(2_048)),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+    href: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)),
+  }).annotate({ closedObject: true }),
 ) {}
 
 export class PortableTextSpan extends Schema.Class<PortableTextSpan>("PortableTextSpan")(
   Schema.Struct({
     _key: PortableTextKey,
     _type: Schema.Literal("span"),
-    text: Schema.String.pipe(Schema.maxLength(100_000)),
-    marks: Schema.Array(Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64))).pipe(
-      Schema.maxItems(32),
+    text: Schema.String.check(Schema.isMaxLength(100_000)),
+    marks: Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))).check(
+      Schema.isMaxLength(32),
     ),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+  }).annotate({ closedObject: true }),
 ) {}
 
 export class PortableTextBlock extends Schema.Class<PortableTextBlock>("PortableTextBlock")(
   Schema.Struct({
     _key: PortableTextKey,
     _type: Schema.Literal("block"),
-    style: Schema.Literal("normal", "h2", "h3", "h4", "h5", "h6", "blockquote"),
-    listItem: Schema.optionalWith(Schema.Literal("bullet", "number"), { exact: true }),
-    level: Schema.optionalWith(Schema.Number.pipe(Schema.int(), Schema.between(1, 3)), {
-      exact: true,
-    }),
-    children: Schema.Array(PortableTextSpan).pipe(Schema.maxItems(5_000)),
-    markDefs: Schema.Array(PortableTextLinkMark).pipe(Schema.maxItems(1_000)),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+    style: Schema.Literals(["normal", "h2", "h3", "h4", "h5", "h6", "blockquote"]),
+    listItem: Schema.optionalKey(Schema.Literals(["bullet", "number"])),
+    level: Schema.optionalKey(
+      Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 3 })),
+    ),
+    children: Schema.Array(PortableTextSpan).check(Schema.isMaxLength(5_000)),
+    markDefs: Schema.Array(PortableTextLinkMark).check(Schema.isMaxLength(1_000)),
+  }).annotate({ closedObject: true }),
 ) {}
 
 export class PortableTextDocument extends Schema.Class<PortableTextDocument>(
@@ -434,24 +423,23 @@ export class PortableTextDocument extends Schema.Class<PortableTextDocument>(
   Schema.Struct({
     version: Schema.Literal(1),
     profile: Schema.Literal("ffd-portable-text"),
-    blocks: Schema.Array(PortableTextBlock).pipe(Schema.maxItems(500)),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+    blocks: Schema.Array(PortableTextBlock).check(Schema.isMaxLength(500)),
+  }).annotate({ closedObject: true }),
 ) {}
 
 export const RichTextConfiguration = Schema.Struct({
-  styles: Schema.optionalWith(
-    Schema.Array(Schema.Literal("normal", "h2", "h3", "h4", "h5", "h6", "blockquote")),
-    { exact: true },
+  styles: Schema.optionalKey(
+    Schema.Array(Schema.Literals(["normal", "h2", "h3", "h4", "h5", "h6", "blockquote"])),
   ),
-  decorators: Schema.optionalWith(Schema.Array(PortableTextDecorator), { exact: true }),
-  links: Schema.optionalWith(Schema.Boolean, { exact: true }),
-  lists: Schema.optionalWith(Schema.Array(Schema.Literal("bullet", "number")), { exact: true }),
+  decorators: Schema.optionalKey(Schema.Array(PortableTextDecorator)),
+  links: Schema.optionalKey(Schema.Boolean),
+  lists: Schema.optionalKey(Schema.Array(Schema.Literals(["bullet", "number"]))),
   minLength: OptionalInteger,
   maxLength: OptionalInteger,
-  default: Schema.optionalWith(PortableTextDocument, { exact: true }),
-}).annotations({
+  default: Schema.optionalKey(PortableTextDocument),
+}).annotate({
   identifier: "RichTextConfiguration",
-  parseOptions: { onExcessProperty: "error" },
+  closedObject: true,
 });
 export type RichTextConfiguration = typeof RichTextConfiguration.Type;
 
@@ -502,13 +490,13 @@ export type FieldConfiguration = FieldConfigurationByKind[CollectionFieldKind];
 export class FieldValidationIssue extends Schema.Class<FieldValidationIssue>(
   "FieldValidationIssue",
 )({
-  path: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
-  code: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  code: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
-export const FieldValidationIssues = Schema.Array(FieldValidationIssue).pipe(
-  Schema.maxItems(fieldSystemLimits.issues),
+export const FieldValidationIssues = Schema.Array(FieldValidationIssue).check(
+  Schema.isMaxLength(fieldSystemLimits.issues),
 );
 export type FieldValidationIssues = typeof FieldValidationIssues.Type;
 

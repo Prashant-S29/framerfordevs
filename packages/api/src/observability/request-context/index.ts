@@ -4,7 +4,7 @@ import { Schema } from "effect";
 
 import { RequestIdSchema } from "../../contracts/response/api";
 
-export const HttpMethodSchema = Schema.Literal(
+export const HttpMethodSchema = Schema.Literals([
   "GET",
   "POST",
   "PUT",
@@ -13,11 +13,11 @@ export const HttpMethodSchema = Schema.Literal(
   "OPTIONS",
   "HEAD",
   "OTHER",
-);
+]);
 
 export type HttpMethod = typeof HttpMethodSchema.Type;
 
-export const RouteFamilySchema = Schema.Literal(
+export const RouteFamilySchema = Schema.Literals([
   "health",
   "readiness",
   "auth",
@@ -25,14 +25,14 @@ export const RouteFamilySchema = Schema.Literal(
   "openapi",
   "tooling",
   "other",
-);
+]);
 
 export type RouteFamily = typeof RouteFamilySchema.Type;
 
 export class TraceParent extends Schema.Class<TraceParent>("TraceParent")({
-  traceId: Schema.String.pipe(Schema.pattern(/^[0-9a-f]{32}$/)),
-  spanId: Schema.String.pipe(Schema.pattern(/^[0-9a-f]{16}$/)),
-  traceFlags: Schema.Literal(0, 1),
+  traceId: Schema.String.check(Schema.isPattern(/^[0-9a-f]{32}$/)),
+  spanId: Schema.String.check(Schema.isPattern(/^[0-9a-f]{16}$/)),
+  traceFlags: Schema.Literals([0, 1]),
 }) {}
 
 export class RequestContext extends Schema.Class<RequestContext>("RequestContext")({

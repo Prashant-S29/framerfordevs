@@ -11,12 +11,13 @@ import {
 } from "@framerfordevs/db/schema/cms";
 import { projectLocale } from "@framerfordevs/db/schema/locale";
 import { environment, projectCapability } from "@framerfordevs/db/schema/platform";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import { ProjectRole } from "../../../contracts/access";
 import { type LocaleTag, ProjectLocaleId } from "../../../contracts/locale";
 import { type AuthUserId, IsoDateTime, WorkspaceId } from "../../../contracts/platform";
 import {
+  AuthoringStaleSchemaFailure,
   CmsCapabilityRequiredFailure,
   DatabaseFailure,
   ForbiddenFailure,
@@ -36,6 +37,8 @@ import {
   type StudioCollectionLocaleScope,
   StudioEntryPage,
   StudioEntrySummary,
+  type StudioResolveEntryIds,
+  StudioResolvedEntryLabel,
 } from "../../../contracts/studio-content";
 import { generatedFormDefinition } from "../../../lib/field/form-definition";
 import { projectStudioForm } from "../../../lib/studio-content/form-projection";
@@ -47,6 +50,7 @@ import { type ApplicationDb, selectUserProjectAccess } from "../../project-acces
 import { decodePublishedSchemaRevisionSync } from "../../schema/repository";
 import { ensureProjectionInvalidAudit } from "../projection-audit";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 interface StudioContentRepositoryOptions {
   readonly database?: Pick<ApplicationDb, "transaction">;
 }
@@ -86,6 +90,12 @@ export interface StudioEntryPageResult {
   readonly page: StudioEntryPage;
   readonly finalBrowseOrder: StudioEntryBrowseOrder | null;
   readonly finalSearchOrder: StudioEntrySearchOrder | null;
+}
+
+export interface ResolveStudioEntryLabelsInput {
+  readonly scope: StudioCollectionLocaleScope;
+  readonly expectedSchemaRevisionId: SchemaRevisionId;
+  readonly entryIds: StudioResolveEntryIds;
 }
 
 function failure(operation: string, cause: unknown) {
@@ -189,7 +199,7 @@ async function selectCollectionAuthority(
     .from(cmsSchemaRevisionField)
     .where(eq(cmsSchemaRevisionField.revisionId, revision.revision.id))
     .orderBy(cmsSchemaRevisionField.position, cmsSchemaRevisionField.fieldId);
-  const role = Schema.decodeUnknownSync(ProjectRole)(access.role);
+  const role = SchemaStrict.decodeUnknownSync(ProjectRole)(access.role);
   if (persistedFields.length === 0) {
     return role === "owner" || role === "developer"
       ? { kind: "configuration_invalid" as const, reason: "empty_schema" as const }
@@ -234,10 +244,10 @@ async function selectCollectionAuthority(
   if (decision.kind === "configuration_invalid") {
     if (decision.reason === "projection_invalid") {
       await ensureProjectionInvalidAudit(executor, {
-        workspaceId: Schema.decodeUnknownSync(WorkspaceId)(access.project.workspaceId),
+        workspaceId: SchemaStrict.decodeUnknownSync(WorkspaceId)(access.project.workspaceId),
         projectId: scope.projectId,
         environmentId: scope.environmentId,
-        schemaRevisionId: Schema.decodeUnknownSync(SchemaRevisionId)(revision.revision.id),
+        schemaRevisionId: SchemaStrict.decodeUnknownSync(SchemaRevisionId)(revision.revision.id),
         actorId,
         occurredAt: now,
       });
@@ -248,11 +258,11 @@ async function selectCollectionAuthority(
   return {
     kind: "success" as const,
     authority: {
-      workspaceId: Schema.decodeUnknownSync(WorkspaceId)(access.project.workspaceId),
+      workspaceId: SchemaStrict.decodeUnknownSync(WorkspaceId)(access.project.workspaceId),
       role,
-      localeId: Schema.decodeUnknownSync(ProjectLocaleId)(locale.id),
+      localeId: SchemaStrict.decodeUnknownSync(ProjectLocaleId)(locale.id),
       locale: scope.locale,
-      schemaRevisionId: Schema.decodeUnknownSync(SchemaRevisionId)(revision.revision.id),
+      schemaRevisionId: SchemaStrict.decodeUnknownSync(SchemaRevisionId)(revision.revision.id),
       canCreate: canWriteLocalized,
       canRename: canWriteLocalized,
       canWriteLocalized,
@@ -368,7 +378,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
               if (row.displayName === null) {
                 throw new Error("Studio entry query returned a null display name.");
               }
-              return Schema.decodeUnknownSync(StudioEntrySummary)({
+              return SchemaStrict.decodeUnknownSync(StudioEntrySummary)({
                 id: row.id,
                 displayName: row.displayName,
                 nameVersion: row.nameVersion,
@@ -380,7 +390,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
             return {
               kind: "success" as const,
               result: {
-                page: Schema.decodeUnknownSync(StudioEntryPage)({
+                page: SchemaStrict.decodeUnknownSync(StudioEntryPage)({
                   items,
                   hasMore: rows.length > input.limit,
                   nextCursor: null,
@@ -389,7 +399,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
                 finalBrowseOrder:
                   input.search === null && final !== undefined
                     ? {
-                        createdAt: Schema.decodeUnknownSync(IsoDateTime)(
+                        createdAt: SchemaStrict.decodeUnknownSync(IsoDateTime)(
                           final.createdAt.toISOString(),
                         ),
                         entryId: final.id,
@@ -413,6 +423,67 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
       }
       if (result.kind === "stale_cursor") return yield* StudioContentCursorStaleFailure.make();
       return result.result;
+    }),
+
+    resolveEntryLabels: Effect.fn("StudioContentRepository.resolveEntryLabels")(function* (
+      actorId: AuthUserId,
+      input: ResolveStudioEntryLabelsInput,
+      now: Date,
+    ) {
+      const result = yield* Effect.tryPromise({
+        try: () =>
+          database.transaction(async (transaction) => {
+            const authorization = await selectCollectionAuthority(
+              transaction,
+              actorId,
+              input.scope,
+              now,
+            );
+            if (authorization.kind !== "success") return authorization;
+            if (authorization.authority.schemaRevisionId !== input.expectedSchemaRevisionId) {
+              return { kind: "stale_schema" as const };
+            }
+            const rows = await transaction
+              .select({ id: cmsEntry.id, displayName: cmsEntry.displayName })
+              .from(cmsEntry)
+              .where(
+                and(
+                  eq(cmsEntry.workspaceId, authorization.authority.workspaceId),
+                  eq(cmsEntry.projectId, input.scope.projectId),
+                  eq(cmsEntry.environmentId, input.scope.environmentId),
+                  eq(cmsEntry.collectionId, input.scope.collectionId),
+                  inArray(cmsEntry.id, input.entryIds),
+                  isNotNull(cmsEntry.displayName),
+                ),
+              )
+              .limit(input.entryIds.length);
+            const rowById = new Map(rows.map((row) => [row.id, row]));
+            return {
+              kind: "success" as const,
+              items: input.entryIds.flatMap((entryId) => {
+                const row = rowById.get(entryId);
+                return row?.displayName === null || row === undefined
+                  ? []
+                  : [
+                      SchemaStrict.decodeUnknownSync(StudioResolvedEntryLabel)({
+                        id: row.id,
+                        displayName: row.displayName,
+                      }),
+                    ];
+              }),
+            };
+          }),
+        catch: (cause) => failure("studio_content.entries.resolve", cause),
+      });
+      if (result.kind === "not_found")
+        return yield* NotFoundFailure.make({ resource: "studio_collection" });
+      if (result.kind === "locale_unavailable") return yield* LocaleUnavailableFailure.make();
+      if (result.kind === "cms_disabled") return yield* CmsCapabilityRequiredFailure.make();
+      if (result.kind === "configuration_invalid") {
+        return yield* StudioCollectionConfigurationInvalidFailure.make({ reason: result.reason });
+      }
+      if (result.kind === "stale_schema") return yield* AuthoringStaleSchemaFailure.make();
+      return result.items;
     }),
 
     getContext: Effect.fn("StudioContentRepository.getContext")(function* (
@@ -455,7 +526,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
               .limit(1);
             if (capability?.status !== "enabled") return { kind: "cms_disabled" as const };
 
-            const role = Schema.decodeUnknownSync(ProjectRole)(access.role);
+            const role = SchemaStrict.decodeUnknownSync(ProjectRole)(access.role);
             const enabledLocales = await transaction
               .select({
                 id: projectLocale.id,
@@ -480,7 +551,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
             );
             const roleCanWrite = isRoleAllowed(role, "content.write");
             const locales = effectiveLocales.map((locale) =>
-              Schema.decodeUnknownSync(StudioContentLocale)({
+              SchemaStrict.decodeUnknownSync(StudioContentLocale)({
                 id: locale.id,
                 tag: locale.tag,
                 displayName: locale.displayName,
@@ -491,7 +562,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
             if (locales.length === 0) {
               return {
                 kind: "success" as const,
-                context: Schema.decodeUnknownSync(StudioContentContext)({
+                context: SchemaStrict.decodeUnknownSync(StudioContentContext)({
                   locales: [],
                   collections: [],
                   configurationNotices: [],
@@ -555,7 +626,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
               if (persistedFields.length === 0) {
                 if (supportRole) {
                   configurationNotices.push(
-                    Schema.decodeUnknownSync(StudioCollectionConfigurationNotice)({
+                    SchemaStrict.decodeUnknownSync(StudioCollectionConfigurationNotice)({
                       collectionId: revision.collectionId,
                       displayName: revision.collectionDisplayName,
                       reason: "empty_schema",
@@ -603,7 +674,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
               if (decision.kind === "hidden") continue;
               if (decision.kind === "configuration_invalid") {
                 configurationNotices.push(
-                  Schema.decodeUnknownSync(StudioCollectionConfigurationNotice)({
+                  SchemaStrict.decodeUnknownSync(StudioCollectionConfigurationNotice)({
                     collectionId: revision.collectionId,
                     displayName: revision.collectionDisplayName,
                     reason: decision.reason,
@@ -611,10 +682,12 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
                 );
                 if (decision.reason === "projection_invalid") {
                   await ensureProjectionInvalidAudit(transaction, {
-                    workspaceId: Schema.decodeUnknownSync(WorkspaceId)(access.project.workspaceId),
+                    workspaceId: SchemaStrict.decodeUnknownSync(WorkspaceId)(
+                      access.project.workspaceId,
+                    ),
                     projectId: scope.projectId,
                     environmentId: scope.environmentId,
-                    schemaRevisionId: Schema.decodeUnknownSync(SchemaRevisionId)(revision.id),
+                    schemaRevisionId: SchemaStrict.decodeUnknownSync(SchemaRevisionId)(revision.id),
                     actorId,
                     occurredAt: now,
                   });
@@ -623,7 +696,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
               }
               const canMutate = roleCanWrite && projectedEditableFieldCount > 0;
               collections.push(
-                Schema.decodeUnknownSync(StudioContentCollection)({
+                SchemaStrict.decodeUnknownSync(StudioContentCollection)({
                   id: revision.collectionId,
                   displayName: revision.collectionDisplayName,
                   capabilities: {
@@ -637,7 +710,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
             }
             return {
               kind: "success" as const,
-              context: Schema.decodeUnknownSync(StudioContentContext)({
+              context: SchemaStrict.decodeUnknownSync(StudioContentContext)({
                 locales,
                 collections,
                 configurationNotices,
@@ -657,10 +730,10 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
 
 export type StudioContentRepositoryService = ReturnType<typeof makeStudioContentRepository>;
 
-export class StudioContentRepository extends Context.Tag("StudioContentRepository")<
+export class StudioContentRepository extends Context.Service<
   StudioContentRepository,
   StudioContentRepositoryService
->() {}
+>()("StudioContentRepository") {}
 
 export const StudioContentRepositoryLive = Layer.succeed(
   StudioContentRepository,

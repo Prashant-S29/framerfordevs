@@ -6,7 +6,7 @@ import {
   decodeStudioBrowserBootstrap,
   type StudioBrowserBootstrap,
 } from "@framerfordevs/studio/contracts";
-import { Data, Effect, Layer, ManagedRuntime } from "effect";
+import { Cause, Data, Effect, Layer, ManagedRuntime } from "effect";
 
 import { renderStudioHtml, type StudioAsset, type StudioAssets } from "./assets";
 import {
@@ -28,6 +28,7 @@ const maximumOAuthResponseBytes = 32 * 1_024;
 const maximumBootstrapResponseBytes = 64 * 1_024;
 const maximumContentRequestBytes = 1 * 1_024 * 1_024;
 const maximumContentSearchRequestBytes = 2 * 1_024;
+const maximumContentResolveRequestBytes = 8 * 1_024;
 const maximumContentResponseBytes = 4 * 1_024 * 1_024;
 const maximumCookieHeaderBytes = 4 * 1_024;
 const csp =
@@ -188,9 +189,10 @@ function exactOrigin(value: string, secureRequired: boolean): string {
 }
 
 function validateAssets(assets: StudioAssets): StudioAssets {
+  const assetPath = /^\/assets\/(?:chunk\/)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
   if (
     typeof assets.entryScript !== "string" ||
-    !/^\/assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(assets.entryScript) ||
+    !assetPath.test(assets.entryScript) ||
     !Array.isArray(assets.stylesheets) ||
     !(assets.files instanceof Map) ||
     assets.files.size < 1 ||
@@ -200,10 +202,7 @@ function validateAssets(assets: StudioAssets): StudioAssets {
   const stylesheets = [...assets.stylesheets];
   if (
     stylesheets.length > 64 ||
-    stylesheets.some(
-      (path) =>
-        typeof path !== "string" || !/^\/assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(path),
-    ) ||
+    stylesheets.some((path) => typeof path !== "string" || !assetPath.test(path)) ||
     !assets.files.has(assets.entryScript) ||
     stylesheets.some((path) => !assets.files.has(path))
   )
@@ -212,7 +211,7 @@ function validateAssets(assets: StudioAssets): StudioAssets {
   let totalBytes = 0;
   for (const [path, asset] of assets.files) {
     if (
-      !/^\/assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(path) ||
+      !assetPath.test(path) ||
       !(asset.body instanceof Uint8Array) ||
       asset.body.byteLength > 2 * 1_024 * 1_024 ||
       typeof asset.contentType !== "string" ||
@@ -303,7 +302,7 @@ function validateConfig(input: StudioServerConfig): ValidatedConfig {
     revocationUrl: `${platformOrigin}/api/auth/oauth2/revoke`,
     resource: `${platformOrigin}/api/studio/v1`,
     bootstrapUrl: `${platformOrigin}/api/studio/v1/projects/${input.projectId}/environments/${input.environmentId}/bootstrap`,
-    studioContentBaseUrl: `${platformOrigin}/api/studio-content/v1/projects/${input.projectId}/environments/${input.environmentId}`,
+    studioContentBaseUrl: `${platformOrigin}/api/studio-content/v2/projects/${input.projectId}/environments/${input.environmentId}`,
     redirectUri: `${applicationOrigin}${input.mountPath}/auth/callback`,
     clientId: `ffd-studio-v1-${input.registrationId}`,
     registrationDigest,
@@ -524,7 +523,7 @@ function withPermit<A>(
     acquire,
     () => effect,
     (permitOwner) =>
-      config.store.releasePermit(key, permitOwner).pipe(Effect.catchAll(() => Effect.void)),
+      config.store.releasePermit(key, permitOwner).pipe(Effect.catch(() => Effect.void)),
   );
 }
 
@@ -1182,7 +1181,7 @@ function revoke(config: ValidatedConfig, token: string): Effect.Effect<void> {
     }),
   }).pipe(
     Effect.asVoid,
-    Effect.catchAll(() => Effect.void),
+    Effect.catch(() => Effect.void),
   );
 }
 
@@ -1286,7 +1285,7 @@ function refreshSession(
     if (claim.status === "terminal") {
       yield* config.store
         .deleteSession(record.sessionDigest, config.registrationDigest)
-        .pipe(Effect.catchAll(() => Effect.void));
+        .pipe(Effect.catch(() => Effect.void));
       return yield* new StudioHttpFailure({
         status: 401,
         code: "STUDIO_SESSION_INVALID",
@@ -1305,7 +1304,7 @@ function refreshSession(
     if (session.grantExpiresAtEpochMs <= now) {
       yield* config.store
         .deleteSession(record.sessionDigest, config.registrationDigest)
-        .pipe(Effect.catchAll(() => Effect.void));
+        .pipe(Effect.catch(() => Effect.void));
       return yield* new StudioHttpFailure({
         status: 401,
         code: "STUDIO_SESSION_INVALID",
@@ -1348,17 +1347,17 @@ function refreshSession(
         resource: config.resource,
       }),
     }).pipe(
-      Effect.catchAll((error) =>
+      Effect.catch((error) =>
         config.store.deleteSession(record.sessionDigest, config.registrationDigest).pipe(
           Effect.andThen(Effect.fail(error)),
-          Effect.catchAll(() => Effect.fail(error)),
+          Effect.catch(() => Effect.fail(error)),
         ),
       ),
     );
     if (response.status !== 200) {
       yield* config.store
         .deleteSession(record.sessionDigest, config.registrationDigest)
-        .pipe(Effect.catchAll(() => Effect.void));
+        .pipe(Effect.catch(() => Effect.void));
       return yield* new StudioHttpFailure({
         status: 401,
         code: "STUDIO_SESSION_INVALID",
@@ -1369,7 +1368,7 @@ function refreshSession(
     if (!isJsonResponse(response)) {
       yield* config.store
         .deleteSession(record.sessionDigest, config.registrationDigest)
-        .pipe(Effect.catchAll(() => Effect.void));
+        .pipe(Effect.catch(() => Effect.void));
       return yield* new StudioHttpFailure({
         status: 502,
         code: "STUDIO_UPSTREAM_UNAVAILABLE",
@@ -1402,7 +1401,7 @@ function refreshSession(
       Effect.tapError(() =>
         config.store
           .deleteSession(record.sessionDigest, config.registrationDigest)
-          .pipe(Effect.catchAll(() => Effect.void)),
+          .pipe(Effect.catch(() => Effect.void)),
       ),
     );
     const verified = yield* bootstrapUpstream(config, tokenSet.accessToken, {
@@ -1412,7 +1411,7 @@ function refreshSession(
       Effect.tapError(() =>
         config.store
           .deleteSession(record.sessionDigest, config.registrationDigest)
-          .pipe(Effect.catchAll(() => Effect.void)),
+          .pipe(Effect.catch(() => Effect.void)),
       ),
     );
     const accessExpiresAtEpochMs = yield* Effect.try({
@@ -1427,7 +1426,7 @@ function refreshSession(
     }).pipe(
       Effect.tapError(() =>
         config.store.deleteSession(record.sessionDigest, config.registrationDigest).pipe(
-          Effect.catchAll(() => Effect.void),
+          Effect.catch(() => Effect.void),
           Effect.andThen(revoke(config, tokenSet.refreshToken)),
         ),
       ),
@@ -1539,7 +1538,7 @@ function loadContentSession(config: ValidatedConfig, request: Request) {
         Effect.tapError(() =>
           config.store
             .deleteSession(record.sessionDigest, config.registrationDigest)
-            .pipe(Effect.catchAll(() => Effect.void)),
+            .pipe(Effect.catch(() => Effect.void)),
         ),
       ),
       rotated: false,
@@ -1547,7 +1546,7 @@ function loadContentSession(config: ValidatedConfig, request: Request) {
     if (active.session.grantExpiresAtEpochMs <= now) {
       yield* config.store
         .deleteSession(sessionDigest, config.registrationDigest)
-        .pipe(Effect.catchAll(() => Effect.void));
+        .pipe(Effect.catch(() => Effect.void));
       return yield* new StudioHttpFailure({
         status: 401,
         code: "STUDIO_SESSION_INVALID",
@@ -2234,6 +2233,7 @@ function validStudioContentPage(value: unknown): boolean {
 type StudioContentSuccessKind =
   | "context"
   | "page"
+  | "resolve"
   | "new_workspace"
   | "entry_workspace"
   | "create"
@@ -2244,9 +2244,41 @@ function validStudioContentEntryValues(value: unknown): boolean {
   return isRecord(value) && Object.keys(value).every((key) => uuid.test(key));
 }
 
-function validStudioContentSuccessData(kind: StudioContentSuccessKind, value: unknown): boolean {
+function validStudioContentSuccessData(
+  kind: StudioContentSuccessKind,
+  value: unknown,
+  requestedResolutionIds?: ReadonlyArray<string>,
+): boolean {
   if (!isRecord(value)) return false;
   if (kind === "page") return validStudioContentPage(value);
+  if (kind === "resolve") {
+    if (
+      requestedResolutionIds === undefined ||
+      !exactStudioContentKeys(value, ["items"]) ||
+      !Array.isArray(value.items) ||
+      value.items.length > requestedResolutionIds.length ||
+      !value.items.every(
+        (item) =>
+          isRecord(item) &&
+          exactStudioContentKeys(item, ["id", "displayName"]) &&
+          typeof item.id === "string" &&
+          uuid.test(item.id) &&
+          boundedStudioContentString(item.displayName, 1, 100),
+      ) ||
+      new Set(value.items.map((item) => (isRecord(item) ? item.id : null))).size !==
+        value.items.length
+    ) {
+      return false;
+    }
+    let previousIndex = -1;
+    return value.items.every((item) => {
+      if (!isRecord(item) || typeof item.id !== "string") return false;
+      const index = requestedResolutionIds.indexOf(item.id);
+      if (index <= previousIndex) return false;
+      previousIndex = index;
+      return true;
+    });
+  }
   if (kind === "rename") return validStudioContentEntry(value);
   if (kind === "context") {
     return (
@@ -2423,6 +2455,7 @@ function validStudioContentEnvelope(
   value: unknown,
   status: number,
   successKind: StudioContentSuccessKind,
+  requestedResolutionIds?: ReadonlyArray<string>,
 ): value is Readonly<Record<string, unknown>> {
   if (
     !isRecord(value) ||
@@ -2436,7 +2469,7 @@ function validStudioContentEnvelope(
     return (
       status === 200 &&
       value.error === null &&
-      validStudioContentSuccessData(successKind, value.data)
+      validStudioContentSuccessData(successKind, value.data, requestedResolutionIds)
     );
   }
   if (value.ok !== false || status < 400 || status > 599 || value.data !== null) return false;
@@ -2476,6 +2509,18 @@ interface StudioContentTarget {
   readonly upstreamPath: string;
   readonly bodyAllowed: boolean;
   readonly successKind: StudioContentSuccessKind;
+}
+
+function isStudioContentShellRoute(route: string): boolean {
+  if (route === "/content") return true;
+  const match = /^\/content\/([^/]+)\/locales\/([^/]+)(?:\/entries\/(new|[^/]+))?$/u.exec(route);
+  if (match === null || !uuid.test(match[1] ?? "")) return false;
+  const locale = match[2] ?? "";
+  if (!/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/u.test(locale) || locale.length > 35) {
+    return false;
+  }
+  const entry = match[3];
+  return entry === undefined || entry === "new" || uuid.test(entry);
 }
 
 function studioContentTarget(
@@ -2520,6 +2565,9 @@ function studioContentTarget(
   if (query !== "") return null;
   if (suffix === "search" && method === "POST") {
     return { upstreamPath: `${base}/search`, bodyAllowed: true, successKind: "page" };
+  }
+  if (suffix === "resolve" && method === "POST") {
+    return { upstreamPath: `${base}/resolve`, bodyAllowed: true, successKind: "resolve" };
   }
   if (suffix === "new" && method === "GET") {
     return {
@@ -2635,6 +2683,16 @@ function validStudioContentBody(route: string, value: unknown): boolean {
       value.limit <= 50
     );
   }
+  if (route.endsWith("/resolve")) {
+    return (
+      exactStudioContentKeys(value, ["entryIds"]) &&
+      Array.isArray(value.entryIds) &&
+      value.entryIds.length >= 1 &&
+      value.entryIds.length <= 100 &&
+      value.entryIds.every((entryId) => typeof entryId === "string" && uuid.test(entryId)) &&
+      new Set(value.entryIds).size === value.entryIds.length
+    );
+  }
   if (route.endsWith("/name")) {
     return (
       Object.keys(value).sort().join(",") === "displayName,expectedNameVersion" &&
@@ -2726,6 +2784,20 @@ function routeRequest(
       const headers = securityHeaders("text/html; charset=utf-8");
       return new Response(method === "HEAD" ? null : body, { status: 200, headers });
     }
+    if (isStudioContentShellRoute(parsed.route) && parsed.query === "") {
+      if (method !== "GET" && method !== "HEAD") {
+        return yield* new StudioHttpFailure({
+          status: 405,
+          code: "STUDIO_REQUEST_INVALID",
+          message: "The Studio route does not allow this method.",
+          allow: "GET, HEAD",
+          outcome: "rejected",
+        });
+      }
+      const body = renderStudioHtml(config.mountPath, config.dashboardOrigin, config.assets);
+      const headers = securityHeaders("text/html; charset=utf-8");
+      return new Response(method === "HEAD" ? null : body, { status: 200, headers });
+    }
     if (
       (method === "GET" || method === "HEAD") &&
       parsed.route.startsWith("/assets/") &&
@@ -2766,6 +2838,7 @@ function routeRequest(
         });
       }
       let requestBody: string | undefined;
+      let requestedResolutionIds: ReadonlyArray<string> | undefined;
       if (target.bodyAllowed) {
         if (request.headers.get("content-type") !== "application/json") {
           return yield* new StudioHttpFailure({
@@ -2777,7 +2850,9 @@ function routeRequest(
         }
         const maximumRequestBytes = parsed.route.endsWith("/search")
           ? maximumContentSearchRequestBytes
-          : maximumContentRequestBytes;
+          : parsed.route.endsWith("/resolve")
+            ? maximumContentResolveRequestBytes
+            : maximumContentRequestBytes;
         requestBody = yield* Effect.tryPromise({
           try: () => boundedRequestText(request, maximumRequestBytes),
           catch: () =>
@@ -2788,8 +2863,9 @@ function routeRequest(
               outcome: "rejected",
             }),
         });
+        const encodedBody = requestBody;
         const body = yield* Effect.try({
-          try: () => parseJson(requestBody as string),
+          try: () => parseJson(encodedBody),
           catch: () =>
             new StudioHttpFailure({
               status: 400,
@@ -2805,6 +2881,16 @@ function routeRequest(
             message: "The Studio Content request is invalid.",
             outcome: "rejected",
           });
+        }
+        if (
+          parsed.route.endsWith("/resolve") &&
+          isRecord(body) &&
+          Array.isArray(body.entryIds) &&
+          body.entryIds.every((entryId) => typeof entryId === "string")
+        ) {
+          requestedResolutionIds = body.entryIds.flatMap((entryId) =>
+            typeof entryId === "string" ? [entryId] : [],
+          );
         }
       } else if (
         request.headers.has("content-length") &&
@@ -2855,7 +2941,12 @@ function routeRequest(
       });
       if (
         !isJsonResponse(upstream) ||
-        !validStudioContentEnvelope(body, upstream.status, target.successKind)
+        !validStudioContentEnvelope(
+          body,
+          upstream.status,
+          target.successKind,
+          requestedResolutionIds,
+        )
       ) {
         return yield* new StudioHttpFailure({
           status: 502,
@@ -2873,7 +2964,7 @@ function routeRequest(
       ) {
         yield* config.store
           .deleteSession(active.record.sessionDigest, config.registrationDigest)
-          .pipe(Effect.catchAll(() => Effect.void));
+          .pipe(Effect.catch(() => Effect.void));
         yield* revoke(config, active.session.refreshToken);
       }
       const headers = securityHeaders("application/json; charset=utf-8");
@@ -3329,7 +3420,7 @@ function routeRequest(
           Effect.tapError(() =>
             config.store
               .deleteSession(record.sessionDigest, config.registrationDigest)
-              .pipe(Effect.catchAll(() => Effect.void)),
+              .pipe(Effect.catch(() => Effect.void)),
           ),
         ),
         rotated: false,
@@ -3337,7 +3428,7 @@ function routeRequest(
       if (active.session.grantExpiresAtEpochMs <= now) {
         yield* config.store
           .deleteSession(sessionDigest, config.registrationDigest)
-          .pipe(Effect.catchAll(() => Effect.void));
+          .pipe(Effect.catch(() => Effect.void));
         return yield* new StudioHttpFailure({
           status: 401,
           code: "STUDIO_SESSION_INVALID",
@@ -3389,7 +3480,7 @@ function routeRequest(
             ? config.store
                 .deleteSession(active.record.sessionDigest, config.registrationDigest)
                 .pipe(
-                  Effect.catchAll(() => Effect.void),
+                  Effect.catch(() => Effect.void),
                   Effect.andThen(revoke(config, active.session.refreshToken)),
                 )
             : Effect.void,
@@ -3580,9 +3671,13 @@ export function createStudioFetchHandler(input: StudioServerConfig): StudioFetch
       let outcome: StudioServerTelemetryEvent["outcome"] = "success";
       if (exit._tag === "Success") response = exit.value;
       else {
+        const [reason] = exit.cause.reasons;
         const failure =
-          exit.cause._tag === "Fail" && exit.cause.error._tag === "StudioHttpFailure"
-            ? exit.cause.error
+          exit.cause.reasons.length === 1 &&
+          reason !== undefined &&
+          Cause.isFailReason(reason) &&
+          reason.error._tag === "StudioHttpFailure"
+            ? reason.error
             : new StudioHttpFailure({
                 status: 500,
                 code: "STUDIO_UPSTREAM_UNAVAILABLE",

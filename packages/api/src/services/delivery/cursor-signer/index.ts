@@ -15,17 +15,21 @@ import { ProjectLocaleId } from "../../../contracts/locale";
 import { EnvironmentId, ProjectId, ResourceVersion } from "../../../contracts/platform";
 import { CollectionId, SchemaRevisionId } from "../../../contracts/schema";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const cursorLifetimeMs = 15 * 60 * 1_000;
 const cursorMaximumLength = 1_024;
-const Digest = Schema.String.pipe(Schema.length(64), Schema.pattern(/^[0-9a-f]{64}$/u));
-const EpochMillis = Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0));
-const Generation = Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0));
-const SortValue = Schema.Union(Schema.String, Schema.Number, Schema.Boolean, Schema.Null);
+const Digest = Schema.String.check(
+  Schema.isBetweenLength(64, 64),
+  Schema.isPattern(/^[0-9a-f]{64}$/u),
+);
+const EpochMillis = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0));
+const Generation = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0));
+const SortValue = Schema.Union([Schema.String, Schema.Number, Schema.Boolean, Schema.Null]);
 
 class DeliveryCursorSortTuple extends Schema.Class<DeliveryCursorSortTuple>(
   "DeliveryCursorSortTuple",
 )({
-  kind: Schema.Literal(
+  kind: Schema.Literals([
     "short_text",
     "slug",
     "email",
@@ -36,8 +40,8 @@ class DeliveryCursorSortTuple extends Schema.Class<DeliveryCursorSortTuple>(
     "date",
     "date_time",
     "reference",
-  ),
-  direction: Schema.Literal("asc", "desc"),
+  ]),
+  direction: Schema.Literals(["asc", "desc"]),
   value: SortValue,
   entryId: EntryId,
 }) {}
@@ -61,12 +65,15 @@ class DeliveryCursorPayload extends Schema.Class<DeliveryCursorPayload>("Deliver
 
 class DeliveryCursorEnvelope extends Schema.Class<DeliveryCursorEnvelope>("DeliveryCursorEnvelope")(
   {
-    payload: Schema.String.pipe(
-      Schema.minLength(1),
-      Schema.maxLength(900),
-      Schema.pattern(/^[A-Za-z0-9_-]+$/u),
+    payload: Schema.String.check(
+      Schema.isMinLength(1),
+      Schema.isMaxLength(900),
+      Schema.isPattern(/^[A-Za-z0-9_-]+$/u),
     ),
-    signature: Schema.String.pipe(Schema.length(43), Schema.pattern(/^[A-Za-z0-9_-]+$/u)),
+    signature: Schema.String.check(
+      Schema.isBetweenLength(43, 43),
+      Schema.isPattern(/^[A-Za-z0-9_-]+$/u),
+    ),
   },
 ) {}
 
@@ -158,7 +165,7 @@ function decodeEnvelope(
     return Effect.fail(invalidCursor());
   }
   const signatureStart = cursor.length - 43;
-  return Schema.decodeUnknown(DeliveryCursorEnvelope)({
+  return SchemaStrict.decodeUnknownEffect(DeliveryCursorEnvelope)({
     payload: cursor.slice(0, signatureStart),
     signature: cursor.slice(signatureStart),
   }).pipe(Effect.mapError(() => invalidCursor()));
@@ -172,7 +179,7 @@ function decodePayload(
     try: (): unknown => JSON.parse(Buffer.from(payload, "base64url").toString("utf8")),
     catch: () => invalidCursor(),
   }).pipe(
-    Effect.flatMap(Schema.decodeUnknown(DeliveryCursorPayload)),
+    Effect.flatMap(SchemaStrict.decodeUnknownEffect(DeliveryCursorPayload)),
     Effect.mapError(() => invalidCursor()),
   );
 }
@@ -200,7 +207,7 @@ export function makeDeliveryCursorSigner(
   return {
     sign: Effect.fn("DeliveryCursorSigner.sign")(function* (input) {
       const now = yield* Clock.currentTimeMillis;
-      const payload = yield* Schema.decodeUnknown(DeliveryCursorPayload)({
+      const payload = yield* SchemaStrict.decodeUnknownEffect(DeliveryCursorPayload)({
         version: 1,
         kind: "delivery_list",
         ...input,
@@ -251,10 +258,10 @@ export function makeDeliveryCursorSigner(
   };
 }
 
-export class DeliveryCursorSigner extends Context.Tag("DeliveryCursorSigner")<
+export class DeliveryCursorSigner extends Context.Service<
   DeliveryCursorSigner,
   DeliveryCursorSignerService
->() {}
+>()("DeliveryCursorSigner") {}
 
 /** Builds the stateless signer once; secret-length validation remains at environment startup. */
 export function makeDeliveryCursorSignerLive(options: DeliveryCursorSignerOptions) {

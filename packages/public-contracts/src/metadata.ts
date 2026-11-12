@@ -12,7 +12,7 @@ export const publicContractFamilies = [
 ] as const;
 export type PublicContractFamily = (typeof publicContractFamilies)[number];
 
-export const publicContractMajors = ["v1"] as const;
+export const publicContractMajors = ["v1", "v2"] as const;
 export type PublicContractMajor = (typeof publicContractMajors)[number];
 
 export const publicArtifactKinds = ["openapi", "json-schema"] as const;
@@ -38,6 +38,7 @@ export const publicContractRegistryKeys = [
   "preview/v1",
   "studio/v1",
   "studio-content/v1",
+  "studio-content/v2",
   "tooling/v1",
   "webhooks/v1",
 ] as const;
@@ -113,6 +114,18 @@ export const publicContractMetadata = {
     sdkSupported: false,
     baselinePath: "baselines/studio-content/v1/openapi.json",
     baselineDigest: "c9226fdcc767d704a41e100a5440560afbb7f64977209f82d42dad20bc48a9fc",
+    deprecatedAt: null,
+    sunsetAt: null,
+  },
+  "studio-content/v2": {
+    family: "studio-content",
+    major: "v2",
+    kind: "openapi",
+    outputPath: "artifacts/studio-content/v2/openapi.json",
+    portalRoute: "/api-reference/studio-content/v2",
+    sdkSupported: false,
+    baselinePath: "baselines/studio-content/v2/openapi.json",
+    baselineDigest: "485fe43e4a2442745e7f222cced9a7d5ea57a1835c5e4a4d666f8a4eb286459f",
     deprecatedAt: null,
     sunsetAt: null,
   },

@@ -1,9 +1,9 @@
 // Orchestrates Studio-token revalidation and bounded Studio Content operations.
 
 import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
-import { EntryId, type EntryValidation } from "../../contracts/entry";
+import { EntryId, type EntryValidation, EntryValidationIssue } from "../../contracts/entry";
 import { AuthUserId } from "../../contracts/platform";
 import { ApiErrorDetail } from "../../contracts/response/api";
 import {
@@ -34,6 +34,8 @@ import {
   StudioNameVersionConflictFailure,
   StudioNewEntryWorkspace,
   StudioRenameEntryRequest,
+  StudioResolveEntriesRequest,
+  StudioResolvedEntryLabels,
   StudioSaveEntryDraftRequest,
   StudioSearchEntriesRequest,
 } from "../../contracts/studio-content";
@@ -48,6 +50,7 @@ import { StudioContentCursorSigner } from "../../services/studio-content/cursor-
 import { StudioContentRepository } from "../../services/studio-content/repository";
 import { StudioRepository } from "../../services/studio/repository";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 function invalidPath() {
   return ValidationFailure.make({
     details: [
@@ -60,15 +63,29 @@ function invalidPath() {
   });
 }
 
+function closedStudioValidationFailure(): ValidationFailure {
+  return ValidationFailure.make({
+    details: [
+      ApiErrorDetail.make({
+        code: "studio_values_invalid",
+        message: "One or more submitted Studio values are invalid.",
+      }),
+    ],
+  });
+}
+
 export function adaptStudioCreateError(error: ApplicationError): ApplicationError {
+  if (error._tag === "ValidationFailure") return closedStudioValidationFailure();
   return error._tag === "EntryCommandConflictFailure" ? StudioCommandConflictFailure.make() : error;
 }
 
 export function adaptStudioRenameError(error: ApplicationError): ApplicationError {
+  if (error._tag === "ValidationFailure") return closedStudioValidationFailure();
   return error._tag === "VersionConflictFailure" ? StudioNameVersionConflictFailure.make() : error;
 }
 
 export function adaptStudioSaveError(error: ApplicationError): ApplicationError {
+  if (error._tag === "ValidationFailure") return closedStudioValidationFailure();
   if (error._tag === "EntryDraftConflictFailure") {
     return StudioDraftVersionConflictFailure.make({ details: error.details });
   }
@@ -88,7 +105,7 @@ function unavailableMutation() {
 }
 
 export function decodeStudioContentScope(projectId: string, environmentId: string) {
-  return Schema.decodeUnknown(StudioContentScope)({ projectId, environmentId }).pipe(
+  return SchemaStrict.decodeUnknownEffect(StudioContentScope)({ projectId, environmentId }).pipe(
     Effect.mapError(() => invalidPath()),
   );
 }
@@ -99,7 +116,7 @@ export function decodeStudioCollectionLocaleScope(
   collectionId: string,
   locale: string,
 ) {
-  return Schema.decodeUnknown(StudioCollectionLocaleScope)({
+  return SchemaStrict.decodeUnknownEffect(StudioCollectionLocaleScope)({
     projectId,
     environmentId,
     collectionId,
@@ -108,31 +125,37 @@ export function decodeStudioCollectionLocaleScope(
 }
 
 export function decodeStudioListEntriesQuery(value: unknown) {
-  return Schema.decodeUnknown(StudioListEntriesQuery)(value, {
+  return SchemaStrict.decodeUnknownEffect(StudioListEntriesQuery)(value, {
     onExcessProperty: "error",
   }).pipe(Effect.mapError(() => invalidPath()));
 }
 
 export function decodeStudioSearchEntriesRequest(value: unknown) {
-  return Schema.decodeUnknown(StudioSearchEntriesRequest)(value, {
+  return SchemaStrict.decodeUnknownEffect(StudioSearchEntriesRequest)(value, {
+    onExcessProperty: "error",
+  }).pipe(Effect.mapError(() => invalidPath()));
+}
+
+export function decodeStudioResolveEntriesRequest(value: unknown) {
+  return SchemaStrict.decodeUnknownEffect(StudioResolveEntriesRequest)(value, {
     onExcessProperty: "error",
   }).pipe(Effect.mapError(() => invalidPath()));
 }
 
 export function decodeStudioCreateEntryRequest(value: unknown) {
-  return Schema.decodeUnknown(StudioCreateEntryRequest)(value, {
+  return SchemaStrict.decodeUnknownEffect(StudioCreateEntryRequest)(value, {
     onExcessProperty: "error",
   }).pipe(Effect.mapError(() => invalidPath()));
 }
 
 export function decodeStudioRenameEntryRequest(value: unknown) {
-  return Schema.decodeUnknown(StudioRenameEntryRequest)(value, {
+  return SchemaStrict.decodeUnknownEffect(StudioRenameEntryRequest)(value, {
     onExcessProperty: "error",
   }).pipe(Effect.mapError(() => invalidPath()));
 }
 
 export function decodeStudioSaveEntryDraftRequest(value: unknown) {
-  return Schema.decodeUnknown(StudioSaveEntryDraftRequest)(value, {
+  return SchemaStrict.decodeUnknownEffect(StudioSaveEntryDraftRequest)(value, {
     onExcessProperty: "error",
   }).pipe(Effect.mapError(() => invalidPath()));
 }
@@ -151,6 +174,7 @@ export const revalidateStudioContentPrincipal = Effect.fn(
 export const studioNestedCollectionOperations = [
   "browse",
   "search",
+  "resolve",
   "new_workspace",
   "entry_workspace",
   "create",
@@ -160,7 +184,7 @@ export const studioNestedCollectionOperations = [
 export type StudioNestedCollectionOperation = (typeof studioNestedCollectionOperations)[number];
 
 function decodeActorId(principal: StudioOAuthPrincipal) {
-  return Schema.decodeUnknown(AuthUserId)(principal.userId).pipe(
+  return SchemaStrict.decodeUnknownEffect(AuthUserId)(principal.userId).pipe(
     Effect.mapError(() => invalidPath()),
   );
 }
@@ -194,7 +218,7 @@ export const authorizeStudioCollectionOperation = Effect.fn(
   now: Date,
 ) {
   const cost =
-    operation === "browse" || operation === "search"
+    operation === "browse" || operation === "search" || operation === "resolve"
       ? 1
       : operation === "new_workspace"
         ? 2
@@ -260,7 +284,7 @@ const listStudioEntries = Effect.fn("studio_content.public.entries.list")(functi
           searchOrder: result.finalSearchOrder,
         })
       : null;
-  return Schema.decodeUnknownSync(StudioEntryPage)({ ...result.page, nextCursor });
+  return SchemaStrict.decodeUnknownSync(StudioEntryPage)({ ...result.page, nextCursor });
 });
 
 export const browseStudioEntries = Effect.fn("studio_content.public.entries.browse")(function* (
@@ -293,6 +317,28 @@ export const searchStudioEntries = Effect.fn("studio_content.public.entries.sear
   );
 });
 
+export const resolveStudioEntryLabels = Effect.fn("studio_content.public.entries.resolve")(
+  function* (
+    principal: StudioOAuthPrincipal,
+    scope: StudioCollectionLocaleScopeType,
+    request: StudioResolveEntriesRequest,
+    now: Date,
+  ) {
+    const authority = yield* authorizeStudioCollectionOperation(principal, scope, "resolve", now);
+    const actorId = yield* decodeActorId(principal);
+    const items = yield* (yield* StudioContentRepository).resolveEntryLabels(
+      actorId,
+      {
+        scope,
+        expectedSchemaRevisionId: authority.schemaRevisionId,
+        entryIds: request.entryIds,
+      },
+      now,
+    );
+    return StudioResolvedEntryLabels.make({ items });
+  },
+);
+
 export function projectStudioValidation(
   validation: EntryValidation,
   form: ReturnType<typeof projectStudioForm>,
@@ -305,7 +351,18 @@ export function projectStudioValidation(
     }
   };
   visit(form.fields);
-  const issues = validation.issues.filter((issue) => visibleFieldIds.has(issue.fieldId));
+  const visibleIssues = validation.issues.filter((issue) => visibleFieldIds.has(issue.fieldId));
+  const issues = visibleIssues.map((issue) =>
+    EntryValidationIssue.make({
+      fieldId: issue.fieldId,
+      path: `field/${issue.fieldId}`,
+      scope: issue.scope,
+      localeId: issue.localeId,
+      locale: issue.locale,
+      code: issue.code,
+      message: "This field value is invalid.",
+    }),
+  );
   return StudioEntryValidation.make({
     status: validation.valid
       ? "valid"
@@ -325,7 +382,7 @@ function studioEntrySummary(entry: {
   readonly updatedAt: string;
 }) {
   if (entry.displayName === null) return null;
-  return Schema.decodeUnknownSync(StudioEntrySummary)({
+  return SchemaStrict.decodeUnknownSync(StudioEntrySummary)({
     id: entry.id,
     displayName: entry.displayName,
     nameVersion: entry.nameVersion,
@@ -335,7 +392,9 @@ function studioEntrySummary(entry: {
 }
 
 export function decodeStudioEntryId(value: string) {
-  return Schema.decodeUnknown(EntryId)(value).pipe(Effect.mapError(() => invalidPath()));
+  return SchemaStrict.decodeUnknownEffect(EntryId)(value).pipe(
+    Effect.mapError(() => invalidPath()),
+  );
 }
 
 export const getStudioNewEntryWorkspace = Effect.fn("studio_content.public.workspace.new")(
@@ -368,7 +427,7 @@ export const getStudioNewEntryWorkspace = Effect.fn("studio_content.public.works
         return yield* AuthoringStaleSchemaFailure.make();
       }
     }
-    return Schema.decodeUnknownSync(StudioNewEntryWorkspace)({
+    return SchemaStrict.decodeUnknownSync(StudioNewEntryWorkspace)({
       localeId: authority.localeId,
       locale: authority.locale,
       form: projectStudioForm(form),
@@ -429,7 +488,7 @@ export const getStudioEntryWorkspace = Effect.fn("studio_content.public.workspac
     const entry = studioEntrySummary(draft.entry);
     if (entry === null) return yield* NotFoundFailure.make({ resource: "entry" });
     const projectedForm = projectStudioForm(form);
-    return Schema.decodeUnknownSync(StudioEntryWorkspace)({
+    return SchemaStrict.decodeUnknownSync(StudioEntryWorkspace)({
       localeId: authority.localeId,
       locale: authority.locale,
       form: projectedForm,
@@ -491,7 +550,7 @@ export const createStudioEntry = Effect.fn("studio_content.public.entry.create")
     .pipe(Effect.mapError(adaptStudioCreateError));
   const entry = studioEntrySummary(result.entry);
   if (entry === null) return yield* NotFoundFailure.make({ resource: "entry" });
-  return Schema.decodeUnknownSync(StudioCreateEntryResult)({
+  return SchemaStrict.decodeUnknownSync(StudioCreateEntryResult)({
     entry,
     commandId: result.commandId,
     sharedVersion: result.sharedVersion,
@@ -559,7 +618,7 @@ export const saveStudioEntryDraft = Effect.fn("studio_content.public.entry.save"
   const result = yield* (yield* EntryRepository)
     .saveDraft(actorId, { ...scope, entryId, ...request }, now, requestId)
     .pipe(Effect.mapError(adaptStudioSaveError));
-  return Schema.decodeUnknownSync(StudioMutationReceipt)({
+  return SchemaStrict.decodeUnknownSync(StudioMutationReceipt)({
     entryId: result.entryId,
     commandId: result.commandId,
     sharedChanged: result.sharedChanged,

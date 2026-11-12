@@ -51,14 +51,15 @@ import {
   makeToolingPrincipalAuthenticator,
   ToolingPrincipalAuthenticator,
 } from "@framerfordevs/api/services/tooling/principal-authenticator/index";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 import request from "supertest";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { createApp } from "../../../src/app";
 
+import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const userId = AuthUserId.make("control-plane-http-user");
-const workspace = Schema.decodeUnknownSync(ControlPlaneWorkspace)({
+const workspace = SchemaStrict.decodeUnknownSync(ControlPlaneWorkspace)({
   id: "019fae8b-1234-7000-8000-000000000001",
   name: "Workspace",
   version: 1,
@@ -66,7 +67,7 @@ const workspace = Schema.decodeUnknownSync(ControlPlaneWorkspace)({
   createdAt: "2026-08-14T00:00:00.000Z",
   updatedAt: "2026-08-14T00:00:00.000Z",
 });
-const capability = Schema.decodeUnknownSync(Capability)({
+const capability = SchemaStrict.decodeUnknownSync(Capability)({
   id: "019fae8b-1234-7000-8000-000000000004",
   key: "cms",
   status: "enabled",
@@ -101,8 +102,8 @@ const projectValue = {
     "studio_registration.write",
   ],
 };
-let currentProject = Schema.decodeUnknownSync(ControlPlaneProject)(projectValue);
-const managementCredential = Schema.decodeUnknownSync(CredentialPrincipal)({
+let currentProject = SchemaStrict.decodeUnknownSync(ControlPlaneProject)(projectValue);
+const managementCredential = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
   credentialId: "019fae8b-1234-7000-8000-000000000006",
   workspaceId: workspace.id,
   projectId: currentProject.id,
@@ -117,7 +118,7 @@ const managementCredential = Schema.decodeUnknownSync(CredentialPrincipal)({
   ],
 });
 const observedActorKinds: Array<string> = [];
-const member = Schema.decodeUnknownSync(ProjectMember)({
+const member = SchemaStrict.decodeUnknownSync(ProjectMember)({
   id: "019fae8b-1234-7000-8000-000000000020",
   projectId: currentProject.id,
   userId,
@@ -130,7 +131,7 @@ const member = Schema.decodeUnknownSync(ProjectMember)({
   createdAt: "2026-08-14T00:00:00.000Z",
   updatedAt: "2026-08-14T00:00:00.000Z",
 });
-const invitation = Schema.decodeUnknownSync(ProjectInvitation)({
+const invitation = SchemaStrict.decodeUnknownSync(ProjectInvitation)({
   id: "019fae8b-1234-7000-8000-000000000021",
   projectId: currentProject.id,
   email: "invited@example.test",
@@ -144,7 +145,7 @@ const invitation = Schema.decodeUnknownSync(ProjectInvitation)({
   createdAt: "2026-08-14T00:00:00.000Z",
   updatedAt: "2026-08-14T00:00:00.000Z",
 });
-const inspectedInvitation = Schema.decodeUnknownSync(InspectedProjectInvitation)({
+const inspectedInvitation = SchemaStrict.decodeUnknownSync(InspectedProjectInvitation)({
   projectId: currentProject.id,
   projectName: currentProject.name,
   role: invitation.role,
@@ -152,7 +153,7 @@ const inspectedInvitation = Schema.decodeUnknownSync(InspectedProjectInvitation)
   inviterName: "Control Plane User",
   expiresAt: invitation.expiresAt,
 });
-const englishLocale = Schema.decodeUnknownSync(ProjectLocale)({
+const englishLocale = SchemaStrict.decodeUnknownSync(ProjectLocale)({
   id: "019fae8b-1234-7000-8000-000000000022",
   workspaceId: workspace.id,
   projectId: currentProject.id,
@@ -164,7 +165,7 @@ const englishLocale = Schema.decodeUnknownSync(ProjectLocale)({
   createdAt: "2026-08-14T00:00:00.000Z",
   updatedAt: "2026-08-14T00:00:00.000Z",
 });
-const currentAccess = Schema.decodeUnknownSync(CurrentProjectAccess)({
+const currentAccess = SchemaStrict.decodeUnknownSync(CurrentProjectAccess)({
   projectId: currentProject.id,
   role: "owner",
   localeAccess: { mode: "all", localeIds: [] },
@@ -187,8 +188,8 @@ const currentAccess = Schema.decodeUnknownSync(CurrentProjectAccess)({
   effectiveLocaleIds: [englishLocale.id],
   effectiveLocaleActions: ["content.read", "content.write", "content.review", "content.publish"],
 });
-const invitationToken = Schema.decodeUnknownSync(InvitationToken)("a".repeat(43));
-const registration = Schema.decodeUnknownSync(StudioRegistration)({
+const invitationToken = SchemaStrict.decodeUnknownSync(InvitationToken)("a".repeat(43));
+const registration = SchemaStrict.decodeUnknownSync(StudioRegistration)({
   id: "019fae8b-1234-7000-8000-000000000005",
   projectId: currentProject.id,
   environmentId: currentProject.primaryEnvironment.id,
@@ -203,7 +204,7 @@ const registration = Schema.decodeUnknownSync(StudioRegistration)({
 });
 
 function legacyProject(project: ControlPlaneProject) {
-  return Schema.decodeUnknownSync(Project)({
+  return SchemaStrict.decodeUnknownSync(Project)({
     id: project.id,
     workspaceId: project.workspaceId,
     name: project.name,
@@ -241,7 +242,7 @@ const repository = {
   ) =>
     Effect.sync(() => {
       observedActorKinds.push(actor.kind);
-      currentProject = Schema.decodeUnknownSync(ControlPlaneProject)({
+      currentProject = SchemaStrict.decodeUnknownSync(ControlPlaneProject)({
         ...currentProject,
         name: input.name,
         version: currentProject.version + 1,
@@ -250,7 +251,7 @@ const repository = {
     }),
   archiveProject: () =>
     Effect.sync(() => {
-      currentProject = Schema.decodeUnknownSync(ControlPlaneProject)({
+      currentProject = SchemaStrict.decodeUnknownSync(ControlPlaneProject)({
         ...currentProject,
         status: "archived",
         archivedAt: "2026-08-15T00:00:00.000Z",
@@ -260,7 +261,7 @@ const repository = {
     }),
   restoreProject: () =>
     Effect.sync(() => {
-      currentProject = Schema.decodeUnknownSync(ControlPlaneProject)({
+      currentProject = SchemaStrict.decodeUnknownSync(ControlPlaneProject)({
         ...currentProject,
         status: "active",
         archivedAt: null,
@@ -353,7 +354,7 @@ const rateLimitManager: RateLimitManagerService = {
   evaluate: (input) =>
     Effect.sync(() => {
       evaluatedRates.push({ policy: input.policy, cost: input.cost });
-      return Schema.decodeUnknownSync(RateLimitDecision)({
+      return SchemaStrict.decodeUnknownSync(RateLimitDecision)({
         allowed: rateLimitsAllow,
         policy: input.policy,
         cost: input.cost,

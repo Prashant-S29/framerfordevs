@@ -1,5 +1,5 @@
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer } from "effect";
 
 import { ForbiddenFailure } from "../../../contracts/response/errors";
 import { RateLimitCost, RateLimitDecision } from "../../../contracts/rate-limit";
@@ -14,6 +14,7 @@ import { RateLimitManager } from "../../../services/rate-limit/manager";
 import { makeWebhookRepository, WebhookRepository } from "../../../services/webhook/repository";
 import { createWebhookEndpoint, replayWebhookEvent, updateWebhookEndpoint } from "./index";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 let destinationValidationCalls = 0;
 const repository = makeWebhookRepository();
 const OperationTest = Layer.mergeAll(
@@ -69,7 +70,7 @@ describe("Webhook management operations", () => {
     it.effect("authorizes endpoint creation before performing external DNS validation", () =>
       Effect.gen(function* () {
         destinationValidationCalls = 0;
-        const input = Schema.decodeUnknownSync(CreateWebhookEndpointInput)({
+        const input = SchemaStrict.decodeUnknownSync(CreateWebhookEndpointInput)({
           projectId: "019fae8b-1234-7000-8000-000000000001",
           environmentId: "019fae8b-1234-7000-8000-000000000002",
           name: "Receiver",
@@ -88,7 +89,7 @@ describe("Webhook management operations", () => {
     it.effect("authorizes destination replacement before performing external DNS validation", () =>
       Effect.gen(function* () {
         destinationValidationCalls = 0;
-        const input = Schema.decodeUnknownSync(UpdateWebhookEndpointInput)({
+        const input = SchemaStrict.decodeUnknownSync(UpdateWebhookEndpointInput)({
           projectId: "019fae8b-1234-7000-8000-000000000001",
           environmentId: "019fae8b-1234-7000-8000-000000000002",
           endpointId: "019fae8b-1234-7000-8000-000000000003",
@@ -109,7 +110,7 @@ describe("Webhook management operations", () => {
     it.effect("rate-limits manual replay before persistence", () =>
       Effect.gen(function* () {
         replayRepositoryCalls = 0;
-        const input = Schema.decodeUnknownSync(ReplayWebhookEventInput)({
+        const input = SchemaStrict.decodeUnknownSync(ReplayWebhookEventInput)({
           projectId: "019fae8b-1234-7000-8000-000000000001",
           environmentId: "019fae8b-1234-7000-8000-000000000002",
           endpointId: "019fae8b-1234-7000-8000-000000000003",

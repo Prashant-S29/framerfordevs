@@ -51,6 +51,7 @@ import {
   PreviewRepositoryLive,
 } from "../../../src/services/preview/repository";
 
+import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ids = {
   workspace: randomUUID(),
@@ -72,7 +73,7 @@ const ids = {
 };
 const ownerId = `m10-preview-owner-${suffix}`;
 const viewerId = `m10-preview-viewer-${suffix}`;
-const viewerActor = Schema.decodeUnknownSync(AuthUserId)(viewerId);
+const viewerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(viewerId);
 const hiddenEditor = {
   helpText: null,
   placeholder: null,
@@ -80,7 +81,7 @@ const hiddenEditor = {
   editableByRoles: ["owner"],
 } as const;
 
-const sharedV1 = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+const sharedV1 = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   id: ids.sharedField,
   parentFieldId: null,
   nodeRole: "root",
@@ -95,11 +96,11 @@ const sharedV1 = Schema.decodeUnknownSync(CollectionFieldDefinition)({
   configuration: {},
   children: [],
 });
-const sharedV2 = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+const sharedV2 = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   ...sharedV1,
   apiKey: "internal_note",
 });
-const localizedField = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+const localizedField = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   id: ids.localizedField,
   parentFieldId: null,
   nodeRole: "root",
@@ -128,7 +129,7 @@ const contractTwo = hashSchemaContract({
   collectionApiKey: "articles",
   fields: [sharedV2, localizedField],
 });
-const principal = Schema.decodeUnknownSync(CredentialPrincipal)({
+const principal = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
   credentialId: ids.credential,
   workspaceId: ids.workspace,
   projectId: ids.project,
@@ -136,27 +137,27 @@ const principal = Schema.decodeUnknownSync(CredentialPrincipal)({
   family: "preview",
   scopes: ["preview.read"],
 });
-const currentCredentialInput = Schema.decodeUnknownSync(PreviewRouteScope)({
+const currentCredentialInput = SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
   projectId: ids.project,
   environmentKey: "main",
   collectionKey: "articles",
   entryId: ids.entry,
   locale: "en",
 });
-const revisionCredentialInput = Schema.decodeUnknownSync(GetRevisionCredentialPreviewInput)({
+const revisionCredentialInput = SchemaStrict.decodeUnknownSync(GetRevisionCredentialPreviewInput)({
   ...currentCredentialInput,
   schemaRevisionId: ids.schemaOne,
   sharedRevisionId: ids.sharedRevision,
   localizedRevisionId: ids.localizedRevisionOne,
 });
-const currentUserInput = Schema.decodeUnknownSync(GetCurrentUserPreviewInput)({
+const currentUserInput = SchemaStrict.decodeUnknownSync(GetCurrentUserPreviewInput)({
   projectId: ids.project,
   environmentId: ids.environment,
   collectionId: ids.collection,
   entryId: ids.entry,
   locale: "en",
 });
-const revisionUserInput = Schema.decodeUnknownSync(GetRevisionUserPreviewInput)({
+const revisionUserInput = SchemaStrict.decodeUnknownSync(GetRevisionUserPreviewInput)({
   ...currentUserInput,
   schemaRevisionId: ids.schemaOne,
   sharedRevisionId: ids.sharedRevision,
@@ -165,7 +166,7 @@ const revisionUserInput = Schema.decodeUnknownSync(GetRevisionUserPreviewInput)(
 
 function failureTag(exit: Exit.Exit<unknown, unknown>): string | undefined {
   if (Exit.isSuccess(exit)) return undefined;
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   return typeof failure === "object" && failure !== null && "_tag" in failure
     ? String(failure._tag)
     : undefined;
@@ -173,7 +174,7 @@ function failureTag(exit: Exit.Exit<unknown, unknown>): string | undefined {
 
 function failureOperation(exit: Exit.Exit<unknown, unknown>): string | undefined {
   if (Exit.isSuccess(exit)) return undefined;
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   return typeof failure === "object" && failure !== null && "operation" in failure
     ? String(failure.operation)
     : undefined;
@@ -596,7 +597,7 @@ afterAll(async () => {
   await db.delete(user).where(or(eq(user.id, ownerId), eq(user.id, viewerId)));
 });
 
-describe.sequential("Preview repository PostgreSQL integration", () => {
+describe("Preview repository PostgreSQL integration", () => {
   it.effect(
     "projects current mixed-contract heads under the published schema and audits full credential authority",
     () =>
@@ -733,7 +734,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
       const disabledLocale = await Effect.runPromiseExit(
         repository.getCredentialCurrent(
           principal,
-          Schema.decodeUnknownSync(PreviewRouteScope)({
+          SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
             ...currentCredentialInput,
             locale: "hi",
           }),
@@ -867,7 +868,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
         );
         const none = yield* repository.getUserRevision(
           viewerActor,
-          Schema.decodeUnknownSync(GetRevisionUserPreviewInput)({
+          SchemaStrict.decodeUnknownSync(GetRevisionUserPreviewInput)({
             ...revisionUserInput,
             sharedRevisionId: null,
             localizedRevisionId: null,
@@ -878,7 +879,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
         const incompatible = yield* Effect.exit(
           repository.getCredentialRevision(
             principal,
-            Schema.decodeUnknownSync(GetRevisionCredentialPreviewInput)({
+            SchemaStrict.decodeUnknownSync(GetRevisionCredentialPreviewInput)({
               ...revisionCredentialInput,
               localizedRevisionId: ids.localizedRevisionTwo,
             }),
@@ -909,7 +910,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
     Effect.gen(function* () {
       const item = yield* makePreviewRepository().getCredentialCurrent(
         principal,
-        Schema.decodeUnknownSync(PreviewRouteScope)({
+        SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
           ...currentCredentialInput,
           entryId: ids.emptyEntry,
         }),
@@ -931,7 +932,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
       Effect.gen(function* () {
         const wrongFamily = yield* Effect.exit(
           makePreviewRepository().getCredentialCurrent(
-            Schema.decodeUnknownSync(CredentialPrincipal)({
+            SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
               ...principal,
               family: "delivery",
               scopes: ["delivery.read"],
@@ -943,7 +944,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
         );
         const missingScope = yield* Effect.exit(
           makePreviewRepository().getCredentialCurrent(
-            Schema.decodeUnknownSync(CredentialPrincipal)({
+            SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
               ...principal,
               scopes: ["content.read"],
             }),
@@ -955,7 +956,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
         const wrongProject = yield* Effect.exit(
           makePreviewRepository().getCredentialCurrent(
             principal,
-            Schema.decodeUnknownSync(PreviewRouteScope)({
+            SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
               ...currentCredentialInput,
               projectId: randomUUID(),
             }),
@@ -963,7 +964,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
             "preview.failed.project",
           ),
         );
-        const wrongPrincipal = Schema.decodeUnknownSync(CredentialPrincipal)({
+        const wrongPrincipal = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
           ...principal,
           environmentId: randomUUID(),
         });
@@ -978,7 +979,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
         const missingCollection = yield* Effect.exit(
           makePreviewRepository().getCredentialCurrent(
             principal,
-            Schema.decodeUnknownSync(PreviewRouteScope)({
+            SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
               ...currentCredentialInput,
               collectionKey: "missing",
             }),
@@ -989,7 +990,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
         const missingEntry = yield* Effect.exit(
           makePreviewRepository().getCredentialCurrent(
             principal,
-            Schema.decodeUnknownSync(PreviewRouteScope)({
+            SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
               ...currentCredentialInput,
               entryId: randomUUID(),
             }),
@@ -1000,7 +1001,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
         const missingLocale = yield* Effect.exit(
           makePreviewRepository().getCredentialCurrent(
             principal,
-            Schema.decodeUnknownSync(PreviewRouteScope)({
+            SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
               ...currentCredentialInput,
               locale: "fr",
             }),
@@ -1011,7 +1012,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
         const missingRevision = yield* Effect.exit(
           makePreviewRepository().getCredentialRevision(
             principal,
-            Schema.decodeUnknownSync(GetRevisionCredentialPreviewInput)({
+            SchemaStrict.decodeUnknownSync(GetRevisionCredentialPreviewInput)({
               ...revisionCredentialInput,
               localizedRevisionId: randomUUID(),
             }),
@@ -1185,7 +1186,7 @@ describe.sequential("Preview repository PostgreSQL integration", () => {
                   current_setting('statement_timeout') as statement_timeout,
                   current_setting('idle_in_transaction_session_timeout') as idle_timeout
               `);
-              const decoded = Schema.decodeUnknownSync(
+              const decoded = SchemaStrict.decodeUnknownSync(
                 Schema.Struct({
                   rows: Schema.Array(
                     Schema.Struct({

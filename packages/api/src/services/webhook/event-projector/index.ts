@@ -20,10 +20,10 @@ export function makeWebhookEventProjector() {
   };
 }
 
-export class WebhookEventProjector extends Context.Tag("WebhookEventProjector")<
+export class WebhookEventProjector extends Context.Service<
   WebhookEventProjector,
   ReturnType<typeof makeWebhookEventProjector>
->() {}
+>()("WebhookEventProjector") {}
 
 export const WebhookEventProjectorLive = Layer.succeed(
   WebhookEventProjector,

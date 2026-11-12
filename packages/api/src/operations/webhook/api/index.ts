@@ -2,7 +2,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 
-import { Clock, Effect, Schema } from "effect";
+import { Clock, Effect } from "effect";
 
 import type { ProjectActor } from "../../../contracts/access";
 import { RateLimitedFailure, UnauthorizedFailure } from "../../../contracts/response/errors";
@@ -33,9 +33,10 @@ import { RateLimitManager } from "../../../services/rate-limit/manager";
 import { WebhookRepository } from "../../../services/webhook/repository";
 import { canonicalizeEntryValue } from "../../../lib/entry/values";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const decodeActor = (value: string | ProjectActor) =>
   typeof value === "string"
-    ? Schema.decodeUnknown(AuthUserId)(value).pipe(
+    ? SchemaStrict.decodeUnknownEffect(AuthUserId)(value).pipe(
         Effect.map((id) => ({ kind: "user" as const, id })),
         Effect.mapError(() => UnauthorizedFailure.make()),
       )
@@ -299,7 +300,7 @@ export const replayWebhookEvent = Effect.fn("webhook.delivery.replay")(function*
     cost: 1,
   });
   if (!decision.allowed) return yield* RateLimitedFailure.make();
-  const encodedInput = yield* Schema.encode(ReplayWebhookEventInput)(input).pipe(
+  const encodedInput = yield* SchemaStrict.encodeEffect(ReplayWebhookEventInput)(input).pipe(
     Effect.mapError(() => UnauthorizedFailure.make()),
   );
   const fingerprint = createHash("sha256")

@@ -4,6 +4,7 @@ import { performance } from "node:perf_hooks";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const priorOAuthRollout = process.env.OAUTH_DEVICE_AUTHORIZATION_ENABLED;
 process.env.OAUTH_DEVICE_AUTHORIZATION_ENABLED = "true";
 
@@ -90,14 +91,14 @@ beforeAll(async () => {
   expect(signUp.status).toBe(200);
   ownerId = signUp.body.user.id;
 
-  const { Effect, Schema } = effectModule;
-  const owner = Schema.decodeUnknownSync(platformContracts.AuthUserId)(ownerId);
+  const { Effect } = effectModule;
+  const owner = SchemaStrict.decodeUnknownSync(platformContracts.AuthUserId)(ownerId);
   const platform = platformServices.makePlatformRepository();
   const schemas = schemaServices.makeSchemaRepository();
   const workspace = await Effect.runPromise(
     platform.createWorkspace(
       owner,
-      Schema.decodeUnknownSync(platformContracts.CreateWorkspaceInput)({
+      SchemaStrict.decodeUnknownSync(platformContracts.CreateWorkspaceInput)({
         name: "M12 Tooling Readiness Workspace",
       }),
       `m12-tooling-workspace-${suffix}`,
@@ -109,7 +110,7 @@ beforeAll(async () => {
     Effect.runPromise(
       platform.createProject(
         owner,
-        Schema.decodeUnknownSync(platformContracts.CreateProjectInput)({
+        SchemaStrict.decodeUnknownSync(platformContracts.CreateProjectInput)({
           workspaceId,
           name,
           key,
@@ -136,7 +137,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     platform.enableCapability(
       owner,
-      Schema.decodeUnknownSync(platformContracts.EnableCapabilityInput)({
+      SchemaStrict.decodeUnknownSync(platformContracts.EnableCapabilityInput)({
         projectId,
         capability: "cms",
       }),
@@ -148,7 +149,7 @@ beforeAll(async () => {
     const created = await Effect.runPromise(
       schemas.createCollection(
         owner,
-        Schema.decodeUnknownSync(schemaContracts.CreateCollectionInput)({
+        SchemaStrict.decodeUnknownSync(schemaContracts.CreateCollectionInput)({
           projectId,
           environmentId,
           apiKey: key,
@@ -162,7 +163,7 @@ beforeAll(async () => {
     const draft = await Effect.runPromise(
       schemas.createField(
         owner,
-        Schema.decodeUnknownSync(schemaContracts.CreateCollectionFieldInput)({
+        SchemaStrict.decodeUnknownSync(schemaContracts.CreateCollectionFieldInput)({
           projectId,
           environmentId,
           collectionId: created.id,
@@ -187,13 +188,13 @@ beforeAll(async () => {
     const validation = await Effect.runPromise(
       schemas.validateSchema(
         owner,
-        Schema.decodeUnknownSync(schemaContracts.ValidateCollectionSchemaInput)(scope),
+        SchemaStrict.decodeUnknownSync(schemaContracts.ValidateCollectionSchemaInput)(scope),
       ),
     );
     const published = await Effect.runPromise(
       schemas.publishSchema(
         owner,
-        Schema.decodeUnknownSync(schemaContracts.PublishCollectionSchemaInput)({
+        SchemaStrict.decodeUnknownSync(schemaContracts.PublishCollectionSchemaInput)({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           expectedPublishedRevisionId: null,
@@ -344,7 +345,7 @@ afterAll(async () => {
   }
 }, 60_000);
 
-describe.sequential("Tooling OAuth HTTP readiness", () => {
+describe("Tooling OAuth HTTP readiness", () => {
   it("exports complete code-owned schema authority through the Authoring OAuth grant", async () => {
     const response = await api
       .get(`/api/authoring/v1/projects/${projectId}/environments/${environmentId}/schema/export`)

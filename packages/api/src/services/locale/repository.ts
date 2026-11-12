@@ -45,6 +45,7 @@ import {
 } from "../project-access";
 import { isRoleAllowed } from "../policy";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
 }
@@ -75,10 +76,10 @@ function hasConstraint(cause: unknown, constraint: string, depth = 0): boolean {
 
 function decodeDatabaseValue<A, I>(
   operation: string,
-  schema: Schema.Schema<A, I, never>,
+  schema: Schema.Codec<A, I, never>,
   value: unknown,
 ) {
-  return Schema.decodeUnknown(schema)(value).pipe(
+  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
     Effect.mapError((cause) => databaseFailure(`${operation}.decode`, cause)),
   );
 }
@@ -810,9 +811,9 @@ export function makeLocaleRepository(options: RepositoryOptions = {}) {
   };
 }
 
-export class LocaleRepository extends Context.Tag("LocaleRepository")<
+export class LocaleRepository extends Context.Service<
   LocaleRepository,
   ReturnType<typeof makeLocaleRepository>
->() {}
+>()("LocaleRepository") {}
 
 export const LocaleRepositoryLive = Layer.succeed(LocaleRepository, makeLocaleRepository());

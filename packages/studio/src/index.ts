@@ -7,3 +7,8 @@ export type {
   StudioBrowserSuccess,
 } from "./contracts";
 export { decodeStudioBrowserBootstrap, decodeStudioBrowserResponse } from "./contracts";
+export {
+  createStudioContentClient,
+  StudioContentClientError,
+  type StudioContentClient,
+} from "./content-client";

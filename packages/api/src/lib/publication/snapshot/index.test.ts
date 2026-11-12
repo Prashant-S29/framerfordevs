@@ -1,7 +1,6 @@
 // Verifies deterministic strict M8 snapshot compilation, pinning, hashing, and aggregate bounds.
 
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import { EntryValues } from "../../../contracts/entry";
 import {
@@ -15,6 +14,7 @@ import {
   type ResolvedPublicationReference,
 } from "./index";
 
+import * as SchemaStrict from "../../schema-strict";
 const ids = {
   entry: "019fae8b-1234-7000-8000-000000000001",
   collection: "019fae8b-1234-7000-8000-000000000002",
@@ -40,7 +40,7 @@ const editor = {
 };
 
 function decodeField(value: unknown): CollectionField {
-  return Schema.decodeUnknownSync(CollectionFieldDefinition)(value);
+  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)(value);
 }
 
 function fieldId(index: number): string {
@@ -170,7 +170,7 @@ function compilerFields(): ReadonlyArray<CollectionField> {
 }
 
 function entryValues(value: unknown) {
-  return Schema.decodeUnknownSync(EntryValues)(value);
+  return SchemaStrict.decodeUnknownSync(EntryValues)(value);
 }
 
 function resolvedReference(): ResolvedPublicationReference {

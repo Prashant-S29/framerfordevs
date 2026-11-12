@@ -21,10 +21,11 @@ import {
   isPortableStudioMountPath,
 } from "./index";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const commandId = "019fae8b-1234-7000-8000-000000000001";
 
-const decodeExits = <A, I>(schema: Schema.Schema<A, I, never>, values: ReadonlyArray<unknown>) =>
-  Effect.forEach(values, (value) => Effect.exit(Schema.decodeUnknown(schema)(value)));
+const decodeExits = <A, I>(schema: Schema.Codec<A, I, never>, values: ReadonlyArray<unknown>) =>
+  Effect.forEach(values, (value) => Effect.exit(SchemaStrict.decodeUnknownEffect(schema)(value)));
 
 describe("Control Plane contracts", () => {
   it.effect("accepts canonical HTTPS and explicit loopback Studio origins", () =>
@@ -103,12 +104,12 @@ describe("Control Plane contracts", () => {
 
   it.effect("normalizes names while rejecting excess create fields", () =>
     Effect.gen(function* () {
-      const request = yield* Schema.decodeUnknown(ControlPlaneCreateWorkspaceRequest)({
+      const request = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCreateWorkspaceRequest)({
         commandId,
         name: "  Product Workspace  ",
       });
       const excess = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneCreateWorkspaceRequest)({
+        SchemaStrict.decodeUnknownEffect(ControlPlaneCreateWorkspaceRequest)({
           commandId,
           name: "Product Workspace",
           ownerId: commandId,
@@ -122,15 +123,17 @@ describe("Control Plane contracts", () => {
 
   it.effect("accepts empty or unique initial capabilities and rejects duplicates", () =>
     Effect.gen(function* () {
-      const empty = yield* Effect.exit(Schema.decodeUnknown(ControlPlaneInitialCapabilities)([]));
+      const empty = yield* Effect.exit(
+        SchemaStrict.decodeUnknownEffect(ControlPlaneInitialCapabilities)([]),
+      );
       const cms = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneInitialCapabilities)(["cms"]),
+        SchemaStrict.decodeUnknownEffect(ControlPlaneInitialCapabilities)(["cms"]),
       );
       const duplicate = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneInitialCapabilities)(["cms", "cms"]),
+        SchemaStrict.decodeUnknownEffect(ControlPlaneInitialCapabilities)(["cms", "cms"]),
       );
       const unknown = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneInitialCapabilities)(["billing"]),
+        SchemaStrict.decodeUnknownEffect(ControlPlaneInitialCapabilities)(["billing"]),
       );
 
       assert.isTrue(Exit.isSuccess(empty));
@@ -143,7 +146,7 @@ describe("Control Plane contracts", () => {
   it.effect("keeps project creation closed and command-idempotent", () =>
     Effect.gen(function* () {
       const valid = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneCreateProjectRequest)({
+        SchemaStrict.decodeUnknownEffect(ControlPlaneCreateProjectRequest)({
           commandId,
           name: "Product Site",
           key: "product-site",
@@ -152,7 +155,7 @@ describe("Control Plane contracts", () => {
         }),
       );
       const missingCommand = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneCreateProjectRequest)({
+        SchemaStrict.decodeUnknownEffect(ControlPlaneCreateProjectRequest)({
           name: "Product Site",
           key: "product-site",
           description: null,
@@ -167,20 +170,24 @@ describe("Control Plane contracts", () => {
 
   it.effect("distinguishes Studio create-only and positive-version update requests", () =>
     Effect.gen(function* () {
-      const createOnly = yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+      const createOnly = yield* SchemaStrict.decodeUnknownEffect(
+        ControlPlanePutStudioRegistrationRequest,
+      )({
         commandId,
         expectedVersion: null,
         applicationOrigin: "https://studio.example.com",
         mountPath: "/studio",
       });
-      const update = yield* Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+      const update = yield* SchemaStrict.decodeUnknownEffect(
+        ControlPlanePutStudioRegistrationRequest,
+      )({
         commandId,
         expectedVersion: 2,
         applicationOrigin: "https://studio.example.com",
         mountPath: "/studio-v2",
       });
       const zeroVersion = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlanePutStudioRegistrationRequest)({
+        SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
           commandId,
           expectedVersion: 0,
           applicationOrigin: "https://studio.example.com",
@@ -196,20 +203,20 @@ describe("Control Plane contracts", () => {
 
   it.effect("requires a positive expected version for user-controlled Studio runtime changes", () =>
     Effect.gen(function* () {
-      const valid = yield* Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+      const valid = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneSetStudioRuntimeRequest)({
         commandId,
         expectedVersion: 3,
         enabled: true,
       });
       const createStyle = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+        SchemaStrict.decodeUnknownEffect(ControlPlaneSetStudioRuntimeRequest)({
           commandId,
           expectedVersion: null,
           enabled: true,
         }),
       );
       const excess = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneSetStudioRuntimeRequest)({
+        SchemaStrict.decodeUnknownEffect(ControlPlaneSetStudioRuntimeRequest)({
           commandId,
           expectedVersion: 3,
           enabled: false,
@@ -235,8 +242,8 @@ describe("Control Plane contracts", () => {
     );
     const message = "m".repeat(512);
     const success = (data: unknown) => ({ ok: true, data, error: null, message });
-    const assertWithinLimit = <A, I>(schema: Schema.Schema<A, I, never>, input: unknown) => {
-      const decoded = Schema.decodeUnknownSync(schema)(input);
+    const assertWithinLimit = <A, I>(schema: Schema.Codec<A, I, never>, input: unknown) => {
+      const decoded = SchemaStrict.decodeUnknownSync(schema)(input);
       assert.isAtMost(
         Buffer.byteLength(JSON.stringify(decoded), "utf8"),
         controlPlaneLimits.responseBytes,
@@ -331,19 +338,19 @@ describe("Control Plane contracts", () => {
   it.effect("keeps the public error-code union closed", () =>
     Effect.gen(function* () {
       const commandConflict = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneApiErrorCode)("COMMAND_CONFLICT"),
+        SchemaStrict.decodeUnknownEffect(ControlPlaneApiErrorCode)("COMMAND_CONFLICT"),
       );
       const cursorInvalid = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneApiErrorCode)("CONTROL_PLANE_CURSOR_INVALID"),
+        SchemaStrict.decodeUnknownEffect(ControlPlaneApiErrorCode)("CONTROL_PLANE_CURSOR_INVALID"),
       );
       const invitationConflict = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneApiErrorCode)("INVITATION_CONFLICT"),
+        SchemaStrict.decodeUnknownEffect(ControlPlaneApiErrorCode)("INVITATION_CONFLICT"),
       );
       const localeConflict = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneApiErrorCode)("LOCALE_CONFLICT"),
+        SchemaStrict.decodeUnknownEffect(ControlPlaneApiErrorCode)("LOCALE_CONFLICT"),
       );
       const internalCode = yield* Effect.exit(
-        Schema.decodeUnknown(ControlPlaneApiErrorCode)("DATABASE_FAILURE"),
+        SchemaStrict.decodeUnknownEffect(ControlPlaneApiErrorCode)("DATABASE_FAILURE"),
       );
 
       assert.isTrue(Exit.isSuccess(commandConflict));

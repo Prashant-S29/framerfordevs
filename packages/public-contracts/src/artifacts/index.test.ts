@@ -14,7 +14,7 @@ function sha256(bytes: string): string {
 }
 
 describe("closed public contract registry", () => {
-  it("contains exactly the eight approved v1 families", () => {
+  it("contains the eight approved v1 families and Studio Content v2 successor", () => {
     expect(publicContractRegistryKeys).toEqual([
       "authoring/v1",
       "control-plane/v1",
@@ -22,6 +22,7 @@ describe("closed public contract registry", () => {
       "preview/v1",
       "studio/v1",
       "studio-content/v1",
+      "studio-content/v2",
       "tooling/v1",
       "webhooks/v1",
     ]);
@@ -37,6 +38,7 @@ describe("closed public contract registry", () => {
     ]);
     expect(Object.keys(publicContractRegistry)).toEqual([...publicContractRegistryKeys]);
     expect(Object.values(publicContractRegistry).map((entry) => entry.kind)).toEqual([
+      "openapi",
       "openapi",
       "openapi",
       "openapi",

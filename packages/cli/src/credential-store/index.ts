@@ -7,6 +7,7 @@ import { Context, Effect, Layer, Schema } from "effect";
 
 import { CredentialStoreUnavailableError, StoredCredentialInvalidError } from "../errors";
 
+import * as SchemaStrict from "../schema-strict";
 const serviceName = "framerfordevs-cli";
 const maximumCredentialBytes = 32 * 1_024;
 
@@ -15,10 +16,13 @@ export class StoredOAuthAuthority extends Schema.Class<StoredOAuthAuthority>(
 )(
   Schema.Struct({
     version: Schema.Literal(1),
-    accessToken: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(16_384)),
-    refreshToken: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(16_384)),
-    accessExpiresAtEpochSeconds: Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0)),
-  }).annotations({ parseOptions: { onExcessProperty: "error" } }),
+    accessToken: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(16_384)),
+    refreshToken: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(16_384)),
+    accessExpiresAtEpochSeconds: Schema.Number.check(
+      Schema.isInt(),
+      Schema.isGreaterThanOrEqualTo(0),
+    ),
+  }).annotate({ closedObject: true }),
 ) {}
 
 interface NativeEntry {
@@ -70,7 +74,7 @@ export function makeCredentialStore(
           try: (): unknown => JSON.parse(value),
           catch: () => StoredCredentialInvalidError.make(),
         });
-        return yield* Schema.decodeUnknown(StoredOAuthAuthority)(parsed).pipe(
+        return yield* SchemaStrict.decodeUnknownEffect(StoredOAuthAuthority)(parsed).pipe(
           Effect.mapError(() => StoredCredentialInvalidError.make()),
         );
       }),
@@ -86,10 +90,9 @@ export function makeCredentialStore(
   };
 }
 
-export class CredentialStore extends Context.Tag("CredentialStore")<
-  CredentialStore,
-  CredentialStoreService
->() {}
+export class CredentialStore extends Context.Service<CredentialStore, CredentialStoreService>()(
+  "CredentialStore",
+) {}
 
 export const CredentialStoreLive = Layer.succeed(
   CredentialStore,

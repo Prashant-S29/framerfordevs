@@ -1,6 +1,6 @@
 // Wraps the pure M6 field kernel in named replaceable Effect service operations.
 
-import { Context, Effect, Layer, ParseResult, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import {
   type CollectionFieldKind,
@@ -26,6 +26,7 @@ import {
   validateFieldValue,
 } from "../../../lib/field/validation";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 export interface FieldConfigurationValidationResult {
   readonly valid: boolean;
   readonly configuration: FieldConfiguration | null;
@@ -41,92 +42,92 @@ const configurationParseOptions = {
 function decodeConfiguration(kind: CollectionFieldKind, input: unknown) {
   switch (kind) {
     case "short_text":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.short_text,
         configurationParseOptions,
       )(input);
     case "long_text":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.long_text,
         configurationParseOptions,
       )(input);
     case "rich_text":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.rich_text,
         configurationParseOptions,
       )(input);
     case "number":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.number,
         configurationParseOptions,
       )(input);
     case "decimal":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.decimal,
         configurationParseOptions,
       )(input);
     case "money":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.money,
         configurationParseOptions,
       )(input);
     case "boolean":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.boolean,
         configurationParseOptions,
       )(input);
     case "date":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.date,
         configurationParseOptions,
       )(input);
     case "date_time":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.date_time,
         configurationParseOptions,
       )(input);
     case "enum":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.enum,
         configurationParseOptions,
       )(input);
     case "url":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.url,
         configurationParseOptions,
       )(input);
     case "email":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.email,
         configurationParseOptions,
       )(input);
     case "slug":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.slug,
         configurationParseOptions,
       )(input);
     case "json":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.json,
         configurationParseOptions,
       )(input);
     case "object":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.object,
         configurationParseOptions,
       )(input);
     case "list":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.list,
         configurationParseOptions,
       )(input);
     case "reference":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.reference,
         configurationParseOptions,
       )(input);
     case "external_asset":
-      return Schema.decodeUnknownEither(
+      return SchemaStrict.decodeUnknownResult(
         fieldConfigurationSchemas.external_asset,
         configurationParseOptions,
       )(input);
@@ -139,10 +140,10 @@ function validateConfigurationOperation(
   input: unknown,
 ): Effect.Effect<FieldConfigurationValidationResult> {
   const decoded = decodeConfiguration(kind, input);
-  if (decoded._tag === "Right") {
-    return Effect.succeed({ valid: true, configuration: decoded.right, issues: [] });
+  if (decoded._tag === "Success") {
+    return Effect.succeed({ valid: true, configuration: decoded.success, issues: [] });
   }
-  const message = ParseResult.TreeFormatter.formatErrorSync(decoded.left).slice(0, 512);
+  const message = decoded.failure.message.slice(0, 512);
   return Effect.succeed({
     valid: false,
     configuration: null,
@@ -196,9 +197,8 @@ export function makeFieldEngine() {
   };
 }
 
-export class FieldEngine extends Context.Tag("FieldEngine")<
-  FieldEngine,
-  ReturnType<typeof makeFieldEngine>
->() {}
+export class FieldEngine extends Context.Service<FieldEngine, ReturnType<typeof makeFieldEngine>>()(
+  "FieldEngine",
+) {}
 
 export const FieldEngineLive = Layer.succeed(FieldEngine, makeFieldEngine());

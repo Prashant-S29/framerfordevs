@@ -86,15 +86,16 @@ import { makeToolingRepository } from "../../../src/services/tooling/repository"
 import { makeWebhookRepository } from "../../../src/services/webhook/repository";
 import { makeWebhookWorkerRepository } from "../../../src/services/webhook/worker-repository";
 
+import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ownerId = `m5-schema-owner-${suffix}`;
 const foreignId = `m5-schema-foreign-${suffix}`;
 const readerId = `m6-schema-reader-${suffix}`;
-const ownerActor = Schema.decodeUnknownSync(AuthUserId)(ownerId);
-const foreignActor = Schema.decodeUnknownSync(AuthUserId)(foreignId);
-const readerActor = Schema.decodeUnknownSync(AuthUserId)(readerId);
-const managementCredentialId = Schema.decodeUnknownSync(ApiCredentialId)(randomUUID());
-const managementActor = Schema.decodeUnknownSync(CmsActor)({
+const ownerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(ownerId);
+const foreignActor = SchemaStrict.decodeUnknownSync(AuthUserId)(foreignId);
+const readerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(readerId);
+const managementCredentialId = SchemaStrict.decodeUnknownSync(ApiCredentialId)(randomUUID());
+const managementActor = SchemaStrict.decodeUnknownSync(CmsActor)({
   kind: "credential",
   id: managementCredentialId,
 });
@@ -118,7 +119,7 @@ function required<A>(value: A | undefined, label: string): A {
 
 function failureTag(exit: Exit.Exit<unknown, unknown>): string | undefined {
   if (Exit.isSuccess(exit)) return undefined;
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   if (typeof failure === "object" && failure !== null && "_tag" in failure) {
     return typeof failure._tag === "string" ? failure._tag : undefined;
   }
@@ -127,7 +128,7 @@ function failureTag(exit: Exit.Exit<unknown, unknown>): string | undefined {
 
 function failureIssueCodes(exit: Exit.Exit<unknown, unknown>): ReadonlyArray<string> {
   if (Exit.isSuccess(exit)) return [];
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   if (typeof failure !== "object" || failure === null || !("issues" in failure)) return [];
   if (!Array.isArray(failure.issues)) return [];
   return failure.issues.flatMap((issue) =>
@@ -161,14 +162,14 @@ beforeAll(async () => {
   workspaceModel = await Effect.runPromise(
     platform.createWorkspace(
       ownerActor,
-      Schema.decodeUnknownSync(CreateWorkspaceInput)({ name: "M5 Schema Workspace" }),
+      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M5 Schema Workspace" }),
       "request-m5-schema-workspace",
     ),
   );
   projectModel = await Effect.runPromise(
     platform.createProject(
       ownerActor,
-      Schema.decodeUnknownSync(CreateProjectInput)({
+      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
         workspaceId: required(workspaceModel, "workspace").id,
         name: "M5 Schema Project",
         key: `schema-${suffix.slice(0, 8)}`,
@@ -192,7 +193,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     platform.enableCapability(
       ownerActor,
-      Schema.decodeUnknownSync(EnableCapabilityInput)({
+      SchemaStrict.decodeUnknownSync(EnableCapabilityInput)({
         projectId: required(projectModel, "project").id,
         capability: "cms",
       }),
@@ -225,7 +226,7 @@ beforeAll(async () => {
   disabledProject = await Effect.runPromise(
     platform.createProject(
       ownerActor,
-      Schema.decodeUnknownSync(CreateProjectInput)({
+      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
         workspaceId: required(workspaceModel, "workspace").id,
         name: "M5 Disabled Project",
         key: `disabled-${suffix.slice(0, 8)}`,
@@ -237,14 +238,14 @@ beforeAll(async () => {
   foreignWorkspace = await Effect.runPromise(
     platform.createWorkspace(
       foreignActor,
-      Schema.decodeUnknownSync(CreateWorkspaceInput)({ name: "M5 Foreign Workspace" }),
+      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M5 Foreign Workspace" }),
       "request-m5-foreign-workspace",
     ),
   );
   foreignProject = await Effect.runPromise(
     platform.createProject(
       foreignActor,
-      Schema.decodeUnknownSync(CreateProjectInput)({
+      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
         workspaceId: required(foreignWorkspace, "foreign workspace").id,
         name: "M5 Foreign Project",
         key: `foreign-${suffix.slice(0, 8)}`,
@@ -256,7 +257,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     platform.enableCapability(
       foreignActor,
-      Schema.decodeUnknownSync(EnableCapabilityInput)({
+      SchemaStrict.decodeUnknownSync(EnableCapabilityInput)({
         projectId: required(foreignProject, "foreign project").id,
         capability: "cms",
       }),
@@ -351,13 +352,13 @@ afterAll(async () => {
   await db.$client.end();
 });
 
-describe.sequential("schema repository PostgreSQL integration", () => {
+describe("schema repository PostgreSQL integration", () => {
   it.effect("atomically creates a collection, schema head, and payload-free audit", () =>
     Effect.gen(function* () {
       const currentProject = required(projectModel, "project");
       firstCollection = yield* schemas.createCollection(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateCollectionInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
           projectId: currentProject.id,
           environmentId: currentProject.environment.id,
           apiKey: "blog_posts",
@@ -414,7 +415,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const duplicate = yield* Effect.exit(
         schemas.createCollection(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateCollectionInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             apiKey: "blog_posts",
@@ -429,7 +430,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const capabilityRequired = yield* Effect.exit(
         schemas.createCollection(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateCollectionInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
             projectId: disabled.id,
             environmentId: disabled.environment.id,
             apiKey: "posts",
@@ -444,7 +445,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const foreign = required(foreignProject, "foreign project");
       const sameKeyInOtherEnvironment = yield* schemas.createCollection(
         foreignActor,
-        yield* Schema.decodeUnknown(CreateCollectionInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
           projectId: foreign.id,
           environmentId: foreign.environment.id,
           apiKey: "blog_posts",
@@ -466,7 +467,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const currentProject = required(projectModel, "project");
       yield* schemas.createCollection(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateCollectionInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
           projectId: currentProject.id,
           environmentId: currentProject.environment.id,
           apiKey: "authors",
@@ -478,7 +479,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       );
       const firstPage = yield* schemas.listCollections(
         ownerActor,
-        yield* Schema.decodeUnknown(ListCollectionsInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ListCollectionsInput)({
           projectId: currentProject.id,
           environmentId: currentProject.environment.id,
           cursor: null,
@@ -487,7 +488,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       );
       const secondPage = yield* schemas.listCollections(
         ownerActor,
-        yield* Schema.decodeUnknown(ListCollectionsInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ListCollectionsInput)({
           projectId: currentProject.id,
           environmentId: currentProject.environment.id,
           cursor: firstPage.nextCursor,
@@ -498,7 +499,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const crossTenant = yield* Effect.exit(
         schemas.getCollection(
           ownerActor,
-          yield* Schema.decodeUnknown(GetCollectionInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetCollectionInput)({
             projectId: foreign.id,
             environmentId: foreign.environment.id,
             collectionId: required(firstCollection, "collection").id,
@@ -517,7 +518,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const collection = required(firstCollection, "collection");
       const noOp = yield* schemas.updateCollection(
         ownerActor,
-        yield* Schema.decodeUnknown(UpdateCollectionInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionInput)({
           projectId: collection.projectId,
           environmentId: collection.environmentId,
           collectionId: collection.id,
@@ -531,7 +532,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       );
       const updated = yield* schemas.updateCollection(
         ownerActor,
-        yield* Schema.decodeUnknown(UpdateCollectionInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionInput)({
           projectId: collection.projectId,
           environmentId: collection.environmentId,
           collectionId: collection.id,
@@ -546,7 +547,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const stale = yield* Effect.exit(
         schemas.updateCollection(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateCollectionInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionInput)({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -574,7 +575,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         const collection = required(firstCollection, "collection");
         const current = yield* schemas.getCollection(
           ownerActor,
-          yield* Schema.decodeUnknown(GetCollectionInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetCollectionInput)({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -582,7 +583,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         const titleDraft = yield* schemas.createField(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -606,7 +607,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         if (!title) throw new Error("Title field was not created.");
         const noOp = yield* schemas.updateField(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateCollectionFieldInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionFieldInput)({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -628,7 +629,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         const summaryDraft = yield* schemas.createField(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -652,7 +653,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         if (!summary) throw new Error("Summary field was not created.");
         const reordered = yield* schemas.reorderFields(
           ownerActor,
-          yield* Schema.decodeUnknown(ReorderCollectionFieldsInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ReorderCollectionFieldsInput)({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -679,7 +680,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const project = required(projectModel, "project");
       const collection = yield* schemas.createCollection(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateCollectionInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
           projectId: project.id,
           environmentId: project.environment.id,
           apiKey: `bulk_${suffix.replaceAll("-", "").slice(0, 20)}`,
@@ -697,7 +698,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const duplicate = yield* Effect.exit(
         schemas.replaceFields(
           ownerActor,
-          yield* Schema.decodeUnknown(ReplaceCollectionDraftFieldsInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ReplaceCollectionDraftFieldsInput)({
             ...scope,
             draftVersion: collection.draftVersion,
             authoringVersion: 1,
@@ -734,7 +735,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       );
       const afterFailure = yield* schemas.getDraft(
         ownerActor,
-        yield* Schema.decodeUnknown(GetCollectionDraftInput)(scope),
+        yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)(scope),
       );
       assert.strictEqual(failureTag(duplicate), "SchemaInvalidFailure");
       assert.include(failureIssueCodes(duplicate), "field_api_key_duplicate");
@@ -742,7 +743,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
 
       const created = yield* schemas.replaceFields(
         ownerActor,
-        yield* Schema.decodeUnknown(ReplaceCollectionDraftFieldsInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ReplaceCollectionDraftFieldsInput)({
           ...scope,
           draftVersion: afterFailure.collection.draftVersion,
           authoringVersion: 1,
@@ -800,7 +801,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const title = required(created.fields[0], "bulk title");
       const updated = yield* schemas.replaceFields(
         ownerActor,
-        yield* Schema.decodeUnknown(ReplaceCollectionDraftFieldsInput)({
+        yield* SchemaStrict.decodeUnknownEffect(ReplaceCollectionDraftFieldsInput)({
           ...scope,
           draftVersion: created.collection.draftVersion,
           authoringVersion: 1,
@@ -853,11 +854,11 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       };
       let draft = yield* schemas.getDraft(
         ownerActor,
-        yield* Schema.decodeUnknown(GetCollectionDraftInput)(scope),
+        yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)(scope),
       );
       draft = yield* schemas.createField(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           parentFieldId: null,
@@ -879,7 +880,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       if (!product) throw new Error("Product object was not created.");
       draft = yield* schemas.createField(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           parentFieldId: product.id,
@@ -899,7 +900,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       );
       draft = yield* schemas.createField(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           parentFieldId: null,
@@ -921,7 +922,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       if (!prices) throw new Error("Prices list was not created.");
       draft = yield* schemas.createField(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           parentFieldId: prices.id,
@@ -941,7 +942,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       );
       draft = yield* schemas.createField(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           parentFieldId: null,
@@ -961,7 +962,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       );
       draft = yield* schemas.createField(
         ownerActor,
-        yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           parentFieldId: null,
@@ -984,7 +985,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const reloadedPrices = draft.fields.find((field) => field.id === prices.id);
       const form = yield* schemas.getDraftForm(
         ownerActor,
-        yield* Schema.decodeUnknown(GetDraftGeneratedFormInput)(scope),
+        yield* SchemaStrict.decodeUnknownEffect(GetDraftGeneratedFormInput)(scope),
       );
       const firstTab = draft.editorLayout.tabs[0];
       const firstGroup = firstTab?.groups[0];
@@ -1000,7 +1001,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       };
       draft = yield* schemas.updateEditorLayout(
         ownerActor,
-        yield* Schema.decodeUnknown(UpdateEditorLayoutInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateEditorLayoutInput)({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           editorLayout: updatedLayout,
@@ -1030,7 +1031,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       for (const fieldId of temporaryIds) {
         draft = yield* schemas.removeField(
           ownerActor,
-          yield* Schema.decodeUnknown(RemoveCollectionFieldInput)({
+          yield* SchemaStrict.decodeUnknownEffect(RemoveCollectionFieldInput)({
             ...scope,
             fieldId,
             draftVersion: draft.collection.draftVersion,
@@ -1051,7 +1052,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         const currentProject = required(projectModel, "project");
         const collection = yield* schemas.createCollection(
           ownerActor,
-          yield* Schema.decodeUnknown(CreateCollectionInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             apiKey: `aggregate_${suffix.slice(0, 8)}`,
@@ -1063,7 +1064,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         let draft = yield* schemas.getDraft(
           ownerActor,
-          yield* Schema.decodeUnknown(GetCollectionDraftInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -1075,7 +1076,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
           const exit = yield* Effect.exit(
             schemas.createField(
               ownerActor,
-              yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+              yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
                 projectId: collection.projectId,
                 environmentId: collection.environmentId,
                 collectionId: collection.id,
@@ -1117,7 +1118,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         const current = yield* schemas.getCollection(
           ownerActor,
-          yield* Schema.decodeUnknown(GetCollectionInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetCollectionInput)({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -1157,11 +1158,11 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       };
       const draft = yield* schemas.getDraft(
         ownerActor,
-        yield* Schema.decodeUnknown(GetCollectionDraftInput)(scope),
+        yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)(scope),
       );
       const validation = yield* schemas.validateSchema(
         ownerActor,
-        yield* Schema.decodeUnknown(ValidateCollectionSchemaInput)(scope),
+        yield* SchemaStrict.decodeUnknownEffect(ValidateCollectionSchemaInput)(scope),
       );
       const acknowledgedChangeIds = validation.changes.items
         .filter((change) => change.classification !== "non_breaking")
@@ -1185,7 +1186,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             const exit = yield* Effect.exit(
               injected.publishSchema(
                 ownerActor,
-                yield* Schema.decodeUnknown(PublishCollectionSchemaInput)({
+                yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)({
                   ...scope,
                   draftVersion: draft.collection.draftVersion,
                   expectedPublishedRevisionId: null,
@@ -1204,7 +1205,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
                 (select count(*)::int from outbox_event where subject_id = ${collection.id}) as events,
                 (select count(*)::int from audit_event where request_id = ${`request-m5-failure-${step}`}) as audits`),
             );
-            const counts = yield* Schema.decodeUnknown(
+            const counts = yield* SchemaStrict.decodeUnknownEffect(
               Schema.Struct({
                 revisions: Schema.Number,
                 snapshots: Schema.Number,
@@ -1234,11 +1235,11 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         };
         const draft = yield* schemas.getDraft(
           ownerActor,
-          yield* Schema.decodeUnknown(GetCollectionDraftInput)(scope),
+          yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)(scope),
         );
         const validation = yield* schemas.validateSchema(
           ownerActor,
-          yield* Schema.decodeUnknown(ValidateCollectionSchemaInput)(scope),
+          yield* SchemaStrict.decodeUnknownEffect(ValidateCollectionSchemaInput)(scope),
         );
         assert.isTrue(validation.valid);
         assert.isTrue(validation.changes.requiresAcknowledgement);
@@ -1254,7 +1255,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         const missingAcknowledgement = yield* Effect.exit(
           schemas.publishSchema(
             ownerActor,
-            yield* Schema.decodeUnknown(PublishCollectionSchemaInput)({
+            yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)({
               ...baseInput,
               acknowledgedChangeIds: [],
             }),
@@ -1267,7 +1268,9 @@ describe.sequential("schema repository PostgreSQL integration", () => {
           "SchemaChangeAcknowledgementRequiredFailure",
         );
 
-        const decodedInput = yield* Schema.decodeUnknown(PublishCollectionSchemaInput)(baseInput);
+        const decodedInput = yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)(
+          baseInput,
+        );
         const published = yield* schemas.publishSchema(
           ownerActor,
           decodedInput,
@@ -1282,18 +1285,18 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         const latest = yield* schemas.getLatestPublished(
           ownerActor,
-          yield* Schema.decodeUnknown(GetLatestPublishedSchemaInput)(scope),
+          yield* SchemaStrict.decodeUnknownEffect(GetLatestPublishedSchemaInput)(scope),
         );
         const original = yield* schemas.getPublishedRevision(
           ownerActor,
-          yield* Schema.decodeUnknown(GetPublishedSchemaRevisionInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetPublishedSchemaRevisionInput)({
             ...scope,
             revisionId: published.id,
           }),
         );
         const readerForm = yield* schemas.getPublishedForm(
           readerActor,
-          yield* Schema.decodeUnknown(GetPublishedGeneratedFormInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetPublishedGeneratedFormInput)({
             ...scope,
             revisionId: null,
           }),
@@ -1320,7 +1323,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
 
         const noOp = yield* schemas.publishSchema(
           ownerActor,
-          yield* Schema.decodeUnknown(PublishCollectionSchemaInput)({
+          yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)({
             ...scope,
             draftVersion: draft.collection.draftVersion,
             expectedPublishedRevisionId: published.id,
@@ -1340,7 +1343,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         if (!title) throw new Error("Published title field was not found.");
         const renamedDraft = yield* schemas.updateField(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateCollectionFieldInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionFieldInput)({
             ...scope,
             fieldId: title.id,
             draftVersion: draft.collection.draftVersion,
@@ -1360,14 +1363,14 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         const changed = yield* schemas.validateSchema(
           ownerActor,
-          yield* Schema.decodeUnknown(ValidateCollectionSchemaInput)(scope),
+          yield* SchemaStrict.decodeUnknownEffect(ValidateCollectionSchemaInput)(scope),
         );
         assert.isTrue(
           changed.changes.items.some((change) => change.code === "field.api_key.updated"),
         );
         const second = yield* schemas.publishSchema(
           ownerActor,
-          yield* Schema.decodeUnknown(PublishCollectionSchemaInput)({
+          yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)({
             ...scope,
             draftVersion: renamedDraft.collection.draftVersion,
             expectedPublishedRevisionId: published.id,
@@ -1381,7 +1384,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         const originalAfterLaterPublication = yield* schemas.getPublishedRevision(
           ownerActor,
-          yield* Schema.decodeUnknown(GetPublishedSchemaRevisionInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetPublishedSchemaRevisionInput)({
             ...scope,
             revisionId: published.id,
           }),
@@ -1399,7 +1402,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         if (!summary) throw new Error("Summary field was not found.");
         const concurrencyDraft = yield* schemas.updateField(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateCollectionFieldInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionFieldInput)({
             ...scope,
             fieldId: summary.id,
             draftVersion: renamedDraft.collection.draftVersion,
@@ -1428,7 +1431,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             schemas
               .publishSchema(
                 ownerActor,
-                yield* Schema.decodeUnknown(PublishCollectionSchemaInput)({
+                yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)({
                   ...concurrentInput,
                   commandId: randomUUID(),
                 }),
@@ -1439,7 +1442,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
             schemas
               .publishSchema(
                 ownerActor,
-                yield* Schema.decodeUnknown(PublishCollectionSchemaInput)({
+                yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)({
                   ...concurrentInput,
                   commandId: randomUUID(),
                 }),
@@ -1551,7 +1554,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const collection = required(firstCollection, "collection");
       const published = yield* schemas.getLatestPublished(
         ownerActor,
-        yield* Schema.decodeUnknown(GetLatestPublishedSchemaInput)({
+        yield* SchemaStrict.decodeUnknownEffect(GetLatestPublishedSchemaInput)({
           projectId: currentProject.id,
           environmentId: currentProject.environment.id,
           collectionId: collection.id,
@@ -1605,17 +1608,17 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         };
         const initial = yield* delivery.getConfiguration(
           ownerActor,
-          yield* Schema.decodeUnknown(GetDeliveryConfigurationInput)(scope),
+          yield* SchemaStrict.decodeUnknownEffect(GetDeliveryConfigurationInput)(scope),
         );
         const denied = yield* Effect.exit(
           delivery.getConfiguration(
             readerActor,
-            yield* Schema.decodeUnknown(GetDeliveryConfigurationInput)(scope),
+            yield* SchemaStrict.decodeUnknownEffect(GetDeliveryConfigurationInput)(scope),
           ),
         );
         const published = yield* schemas.getLatestPublished(
           ownerActor,
-          yield* Schema.decodeUnknown(GetLatestPublishedSchemaInput)(scope),
+          yield* SchemaStrict.decodeUnknownEffect(GetLatestPublishedSchemaInput)(scope),
         );
         const field = published.fields.find(
           (candidate) => candidate.nodeRole === "root" && candidate.kind === "short_text",
@@ -1634,7 +1637,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         const unacknowledged = yield* Effect.exit(
           delivery.updateConfiguration(
             ownerActor,
-            yield* Schema.decodeUnknown(UpdateDeliveryConfigurationInput)({
+            yield* SchemaStrict.decodeUnknownEffect(UpdateDeliveryConfigurationInput)({
               ...scope,
               expectedVersion: initial.version,
               access: "public",
@@ -1647,7 +1650,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         const configured = yield* delivery.updateConfiguration(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateDeliveryConfigurationInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateDeliveryConfigurationInput)({
             ...scope,
             expectedVersion: initial.version,
             access: "protected",
@@ -1659,7 +1662,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         const publicConfiguration = yield* delivery.updateConfiguration(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateDeliveryConfigurationInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateDeliveryConfigurationInput)({
             ...scope,
             expectedVersion: configured.version,
             access: "public",
@@ -1671,7 +1674,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         const noOp = yield* delivery.updateConfiguration(
           ownerActor,
-          yield* Schema.decodeUnknown(UpdateDeliveryConfigurationInput)({
+          yield* SchemaStrict.decodeUnknownEffect(UpdateDeliveryConfigurationInput)({
             ...scope,
             expectedVersion: publicConfiguration.version,
             access: "public",
@@ -1684,7 +1687,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         const stale = yield* Effect.exit(
           delivery.updateConfiguration(
             ownerActor,
-            yield* Schema.decodeUnknown(UpdateDeliveryConfigurationInput)({
+            yield* SchemaStrict.decodeUnknownEffect(UpdateDeliveryConfigurationInput)({
               ...scope,
               expectedVersion: configured.version,
               access: "protected",
@@ -1730,7 +1733,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const project = required(projectModel, "project");
       const plan = yield* authoringSchemas.plan(
         managementActor,
-        yield* Schema.decodeUnknown(AuthoringSchemaPlanInput)({
+        yield* SchemaStrict.decodeUnknownEffect(AuthoringSchemaPlanInput)({
           scope: {
             projectId: project.id,
             environmentId: project.environment.id,
@@ -1768,7 +1771,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const collection = required(firstCollection, "collection");
       const current = yield* schemas.getCollection(
         managementActor,
-        yield* Schema.decodeUnknown(GetCollectionInput)({
+        yield* SchemaStrict.decodeUnknownEffect(GetCollectionInput)({
           projectId: collection.projectId,
           environmentId: collection.environmentId,
           collectionId: collection.id,
@@ -1777,7 +1780,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
       const requestId = `request-m13-credential-${suffix}`;
       const updated = yield* schemas.updateCollection(
         managementActor,
-        yield* Schema.decodeUnknown(UpdateCollectionInput)({
+        yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionInput)({
           projectId: collection.projectId,
           environmentId: collection.environmentId,
           collectionId: collection.id,
@@ -1843,7 +1846,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         const webhook = makeWebhookRepository();
         yield* webhook.createEndpoint(
           actor,
-          yield* Schema.decodeUnknown(CreateWebhookEndpointInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateWebhookEndpointInput)({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             name: `Archive recovery ${endpointId.slice(0, 8)}`,
@@ -1877,7 +1880,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         const successSecretId = randomUUID();
         yield* webhook.createEndpoint(
           actor,
-          yield* Schema.decodeUnknown(CreateWebhookEndpointInput)({
+          yield* SchemaStrict.decodeUnknownEffect(CreateWebhookEndpointInput)({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             name: `Archive success ${successEndpointId.slice(0, 8)}`,
@@ -2042,7 +2045,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         const archived = yield* platform.archiveProject(
           ownerActor,
-          yield* Schema.decodeUnknown(ArchiveProjectInput)({
+          yield* SchemaStrict.decodeUnknownEffect(ArchiveProjectInput)({
             projectId: currentProject.id,
             version: required(currentProjectRow, "archive project").version,
           }),
@@ -2118,7 +2121,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
 
         yield* platform.restoreProject(
           ownerActor,
-          yield* Schema.decodeUnknown(RestoreProjectInput)({
+          yield* SchemaStrict.decodeUnknownEffect(RestoreProjectInput)({
             projectId: currentProject.id,
             version: archived.version,
           }),
@@ -2225,7 +2228,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
 
         const beforeRemoval = yield* schemas.getDraft(
           ownerActor,
-          yield* Schema.decodeUnknown(GetCollectionDraftInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -2233,7 +2236,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         const removedDraft = yield* schemas.removeField(
           ownerActor,
-          yield* Schema.decodeUnknown(RemoveCollectionFieldInput)({
+          yield* SchemaStrict.decodeUnknownEffect(RemoveCollectionFieldInput)({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -2248,7 +2251,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         const latestPublished = yield* schemas.getLatestPublished(
           ownerActor,
-          yield* Schema.decodeUnknown(GetLatestPublishedSchemaInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetLatestPublishedSchemaInput)({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -2271,7 +2274,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         );
         const currentDraft = yield* schemas.getDraft(
           ownerActor,
-          yield* Schema.decodeUnknown(GetCollectionDraftInput)({
+          yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -2280,7 +2283,7 @@ describe.sequential("schema repository PostgreSQL integration", () => {
         const archivedMutation = yield* Effect.exit(
           schemas.createField(
             ownerActor,
-            yield* Schema.decodeUnknown(CreateCollectionFieldInput)({
+            yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
               projectId: collection.projectId,
               environmentId: collection.environmentId,
               collectionId: collection.id,

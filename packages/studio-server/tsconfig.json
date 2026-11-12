@@ -1,5 +1,9 @@
 {
   "extends": "@framerfordevs/config/tsconfig.base.json",
-  "compilerOptions": { "rootDir": ".", "types": ["node", "vitest/globals"] },
+  "compilerOptions": {
+    "rootDir": ".",
+    "lib": ["ESNext", "DOM"],
+    "types": ["node", "vitest/globals"]
+  },
   "include": ["src", "test"]
 }

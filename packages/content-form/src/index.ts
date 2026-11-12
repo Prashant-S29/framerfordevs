@@ -20,6 +20,9 @@ export {
   type ContentFieldValidationResult,
   type ContentFieldValidator,
   type ContentFormProps,
+  type ContentFormServerIssue,
+  type ContentReferencePicker,
+  type ContentReferencePickerProps,
 } from "./content-form";
 export {
   apiKeyValuesToStableIds,
@@ -28,6 +31,8 @@ export {
   fieldMutations,
   partitionContentFormDefinition,
   stableIdValuesToApiKeys,
+  type ContentDefaultKeying,
+  type ContentDefaultOptions,
   type ContentDraftMutation,
   type DraftMutationPath,
 } from "./values";

@@ -1,14 +1,19 @@
 // Defines bounded application metrics and the replaceable telemetry service used by business operations.
 
-import { Context, Effect, Layer, Metric, MetricBoundaries, Schema } from "effect";
+import { Context, Effect, Layer, Metric, Schema } from "effect";
 
 import type { RateLimitEnforcementMode, RateLimitPolicy } from "../../contracts/rate-limit";
 import type { HttpMethod, RouteFamily } from "../request-context";
 
-export const StatusFamilySchema = Schema.Literal("1xx", "2xx", "3xx", "4xx", "5xx");
+export const StatusFamilySchema = Schema.Literals(["1xx", "2xx", "3xx", "4xx", "5xx"]);
 export type StatusFamily = typeof StatusFamilySchema.Type;
 
-export const OperationOutcomeSchema = Schema.Literal("success", "failure", "defect", "interrupted");
+export const OperationOutcomeSchema = Schema.Literals([
+  "success",
+  "failure",
+  "defect",
+  "interrupted",
+]);
 export type OperationOutcome = typeof OperationOutcomeSchema.Type;
 
 export interface HttpRequestMetric {
@@ -242,11 +247,10 @@ const requestCount = Metric.counter("http_requests_total", {
   incremental: true,
 });
 
-const requestLatency = Metric.histogram(
-  "http_request_duration_ms",
-  MetricBoundaries.exponential({ start: 1, factor: 2, count: 16 }),
-  "Inbound HTTP request duration in milliseconds",
-);
+const requestLatency = Metric.histogram("http_request_duration_ms", {
+  description: "Inbound HTTP request duration in milliseconds",
+  boundaries: Metric.exponentialBoundaries({ start: 1, factor: 2, count: 16 }),
+});
 
 const defectCount = Metric.counter("application_unhandled_defects_total", {
   description: "Unhandled application defects",
@@ -268,22 +272,20 @@ const schemaPublicationCount = Metric.counter("cms_schema_publications_total", {
   incremental: true,
 });
 
-const schemaPublicationLatency = Metric.histogram(
-  "cms_schema_publication_duration_ms",
-  MetricBoundaries.exponential({ start: 1, factor: 2, count: 16 }),
-  "CMS schema publication duration in milliseconds",
-);
+const schemaPublicationLatency = Metric.histogram("cms_schema_publication_duration_ms", {
+  description: "CMS schema publication duration in milliseconds",
+  boundaries: Metric.exponentialBoundaries({ start: 1, factor: 2, count: 16 }),
+});
 
 const entryPublicationCount = Metric.counter("cms_entry_publication_operations_total", {
   description: "Entry publication outcomes by bounded operation, result, and size bucket",
   incremental: true,
 });
 
-const entryPublicationLatency = Metric.histogram(
-  "cms_entry_publication_duration_ms",
-  MetricBoundaries.exponential({ start: 1, factor: 2, count: 16 }),
-  "Entry publication operation duration in milliseconds",
-);
+const entryPublicationLatency = Metric.histogram("cms_entry_publication_duration_ms", {
+  description: "Entry publication operation duration in milliseconds",
+  boundaries: Metric.exponentialBoundaries({ start: 1, factor: 2, count: 16 }),
+});
 
 const entryPublicationValidationFailureCount = Metric.counter(
   "cms_entry_publication_validation_failures_total",
@@ -306,22 +308,20 @@ const previewAuditFailureCount = Metric.counter("cms_preview_audit_failures_tota
   incremental: true,
 });
 
-const previewReadLatency = Metric.histogram(
-  "cms_preview_read_duration_ms",
-  MetricBoundaries.exponential({ start: 1, factor: 2, count: 16 }),
-  "Preview read duration in milliseconds",
-);
+const previewReadLatency = Metric.histogram("cms_preview_read_duration_ms", {
+  description: "Preview read duration in milliseconds",
+  boundaries: Metric.exponentialBoundaries({ start: 1, factor: 2, count: 16 }),
+});
 
 const controlPlaneRequestCount = Metric.counter("control_plane_requests_total", {
   description: "Control Plane request outcomes by closed operation, subject, status, and cost",
   incremental: true,
 });
 
-const controlPlaneRequestLatency = Metric.histogram(
-  "control_plane_request_duration_ms",
-  MetricBoundaries.exponential({ start: 1, factor: 2, count: 12 }),
-  "Control Plane request duration in milliseconds",
-);
+const controlPlaneRequestLatency = Metric.histogram("control_plane_request_duration_ms", {
+  description: "Control Plane request duration in milliseconds",
+  boundaries: Metric.exponentialBoundaries({ start: 1, factor: 2, count: 12 }),
+});
 
 const toolingRequestCount = Metric.counter("tooling_requests_total", {
   description:
@@ -329,11 +329,10 @@ const toolingRequestCount = Metric.counter("tooling_requests_total", {
   incremental: true,
 });
 
-const toolingRequestLatency = Metric.histogram(
-  "tooling_request_duration_ms",
-  MetricBoundaries.exponential({ start: 1, factor: 2, count: 12 }),
-  "Tooling request duration in milliseconds",
-);
+const toolingRequestLatency = Metric.histogram("tooling_request_duration_ms", {
+  description: "Tooling request duration in milliseconds",
+  boundaries: Metric.exponentialBoundaries({ start: 1, factor: 2, count: 12 }),
+});
 
 const toolingOAuthVerificationCount = Metric.counter("tooling_oauth_verifications_total", {
   description: "Tooling OAuth access-token verification outcomes",
@@ -350,11 +349,10 @@ const authoringRequestCount = Metric.counter("authoring_requests_total", {
   incremental: true,
 });
 
-const authoringRequestLatency = Metric.histogram(
-  "authoring_request_duration_ms",
-  MetricBoundaries.exponential({ start: 1, factor: 2, count: 16 }),
-  "Authoring request duration in milliseconds by bounded endpoint and outcome",
-);
+const authoringRequestLatency = Metric.histogram("authoring_request_duration_ms", {
+  description: "Authoring request duration in milliseconds by bounded endpoint and outcome",
+  boundaries: Metric.exponentialBoundaries({ start: 1, factor: 2, count: 16 }),
+});
 
 const authoringPayloadCount = Metric.counter("authoring_payloads_total", {
   description: "Authoring request and response size buckets by bounded endpoint",
@@ -376,24 +374,24 @@ const rateLimitStoreCount = Metric.counter("rate_limit_store_operations_total", 
   incremental: true,
 });
 
-const rateLimitStoreLatency = Metric.histogram(
-  "rate_limit_store_duration_ms",
-  MetricBoundaries.exponential({ start: 1, factor: 2, count: 12 }),
-  "Rate-limit primary-store duration in milliseconds",
-);
+const rateLimitStoreLatency = Metric.histogram("rate_limit_store_duration_ms", {
+  description: "Rate-limit primary-store duration in milliseconds",
+  boundaries: Metric.exponentialBoundaries({ start: 1, factor: 2, count: 12 }),
+});
 
-function withRequestLabels<Type, In, Out>(
-  metric: Metric.Metric<Type, In, Out>,
+function withRequestLabels<In, State>(
+  metric: Metric.Metric<In, State>,
   event: HttpRequestMetric,
-): Metric.Metric<Type, In, Out> {
-  return Metric.tagged(
-    Metric.tagged(Metric.tagged(metric, "method", event.method), "route", event.routeFamily),
-    "status_family",
-    event.statusFamily,
+): Metric.Metric<In, State> {
+  return Metric.withAttributes(
+    Metric.withAttributes(Metric.withAttributes(metric, { method: event.method }), {
+      route: event.routeFamily,
+    }),
+    { status_family: event.statusFamily },
   );
 }
 
-export class Telemetry extends Context.Tag("Telemetry")<Telemetry, TelemetryService>() {}
+export class Telemetry extends Context.Service<Telemetry, TelemetryService>()("Telemetry") {}
 
 export const TelemetryLive = Layer.succeed(Telemetry, {
   recordHttpRequest: (event) =>
@@ -401,186 +399,166 @@ export const TelemetryLive = Layer.succeed(Telemetry, {
       Metric.update(withRequestLabels(requestCount, event), 1),
       Metric.update(withRequestLabels(requestLatency, event), event.durationMs),
     ]).pipe(Effect.asVoid),
-  recordDefect: (routeFamily) => Metric.update(Metric.tagged(defectCount, "route", routeFamily), 1),
+  recordDefect: (routeFamily) =>
+    Metric.update(Metric.withAttributes(defectCount, { route: routeFamily }), 1),
   recordCredentialVerification: (event) =>
     Metric.update(
-      Metric.tagged(
-        Metric.tagged(credentialVerificationCount, "family", event.family),
-        "outcome",
-        event.outcome,
+      Metric.withAttributes(
+        Metric.withAttributes(credentialVerificationCount, { family: event.family }),
+        { outcome: event.outcome },
       ),
       1,
     ),
   recordLocaleMutation: (event) =>
     Metric.update(
-      Metric.tagged(
-        Metric.tagged(localeMutationCount, "action", event.action),
-        "outcome",
-        event.outcome,
-      ),
+      Metric.withAttributes(Metric.withAttributes(localeMutationCount, { action: event.action }), {
+        outcome: event.outcome,
+      }),
       1,
     ),
   recordSchemaPublication: (event) => {
-    const labels = Metric.tagged(
-      Metric.tagged(
-        Metric.tagged(schemaPublicationCount, "outcome", event.outcome),
-        "severity",
-        event.severity,
+    const labels = Metric.withAttributes(
+      Metric.withAttributes(
+        Metric.withAttributes(schemaPublicationCount, { outcome: event.outcome }),
+        { severity: event.severity },
       ),
-      "field_count",
-      event.fieldCountBucket,
+      { field_count: event.fieldCountBucket },
     );
-    const latency = Metric.tagged(
-      Metric.tagged(
-        Metric.tagged(schemaPublicationLatency, "outcome", event.outcome),
-        "severity",
-        event.severity,
+    const latency = Metric.withAttributes(
+      Metric.withAttributes(
+        Metric.withAttributes(schemaPublicationLatency, { outcome: event.outcome }),
+        { severity: event.severity },
       ),
-      "field_count",
-      event.fieldCountBucket,
+      { field_count: event.fieldCountBucket },
     );
     return Effect.all([Metric.update(labels, 1), Metric.update(latency, event.durationMs)]).pipe(
       Effect.asVoid,
     );
   },
   recordEntryPublication: (event) => {
-    const labels = Metric.tagged(
-      Metric.tagged(
-        Metric.tagged(entryPublicationCount, "operation", event.operation),
-        "outcome",
-        event.outcome,
+    const labels = Metric.withAttributes(
+      Metric.withAttributes(
+        Metric.withAttributes(entryPublicationCount, { operation: event.operation }),
+        { outcome: event.outcome },
       ),
-      "size_bucket",
-      event.sizeBucket,
+      { size_bucket: event.sizeBucket },
     );
-    const latency = Metric.tagged(
-      Metric.tagged(entryPublicationLatency, "operation", event.operation),
-      "outcome",
-      event.outcome,
+    const latency = Metric.withAttributes(
+      Metric.withAttributes(entryPublicationLatency, { operation: event.operation }),
+      { outcome: event.outcome },
     );
     return Effect.all([Metric.update(labels, 1), Metric.update(latency, event.durationMs)]).pipe(
       Effect.asVoid,
     );
   },
   recordEntryPublicationValidationFailure: (category) =>
-    Metric.update(Metric.tagged(entryPublicationValidationFailureCount, "category", category), 1),
+    Metric.update(
+      Metric.withAttributes(entryPublicationValidationFailureCount, { category: category }),
+      1,
+    ),
   recordPreviewRead: (event) => {
-    const label = <Type, In, Out>(metric: Metric.Metric<Type, In, Out>) =>
-      Metric.tagged(
-        Metric.tagged(
-          Metric.tagged(
-            Metric.tagged(Metric.tagged(metric, "source", event.source), "subject", event.subject),
-            "outcome",
-            event.outcome,
+    const label = <In, State>(metric: Metric.Metric<In, State>) =>
+      Metric.withAttributes(
+        Metric.withAttributes(
+          Metric.withAttributes(
+            Metric.withAttributes(Metric.withAttributes(metric, { source: event.source }), {
+              subject: event.subject,
+            }),
+            { outcome: event.outcome },
           ),
-          "validation",
-          event.validation,
+          { validation: event.validation },
         ),
-        "issue_count",
-        event.issueCountBucket,
+        { issue_count: event.issueCountBucket },
       );
-    const count = Metric.tagged(label(previewReadCount), "size", event.sizeBucket);
-    const latency = Metric.tagged(label(previewReadLatency), "size", event.sizeBucket);
+    const count = Metric.withAttributes(label(previewReadCount), { size: event.sizeBucket });
+    const latency = Metric.withAttributes(label(previewReadLatency), { size: event.sizeBucket });
     return Effect.all([Metric.update(count, 1), Metric.update(latency, event.durationMs)]).pipe(
       Effect.asVoid,
     );
   },
   recordPreviewQueryRejection: (category) =>
-    Metric.update(Metric.tagged(previewQueryRejectionCount, "category", category), 1),
+    Metric.update(Metric.withAttributes(previewQueryRejectionCount, { category: category }), 1),
   recordPreviewAuditFailure: () => Metric.update(previewAuditFailureCount, 1),
   recordControlPlaneRequest: (event) => {
-    const label = <Type, In, Out>(metric: Metric.Metric<Type, In, Out>) =>
-      Metric.tagged(
-        Metric.tagged(
-          Metric.tagged(
-            Metric.tagged(metric, "operation", event.operation),
-            "subject",
-            event.subject,
-          ),
-          "outcome",
-          event.outcome,
+    const label = <In, State>(metric: Metric.Metric<In, State>) =>
+      Metric.withAttributes(
+        Metric.withAttributes(
+          Metric.withAttributes(Metric.withAttributes(metric, { operation: event.operation }), {
+            subject: event.subject,
+          }),
+          { outcome: event.outcome },
         ),
-        "status_family",
-        event.statusFamily,
+        { status_family: event.statusFamily },
       );
-    const count = Metric.tagged(label(controlPlaneRequestCount), "cost", event.costBucket);
-    const latency = Metric.tagged(label(controlPlaneRequestLatency), "cost", event.costBucket);
+    const count = Metric.withAttributes(label(controlPlaneRequestCount), {
+      cost: event.costBucket,
+    });
+    const latency = Metric.withAttributes(label(controlPlaneRequestLatency), {
+      cost: event.costBucket,
+    });
     return Effect.all([Metric.update(count, 1), Metric.update(latency, event.durationMs)]).pipe(
       Effect.asVoid,
     );
   },
   recordToolingRequest: (event) => {
-    const label = <Type, In, Out>(metric: Metric.Metric<Type, In, Out>) =>
-      Metric.tagged(
-        Metric.tagged(
-          Metric.tagged(
-            Metric.tagged(
-              Metric.tagged(metric, "endpoint", event.endpoint),
-              "subject",
-              event.subject,
-            ),
-            "outcome",
-            event.outcome,
+    const label = <In, State>(metric: Metric.Metric<In, State>) =>
+      Metric.withAttributes(
+        Metric.withAttributes(
+          Metric.withAttributes(
+            Metric.withAttributes(Metric.withAttributes(metric, { endpoint: event.endpoint }), {
+              subject: event.subject,
+            }),
+            { outcome: event.outcome },
           ),
-          "status_family",
-          event.statusFamily,
+          { status_family: event.statusFamily },
         ),
-        "response_size",
-        event.responseSizeBucket,
+        { response_size: event.responseSizeBucket },
       );
-    const count = Metric.tagged(label(toolingRequestCount), "page_count", event.pageCountBucket);
-    const latency = Metric.tagged(
-      label(toolingRequestLatency),
-      "page_count",
-      event.pageCountBucket,
-    );
+    const count = Metric.withAttributes(label(toolingRequestCount), {
+      page_count: event.pageCountBucket,
+    });
+    const latency = Metric.withAttributes(label(toolingRequestLatency), {
+      page_count: event.pageCountBucket,
+    });
     return Effect.all([Metric.update(count, 1), Metric.update(latency, event.durationMs)]).pipe(
       Effect.asVoid,
     );
   },
   recordToolingOAuthVerification: (outcome) =>
-    Metric.update(Metric.tagged(toolingOAuthVerificationCount, "outcome", outcome), 1),
+    Metric.update(Metric.withAttributes(toolingOAuthVerificationCount, { outcome: outcome }), 1),
   recordAuthoringAuthentication: (event) =>
     Metric.update(
-      Metric.tagged(
-        Metric.tagged(authoringAuthenticationCount, "subject", event.subject),
-        "outcome",
-        event.outcome,
+      Metric.withAttributes(
+        Metric.withAttributes(authoringAuthenticationCount, { subject: event.subject }),
+        { outcome: event.outcome },
       ),
       1,
     ),
   recordAuthoringRequest: (event) => {
-    const requests = Metric.tagged(
-      Metric.tagged(
-        Metric.tagged(
-          Metric.tagged(authoringRequestCount, "endpoint", event.endpoint),
-          "subject",
-          event.subject,
+    const requests = Metric.withAttributes(
+      Metric.withAttributes(
+        Metric.withAttributes(
+          Metric.withAttributes(authoringRequestCount, { endpoint: event.endpoint }),
+          { subject: event.subject },
         ),
-        "outcome",
-        event.outcome,
+        { outcome: event.outcome },
       ),
-      "status_family",
-      event.statusFamily,
+      { status_family: event.statusFamily },
     );
-    const latency = Metric.tagged(
-      Metric.tagged(authoringRequestLatency, "endpoint", event.endpoint),
-      "outcome",
-      event.outcome,
+    const latency = Metric.withAttributes(
+      Metric.withAttributes(authoringRequestLatency, { endpoint: event.endpoint }),
+      { outcome: event.outcome },
     );
-    const payloads = Metric.tagged(
-      Metric.tagged(
-        Metric.tagged(authoringPayloadCount, "endpoint", event.endpoint),
-        "request_size",
-        event.requestSizeBucket,
+    const payloads = Metric.withAttributes(
+      Metric.withAttributes(
+        Metric.withAttributes(authoringPayloadCount, { endpoint: event.endpoint }),
+        { request_size: event.requestSizeBucket },
       ),
-      "response_size",
-      event.responseSizeBucket,
+      { response_size: event.responseSizeBucket },
     );
-    const quotaCosts = Metric.tagged(
-      Metric.tagged(authoringQuotaCostCount, "endpoint", event.endpoint),
-      "cost",
-      event.costBucket,
+    const quotaCosts = Metric.withAttributes(
+      Metric.withAttributes(authoringQuotaCostCount, { endpoint: event.endpoint }),
+      { cost: event.costBucket },
     );
     return Effect.all([
       Metric.update(requests, 1),
@@ -591,20 +569,18 @@ export const TelemetryLive = Layer.succeed(Telemetry, {
   },
   recordRateLimitDecision: (event) =>
     Metric.update(
-      Metric.tagged(
-        Metric.tagged(
-          Metric.tagged(rateLimitDecisionCount, "policy", event.policy),
-          "enforcement_mode",
-          event.enforcementMode,
+      Metric.withAttributes(
+        Metric.withAttributes(
+          Metric.withAttributes(rateLimitDecisionCount, { policy: event.policy }),
+          { enforcement_mode: event.enforcementMode },
         ),
-        "outcome",
-        event.outcome,
+        { outcome: event.outcome },
       ),
       1,
     ),
   recordRateLimitStore: (event) => {
-    const resultMetric = Metric.tagged(rateLimitStoreCount, "result", event.result);
-    const latencyMetric = Metric.tagged(rateLimitStoreLatency, "result", event.result);
+    const resultMetric = Metric.withAttributes(rateLimitStoreCount, { result: event.result });
+    const latencyMetric = Metric.withAttributes(rateLimitStoreLatency, { result: event.result });
     return Effect.all([
       Metric.update(resultMetric, 1),
       Metric.update(latencyMetric, event.durationMs),

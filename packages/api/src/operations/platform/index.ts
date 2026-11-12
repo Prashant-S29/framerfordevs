@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import {
   ControlPlaneCommandId,
@@ -25,8 +25,11 @@ import {
 } from "../../contracts/platform";
 import { PlatformRepository } from "../../services/platform-repository";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const decodeActorId = (actorId: string) =>
-  Schema.decodeUnknown(AuthUserId)(actorId).pipe(Effect.mapError(() => UnauthorizedFailure.make()));
+  SchemaStrict.decodeUnknownEffect(AuthUserId)(actorId).pipe(
+    Effect.mapError(() => UnauthorizedFailure.make()),
+  );
 
 function platformProject(project: ControlPlaneProject): Project {
   return Project.make({

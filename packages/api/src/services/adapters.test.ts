@@ -14,7 +14,7 @@ describe("typed third-party adapters", () => {
 
       assert.isTrue(Exit.isFailure(result));
       if (Exit.isFailure(result)) {
-        const error = Option.getOrUndefined(Cause.failureOption(result.cause));
+        const error = Option.getOrUndefined(Cause.findErrorOption(result.cause));
         assert.strictEqual(error?._tag, "DatabaseFailure");
       }
     }),
@@ -27,7 +27,7 @@ describe("typed third-party adapters", () => {
 
       assert.isTrue(Exit.isFailure(result));
       if (Exit.isFailure(result)) {
-        const error = Option.getOrUndefined(Cause.failureOption(result.cause));
+        const error = Option.getOrUndefined(Cause.findErrorOption(result.cause));
         assert.strictEqual(error?._tag, "AuthSessionFailure");
       }
     }),

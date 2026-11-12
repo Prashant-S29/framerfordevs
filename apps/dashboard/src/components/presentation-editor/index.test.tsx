@@ -6,17 +6,18 @@ import { CollectionFieldDefinition } from "@framerfordevs/api/contracts/schema/i
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
-import { Schema } from "effect";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LayoutGroupEditor, PresentationFieldCard } from "./index";
 
+import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const fieldId = "019fae8b-1234-7000-8000-000000000201";
 const draftId = "019fae8b-1234-7000-8000-000000000202";
 const liveId = "019fae8b-1234-7000-8000-000000000203";
 const roles = ["owner", "developer"] as const;
 
-const field = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+const field = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   id: fieldId,
   parentFieldId: null,
   nodeRole: "root",
@@ -42,7 +43,7 @@ const field = Schema.decodeUnknownSync(CollectionFieldDefinition)({
   children: [],
 });
 
-const presentation = Schema.decodeUnknownSync(AuthoringFieldPresentation)({
+const presentation = SchemaStrict.decodeUnknownSync(AuthoringFieldPresentation)({
   fieldId,
   displayLabel: "Status",
   position: 0,
@@ -53,7 +54,7 @@ const presentation = Schema.decodeUnknownSync(AuthoringFieldPresentation)({
   ],
 });
 
-const layout = Schema.decodeUnknownSync(EditorLayout)({
+const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
   version: 1,
   tabs: [
     {
@@ -122,7 +123,7 @@ describe("presentation editor controls", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Move Live up" }));
-    const reordered = Schema.decodeUnknownSync(AuthoringFieldPresentation)(
+    const reordered = SchemaStrict.decodeUnknownSync(AuthoringFieldPresentation)(
       onChange.mock.calls.at(-1)?.[0],
     );
     expect(reordered.enumOptions.map((option) => option.optionId)).toEqual([liveId, draftId]);
@@ -162,7 +163,9 @@ describe("presentation editor controls", () => {
       screen.getByLabelText("Group"),
       "019fae8b-1234-7000-8000-000000000213",
     );
-    const moved = Schema.decodeUnknownSync(EditorLayout)(onLayoutChange.mock.calls.at(-1)?.[0]);
+    const moved = SchemaStrict.decodeUnknownSync(EditorLayout)(
+      onLayoutChange.mock.calls.at(-1)?.[0],
+    );
     expect(moved.tabs[0]?.groups[0]?.fields).toHaveLength(0);
     expect(moved.tabs[0]?.groups[1]?.fields[0]?.id).toBe("019fae8b-1234-7000-8000-000000000212");
     expect((await axe.run(container)).violations).toEqual([]);

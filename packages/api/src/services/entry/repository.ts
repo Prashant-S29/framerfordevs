@@ -90,6 +90,8 @@ import {
 import { isRoleAllowed } from "../policy";
 import { hashSchemaContract } from "../schema/engine";
 
+import * as SchemaStrict from "../../lib/schema-strict";
+import { Uuid } from "../../contracts/uuid";
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
 }
@@ -118,7 +120,7 @@ function fingerprintJson(value: unknown): string {
 }
 
 function entryValue(row: typeof cmsEntry.$inferSelect) {
-  return Schema.decodeUnknownSync(CmsEntry)({
+  return SchemaStrict.decodeUnknownSync(CmsEntry)({
     id: row.id,
     workspaceId: row.workspaceId,
     projectId: row.projectId,
@@ -136,13 +138,11 @@ function entryValue(row: typeof cmsEntry.$inferSelect) {
 }
 
 function entryValues(value: unknown): EntryValues {
-  return Schema.decodeUnknownSync(Schema.Record({ key: Schema.UUID, value: Schema.Unknown }))(
-    value,
-  );
+  return SchemaStrict.decodeUnknownSync(Schema.Record(Uuid, Schema.Unknown))(value);
 }
 
 function fieldValue(row: typeof cmsSchemaRevisionField.$inferSelect): CollectionField {
-  return Schema.decodeUnknownSync(CollectionFieldDefinition)({
+  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
     id: row.fieldId,
     parentFieldId: row.parentFieldId,
     nodeRole: row.nodeRole,
@@ -349,7 +349,7 @@ async function authorizeScope(
     )
     .limit(1);
   if (!capability) return outcome("cms_required");
-  const role = Schema.decodeUnknownSync(ProjectRole)(access.role);
+  const role = SchemaStrict.decodeUnknownSync(ProjectRole)(access.role);
   return outcomeWith("success", {
     access: {
       workspaceId: access.project.workspaceId,
@@ -645,7 +645,7 @@ function validateDraftValues(options: {
         break;
       }
       issues.push(
-        Schema.decodeUnknownSync(EntryValidationIssue)({
+        SchemaStrict.decodeUnknownSync(EntryValidationIssue)({
           fieldId: field.id,
           path: issue.path,
           scope: effective === "shared" ? "shared" : "localized",
@@ -841,7 +841,7 @@ async function validateReferenceAvailability(
       break;
     }
     issues.push(
-      Schema.decodeUnknownSync(EntryValidationIssue)({
+      SchemaStrict.decodeUnknownSync(EntryValidationIssue)({
         fieldId: use.fieldId,
         path: use.path,
         scope: use.scope,
@@ -1367,7 +1367,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
               locale: result.scope.access.locale,
             })
           : result.validation;
-      return Schema.decodeUnknownSync(CreateEntryWithDraftResult)({
+      return SchemaStrict.decodeUnknownSync(CreateEntryWithDraftResult)({
         entry: entryValue(result.row),
         commandId: input.commandId,
         sharedVersion: result.sharedVersion,
@@ -1433,10 +1433,10 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
               collectionId: input.collectionId,
               locale: input.locale,
               createdAt: toIso(last.entry.createdAt),
-              entryId: Schema.decodeUnknownSync(CmsEntry)(entryValue(last.entry)).id,
+              entryId: SchemaStrict.decodeUnknownSync(CmsEntry)(entryValue(last.entry)).id,
             })
           : null;
-      return Schema.decodeUnknownSync(CmsEntryPage)({ items, nextCursor });
+      return SchemaStrict.decodeUnknownSync(CmsEntryPage)({ items, nextCursor });
     }),
 
     /** Renames management-only entry metadata with tenant scope and optimistic concurrency. */
@@ -1638,7 +1638,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
       if (result.kind === "cms_required") return yield* CmsCapabilityRequiredFailure.make();
       if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
       if (result.kind === "published_required") return yield* PublishedSchemaRequiredFailure.make();
-      return Schema.decodeUnknownSync(CmsEntryDraft)({
+      return SchemaStrict.decodeUnknownSync(CmsEntryDraft)({
         entry: entryValue(result.row),
         localeId: result.scope.access.locale.id,
         locale: result.scope.access.locale.tag,
@@ -2117,7 +2117,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
               });
         const sharedValues = entryValues(sharedRows[0]?.values ?? {});
         const localizedValues = entryValues(localeRows[0]?.values ?? {});
-        return Schema.decodeUnknownSync(SaveEntryDraftResult)({
+        return SchemaStrict.decodeUnknownSync(SaveEntryDraftResult)({
           entryId: result.row.id,
           commandId: input.commandId,
           sharedChanged: sharedRows[0]?.commandId === input.commandId,
@@ -2134,7 +2134,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
           }),
         });
       }
-      return Schema.decodeUnknownSync(SaveEntryDraftResult)({
+      return SchemaStrict.decodeUnknownSync(SaveEntryDraftResult)({
         entryId: result.row.id,
         commandId: input.commandId,
         sharedChanged: result.sharedResult.changed,
@@ -2246,7 +2246,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
       if (result.kind === "published_required") return yield* PublishedSchemaRequiredFailure.make();
       const rows = result.rows.slice(0, input.limit);
       const items = rows.map((row) =>
-        Schema.decodeUnknownSync(EntryRevisionSummary)({
+        SchemaStrict.decodeUnknownSync(EntryRevisionSummary)({
           id: row.id,
           entryId: row.entryId,
           localeId: input.scope === "shared" ? null : "localeId" in row ? row.localeId : null,
@@ -2273,7 +2273,8 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
               locale: input.locale,
               scope: input.scope,
               sequence: last.sequence,
-              revisionId: Schema.decodeUnknownSync(EntryRevisionSummary)({ ...items.at(-1) }).id,
+              revisionId: SchemaStrict.decodeUnknownSync(EntryRevisionSummary)({ ...items.at(-1) })
+                .id,
             })
           : null;
       return EntryRevisionPage.make({ items, nextCursor });
@@ -2697,7 +2698,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
       if (result.kind === "validation_failure")
         return yield* ValidationFailure.make({ details: result.details });
       if (result.kind === "replay")
-        return Schema.decodeUnknownSync(SaveEntryDraftResult)({
+        return SchemaStrict.decodeUnknownSync(SaveEntryDraftResult)({
           entryId: result.row.id,
           commandId: input.commandId,
           sharedChanged: input.scope === "shared" && result.receipt.resultKind === "changed",
@@ -2708,7 +2709,7 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
           localizedRevisionId: result.receipt.resultLocaleRevisionId,
           validation: EntryValidation.make({ valid: true, issues: [], capped: false }),
         });
-      return Schema.decodeUnknownSync(SaveEntryDraftResult)({
+      return SchemaStrict.decodeUnknownSync(SaveEntryDraftResult)({
         entryId: result.row.id,
         commandId: input.commandId,
         sharedChanged: input.scope === "shared" && result.changed,
@@ -2723,9 +2724,9 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
   };
 }
 
-export class EntryRepository extends Context.Tag("EntryRepository")<
+export class EntryRepository extends Context.Service<
   EntryRepository,
   ReturnType<typeof makeEntryRepository>
->() {}
+>()("EntryRepository") {}
 
 export const EntryRepositoryLive = Layer.succeed(EntryRepository, makeEntryRepository());

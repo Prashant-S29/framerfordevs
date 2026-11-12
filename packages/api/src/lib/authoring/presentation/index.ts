@@ -2,8 +2,6 @@
 
 import { createHash } from "node:crypto";
 
-import { Schema } from "effect";
-
 import { projectRoleValues } from "../../../contracts/access";
 import {
   AuthoringCollectionPresentation,
@@ -30,6 +28,7 @@ import {
   validateCollectionDraft,
 } from "../../../services/schema/engine";
 
+import * as SchemaStrict from "../../schema-strict";
 export function fingerprintAuthoringPresentation(options: {
   readonly actor: CmsActor;
   readonly projectId: string;
@@ -287,7 +286,7 @@ export function buildAuthoringPresentationCandidate(options: {
     formatVersion: 2,
     validationProfile: options.current.validationProfile,
     currencyRegistryProfile: options.current.currencyRegistryProfile,
-    collection: Schema.decodeUnknownSync(CmsCollection)({
+    collection: SchemaStrict.decodeUnknownSync(CmsCollection)({
       id: options.current.collectionId,
       workspaceId: options.current.workspaceId,
       projectId: options.current.projectId,

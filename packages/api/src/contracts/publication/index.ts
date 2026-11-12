@@ -15,45 +15,44 @@ import { LocaleTag, ProjectLocaleId } from "../locale";
 import { AuthUserId, Cursor, EnvironmentId, IsoDateTime, PageLimit, ProjectId } from "../platform";
 import { CollectionFieldId, CollectionId, ContractHash, SchemaRevisionId } from "../schema";
 
+import * as SchemaStrict from "../../lib/schema-strict";
+import { UuidValue } from "../uuid";
 const digestPattern = /^[0-9a-f]{64}$/u;
 
-export const EntryPublicationId = Schema.UUID.pipe(Schema.brand("EntryPublicationId"));
+export const EntryPublicationId = UuidValue.pipe(Schema.brand("EntryPublicationId"));
 export type EntryPublicationId = typeof EntryPublicationId.Type;
 
-export const EntryDeliverySnapshotId = Schema.UUID.pipe(Schema.brand("EntryDeliverySnapshotId"));
+export const EntryDeliverySnapshotId = UuidValue.pipe(Schema.brand("EntryDeliverySnapshotId"));
 export type EntryDeliverySnapshotId = typeof EntryDeliverySnapshotId.Type;
 
-export const EntryPublicationSequence = Schema.Number.pipe(
-  Schema.int(),
-  Schema.greaterThanOrEqualTo(1),
-  Schema.brand("EntryPublicationSequence"),
-);
+export const EntryPublicationSequence = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isGreaterThanOrEqualTo(1),
+).pipe(Schema.brand("EntryPublicationSequence"));
 export type EntryPublicationSequence = typeof EntryPublicationSequence.Type;
 
-export const EntryPublicationStateVersion = Schema.Number.pipe(
-  Schema.int(),
-  Schema.greaterThanOrEqualTo(0),
-  Schema.brand("EntryPublicationStateVersion"),
-);
+export const EntryPublicationStateVersion = Schema.Number.check(
+  Schema.isInt(),
+  Schema.isGreaterThanOrEqualTo(0),
+).pipe(Schema.brand("EntryPublicationStateVersion"));
 export type EntryPublicationStateVersion = typeof EntryPublicationStateVersion.Type;
 
-export const EntryPublicationHash = Schema.String.pipe(
-  Schema.length(64),
-  Schema.pattern(digestPattern),
-  Schema.brand("EntryPublicationHash"),
-);
+export const EntryPublicationHash = Schema.String.check(
+  Schema.isBetweenLength(64, 64),
+  Schema.isPattern(digestPattern),
+).pipe(Schema.brand("EntryPublicationHash"));
 export type EntryPublicationHash = typeof EntryPublicationHash.Type;
 
-export const EntryPublicationSizeBucket = Schema.Literal(
+export const EntryPublicationSizeBucket = Schema.Literals([
   "small",
   "medium",
   "large",
   "near_limit",
   "over_limit",
-);
+]);
 export type EntryPublicationSizeBucket = typeof EntryPublicationSizeBucket.Type;
 
-const SnapshotBytes = Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0));
+const SnapshotBytes = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0));
 
 export class EntryPublicationSize extends Schema.Class<EntryPublicationSize>(
   "EntryPublicationSize",
@@ -70,21 +69,21 @@ export class EntryPublicationIssueTarget extends Schema.Class<EntryPublicationIs
 )({
   collectionId: CollectionId,
   entryId: EntryId,
-  displayName: Schema.NullOr(Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100))),
+  displayName: Schema.NullOr(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100))),
 }) {}
 
 export class EntryPublicationValidationIssue extends Schema.Class<EntryPublicationValidationIssue>(
   "EntryPublicationValidationIssue",
 )({
   fieldId: Schema.NullOr(CollectionFieldId),
-  path: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(256)),
-  code: Schema.String.pipe(
-    Schema.minLength(1),
-    Schema.maxLength(64),
-    Schema.pattern(/^[a-z][a-z0-9_]{0,63}$/u),
+  path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  code: Schema.String.check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(64),
+    Schema.isPattern(/^[a-z][a-z0-9_]{0,63}$/u),
   ),
-  message: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(512)),
-  target: Schema.optionalWith(EntryPublicationIssueTarget, { exact: true }),
+  message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  target: Schema.optionalKey(EntryPublicationIssueTarget),
 }) {}
 
 export class EntryPublicationSummary extends Schema.Class<EntryPublicationSummary>(
@@ -116,7 +115,7 @@ export class EntryPublicationSummary extends Schema.Class<EntryPublicationSummar
 export class EntryPublicationPage extends Schema.Class<EntryPublicationPage>(
   "EntryPublicationPage",
 )({
-  items: Schema.Array(EntryPublicationSummary).pipe(Schema.maxItems(50)),
+  items: Schema.Array(EntryPublicationSummary).check(Schema.isMaxLength(50)),
   nextCursor: Schema.NullOr(Cursor),
 }) {}
 
@@ -126,7 +125,7 @@ export class EntryPublicationStatus extends Schema.Class<EntryPublicationStatus>
   entryId: EntryId,
   localeId: ProjectLocaleId,
   locale: LocaleTag,
-  state: Schema.Literal("published", "unpublished"),
+  state: Schema.Literals(["published", "unpublished"]),
   stateVersion: EntryPublicationStateVersion,
   currentPublication: Schema.NullOr(EntryPublicationSummary),
   currentSchemaRevisionId: SchemaRevisionId,
@@ -156,7 +155,7 @@ export class EntryPublicationPlan extends Schema.Class<EntryPublicationPlan>(
   localizedRevisionId: Schema.NullOr(EntryRevisionId),
   localizedVersion: EntryDraftVersion,
   valid: Schema.Boolean,
-  issues: Schema.Array(EntryPublicationValidationIssue).pipe(Schema.maxItems(50)),
+  issues: Schema.Array(EntryPublicationValidationIssue).check(Schema.isMaxLength(50)),
   capped: Schema.Boolean,
   contentHash: Schema.NullOr(EntryPublicationHash),
   authorityHash: Schema.NullOr(EntryPublicationHash),
@@ -217,7 +216,7 @@ export class PublishEntryResult extends Schema.Class<PublishEntryResult>("Publis
   locale: LocaleTag,
   commandId: EntryCommandId,
   stateVersion: EntryPublicationStateVersion,
-  resultKind: Schema.Literal("changed", "no_op"),
+  resultKind: Schema.Literals(["changed", "no_op"]),
   publication: EntryPublicationSummary,
 }) {}
 
@@ -229,34 +228,36 @@ export class UnpublishEntryResult extends Schema.Class<UnpublishEntryResult>(
   locale: LocaleTag,
   commandId: EntryCommandId,
   stateVersion: EntryPublicationStateVersion,
-  resultKind: Schema.Literal("changed", "no_op"),
+  resultKind: Schema.Literals(["changed", "no_op"]),
   unpublishedPublicationId: Schema.NullOr(EntryPublicationId),
   unpublishedPublicationSequence: Schema.NullOr(EntryPublicationSequence),
   unpublishedAt: IsoDateTime,
 }) {}
 
-export const GetEntryPublicationStatusInputSchema = Schema.standardSchemaV1(
+export const GetEntryPublicationStatusInputSchema = SchemaStrict.toStandardSchemaV1(
   GetEntryPublicationStatusInput,
 );
-export const ValidateEntryPublicationInputSchema = Schema.standardSchemaV1(
+export const ValidateEntryPublicationInputSchema = SchemaStrict.toStandardSchemaV1(
   ValidateEntryPublicationInput,
 );
-export const PublishEntryInputSchema = Schema.standardSchemaV1(PublishEntryInput);
-export const UnpublishEntryInputSchema = Schema.standardSchemaV1(UnpublishEntryInput);
-export const ListEntryPublicationsInputSchema = Schema.standardSchemaV1(ListEntryPublicationsInput);
+export const PublishEntryInputSchema = SchemaStrict.toStandardSchemaV1(PublishEntryInput);
+export const UnpublishEntryInputSchema = SchemaStrict.toStandardSchemaV1(UnpublishEntryInput);
+export const ListEntryPublicationsInputSchema = SchemaStrict.toStandardSchemaV1(
+  ListEntryPublicationsInput,
+);
 
-export const EntryPublicationStatusOutputSchema = Schema.standardSchemaV1(
+export const EntryPublicationStatusOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(EntryPublicationStatus),
 );
-export const EntryPublicationPlanOutputSchema = Schema.standardSchemaV1(
+export const EntryPublicationPlanOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(EntryPublicationPlan),
 );
-export const PublishEntryResultOutputSchema = Schema.standardSchemaV1(
+export const PublishEntryResultOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(PublishEntryResult),
 );
-export const UnpublishEntryResultOutputSchema = Schema.standardSchemaV1(
+export const UnpublishEntryResultOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(UnpublishEntryResult),
 );
-export const EntryPublicationPageOutputSchema = Schema.standardSchemaV1(
+export const EntryPublicationPageOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(EntryPublicationPage),
 );

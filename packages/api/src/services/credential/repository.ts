@@ -62,6 +62,7 @@ import {
 import { areScopesAllowedForFamily, isRoleAllowed } from "../policy";
 import { type ApplicationDb, authorizeUserProject } from "../project-access";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 /** Creates a discriminated repository outcome without attaching mutable state. */
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
@@ -83,10 +84,10 @@ function databaseFailure(operation: string, cause: unknown) {
 /** Decodes persisted values before they can enter credential domain workflows. */
 function decodeDatabaseValue<A, I>(
   operation: string,
-  schema: Schema.Schema<A, I, never>,
+  schema: Schema.Codec<A, I, never>,
   value: unknown,
 ) {
-  return Schema.decodeUnknown(schema)(value).pipe(
+  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
     Effect.mapError((cause) => databaseFailure(`${operation}.decode`, cause)),
   );
 }
@@ -570,7 +571,7 @@ export function makeCredentialRepository(options: RepositoryOptions = {}) {
         const last = visible.at(-1);
         const nextCursor =
           result.rows.length > input.limit && last
-            ? yield* Schema.decodeUnknown(ControlPlaneCursor)(
+            ? yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCursor)(
                 yield* signer.sign(authority, {
                   finalSortAtEpochMs: last.createdAt.getTime(),
                   finalId: last.id,
@@ -1390,10 +1391,10 @@ export function makeCredentialRepository(options: RepositoryOptions = {}) {
   };
 }
 
-export class CredentialRepository extends Context.Tag("CredentialRepository")<
+export class CredentialRepository extends Context.Service<
   CredentialRepository,
   ReturnType<typeof makeCredentialRepository>
->() {}
+>()("CredentialRepository") {}
 
 export const CredentialRepositoryLive = Layer.succeed(
   CredentialRepository,

@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 import ts from "typescript";
 
 import { canonicalizeJson, sha256 } from "../canonical";
 import { planGeneration } from "./index";
 import { type JsonValue, ToolingCollectionRevision, ToolingManifestPage } from "../schema";
 
+import * as SchemaStrict from "../schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const collectionId = "019fae8b-1234-7000-8000-000000000003";
@@ -80,7 +80,7 @@ function fixture() {
     fields,
   };
   const contractHash = sha256(canonicalizeJson(contract));
-  const revision = Schema.decodeUnknownSync(ToolingCollectionRevision)({
+  const revision = SchemaStrict.decodeUnknownSync(ToolingCollectionRevision)({
     projectId,
     environmentId,
     environmentKey: "main",
@@ -93,7 +93,7 @@ function fixture() {
     contract,
   });
   const locales = [{ id: localeId, tag: "en" }];
-  const manifest = Schema.decodeUnknownSync(ToolingManifestPage)({
+  const manifest = SchemaStrict.decodeUnknownSync(ToolingManifestPage)({
     projectId,
     environmentId,
     environmentKey: "main",
@@ -156,7 +156,7 @@ describe("deterministic project generator", () => {
     for (const fragment of [
       "PortableTextDocumentSchema",
       "DecimalSchema",
-      'Schema.Literal("EUR", "USD")',
+      'Schema.Literals(["EUR", "USD"])',
       "Schema.Boolean",
       "Schema.Literal",
       "DateSchema",
@@ -199,7 +199,7 @@ describe("deterministic project generator", () => {
           types: ["node"],
           typeRoots: [resolve(process.cwd(), "node_modules/@types")],
           paths: {
-            effect: [resolve(process.cwd(), "node_modules/effect/dist/dts/index.d.ts")],
+            effect: [resolve(process.cwd(), "node_modules/effect/dist/index.d.ts")],
             "@framerfordevs/sdk/client": [resolve(process.cwd(), "../sdk/src/client/index.ts")],
             "@framerfordevs/sdk/effect": [resolve(process.cwd(), "../sdk/src/effect/index.ts")],
           },
@@ -219,7 +219,7 @@ describe("deterministic project generator", () => {
 
   it("rejects incomplete and hash-mismatched authority", () => {
     const { manifest, revision } = fixture();
-    const incomplete = Schema.decodeUnknownSync(ToolingManifestPage)({
+    const incomplete = SchemaStrict.decodeUnknownSync(ToolingManifestPage)({
       ...manifest,
       nextCursor: "continuation",
     });

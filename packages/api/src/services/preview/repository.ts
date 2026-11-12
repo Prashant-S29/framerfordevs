@@ -20,7 +20,7 @@ import {
   project,
   projectCapability,
 } from "@framerfordevs/db/schema/platform";
-import { Context, Effect, Either, Layer, Schema } from "effect";
+import { Context, Effect, Result, Layer, Schema } from "effect";
 
 import {
   ProjectRole,
@@ -65,6 +65,8 @@ import { authorizeUserProject, selectUserProjectAccess } from "../project-access
 import { PreviewDocumentEngine } from "./document-engine";
 import { hashSchemaContract } from "../schema/engine";
 
+import * as SchemaStrict from "../../lib/schema-strict";
+import { Uuid } from "../../contracts/uuid";
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
 }
@@ -80,15 +82,15 @@ function databaseFailure(operation: string, cause: unknown) {
   return DatabaseFailure.make({ operation, cause });
 }
 
-const EntryValuesSchema = Schema.Record({ key: Schema.UUID, value: Schema.Unknown });
+const EntryValuesSchema = Schema.Record(Uuid, Schema.Unknown);
 
 function decodeEntryValues(value: unknown): EntryValues | null {
-  const decoded = Schema.decodeUnknownEither(EntryValuesSchema)(value);
-  return Either.isLeft(decoded) ? null : decoded.right;
+  const decoded = SchemaStrict.decodeUnknownResult(EntryValuesSchema)(value);
+  return Result.isFailure(decoded) ? null : decoded.success;
 }
 
 function decodeField(row: typeof cmsSchemaRevisionField.$inferSelect): CollectionField | null {
-  const decoded = Schema.decodeUnknownEither(CollectionFieldDefinition)({
+  const decoded = SchemaStrict.decodeUnknownResult(CollectionFieldDefinition)({
     id: row.fieldId,
     parentFieldId: row.parentFieldId,
     nodeRole: row.nodeRole,
@@ -106,7 +108,7 @@ function decodeField(row: typeof cmsSchemaRevisionField.$inferSelect): Collectio
     configuration: row.configuration,
     children: [],
   });
-  return Either.isLeft(decoded) ? null : decoded.right;
+  return Result.isFailure(decoded) ? null : decoded.success;
 }
 
 interface ResolvedPreviewScope {
@@ -285,8 +287,8 @@ async function resolveUserScope(
   if (authorization.kind === "not_found") return outcome("not_found");
   if (authorization.kind === "forbidden") return outcome("forbidden");
   if (authorization.access.project.archivedAt !== null) return outcome("invalid_state");
-  const role = Schema.decodeUnknownEither(ProjectRole)(authorization.access.role);
-  if (Either.isLeft(role)) return outcome("corrupt");
+  const role = SchemaStrict.decodeUnknownResult(ProjectRole)(authorization.access.role);
+  if (Result.isFailure(role)) return outcome("corrupt");
   const [environmentRow] = await executor
     .select({ id: environment.id })
     .from(environment)
@@ -328,7 +330,7 @@ async function resolveUserScope(
       collection: selected.collection,
       entry: selected.entry,
       locale,
-      role: role.right,
+      role: role.success,
       actorType: "user",
       actorId,
     } satisfies ResolvedPreviewScope,
@@ -751,8 +753,8 @@ export function makePreviewRepository(options: PreviewRepositoryOptions = {}) {
       });
       if (!compilation.ok) return outcome("corrupt");
       if (compilation.responseBytes > previewLimits.responseBytes) return outcome("too_large");
-      const item = Schema.decodeUnknownEither(PreviewItem)(compilation.item);
-      if (Either.isLeft(item)) return outcome("corrupt");
+      const item = SchemaStrict.decodeUnknownResult(PreviewItem)(compilation.item);
+      if (Result.isFailure(item)) return outcome("corrupt");
       try {
         if (options.testFailBeforeAudit) throw new Error("Injected Preview audit failure.");
         await persistAudit(
@@ -765,7 +767,7 @@ export function makePreviewRepository(options: PreviewRepositoryOptions = {}) {
       } catch (cause) {
         throw new PreviewAuditPersistenceError(cause);
       }
-      return withValue("success", { item: item.right });
+      return withValue("success", { item: item.success });
     });
 
   const runWithSerializationRetry = async (request: PreviewReadRequest): Promise<ReadResult> => {
@@ -881,10 +883,10 @@ export function makePreviewRepository(options: PreviewRepositoryOptions = {}) {
   };
 }
 
-export class PreviewRepository extends Context.Tag("PreviewRepository")<
+export class PreviewRepository extends Context.Service<
   PreviewRepository,
   ReturnType<typeof makePreviewRepository>
->() {}
+>()("PreviewRepository") {}
 
 export const PreviewRepositoryLive = Layer.effect(
   PreviewRepository,

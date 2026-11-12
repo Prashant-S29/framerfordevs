@@ -1,6 +1,6 @@
 // Defines project access, membership, invitation, and environment credential boundary contracts.
 
-import { Schema } from "effect";
+import { Schema, SchemaTransformation, Effect } from "effect";
 
 import { ApiSuccessSchema } from "../response/api";
 import { ProjectLocaleId } from "../locale";
@@ -15,6 +15,8 @@ import {
   WorkspaceId,
 } from "../platform";
 
+import * as SchemaStrict from "../../lib/schema-strict";
+import { UuidValue } from "../uuid";
 /** Detects control characters that are unsafe in normalized human-entered identity metadata. */
 function hasControlCharacter(value: string): boolean {
   for (const character of value) {
@@ -27,10 +29,13 @@ function hasControlCharacter(value: string): boolean {
 }
 
 const NormalizedString = Schema.String.pipe(
-  Schema.transform(Schema.String, {
-    decode: (value) => value.trim().normalize("NFC"),
-    encode: (value) => value,
-  }),
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transform({
+      decode: (value) => value.trim().normalize("NFC"),
+      encode: (value) => value,
+    }),
+  ),
 );
 
 export const projectRoleValues = [
@@ -92,35 +97,35 @@ export const credentialScopeValues = [
   "preview.read",
 ] as const;
 
-export const ProjectMembershipId = Schema.UUID.pipe(Schema.brand("ProjectMembershipId"));
+export const ProjectMembershipId = UuidValue.pipe(Schema.brand("ProjectMembershipId"));
 export type ProjectMembershipId = typeof ProjectMembershipId.Type;
 
-export const ProjectInvitationId = Schema.UUID.pipe(Schema.brand("ProjectInvitationId"));
+export const ProjectInvitationId = UuidValue.pipe(Schema.brand("ProjectInvitationId"));
 export type ProjectInvitationId = typeof ProjectInvitationId.Type;
 
-export const ApiCredentialId = Schema.UUID.pipe(Schema.brand("ApiCredentialId"));
+export const ApiCredentialId = UuidValue.pipe(Schema.brand("ApiCredentialId"));
 export type ApiCredentialId = typeof ApiCredentialId.Type;
 
-export const ApiCredentialRotationId = Schema.UUID.pipe(Schema.brand("ApiCredentialRotationId"));
+export const ApiCredentialRotationId = UuidValue.pipe(Schema.brand("ApiCredentialRotationId"));
 export type ApiCredentialRotationId = typeof ApiCredentialRotationId.Type;
 
-export const ProjectActor = Schema.Union(
+export const ProjectActor = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("user"), id: AuthUserId }),
   Schema.Struct({ kind: Schema.Literal("credential"), id: ApiCredentialId }),
-).annotations({ identifier: "ProjectActor", parseOptions: { onExcessProperty: "error" } });
+]).annotate({ identifier: "ProjectActor", closedObject: true });
 export type ProjectActor = typeof ProjectActor.Type;
 
-export const ProjectRole = Schema.Literal(...projectRoleValues);
+export const ProjectRole = Schema.Literals(projectRoleValues);
 export type ProjectRole = typeof ProjectRole.Type;
 
-export const LocaleAccessMode = Schema.Literal("all", "selected", "none");
+export const LocaleAccessMode = Schema.Literals(["all", "selected", "none"]);
 export type LocaleAccessMode = typeof LocaleAccessMode.Type;
 
-export const SelectedProjectLocaleIds = Schema.Array(ProjectLocaleId).pipe(
-  Schema.minItems(1),
-  Schema.maxItems(100),
-  Schema.filter((localeIds) => new Set(localeIds).size === localeIds.length, {
-    message: () => "Selected locale IDs must be unique.",
+export const SelectedProjectLocaleIds = Schema.Array(ProjectLocaleId).check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(100),
+  Schema.makeFilter((localeIds) => new Set(localeIds).size === localeIds.length, {
+    message: "Selected locale IDs must be unique.",
   }),
 );
 export type SelectedProjectLocaleIds = typeof SelectedProjectLocaleIds.Type;
@@ -144,11 +149,11 @@ export class NoProjectLocaleAccess extends Schema.Class<NoProjectLocaleAccess>(
   mode: Schema.Literal("none"),
 }) {}
 
-export const ProjectLocaleAccess = Schema.Union(
+export const ProjectLocaleAccess = Schema.Union([
   AllProjectLocaleAccess,
   SelectedProjectLocaleAccess,
   NoProjectLocaleAccess,
-);
+]);
 export type ProjectLocaleAccess = typeof ProjectLocaleAccess.Type;
 
 const ProjectPolicyFields = {
@@ -165,29 +170,32 @@ interface ProjectLocalePolicyShape {
   readonly localeAccess: ProjectLocaleAccess;
 }
 
-export const ProjectMemberPolicy = Schema.Struct(ProjectPolicyFields).pipe(
-  Schema.filter(ownerHasAllLocaleAccess, {
-    message: () => "Project owners must have all-locale access.",
-  }),
-  Schema.annotations({
-    identifier: "ProjectMemberPolicy",
-    parseOptions: { onExcessProperty: "error" },
-  }),
-);
+export const ProjectMemberPolicy = Schema.Struct(ProjectPolicyFields)
+  .check(
+    Schema.makeFilter(ownerHasAllLocaleAccess, {
+      message: "Project owners must have all-locale access.",
+    }),
+  )
+  .pipe(
+    Schema.annotate({
+      identifier: "ProjectMemberPolicy",
+      closedObject: true,
+    }),
+  );
 export type ProjectMemberPolicy = typeof ProjectMemberPolicy.Type;
 
-export const ProjectInvitationPolicy = ProjectMemberPolicy.annotations({
+export const ProjectInvitationPolicy = ProjectMemberPolicy.annotate({
   identifier: "ProjectInvitationPolicy",
 });
 export type ProjectInvitationPolicy = typeof ProjectInvitationPolicy.Type;
 
-export const ProjectPermissionAction = Schema.Literal(...projectPermissionActionValues);
+export const ProjectPermissionAction = Schema.Literals(projectPermissionActionValues);
 export type ProjectPermissionAction = typeof ProjectPermissionAction.Type;
 
-export const ProjectPermissionActions = Schema.Array(ProjectPermissionAction).pipe(
-  Schema.maxItems(projectPermissionActionValues.length),
-  Schema.filter((actions) => new Set(actions).size === actions.length, {
-    message: () => "Project permission actions must be unique.",
+export const ProjectPermissionActions = Schema.Array(ProjectPermissionAction).check(
+  Schema.isMaxLength(projectPermissionActionValues.length),
+  Schema.makeFilter((actions) => new Set(actions).size === actions.length, {
+    message: "Project permission actions must be unique.",
   }),
 );
 export type ProjectPermissionActions = typeof ProjectPermissionActions.Type;
@@ -199,143 +207,161 @@ export class ProjectPolicyProjection extends Schema.Class<ProjectPolicyProjectio
   localeAccess: ProjectLocaleAccess,
   baseRoleActions: ProjectPermissionActions,
   effectiveProjectActions: ProjectPermissionActions,
-  configuredLocaleIds: Schema.Array(ProjectLocaleId).pipe(Schema.maxItems(100)),
-  effectiveLocaleIds: Schema.Array(ProjectLocaleId).pipe(Schema.maxItems(100)),
+  configuredLocaleIds: Schema.Array(ProjectLocaleId).check(Schema.isMaxLength(100)),
+  effectiveLocaleIds: Schema.Array(ProjectLocaleId).check(Schema.isMaxLength(100)),
   effectiveLocaleActions: ProjectPermissionActions,
 }) {}
 
-export const ProjectInvitationStatus = Schema.Literal("pending", "accepted", "revoked", "expired");
+export const ProjectInvitationStatus = Schema.Literals([
+  "pending",
+  "accepted",
+  "revoked",
+  "expired",
+]);
 export type ProjectInvitationStatus = typeof ProjectInvitationStatus.Type;
 
-export const CredentialFamily = Schema.Literal("management", "delivery", "preview");
+export const CredentialFamily = Schema.Literals(["management", "delivery", "preview"]);
 export type CredentialFamily = typeof CredentialFamily.Type;
 
-export const CredentialLifecycleStatus = Schema.Literal(
+export const CredentialLifecycleStatus = Schema.Literals([
   "pending",
   "active",
   "retiring",
   "expired",
   "revoked",
   "canceled",
-);
+]);
 export type CredentialLifecycleStatus = typeof CredentialLifecycleStatus.Type;
 
-export const CredentialRotationStatus = Schema.Literal(
+export const CredentialRotationStatus = Schema.Literals([
   "pending",
   "overlap",
   "canceled",
   "completed",
-);
+]);
 export type CredentialRotationStatus = typeof CredentialRotationStatus.Type;
 
-export const CredentialScope = Schema.Literal(...credentialScopeValues);
+export const CredentialScope = Schema.Literals(credentialScopeValues);
 export type CredentialScope = typeof CredentialScope.Type;
 
-export const CredentialScopes = Schema.Array(CredentialScope).pipe(
-  Schema.minItems(1),
-  Schema.maxItems(16),
-  Schema.filter((scopes) => new Set(scopes).size === scopes.length, {
-    message: () => "Credential scopes must be unique.",
+export const CredentialScopes = Schema.Array(CredentialScope).check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(16),
+  Schema.makeFilter((scopes) => new Set(scopes).size === scopes.length, {
+    message: "Credential scopes must be unique.",
   }),
 );
 export type CredentialScopes = typeof CredentialScopes.Type;
 
 export const CanonicalEmail = NormalizedString.pipe(
-  Schema.transform(Schema.String, {
-    decode: (value) => value.toLowerCase(),
-    encode: (value) => value,
-  }),
-  Schema.minLength(3),
-  Schema.maxLength(320),
-  Schema.pattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/u),
-  Schema.filter((value) => !hasControlCharacter(value), {
-    message: () => "Email addresses cannot contain control characters.",
-  }),
-  Schema.brand("CanonicalEmail"),
-);
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transform({
+      decode: (value) => value.toLowerCase(),
+      encode: (value) => value,
+    }),
+  ),
+)
+  .check(
+    Schema.isMinLength(3),
+    Schema.isMaxLength(320),
+    Schema.isPattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/u),
+    Schema.makeFilter((value) => !hasControlCharacter(value), {
+      message: "Email addresses cannot contain control characters.",
+    }),
+  )
+  .pipe(Schema.brand("CanonicalEmail"));
 export type CanonicalEmail = typeof CanonicalEmail.Type;
 
 export const ProjectAccessSearch = NormalizedString.pipe(
-  Schema.transform(Schema.String, {
-    decode: (value) => value.toLowerCase(),
-    encode: (value) => value,
-  }),
-  Schema.minLength(1),
-  Schema.maxLength(100),
-  Schema.filter((value) => !hasControlCharacter(value), {
-    message: () => "Search text cannot contain control characters.",
-  }),
-  Schema.brand("ProjectAccessSearch"),
-);
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transform({
+      decode: (value) => value.toLowerCase(),
+      encode: (value) => value,
+    }),
+  ),
+)
+  .check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(100),
+    Schema.makeFilter((value) => !hasControlCharacter(value), {
+      message: "Search text cannot contain control characters.",
+    }),
+  )
+  .pipe(Schema.brand("ProjectAccessSearch"));
 export type ProjectAccessSearch = typeof ProjectAccessSearch.Type;
 
-export const ProjectInvitationListStatus = Schema.Literal(
+export const ProjectInvitationListStatus = Schema.Literals([
   "all",
   "pending",
   "accepted",
   "revoked",
   "expired",
-);
+]);
 export type ProjectInvitationListStatus = typeof ProjectInvitationListStatus.Type;
 
-export const InvitationToken = Schema.String.pipe(
-  Schema.length(43),
-  Schema.pattern(/^[A-Za-z0-9_-]+$/u),
-  Schema.brand("InvitationToken"),
-);
+export const InvitationToken = Schema.String.check(
+  Schema.isBetweenLength(43, 43),
+  Schema.isPattern(/^[A-Za-z0-9_-]+$/u),
+).pipe(Schema.brand("InvitationToken"));
 export type InvitationToken = typeof InvitationToken.Type;
 
-export const CredentialName = NormalizedString.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(100),
-  Schema.filter((value) => !hasControlCharacter(value), {
-    message: () => "Credential names cannot contain control characters.",
+export const CredentialName = NormalizedString.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(100),
+  Schema.makeFilter((value) => !hasControlCharacter(value), {
+    message: "Credential names cannot contain control characters.",
   }),
-  Schema.brand("CredentialName"),
-);
+).pipe(Schema.brand("CredentialName"));
 export type CredentialName = typeof CredentialName.Type;
 
-export const CredentialKeyPrefix = Schema.String.pipe(
-  Schema.minLength(44),
-  Schema.maxLength(45),
-  Schema.pattern(
+export const CredentialKeyPrefix = Schema.String.check(
+  Schema.isMinLength(44),
+  Schema.isMaxLength(45),
+  Schema.isPattern(
     /^ffd_(?:mgmt|del|prev)_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u,
   ),
-  Schema.brand("CredentialKeyPrefix"),
-);
+).pipe(Schema.brand("CredentialKeyPrefix"));
 export type CredentialKeyPrefix = typeof CredentialKeyPrefix.Type;
 
-export const CredentialSecret = Schema.String.pipe(
-  Schema.minLength(88),
-  Schema.maxLength(89),
-  Schema.pattern(
+export const CredentialSecret = Schema.String.check(
+  Schema.isMinLength(88),
+  Schema.isMaxLength(89),
+  Schema.isPattern(
     /^ffd_(?:mgmt|del|prev)_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{43}$/u,
   ),
-  Schema.brand("CredentialSecret"),
-);
+).pipe(Schema.brand("CredentialSecret"));
 export type CredentialSecret = typeof CredentialSecret.Type;
 
 export const CreateProjectInvitationInput = Schema.Struct({
   projectId: ProjectId,
   email: CanonicalEmail,
   ...ProjectPolicyFields,
-}).pipe(
-  Schema.filter(ownerHasAllLocaleAccess, {
-    message: () => "Project owners must have all-locale access.",
-  }),
-  Schema.annotations({
-    identifier: "CreateProjectInvitationInput",
-    parseOptions: { onExcessProperty: "error" },
-  }),
-);
+})
+  .check(
+    Schema.makeFilter(ownerHasAllLocaleAccess, {
+      message: "Project owners must have all-locale access.",
+    }),
+  )
+  .pipe(
+    Schema.annotate({
+      identifier: "CreateProjectInvitationInput",
+      closedObject: true,
+    }),
+  );
 export type CreateProjectInvitationInput = typeof CreateProjectInvitationInput.Type;
 
 export class ListProjectInvitationsInput extends Schema.Class<ListProjectInvitationsInput>(
   "ListProjectInvitationsInput",
 )({
   projectId: ProjectId,
-  status: Schema.optionalWith(ProjectInvitationListStatus, { default: () => "all" as const }),
-  search: Schema.optionalWith(Schema.NullOr(ProjectAccessSearch), { default: () => null }),
+  status: ProjectInvitationListStatus.pipe(
+    Schema.withDecodingDefaultType(Effect.sync(() => "all")),
+  ),
+  search: Schema.NullOr(ProjectAccessSearch).pipe(
+    Schema.withDecodingDefaultType(Effect.sync(() => null)),
+  ),
   cursor: Schema.NullOr(Cursor),
   limit: PageLimit,
 }) {}
@@ -370,8 +396,10 @@ export class ListProjectMembersInput extends Schema.Class<ListProjectMembersInpu
   "ListProjectMembersInput",
 )({
   projectId: ProjectId,
-  role: Schema.optionalWith(Schema.NullOr(ProjectRole), { default: () => null }),
-  search: Schema.optionalWith(Schema.NullOr(ProjectAccessSearch), { default: () => null }),
+  role: Schema.NullOr(ProjectRole).pipe(Schema.withDecodingDefaultType(Effect.sync(() => null))),
+  search: Schema.NullOr(ProjectAccessSearch).pipe(
+    Schema.withDecodingDefaultType(Effect.sync(() => null)),
+  ),
   cursor: Schema.NullOr(Cursor),
   limit: PageLimit,
 }) {}
@@ -381,15 +409,18 @@ export const UpdateProjectMemberPolicyInput = Schema.Struct({
   membershipId: ProjectMembershipId,
   version: ResourceVersion,
   ...ProjectPolicyFields,
-}).pipe(
-  Schema.filter(ownerHasAllLocaleAccess, {
-    message: () => "Project owners must have all-locale access.",
-  }),
-  Schema.annotations({
-    identifier: "UpdateProjectMemberPolicyInput",
-    parseOptions: { onExcessProperty: "error" },
-  }),
-);
+})
+  .check(
+    Schema.makeFilter(ownerHasAllLocaleAccess, {
+      message: "Project owners must have all-locale access.",
+    }),
+  )
+  .pipe(
+    Schema.annotate({
+      identifier: "UpdateProjectMemberPolicyInput",
+      closedObject: true,
+    }),
+  );
 export type UpdateProjectMemberPolicyInput = typeof UpdateProjectMemberPolicyInput.Type;
 
 export class RemoveProjectMemberInput extends Schema.Class<RemoveProjectMemberInput>(
@@ -409,12 +440,12 @@ export class IssueApiCredentialInput extends Schema.Class<IssueApiCredentialInpu
   name: CredentialName,
   scopes: CredentialScopes,
   expiresAt: Schema.NullOr(IsoDateTime),
-  previewAuthorityAcknowledged: Schema.optionalWith(Schema.Boolean, {
-    default: () => false,
-  }),
-  nonExpiringAcknowledged: Schema.optionalWith(Schema.Boolean, {
-    default: () => false,
-  }),
+  previewAuthorityAcknowledged: Schema.Boolean.pipe(
+    Schema.withDecodingDefaultType(Effect.sync(() => false)),
+  ),
+  nonExpiringAcknowledged: Schema.Boolean.pipe(
+    Schema.withDecodingDefaultType(Effect.sync(() => false)),
+  ),
 }) {}
 
 export class ListApiCredentialsInput extends Schema.Class<ListApiCredentialsInput>(
@@ -444,7 +475,7 @@ export class ChangeApiCredentialRotationInput extends Schema.Class<ChangeApiCred
   environmentId: EnvironmentId,
   rotationId: ApiCredentialRotationId,
   expectedVersion: ResourceVersion,
-  action: Schema.Literal("activate", "cancel", "complete"),
+  action: Schema.Literals(["activate", "cancel", "complete"]),
 }) {}
 
 export class RevokeApiCredentialInput extends Schema.Class<RevokeApiCredentialInput>(
@@ -464,7 +495,7 @@ export class CurrentProjectAccess extends Schema.Class<CurrentProjectAccess>(
   localeAccess: ProjectLocaleAccess,
   baseRoleActions: ProjectPermissionActions,
   effectiveProjectActions: ProjectPermissionActions,
-  effectiveLocaleIds: Schema.Array(ProjectLocaleId).pipe(Schema.maxItems(100)),
+  effectiveLocaleIds: Schema.Array(ProjectLocaleId).check(Schema.isMaxLength(100)),
   effectiveLocaleActions: ProjectPermissionActions,
 }) {}
 
@@ -472,7 +503,7 @@ export class ProjectMember extends Schema.Class<ProjectMember>("ProjectMember")(
   id: ProjectMembershipId,
   projectId: ProjectId,
   userId: AuthUserId,
-  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(255)),
+  name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
   email: CanonicalEmail,
   role: ProjectRole,
   localeAccess: ProjectLocaleAccess,
@@ -508,10 +539,10 @@ export class InspectedProjectInvitation extends Schema.Class<InspectedProjectInv
   "InspectedProjectInvitation",
 )({
   projectId: ProjectId,
-  projectName: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
+  projectName: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
   role: ProjectRole,
   localeAccess: ProjectLocaleAccess,
-  inviterName: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(255)),
+  inviterName: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
   expiresAt: IsoDateTime,
 }) {}
 
@@ -591,68 +622,77 @@ export class ApiCredentialPage extends Schema.Class<ApiCredentialPage>("ApiCrede
   nextCursor: Schema.NullOr(Cursor),
 }) {}
 
-export const CreateProjectInvitationInputSchema = Schema.standardSchemaV1(
+export const CreateProjectInvitationInputSchema = SchemaStrict.toStandardSchemaV1(
   CreateProjectInvitationInput,
 );
-export const ListProjectInvitationsInputSchema = Schema.standardSchemaV1(
+export const ListProjectInvitationsInputSchema = SchemaStrict.toStandardSchemaV1(
   ListProjectInvitationsInput,
 );
-export const InspectProjectInvitationInputSchema = Schema.standardSchemaV1(
+export const InspectProjectInvitationInputSchema = SchemaStrict.toStandardSchemaV1(
   InspectProjectInvitationInput,
 );
-export const AcceptProjectInvitationInputSchema = Schema.standardSchemaV1(
+export const AcceptProjectInvitationInputSchema = SchemaStrict.toStandardSchemaV1(
   AcceptProjectInvitationInput,
 );
-export const RevokeProjectInvitationInputSchema = Schema.standardSchemaV1(
+export const RevokeProjectInvitationInputSchema = SchemaStrict.toStandardSchemaV1(
   RevokeProjectInvitationInput,
 );
-export const GetCurrentProjectAccessInputSchema = Schema.standardSchemaV1(
+export const GetCurrentProjectAccessInputSchema = SchemaStrict.toStandardSchemaV1(
   GetCurrentProjectAccessInput,
 );
-export const ListProjectMembersInputSchema = Schema.standardSchemaV1(ListProjectMembersInput);
-export const UpdateProjectMemberPolicyInputSchema = Schema.standardSchemaV1(
+export const ListProjectMembersInputSchema =
+  SchemaStrict.toStandardSchemaV1(ListProjectMembersInput);
+export const UpdateProjectMemberPolicyInputSchema = SchemaStrict.toStandardSchemaV1(
   UpdateProjectMemberPolicyInput,
 );
-export const RemoveProjectMemberInputSchema = Schema.standardSchemaV1(RemoveProjectMemberInput);
-export const IssueApiCredentialInputSchema = Schema.standardSchemaV1(IssueApiCredentialInput);
-export const ListApiCredentialsInputSchema = Schema.standardSchemaV1(ListApiCredentialsInput);
-export const StartApiCredentialRotationInputSchema = Schema.standardSchemaV1(
+export const RemoveProjectMemberInputSchema =
+  SchemaStrict.toStandardSchemaV1(RemoveProjectMemberInput);
+export const IssueApiCredentialInputSchema =
+  SchemaStrict.toStandardSchemaV1(IssueApiCredentialInput);
+export const ListApiCredentialsInputSchema =
+  SchemaStrict.toStandardSchemaV1(ListApiCredentialsInput);
+export const StartApiCredentialRotationInputSchema = SchemaStrict.toStandardSchemaV1(
   StartApiCredentialRotationInput,
 );
-export const ChangeApiCredentialRotationInputSchema = Schema.standardSchemaV1(
+export const ChangeApiCredentialRotationInputSchema = SchemaStrict.toStandardSchemaV1(
   ChangeApiCredentialRotationInput,
 );
-export const RevokeApiCredentialInputSchema = Schema.standardSchemaV1(RevokeApiCredentialInput);
+export const RevokeApiCredentialInputSchema =
+  SchemaStrict.toStandardSchemaV1(RevokeApiCredentialInput);
 
-export const CurrentProjectAccessOutputSchema = Schema.standardSchemaV1(
+export const CurrentProjectAccessOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(CurrentProjectAccess),
 );
-export const ProjectMemberOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(ProjectMember));
-export const ProjectMemberPageOutputSchema = Schema.standardSchemaV1(
+export const ProjectMemberOutputSchema = SchemaStrict.toStandardSchemaV1(
+  ApiSuccessSchema(ProjectMember),
+);
+export const ProjectMemberPageOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(ProjectMemberPage),
 );
-export const ProjectInvitationOutputSchema = Schema.standardSchemaV1(
+export const ProjectInvitationOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(ProjectInvitation),
 );
-export const IssuedProjectInvitationOutputSchema = Schema.standardSchemaV1(
+export const IssuedProjectInvitationOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(IssuedProjectInvitation),
 );
-export const InspectedProjectInvitationOutputSchema = Schema.standardSchemaV1(
+export const InspectedProjectInvitationOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(InspectedProjectInvitation),
 );
-export const ProjectInvitationPageOutputSchema = Schema.standardSchemaV1(
+export const ProjectInvitationPageOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(ProjectInvitationPage),
 );
-export const ApiCredentialOutputSchema = Schema.standardSchemaV1(ApiSuccessSchema(ApiCredential));
-export const IssuedApiCredentialOutputSchema = Schema.standardSchemaV1(
+export const ApiCredentialOutputSchema = SchemaStrict.toStandardSchemaV1(
+  ApiSuccessSchema(ApiCredential),
+);
+export const IssuedApiCredentialOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(IssuedApiCredential),
 );
-export const ApiCredentialRotationOutputSchema = Schema.standardSchemaV1(
+export const ApiCredentialRotationOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(ApiCredentialRotation),
 );
-export const StartedApiCredentialRotationOutputSchema = Schema.standardSchemaV1(
+export const StartedApiCredentialRotationOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(StartedApiCredentialRotation),
 );
-export const ApiCredentialPageOutputSchema = Schema.standardSchemaV1(
+export const ApiCredentialPageOutputSchema = SchemaStrict.toStandardSchemaV1(
   ApiSuccessSchema(ApiCredentialPage),
 );

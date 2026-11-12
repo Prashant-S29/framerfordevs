@@ -66,7 +66,7 @@ describe("system operations", () => {
         assert.isNull(session);
         assert.isTrue(Exit.isFailure(required));
         if (Exit.isFailure(required)) {
-          const failure = Option.getOrUndefined(Cause.failureOption(required.cause));
+          const failure = Option.getOrUndefined(Cause.findErrorOption(required.cause));
           assert.strictEqual(failure?._tag, "UnauthorizedFailure");
         }
       }),

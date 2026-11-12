@@ -14,7 +14,7 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import {
   AuthUserId,
@@ -34,9 +34,10 @@ import {
   projectionInvalidAuditAction,
 } from "../../../src/services/studio-content/projection-audit";
 
+import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ownerId = `m19-audit-owner-${suffix}`;
-const actorId = Schema.decodeUnknownSync(AuthUserId)(ownerId);
+const actorId = SchemaStrict.decodeUnknownSync(AuthUserId)(ownerId);
 const platform = makePlatformRepository();
 let workspaceModel: Workspace | undefined;
 let projectModel: Project | undefined;
@@ -56,14 +57,14 @@ beforeAll(async () => {
   workspaceModel = await Effect.runPromise(
     platform.createWorkspace(
       actorId,
-      Schema.decodeUnknownSync(CreateWorkspaceInput)({ name: "M19 Projection Audit" }),
+      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M19 Projection Audit" }),
       `request-m19-audit-workspace-${suffix}`,
     ),
   );
   projectModel = await Effect.runPromise(
     platform.createProject(
       actorId,
-      Schema.decodeUnknownSync(CreateProjectInput)({
+      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
         workspaceId: required(workspaceModel).id,
         name: "M19 Projection Audit Project",
         key: `m19-audit-${suffix.slice(0, 8)}`,
@@ -109,7 +110,7 @@ function input(revisionId: typeof SchemaRevisionId.Type) {
 
 describe("Studio Content projection-invalid audit persistence", () => {
   it("persists exactly one event across concurrent detections", async () => {
-    const revisionId = Schema.decodeUnknownSync(SchemaRevisionId)(randomUUID());
+    const revisionId = SchemaStrict.decodeUnknownSync(SchemaRevisionId)(randomUUID());
     const results = await Promise.all(
       Array.from({ length: 8 }, () => ensureProjectionInvalidAudit(db, input(revisionId))),
     );
@@ -151,7 +152,7 @@ describe("Studio Content projection-invalid audit persistence", () => {
   });
 
   it("fails closed when the deterministic primary key contains mismatched authority", async () => {
-    const revisionId = Schema.decodeUnknownSync(SchemaRevisionId)(randomUUID());
+    const revisionId = SchemaStrict.decodeUnknownSync(SchemaRevisionId)(randomUUID());
     const authority = input(revisionId);
     const auditId = projectionInvalidAuditId(revisionId);
     await db.insert(auditEvent).values({

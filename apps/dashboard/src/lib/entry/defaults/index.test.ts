@@ -4,15 +4,16 @@ import {
   CollectionFieldDefinition,
   defaultFieldEditorMetadata,
 } from "@framerfordevs/api/contracts/schema/index";
-import { Schema } from "effect";
+
 import { describe, expect, it } from "vitest";
 
 import { applyGeneratedFormDefaults, applyNewEntryPartitionDefaults } from "./index";
 
+import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const rootId = "019fae8b-1234-7000-8000-000000000081";
 const childId = "019fae8b-1234-7000-8000-000000000082";
 
-const child = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+const child = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   id: childId,
   parentFieldId: rootId,
   nodeRole: "object_property",
@@ -28,7 +29,7 @@ const child = Schema.decodeUnknownSync(CollectionFieldDefinition)({
   children: [],
 });
 
-const mixedObject = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+const mixedObject = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   id: rootId,
   parentFieldId: null,
   nodeRole: "root",
@@ -44,7 +45,7 @@ const mixedObject = Schema.decodeUnknownSync(CollectionFieldDefinition)({
   children: [child],
 });
 
-const atomicObject = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+const atomicObject = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   ...mixedObject,
   required: false,
   localization: "localized",

@@ -1,10 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Schema } from "effect";
 
 import { EntryValueMutations } from "../../../contracts/entry";
 import { StudioFormProjection } from "../../../contracts/studio-content";
 import { studioMutationsUseProjectedAuthority } from ".";
 
+import * as SchemaStrict from "../../schema-strict";
 const ids = {
   collection: "019fae8b-1234-7000-8000-000000000001",
   revision: "019fae8b-1234-7000-8000-000000000002",
@@ -17,7 +17,7 @@ const ids = {
   placement: "019fae8b-1234-7000-8000-000000000009",
 };
 
-const form = Schema.decodeUnknownSync(StudioFormProjection)({
+const form = SchemaStrict.decodeUnknownSync(StudioFormProjection)({
   collectionId: ids.collection,
   schemaRevisionId: ids.revision,
   contractHash: "a".repeat(64),
@@ -98,7 +98,7 @@ const form = Schema.decodeUnknownSync(StudioFormProjection)({
 });
 
 function mutations(value: unknown) {
-  return Schema.decodeUnknownSync(EntryValueMutations)(value);
+  return SchemaStrict.decodeUnknownSync(EntryValueMutations)(value);
 }
 
 describe("Studio projected mutation authority", () => {

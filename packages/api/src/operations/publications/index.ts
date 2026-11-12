@@ -1,6 +1,6 @@
 // Defines named M8 exact-locale publication workflows at the Effect boundary.
 
-import { Cause, Clock, Effect, Exit, Option, Schema } from "effect";
+import { Cause, Clock, Effect, Exit, Option } from "effect";
 
 import { UnauthorizedFailure } from "../../contracts/response/errors";
 import type {
@@ -14,8 +14,11 @@ import { AuthUserId } from "../../contracts/platform";
 import { Telemetry, type EntryPublicationValidationCategory } from "../../observability/telemetry";
 import { PublicationRepository } from "../../services/publication/repository";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 const decodeActorId = (actorId: string) =>
-  Schema.decodeUnknown(AuthUserId)(actorId).pipe(Effect.mapError(() => UnauthorizedFailure.make()));
+  SchemaStrict.decodeUnknownEffect(AuthUserId)(actorId).pipe(
+    Effect.mapError(() => UnauthorizedFailure.make()),
+  );
 
 function validationCategory(
   code: string,
@@ -29,7 +32,7 @@ function validationCategory(
 
 function failureOutcome(exit: Exit.Exit<unknown, unknown>): "invalid" | "conflict" | "failure" {
   if (Exit.isSuccess(exit)) return "failure";
-  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  const failure = Option.getOrUndefined(Cause.findErrorOption(exit.cause));
   if (typeof failure !== "object" || failure === null || !("_tag" in failure)) return "failure";
   if (failure._tag === "EntryPublicationInvalidFailure") return "invalid";
   if (failure._tag === "EntryPublicationConflictFailure") return "conflict";

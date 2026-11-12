@@ -1,21 +1,22 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import { AuthoringValueMutations } from "../../../contracts/authoring";
 import { CollectionFieldId } from "../../../contracts/schema";
 import { projectAuthoringValue, resolveAuthoringMutations } from "./index";
 
+import * as SchemaStrict from "../../schema-strict";
 const titleFieldId = "019fae8b-1234-7000-8000-000000000011";
 const seoFieldId = "019fae8b-1234-7000-8000-000000000012";
 
-const decodeInput = Schema.decodeUnknown(AuthoringValueMutations);
+const decodeInput = SchemaStrict.decodeUnknownEffect(AuthoringValueMutations);
 
 describe("authoring public mutations", () => {
   it.effect("resolves API-key paths to stable field IDs without changing values", () =>
     Effect.gen(function* () {
       const [titleId, seoId] = yield* Effect.all([
-        Schema.decodeUnknown(CollectionFieldId)(titleFieldId),
-        Schema.decodeUnknown(CollectionFieldId)(seoFieldId),
+        SchemaStrict.decodeUnknownEffect(CollectionFieldId)(titleFieldId),
+        SchemaStrict.decodeUnknownEffect(CollectionFieldId)(seoFieldId),
       ]);
       const mutations = yield* decodeInput([
         {
@@ -55,7 +56,7 @@ describe("authoring public mutations", () => {
     "rejects unknown, scope-mismatched, and non-editable paths without values in issues",
     () =>
       Effect.gen(function* () {
-        const titleId = yield* Schema.decodeUnknown(CollectionFieldId)(titleFieldId);
+        const titleId = yield* SchemaStrict.decodeUnknownEffect(CollectionFieldId)(titleFieldId);
         const mutations = yield* decodeInput([
           { operation: "set", scope: "localized", path: ["unknown"], value: "secret-a" },
           { operation: "set", scope: "localized", path: ["title"], value: "secret-b" },
@@ -80,8 +81,8 @@ describe("authoring public mutations", () => {
   it.effect("rejects duplicate or ancestor-overlapping mutations within one scope", () =>
     Effect.gen(function* () {
       const [titleId, seoId] = yield* Effect.all([
-        Schema.decodeUnknown(CollectionFieldId)(titleFieldId),
-        Schema.decodeUnknown(CollectionFieldId)(seoFieldId),
+        SchemaStrict.decodeUnknownEffect(CollectionFieldId)(titleFieldId),
+        SchemaStrict.decodeUnknownEffect(CollectionFieldId)(seoFieldId),
       ]);
       const mutations = yield* decodeInput([
         { operation: "set", scope: "localized", path: ["seo"], value: {} },
@@ -109,8 +110,8 @@ describe("authoring public mutations", () => {
   it.effect("translates whole object and list values without allowing hidden nested writes", () =>
     Effect.gen(function* () {
       const [seoId, titleId] = yield* Effect.all([
-        Schema.decodeUnknown(CollectionFieldId)(seoFieldId),
-        Schema.decodeUnknown(CollectionFieldId)(titleFieldId),
+        SchemaStrict.decodeUnknownEffect(CollectionFieldId)(seoFieldId),
+        SchemaStrict.decodeUnknownEffect(CollectionFieldId)(titleFieldId),
       ]);
       const shape = {
         kind: "object" as const,
@@ -177,7 +178,7 @@ describe("authoring public mutations", () => {
 
   it.effect("enforces recursive value depth without returning submitted content", () =>
     Effect.gen(function* () {
-      const titleId = yield* Schema.decodeUnknown(CollectionFieldId)(titleFieldId);
+      const titleId = yield* SchemaStrict.decodeUnknownEffect(CollectionFieldId)(titleFieldId);
       let value: Record<string, unknown> = {};
       for (let index = 0; index < 25; index += 1) value = { nested: value };
       const mutations = yield* decodeInput([

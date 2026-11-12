@@ -78,13 +78,13 @@ export function sanitizeCause(cause: unknown): unknown {
   return { type: typeof cause };
 }
 
-export class ApplicationLogger extends Context.Tag("ApplicationLogger")<
+export class ApplicationLogger extends Context.Service<
   ApplicationLogger,
   {
     readonly info: (message: string, fields?: LogFields) => Effect.Effect<void>;
     readonly error: (message: string, fields?: LogFields) => Effect.Effect<void>;
   }
->() {}
+>()("ApplicationLogger") {}
 
 export const ApplicationLoggerLive = Layer.succeed(ApplicationLogger, {
   info: (message, fields = {}) =>

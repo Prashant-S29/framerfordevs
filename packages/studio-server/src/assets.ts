@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const maximumAssets = 64;
 const maximumAssetBytes = 2 * 1_024 * 1_024;
 const maximumTotalBytes = 8 * 1_024 * 1_024;
-const assetPath = /^assets\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+const assetPath = /^assets\/(?:chunk\/)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 
 export interface StudioAsset {
   readonly body: Uint8Array;

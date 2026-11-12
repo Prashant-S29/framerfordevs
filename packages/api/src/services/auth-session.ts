@@ -5,12 +5,12 @@ import { AuthSessionFailure } from "../contracts/response/errors";
 
 export type AuthSession = Awaited<ReturnType<typeof auth.api.getSession>>;
 
-export class AuthSessionService extends Context.Tag("AuthSessionService")<
+export class AuthSessionService extends Context.Service<
   AuthSessionService,
   {
     readonly getSession: (headers: Headers) => Effect.Effect<AuthSession, AuthSessionFailure>;
   }
->() {}
+>()("AuthSessionService") {}
 
 export function makeAuthSessionService(lookup: (headers: Headers) => Promise<AuthSession>) {
   return {

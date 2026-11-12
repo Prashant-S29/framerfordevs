@@ -9,15 +9,19 @@ import {
   SecurityServiceFailure,
 } from "../../../contracts/response/errors";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 const cursorLifetimeMs = 15 * 60 * 1_000;
 const cursorMaximumLength = 512;
-const EpochMillis = Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(0));
+const EpochMillis = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0));
 
 const ToolingCursorPayload = Schema.Struct({
   version: Schema.Literal(1),
   kind: Schema.Literal("tooling_page"),
-  authorityDigest: Schema.String.pipe(Schema.length(64), Schema.pattern(/^[0-9a-f]{64}$/u)),
-  finalId: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
+  authorityDigest: Schema.String.check(
+    Schema.isBetweenLength(64, 64),
+    Schema.isPattern(/^[0-9a-f]{64}$/u),
+  ),
+  finalId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
   issuedAtEpochMs: EpochMillis,
   expiresAtEpochMs: EpochMillis,
 });
@@ -135,9 +139,9 @@ export function makeToolingCursorSigner(
           try: (): unknown => JSON.parse(Buffer.from(payloadText, "base64url").toString("utf8")),
           catch: () => invalidCursor(),
         });
-        const payload = yield* Schema.decodeUnknown(ToolingCursorPayload)(unknownPayload).pipe(
-          Effect.mapError(() => invalidCursor()),
-        );
+        const payload = yield* SchemaStrict.decodeUnknownEffect(ToolingCursorPayload)(
+          unknownPayload,
+        ).pipe(Effect.mapError(() => invalidCursor()));
         const now = yield* Clock.currentTimeMillis;
         if (
           payload.authorityDigest !== authorityDigest(authority) ||
@@ -152,10 +156,10 @@ export function makeToolingCursorSigner(
   };
 }
 
-export class ToolingCursorSigner extends Context.Tag("ToolingCursorSigner")<
+export class ToolingCursorSigner extends Context.Service<
   ToolingCursorSigner,
   ToolingCursorSignerService
->() {}
+>()("ToolingCursorSigner") {}
 
 export function makeToolingCursorSignerLive(options: ToolingCursorSignerOptions) {
   return Layer.succeed(ToolingCursorSigner, makeToolingCursorSigner(options));

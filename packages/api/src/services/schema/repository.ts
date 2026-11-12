@@ -94,6 +94,7 @@ import {
   authorizeCmsActorProject,
 } from "../project-access";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
 }
@@ -124,10 +125,10 @@ function hasConstraint(cause: unknown, constraint: string, depth = 0): boolean {
 
 function decodeDatabaseValue<A, I>(
   operation: string,
-  schema: Schema.Schema<A, I, never>,
+  schema: Schema.Codec<A, I, never>,
   value: unknown,
 ) {
-  return Schema.decodeUnknown(schema)(value).pipe(
+  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
     Effect.mapError((cause) => databaseFailure(`${operation}.decode`, cause)),
   );
 }
@@ -390,7 +391,7 @@ export function decodePersistedFieldEditorMetadataSync(
 ): FieldEditorMetadata {
   return Object.keys(editorMetadata).length === 0
     ? defaultFieldEditorMetadata
-    : Schema.decodeUnknownSync(FieldEditorMetadata)(editorMetadata);
+    : SchemaStrict.decodeUnknownSync(FieldEditorMetadata)(editorMetadata);
 }
 
 function fieldValue(
@@ -398,7 +399,7 @@ function fieldValue(
 ) {
   const id = "fieldId" in row ? row.fieldId : row.id;
   const editor = decodePersistedFieldEditorMetadataSync(row.editorMetadata);
-  return Schema.decodeUnknownSync(CollectionFieldDefinition)({
+  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
     id,
     parentFieldId: row.parentFieldId,
     nodeRole: row.nodeRole,
@@ -446,13 +447,13 @@ function draftStateSync(
     currencyRegistryProfile:
       collection.currencyRegistryProfile === null
         ? null
-        : Schema.decodeUnknownSync(Schema.String)(collection.currencyRegistryProfile),
-    collection: Schema.decodeUnknownSync(CmsCollection)(collectionValue(collection)),
+        : SchemaStrict.decodeUnknownSync(Schema.String)(collection.currencyRegistryProfile),
+    collection: SchemaStrict.decodeUnknownSync(CmsCollection)(collectionValue(collection)),
     fields,
     editorLayout:
       collection.editorLayout === null
         ? syntheticEditorLayout(fields)
-        : Schema.decodeUnknownSync(EditorLayout)(collection.editorLayout),
+        : SchemaStrict.decodeUnknownSync(EditorLayout)(collection.editorLayout),
   };
 }
 
@@ -506,7 +507,7 @@ export function decodePublishedSchemaRevisionSync(rows: {
   const editorLayout =
     revision.editorLayout === null
       ? syntheticEditorLayout(fields)
-      : Schema.decodeUnknownSync(EditorLayout)(revision.editorLayout);
+      : SchemaStrict.decodeUnknownSync(EditorLayout)(revision.editorLayout);
   const contractHash = hashSchemaContract({
     formatVersion: revision.formatVersion,
     validationProfile: revision.validationProfile,
@@ -514,7 +515,7 @@ export function decodePublishedSchemaRevisionSync(rows: {
     collectionApiKey: revision.collectionApiKey,
     fields,
   });
-  const published = Schema.decodeUnknownSync(PublishedSchemaRevision)({
+  const published = SchemaStrict.decodeUnknownSync(PublishedSchemaRevision)({
     id: revision.id,
     workspaceId: revision.workspaceId,
     projectId: revision.projectId,
@@ -696,7 +697,7 @@ function materializeAuthoringFields(
       continue;
     }
 
-    const candidate = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+    const candidate = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
       id: fieldId,
       parentFieldId: current.parent?.id ?? null,
       nodeRole,
@@ -855,7 +856,7 @@ function appendRootPlacement(layout: EditorLayout, field: CollectionFieldDefinit
       },
     ],
   };
-  return Schema.decodeUnknownSync(EditorLayout)({
+  return SchemaStrict.decodeUnknownSync(EditorLayout)({
     ...layout,
     tabs: layout.tabs.map((tab) =>
       tab.id === lastTab.id
@@ -869,7 +870,7 @@ function appendRootPlacement(layout: EditorLayout, field: CollectionFieldDefinit
 }
 
 function removeRootPlacement(layout: EditorLayout, fieldId: string): EditorLayout {
-  return Schema.decodeUnknownSync(EditorLayout)({
+  return SchemaStrict.decodeUnknownSync(EditorLayout)({
     ...layout,
     tabs: layout.tabs.map((tab) => ({
       ...tab,
@@ -1373,7 +1374,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
             ).length;
             const fieldId = randomUUID();
             const editor = nodeRole === "list_item" && parent ? parent.editor : input.field.editor;
-            const candidate = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+            const candidate = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
               id: fieldId,
               parentFieldId: input.parentFieldId,
               nodeRole,
@@ -1575,7 +1576,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
             if (unchanged)
               return outcomeWith("success", { draft: decodeDraftSync(collection, rows) });
 
-            const candidate = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+            const candidate = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
               id: current.id,
               parentFieldId: current.parentFieldId,
               nodeRole: currentDefinition.nodeRole,
@@ -1916,7 +1917,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               .map((row) => {
                 const node = fieldValue(row);
                 return affected.some((value) => value.id === row.id)
-                  ? Schema.decodeUnknownSync(CollectionFieldDefinition)({
+                  ? SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
                       ...node,
                       position: node.position - 1,
                     })
@@ -2302,7 +2303,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               validationProfile: draft.validationProfile,
               currencyRegistryProfile: draft.currencyRegistryProfile,
               contractHash: draft.contractHash,
-              role: Schema.decodeUnknownSync(ProjectRole)(authorization.access.role),
+              role: SchemaStrict.decodeUnknownSync(ProjectRole)(authorization.access.role),
               canEdit: isRoleAllowed(authorization.access.role, "content.write"),
               fields: draft.fields,
               editorLayout: draft.editorLayout,
@@ -2352,7 +2353,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               validationProfile: revision.validationProfile,
               currencyRegistryProfile: revision.currencyRegistryProfile,
               contractHash: revision.contractHash,
-              role: Schema.decodeUnknownSync(ProjectRole)(authorization.access.role),
+              role: SchemaStrict.decodeUnknownSync(ProjectRole)(authorization.access.role),
               canEdit: isRoleAllowed(authorization.access.role, "content.write"),
               fields: revision.fields,
               editorLayout: revision.editorLayout,
@@ -2466,7 +2467,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 return outcome("conflict");
               const expected = fingerprintSchemaPublication(
                 input,
-                Schema.decodeUnknownSync(SchemaHash)(existing.schemaHash),
+                SchemaStrict.decodeUnknownSync(SchemaHash)(existing.schemaHash),
               );
               if (existing.commandFingerprint !== expected) return outcome("conflict");
               const rows = await loadPublishedRevisionRows(transaction, {
@@ -2824,9 +2825,8 @@ type SchemaRepositoryService = Pick<
   | "getPublishedForm"
 >;
 
-export class SchemaRepository extends Context.Tag("SchemaRepository")<
-  SchemaRepository,
-  SchemaRepositoryService
->() {}
+export class SchemaRepository extends Context.Service<SchemaRepository, SchemaRepositoryService>()(
+  "SchemaRepository",
+) {}
 
 export const SchemaRepositoryLive = Layer.succeed(SchemaRepository, makeSchemaRepository());

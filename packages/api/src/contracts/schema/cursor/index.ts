@@ -5,6 +5,7 @@ import { ValidationFailure } from "../../response/errors";
 import { Cursor, EnvironmentId, IsoDateTime } from "../../platform";
 import { CollectionId } from "..";
 
+import * as SchemaStrict from "../../../lib/schema-strict";
 class CollectionCursorPayload extends Schema.Class<CollectionCursorPayload>(
   "CollectionCursorPayload",
 )({
@@ -28,7 +29,9 @@ const invalidCursor = () =>
 
 const encodePayload = Effect.fn("schemaCursor.encode")(function* (payload: object) {
   const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  return yield* Schema.decodeUnknown(Cursor)(encoded).pipe(Effect.mapError(() => invalidCursor()));
+  return yield* SchemaStrict.decodeUnknownEffect(Cursor)(encoded).pipe(
+    Effect.mapError(() => invalidCursor()),
+  );
 });
 
 const decodePayload = Effect.fn("schemaCursor.decode")(function* (cursor: Cursor) {
@@ -40,7 +43,7 @@ const decodePayload = Effect.fn("schemaCursor.decode")(function* (cursor: Cursor
     try: (): unknown => JSON.parse(json),
     catch: () => invalidCursor(),
   });
-  return yield* Schema.decodeUnknown(CollectionCursorPayload)(unknownPayload).pipe(
+  return yield* SchemaStrict.decodeUnknownEffect(CollectionCursorPayload)(unknownPayload).pipe(
     Effect.mapError(() => invalidCursor()),
   );
 });

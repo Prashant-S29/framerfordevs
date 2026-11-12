@@ -25,9 +25,9 @@ export function makePublicationEngine() {
   };
 }
 
-export class PublicationEngine extends Context.Tag("PublicationEngine")<
+export class PublicationEngine extends Context.Service<
   PublicationEngine,
   ReturnType<typeof makePublicationEngine>
->() {}
+>()("PublicationEngine") {}
 
 export const PublicationEngineLive = Layer.succeed(PublicationEngine, makePublicationEngine());

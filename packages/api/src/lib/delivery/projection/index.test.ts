@@ -1,7 +1,6 @@
 // Verifies complete supported root-scalar projection, exact representations, and invariant failure behavior.
 
 import { describe, expect, it } from "vitest";
-import { Schema } from "effect";
 
 import {
   CollectionFieldDefinition,
@@ -9,6 +8,7 @@ import {
 } from "../../../contracts/schema";
 import { compileDeliveryProjections } from "./index";
 
+import * as SchemaStrict from "../../schema-strict";
 const editor = {
   helpText: null,
   placeholder: null,
@@ -17,7 +17,7 @@ const editor = {
 };
 
 function field(value: unknown): CollectionField {
-  return Schema.decodeUnknownSync(CollectionFieldDefinition)(value);
+  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)(value);
 }
 
 function root(

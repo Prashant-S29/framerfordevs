@@ -17,6 +17,7 @@ import {
 } from "../../contracts/access";
 import type { ProjectLocaleId } from "../../contracts/locale";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 export type PolicyDecisionReason =
   | "allowed"
   | "unknown_action"
@@ -168,8 +169,8 @@ const deny = (reason: Exclude<PolicyDecisionReason, "allowed">): PolicyDecision 
   reason,
 });
 
-function decodeOption<A, I>(schema: Schema.Schema<A, I, never>, value: unknown): A | undefined {
-  return Option.getOrUndefined(Schema.decodeUnknownOption(schema)(value));
+function decodeOption<A, I>(schema: Schema.Codec<A, I, never>, value: unknown): A | undefined {
+  return Option.getOrUndefined(SchemaStrict.decodeUnknownOption(schema)(value));
 }
 
 export function isRoleAllowed(role: string, action: string): boolean {
@@ -340,9 +341,9 @@ export function makePolicyService() {
   };
 }
 
-export class PolicyService extends Context.Tag("PolicyService")<
+export class PolicyService extends Context.Service<
   PolicyService,
   ReturnType<typeof makePolicyService>
->() {}
+>()("PolicyService") {}
 
 export const PolicyServiceLive = Layer.succeed(PolicyService, makePolicyService());

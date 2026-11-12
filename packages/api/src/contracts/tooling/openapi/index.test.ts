@@ -1,4 +1,4 @@
-import { JSONSchema } from "effect";
+import { make as makeJsonSchema } from "../../response/json-schema";
 import { describe, expect, it } from "vitest";
 
 import { toolingOpenApiDocument } from "./index";
@@ -43,8 +43,8 @@ describe("Tooling public contract", () => {
 
     expect(references.length).toBeGreaterThan(0);
     expect(references.every((reference) => reference.startsWith("#/components/"))).toBe(true);
-    expect(() => JSONSchema.make(ToolingSchemaManifestPageResponse)).not.toThrow();
-    expect(() => JSONSchema.make(ToolingCollectionContractRevisionResponse)).not.toThrow();
+    expect(() => makeJsonSchema(ToolingSchemaManifestPageResponse)).not.toThrow();
+    expect(() => makeJsonSchema(ToolingCollectionContractRevisionResponse)).not.toThrow();
   });
 
   it("requires locale, revision, stable identity, and contract hashes in generated schemas", () => {

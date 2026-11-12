@@ -11,7 +11,7 @@ import {
   cmsEntryLocalePublicationHead,
   cmsSchemaRevisionField,
 } from "@framerfordevs/db/schema/cms";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import { DatabaseFailure } from "../../contracts/response/errors";
 import {
@@ -26,6 +26,7 @@ import {
 import { reconstructFieldTree } from "../../lib/field/tree";
 import type { ApplicationDb, ApplicationTransaction } from "../project-access";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 export interface DeliveryBackfillOptions {
   readonly mode: "dry_run" | "apply";
   readonly batchSize: number;
@@ -69,7 +70,7 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 
 /** Reconstructs an immutable historical field row without consulting current draft state. */
 function fieldValue(row: typeof cmsSchemaRevisionField.$inferSelect): CollectionField {
-  return Schema.decodeUnknownSync(CollectionFieldDefinition)({
+  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
     id: row.fieldId,
     parentFieldId: row.parentFieldId,
     nodeRole: row.nodeRole,

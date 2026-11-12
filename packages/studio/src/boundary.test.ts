@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 const browserSources = [
   new URL("./app/index.tsx", import.meta.url),
   new URL("./app/shell.tsx", import.meta.url),
+  new URL("./app/content/navigation.tsx", import.meta.url),
+  new URL("./app/content/workspace.tsx", import.meta.url),
+  new URL("./content-client/index.ts", import.meta.url),
+  new URL("./contracts/content/index.ts", import.meta.url),
   new URL("./contracts/index.ts", import.meta.url),
 ];
 

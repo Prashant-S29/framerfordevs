@@ -42,6 +42,23 @@ export interface ContentFieldValidationIssue {
   readonly message: string;
 }
 
+export interface ContentFormServerIssue {
+  readonly fieldId: string;
+  readonly message: string;
+}
+
+export interface ContentReferencePickerProps {
+  readonly controlId: string;
+  readonly field: ContentFormField & { readonly kind: "reference" };
+  readonly value: string | null;
+  readonly disabled: boolean;
+  readonly readOnly: boolean;
+  readonly ariaDescribedBy: string | undefined;
+  readonly onChange: (value: string | undefined) => void;
+}
+
+export type ContentReferencePicker = ComponentType<ContentReferencePickerProps>;
+
 export interface ContentFieldValidationResult {
   readonly issues: ReadonlyArray<ContentFieldValidationIssue>;
 }
@@ -55,10 +72,16 @@ interface ControlProps {
   readonly field: ContentFormField;
   readonly value: unknown;
   readonly disabled: boolean;
+  readonly readOnly: boolean;
+  readonly busy: boolean;
+  readonly editable: ReadonlySet<string>;
+  readonly issues: Readonly<Record<string, string>>;
   readonly issue: string | undefined;
   readonly instanceId: string;
   readonly path: string;
   readonly helpTextOverride?: string | null;
+  readonly referencePicker?: ContentReferencePicker;
+  readonly clearIssue: (fieldId: string) => void;
   readonly onChange: (value: unknown) => void;
 }
 
@@ -78,6 +101,7 @@ function controlIds(props: Pick<ControlProps, "instanceId" | "path">) {
     control,
     description: `${control}-description`,
     error: `${control}-error`,
+    readOnly: `${control}-read-only`,
   };
 }
 
@@ -85,7 +109,12 @@ function describedBy(props: ControlProps, additionalId?: string): string | undef
   const ids = controlIds(props);
   const help = props.helpTextOverride ?? props.field.editor.helpText;
   return (
-    [help ? ids.description : null, props.issue ? ids.error : null, additionalId ?? null]
+    [
+      help ? ids.description : null,
+      props.issue ? ids.error : null,
+      props.readOnly ? ids.readOnly : null,
+      additionalId ?? null,
+    ]
       .filter((value) => value !== null)
       .join(" ") || undefined
   );
@@ -97,8 +126,12 @@ function FieldShell({
   instanceId,
   path,
   helpTextOverride,
+  readOnly,
   children,
-}: Pick<ControlProps, "field" | "issue" | "instanceId" | "path" | "helpTextOverride"> & {
+}: Pick<
+  ControlProps,
+  "field" | "issue" | "instanceId" | "path" | "helpTextOverride" | "readOnly"
+> & {
   readonly children: React.ReactNode;
 }) {
   const ids = controlIds({ instanceId, path });
@@ -110,6 +143,7 @@ function FieldShell({
       </FieldLabel>
       {children}
       {help ? <FieldDescription id={ids.description}>{help}</FieldDescription> : null}
+      {readOnly ? <FieldDescription id={ids.readOnly}>Read only.</FieldDescription> : null}
       <FieldError id={ids.error}>{issue}</FieldError>
     </Field>
   );
@@ -273,6 +307,7 @@ function BooleanControl(props: ControlProps) {
       <div>
         <FieldLabel htmlFor={ids.control}>{fieldLabel(props.field)}</FieldLabel>
         {help ? <FieldDescription id={ids.description}>{help}</FieldDescription> : null}
+        {props.readOnly ? <FieldDescription id={ids.readOnly}>Read only.</FieldDescription> : null}
         <FieldError id={ids.error}>{props.issue}</FieldError>
       </div>
     </Field>
@@ -388,11 +423,20 @@ function ObjectControl(props: ControlProps) {
             key={child.id}
             field={child}
             value={Reflect.get(value, child.id)}
-            disabled={props.disabled}
-            issue={undefined}
+            readOnly={props.readOnly || !props.editable.has(child.id)}
+            busy={props.busy}
+            disabled={props.busy || props.readOnly || !props.editable.has(child.id)}
+            editable={props.editable}
+            issues={props.issues}
+            issue={Reflect.get(props.issues, child.id)}
             instanceId={props.instanceId}
             path={`${props.path}-${child.id}`}
-            onChange={(next) => props.onChange({ ...value, [child.id]: next })}
+            referencePicker={props.referencePicker}
+            clearIssue={props.clearIssue}
+            onChange={(next) => {
+              props.clearIssue(child.id);
+              props.onChange({ ...value, [child.id]: next });
+            }}
           />
         ))}
       </FieldGroup>
@@ -401,6 +445,7 @@ function ObjectControl(props: ControlProps) {
           {props.helpTextOverride ?? props.field.editor.helpText}
         </FieldDescription>
       ) : null}
+      {props.readOnly ? <FieldDescription id={ids.readOnly}>Read only.</FieldDescription> : null}
       <FieldError id={ids.error}>{props.issue}</FieldError>
     </FieldSet>
   );
@@ -411,6 +456,7 @@ function ListControl(props: ControlProps) {
   const ids = controlIds(props);
   const values = Array.isArray(props.value) ? props.value : [];
   const item = props.field.children[0];
+  const minimum = Math.max(props.field.configuration.minItems ?? 0, 0);
   const maximum = Math.min(props.field.configuration.maxItems ?? 100, 100);
   return (
     <FieldSet
@@ -426,24 +472,31 @@ function ListControl(props: ControlProps) {
                 <GeneratedControl
                   field={item}
                   value={value}
-                  disabled={props.disabled}
-                  issue={undefined}
+                  readOnly={props.readOnly || !props.editable.has(item.id)}
+                  busy={props.busy}
+                  disabled={props.busy || props.readOnly || !props.editable.has(item.id)}
+                  editable={props.editable}
+                  issues={props.issues}
+                  issue={Reflect.get(props.issues, item.id)}
                   instanceId={props.instanceId}
                   path={`${props.path}-${index}-${item.id}`}
-                  onChange={(next) =>
+                  referencePicker={props.referencePicker}
+                  clearIssue={props.clearIssue}
+                  onChange={(next) => {
+                    props.clearIssue(item.id);
                     props.onChange(
                       values.map((current, currentIndex) =>
                         currentIndex === index ? next : current,
                       ),
-                    )
-                  }
+                    );
+                  }}
                 />
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={props.disabled || index === 0}
+                    disabled={props.disabled || !props.editable.has(props.field.id) || index === 0}
                     onClick={() => {
                       const next = [...values];
                       const previous = next[index - 1];
@@ -460,7 +513,32 @@ function ListControl(props: ControlProps) {
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={props.disabled}
+                    disabled={
+                      props.disabled ||
+                      !props.editable.has(props.field.id) ||
+                      index === values.length - 1
+                    }
+                    onClick={() => {
+                      const next = [...values];
+                      const following = next[index + 1];
+                      if (following !== undefined) {
+                        next[index + 1] = value;
+                        next[index] = following;
+                        props.onChange(next);
+                      }
+                    }}
+                  >
+                    Move down
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={
+                      props.disabled ||
+                      !props.editable.has(props.field.id) ||
+                      values.length <= minimum
+                    }
                     onClick={() =>
                       props.onChange(values.filter((_, currentIndex) => currentIndex !== index))
                     }
@@ -476,7 +554,9 @@ function ListControl(props: ControlProps) {
         type="button"
         size="sm"
         variant="outline"
-        disabled={props.disabled || !item || values.length >= maximum}
+        disabled={
+          props.disabled || !props.editable.has(props.field.id) || !item || values.length >= maximum
+        }
         onClick={() => props.onChange([...values, undefined])}
       >
         Add item
@@ -486,30 +566,47 @@ function ListControl(props: ControlProps) {
           {props.helpTextOverride ?? props.field.editor.helpText}
         </FieldDescription>
       ) : null}
+      {props.readOnly ? <FieldDescription id={ids.readOnly}>Read only.</FieldDescription> : null}
       <FieldError id={ids.error}>{props.issue}</FieldError>
     </FieldSet>
   );
 }
 
 function ReferenceControl(props: ControlProps) {
+  if (props.field.kind !== "reference") return null;
   const ids = controlIds(props);
   const instructionId = `${ids.control}-reference-instruction`;
+  const Picker = props.referencePicker;
   return (
     <FieldShell {...props}>
-      <Input
-        id={ids.control}
-        value={typeof props.value === "string" ? props.value : ""}
-        placeholder="Entry ID"
-        disabled={props.disabled}
-        aria-invalid={Boolean(props.issue)}
-        aria-describedby={describedBy(props, instructionId)}
-        spellCheck={false}
-        autoComplete="off"
-        onChange={(event) => props.onChange(event.target.value || undefined)}
-      />
-      <FieldDescription id={instructionId}>
-        Use a stable entry ID from the configured collection.
-      </FieldDescription>
+      {Picker ? (
+        <Picker
+          controlId={ids.control}
+          field={props.field}
+          value={typeof props.value === "string" ? props.value : null}
+          disabled={props.disabled}
+          readOnly={props.readOnly}
+          ariaDescribedBy={describedBy(props)}
+          onChange={(value) => props.onChange(value)}
+        />
+      ) : (
+        <>
+          <Input
+            id={ids.control}
+            value={typeof props.value === "string" ? props.value : ""}
+            placeholder="Entry ID"
+            disabled={props.disabled}
+            aria-invalid={Boolean(props.issue)}
+            aria-describedby={describedBy(props, instructionId)}
+            spellCheck={false}
+            autoComplete="off"
+            onChange={(event) => props.onChange(event.target.value || undefined)}
+          />
+          <FieldDescription id={instructionId}>
+            Use a stable entry ID from the configured collection.
+          </FieldDescription>
+        </>
+      )}
     </FieldShell>
   );
 }
@@ -597,6 +694,7 @@ function AssetControl(props: ControlProps) {
           {props.helpTextOverride ?? props.field.editor.helpText}
         </FieldDescription>
       ) : null}
+      {props.readOnly ? <FieldDescription id={ids.readOnly}>Read only.</FieldDescription> : null}
       <FieldError id={ids.error}>{props.issue}</FieldError>
     </FieldSet>
   );
@@ -648,6 +746,12 @@ function GeneratedControl(props: ControlProps) {
   return <Control {...props} />;
 }
 
+function hasEditableAuthority(field: ContentFormField, editable: ReadonlySet<string>): boolean {
+  return (
+    editable.has(field.id) || field.children.some((child) => hasEditableAuthority(child, editable))
+  );
+}
+
 function FormGroup({
   group,
   fields,
@@ -656,6 +760,8 @@ function FormGroup({
   values,
   issues,
   instanceId,
+  busy,
+  referencePicker,
   setValues,
   clearIssue,
 }: {
@@ -666,6 +772,8 @@ function FormGroup({
   readonly values: Readonly<Record<string, unknown>>;
   readonly issues: Readonly<Record<string, string>>;
   readonly instanceId: string;
+  readonly busy: boolean;
+  readonly referencePicker?: ContentReferencePicker;
   readonly setValues: (fieldId: string, value: unknown) => void;
   readonly clearIssue: (fieldId: string) => void;
 }) {
@@ -678,16 +786,23 @@ function FormGroup({
         .map((placement) => {
           const field = fields.get(placement.fieldId);
           if (!field) return null;
+          const readOnly = !definition.canEdit || !hasEditableAuthority(field, editable);
           return (
             <GeneratedControl
               key={field.id}
               field={field}
               value={Reflect.get(values, field.id)}
-              disabled={!definition.canEdit || !editable.has(field.id)}
+              readOnly={readOnly}
+              busy={busy}
+              disabled={busy || readOnly}
+              editable={editable}
+              issues={issues}
               issue={Reflect.get(issues, field.id)}
               instanceId={instanceId}
               path={field.id}
               helpTextOverride={placement.helpTextOverride}
+              referencePicker={referencePicker}
+              clearIssue={clearIssue}
               onChange={(value) => {
                 clearIssue(field.id);
                 setValues(field.id, value);
@@ -707,8 +822,24 @@ export interface ContentFormProps {
   readonly onSubmit?: () => void;
   readonly submitLabel?: string;
   readonly statusMessage?: string;
-  readonly serverIssues?: Readonly<Record<string, string>>;
+  readonly issueSummaryLabel?: string;
+  readonly focusIssueFieldId?: string | null;
+  readonly serverIssues?: Readonly<Record<string, string>> | ReadonlyArray<ContentFormServerIssue>;
   readonly submitting?: boolean;
+  readonly showSubmitAction?: boolean;
+  readonly showStatusMessage?: boolean;
+  readonly referencePicker?: ContentReferencePicker;
+  readonly defaultKeying?: "api_key" | "field_id";
+}
+
+function serverIssueMap(
+  issues: Readonly<Record<string, string>> | ReadonlyArray<ContentFormServerIssue> | undefined,
+): Readonly<Record<string, string>> {
+  if (issues === undefined) return {};
+  if (Array.isArray(issues)) {
+    return Object.fromEntries(issues.map((issue) => [issue.fieldId, issue.message]));
+  }
+  return Object.fromEntries(Object.entries(issues));
 }
 
 export function ContentForm({
@@ -719,8 +850,14 @@ export function ContentForm({
   onSubmit,
   submitLabel = "Validate preview",
   statusMessage = "Preview values are local and are never saved.",
+  issueSummaryLabel = "Review the highlighted preview fields.",
+  focusIssueFieldId,
   serverIssues,
   submitting = false,
+  showSubmitAction = true,
+  showStatusMessage = true,
+  referencePicker,
+  defaultKeying = "api_key",
 }: ContentFormProps) {
   const instanceId = useId();
   const formRef = useRef<HTMLFormElement>(null);
@@ -731,14 +868,23 @@ export function ContentForm({
   const [activeTabId, setActiveTabId] = useState(() => tabs[0]?.id ?? "");
   const [pendingFocusFieldId, setPendingFocusFieldId] = useState<string | null>(null);
   const [localValues, setLocalValues] = useState<Readonly<Record<string, unknown>>>(() =>
-    applyGeneratedFormDefaults(definition.fields, {}),
+    applyGeneratedFormDefaults(
+      definition.fields,
+      {},
+      {
+        keying: defaultKeying,
+        editableFieldIds: new Set(definition.editableFieldIds),
+      },
+    ),
   );
   const [localIssues, setLocalIssues] = useState<Readonly<Record<string, string>>>({});
   const [editedFieldIds, setEditedFieldIds] = useState<ReadonlySet<string>>(() => new Set());
   const values = controlledValues ?? localValues;
+  const decodedServerIssues = serverIssueMap(serverIssues);
+  const serverIssueSignature = Object.keys(decodedServerIssues).sort().join("\u0000");
   const issues = {
     ...Object.fromEntries(
-      Object.entries(serverIssues ?? {}).filter(([fieldId]) => !editedFieldIds.has(fieldId)),
+      Object.entries(decodedServerIssues).filter(([fieldId]) => !editedFieldIds.has(fieldId)),
     ),
     ...localIssues,
   };
@@ -754,6 +900,30 @@ export function ContentForm({
   useEffect(() => {
     if (!tabs.some((tab) => tab.id === activeTabId)) setActiveTabId(tabs[0]?.id ?? "");
   }, [activeTabId, tabs]);
+
+  useEffect(() => {
+    if (serverIssueSignature.length === 0) return;
+    const currentServerIssueIds = new Set(serverIssueSignature.split("\u0000"));
+    setEditedFieldIds(
+      (current) => new Set([...current].filter((fieldId) => !currentServerIssueIds.has(fieldId))),
+    );
+  }, [serverIssueSignature]);
+
+  useEffect(() => {
+    if (!focusIssueFieldId) return;
+    setEditedFieldIds((current) => {
+      const next = new Set(current);
+      next.delete(focusIssueFieldId);
+      return next;
+    });
+    const tab = tabs.find((candidate) =>
+      candidate.groups.some((group) =>
+        group.fields.some((placement) => placement.fieldId === focusIssueFieldId),
+      ),
+    );
+    if (tab) setActiveTabId(tab.id);
+    setPendingFocusFieldId(focusIssueFieldId);
+  }, [focusIssueFieldId, tabs]);
 
   useEffect(() => {
     if (pendingFocusFieldId === null) return;
@@ -784,10 +954,13 @@ export function ContentForm({
     values,
     issues,
     instanceId,
+    busy: submitting,
+    referencePicker,
     setValues: updateField,
     clearIssue,
   };
   const hasSidebar = definition.editorLayout.sidebarGroups.length > 0;
+  const hasTabs = tabs.length > 0;
 
   return (
     <form
@@ -818,38 +991,46 @@ export function ContentForm({
     >
       {Object.keys(issues).length > 0 ? (
         <div role="alert" tabIndex={-1} className="rounded-md border border-destructive p-3">
-          <p className="font-medium">Review the highlighted preview fields.</p>
+          <p className="font-medium">{issueSummaryLabel}</p>
         </div>
       ) : null}
       <div className={hasSidebar ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]" : undefined}>
-        <Tabs value={activeTabId} onValueChange={setActiveTabId}>
-          <TabsList aria-label="Form sections" className="max-w-full justify-start overflow-x-auto">
+        {hasTabs ? (
+          <Tabs value={activeTabId} onValueChange={setActiveTabId}>
+            <TabsList
+              aria-label="Form sections"
+              className="max-w-full justify-start overflow-x-auto"
+            >
+              {tabs.map((tab) => (
+                <TabsTrigger key={tab.id} value={tab.id}>
+                  {tab.title}
+                </TabsTrigger>
+              ))}
+            </TabsList>
             {tabs.map((tab) => (
-              <TabsTrigger key={tab.id} value={tab.id}>
-                {tab.title}
-              </TabsTrigger>
+              <TabsContent key={tab.id} value={tab.id} className="pt-4">
+                <section
+                  className="flex flex-col gap-4"
+                  aria-labelledby={`${instanceId}-${tab.id}`}
+                >
+                  <div>
+                    <h3 id={`${instanceId}-${tab.id}`} className="font-semibold">
+                      {tab.title}
+                    </h3>
+                    {tab.description ? (
+                      <p className="text-muted-foreground text-sm">{tab.description}</p>
+                    ) : null}
+                  </div>
+                  {[...tab.groups]
+                    .sort((left, right) => left.position - right.position)
+                    .map((group) => (
+                      <FormGroup key={group.id} group={group} {...groupProps} />
+                    ))}
+                </section>
+              </TabsContent>
             ))}
-          </TabsList>
-          {tabs.map((tab) => (
-            <TabsContent key={tab.id} value={tab.id} className="pt-4">
-              <section className="flex flex-col gap-4" aria-labelledby={`${instanceId}-${tab.id}`}>
-                <div>
-                  <h3 id={`${instanceId}-${tab.id}`} className="font-semibold">
-                    {tab.title}
-                  </h3>
-                  {tab.description ? (
-                    <p className="text-muted-foreground text-sm">{tab.description}</p>
-                  ) : null}
-                </div>
-                {[...tab.groups]
-                  .sort((left, right) => left.position - right.position)
-                  .map((group) => (
-                    <FormGroup key={group.id} group={group} {...groupProps} />
-                  ))}
-              </section>
-            </TabsContent>
-          ))}
-        </Tabs>
+          </Tabs>
+        ) : null}
         {hasSidebar ? (
           <aside aria-label="Form sidebar" className="flex flex-col gap-4">
             {[...definition.editorLayout.sidebarGroups]
@@ -860,14 +1041,20 @@ export function ContentForm({
           </aside>
         ) : null}
       </div>
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={submitting}>
-          {submitting ? "Saving…" : submitLabel}
-        </Button>
-        <p className="text-muted-foreground text-sm" aria-live="polite">
-          {statusMessage}
-        </p>
-      </div>
+      {showSubmitAction || showStatusMessage ? (
+        <div className="flex items-center gap-3">
+          {showSubmitAction ? (
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Saving…" : submitLabel}
+            </Button>
+          ) : null}
+          {showStatusMessage ? (
+            <p className="text-muted-foreground text-sm" aria-live="polite">
+              {statusMessage}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </form>
   );
 }

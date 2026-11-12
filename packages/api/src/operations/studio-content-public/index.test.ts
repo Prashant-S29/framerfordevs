@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 
 import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
 
@@ -51,18 +51,20 @@ import {
   studioNestedCollectionOperations,
 } from ".";
 
+import * as SchemaStrict from "../../lib/schema-strict";
 describe("Studio Content nested collection gate", () => {
   it("covers every approved nested operation family through one closed matrix", () => {
     assert.deepStrictEqual(studioNestedCollectionOperations, [
       "browse",
       "search",
+      "resolve",
       "new_workspace",
       "entry_workspace",
       "create",
       "rename",
       "save",
     ]);
-    assert.strictEqual(new Set(studioNestedCollectionOperations).size, 7);
+    assert.strictEqual(new Set(studioNestedCollectionOperations).size, 8);
   });
 
   it.effect("rejects excess properties on every mutation request", () =>
@@ -126,7 +128,7 @@ describe("Studio Content nested collection gate", () => {
         localizedRevision: "019fae8b-1234-7000-8000-000000000030",
       } as const;
       const hash = ContractHash.make("a".repeat(64));
-      const scope = Schema.decodeUnknownSync(StudioCollectionLocaleScope)({
+      const scope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
         projectId: ids.project,
         environmentId: ids.environment,
         collectionId: ids.collection,
@@ -146,7 +148,7 @@ describe("Studio Content nested collection gate", () => {
         scopes: ["studio:session", "offline_access"],
         expiresAtEpochSeconds: 1_900_000_000,
       };
-      const field = Schema.decodeUnknownSync(CollectionFieldDefinition)({
+      const field = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
         id: ids.field,
         parentFieldId: null,
         nodeRole: "root",
@@ -167,7 +169,7 @@ describe("Studio Content nested collection gate", () => {
         children: [],
       });
       const form = (revisionId: string) =>
-        Schema.decodeUnknownSync(GeneratedFormDefinition)({
+        SchemaStrict.decodeUnknownSync(GeneratedFormDefinition)({
           source: "published",
           collectionId: ids.collection,
           revisionId,
@@ -214,7 +216,7 @@ describe("Studio Content nested collection gate", () => {
           currencyMinorUnits: {},
         });
       const draft = (revisionId: string) =>
-        Schema.decodeUnknownSync(CmsEntryDraft)({
+        SchemaStrict.decodeUnknownSync(CmsEntryDraft)({
           entry: {
             id: ids.entry,
             workspaceId: ids.workspace,
@@ -243,7 +245,7 @@ describe("Studio Content nested collection gate", () => {
           canEditShared: true,
           validation: { valid: true, issues: [], capped: false },
         });
-      const bootstrap = Schema.decodeUnknownSync(StudioBootstrap)({
+      const bootstrap = SchemaStrict.decodeUnknownSync(StudioBootstrap)({
         formatVersion: 1,
         registration: {
           id: principal.registrationId,
@@ -281,6 +283,7 @@ describe("Studio Content nested collection gate", () => {
         },
         getContext: () => Effect.die("Unexpected context call."),
         listEntries: () => Effect.die("Unexpected list call."),
+        resolveEntryLabels: () => Effect.die("Unexpected resolution call."),
       };
       const schemaRepository: ReturnType<typeof makeSchemaRepository> = {
         ...makeSchemaRepository(),
@@ -298,7 +301,7 @@ describe("Studio Content nested collection gate", () => {
         evaluate: (input) => {
           costs.push(input.cost);
           return Effect.succeed(
-            Schema.decodeUnknownSync(RateLimitDecision)({
+            SchemaStrict.decodeUnknownSync(RateLimitDecision)({
               allowed: true,
               policy: input.policy,
               cost: input.cost,
@@ -367,11 +370,11 @@ describe("Studio Content nested collection gate", () => {
         scopes: ["studio:session", "offline_access"],
         expiresAtEpochSeconds: 1_900_000_000,
       };
-      const scope = Schema.decodeUnknownSync(StudioContentScope)({
+      const scope = SchemaStrict.decodeUnknownSync(StudioContentScope)({
         projectId: ids.project,
         environmentId: ids.environment,
       });
-      const context = Schema.decodeUnknownSync(StudioContentContext)({
+      const context = SchemaStrict.decodeUnknownSync(StudioContentContext)({
         locales: [],
         collections: [],
         configurationNotices: [
@@ -382,7 +385,7 @@ describe("Studio Content nested collection gate", () => {
           },
         ],
       });
-      const bootstrap = Schema.decodeUnknownSync(StudioBootstrap)({
+      const bootstrap = SchemaStrict.decodeUnknownSync(StudioBootstrap)({
         formatVersion: 1,
         registration: {
           id: ids.registration,
@@ -401,7 +404,7 @@ describe("Studio Content nested collection gate", () => {
       const rateLimitManager: RateLimitManagerService = {
         evaluate: (input) =>
           Effect.succeed(
-            Schema.decodeUnknownSync(RateLimitDecision)({
+            SchemaStrict.decodeUnknownSync(RateLimitDecision)({
               allowed: true,
               policy: input.policy,
               cost: input.cost,
@@ -462,7 +465,7 @@ describe("Studio Content nested collection gate", () => {
       group: "019fae8b-1234-7000-8000-000000000016",
       placement: "019fae8b-1234-7000-8000-000000000017",
     } as const;
-    const form = Schema.decodeUnknownSync(StudioFormProjection)({
+    const form = SchemaStrict.decodeUnknownSync(StudioFormProjection)({
       collectionId: ids.collection,
       schemaRevisionId: ids.revision,
       contractHash: "a".repeat(64),
@@ -521,7 +524,7 @@ describe("Studio Content nested collection gate", () => {
       code: "required",
       message,
     });
-    const validation = Schema.decodeUnknownSync(EntryValidation)({
+    const validation = SchemaStrict.decodeUnknownSync(EntryValidation)({
       valid: false,
       issues: [issue(ids.visible, "Visible issue"), issue(ids.hidden, "Hidden issue")],
       capped: false,
@@ -534,7 +537,7 @@ describe("Studio Content nested collection gate", () => {
     assert.notInclude(JSON.stringify(projected), "Hidden issue");
     assert.strictEqual(
       projectStudioValidation(
-        Schema.decodeUnknownSync(EntryValidation)({
+        SchemaStrict.decodeUnknownSync(EntryValidation)({
           valid: false,
           issues: [issue(ids.visible, "Visible issue")],
           capped: false,
@@ -545,7 +548,7 @@ describe("Studio Content nested collection gate", () => {
     );
     assert.strictEqual(
       projectStudioValidation(
-        Schema.decodeUnknownSync(EntryValidation)({ valid: true, issues: [], capped: false }),
+        SchemaStrict.decodeUnknownSync(EntryValidation)({ valid: true, issues: [], capped: false }),
         form,
       ).status,
       "valid",
