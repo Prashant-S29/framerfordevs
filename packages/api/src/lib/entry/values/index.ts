@@ -1,5 +1,3 @@
-// Applies bounded stable-field entry mutations and merges disjoint shared/localized fragments without Effect or server dependencies.
-
 import type { EntryValueMutation, EntryValuePath, EntryValues } from "../../../contracts/entry";
 
 export const entryValueLimits = {
@@ -29,14 +27,12 @@ export interface EntryMergeResult {
   readonly issues: ReadonlyArray<EntryValueKernelIssue>;
 }
 
-/** Narrows JSON object containers while excluding arrays and class instances. */
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 }
 
-/** Renders one stable mutation path without exposing values. */
 function renderPath(path: EntryValuePath): string {
   let rendered = "values";
   for (const segment of path) {
@@ -45,7 +41,6 @@ function renderPath(path: EntryValuePath): string {
   return rendered;
 }
 
-/** Produces deterministic JSON for value hashes and no-op comparison. */
 export function canonicalizeEntryValue(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
   if (Array.isArray(value)) {
@@ -58,7 +53,6 @@ export function canonicalizeEntryValue(value: unknown): string {
   return `{${entries.join(",")}}`;
 }
 
-/** Rejects cyclic, non-JSON, excessively deep, large, or complex draft documents. */
 export function validateEntryDocument(value: unknown): ReadonlyArray<EntryValueKernelIssue> {
   const issues: Array<EntryValueKernelIssue> = [];
   const seen = new WeakSet<object>();
@@ -147,7 +141,6 @@ export function validateEntryDocument(value: unknown): ReadonlyArray<EntryValueK
   return issues;
 }
 
-/** Resolves a complete stable path against an existing document. */
 function resolvePath(document: Record<string, unknown>, path: EntryValuePath): unknown {
   let current: unknown = document;
   for (const segment of path) {
@@ -162,7 +155,6 @@ function resolvePath(document: Record<string, unknown>, path: EntryValuePath): u
   return current;
 }
 
-/** Resolves the parent container for a set/unset mutation without inventing list structure. */
 function resolveParent(
   document: Record<string, unknown>,
   path: EntryValuePath,
@@ -192,7 +184,6 @@ function resolveParent(
   return isPlainRecord(current) || Array.isArray(current) ? { parent: current, leaf } : null;
 }
 
-/** Applies one decoded mutation and reports only path-safe feedback. */
 function applyMutation(
   document: Record<string, unknown>,
   mutation: EntryValueMutation,
@@ -266,7 +257,6 @@ function applyMutation(
   return null;
 }
 
-/** Applies one bounded command atomically and derives deterministic changed root field IDs. */
 export function applyEntryMutations(
   currentValues: EntryValues,
   mutations: ReadonlyArray<EntryValueMutation>,
@@ -345,7 +335,6 @@ export function applyEntryMutations(
   };
 }
 
-/** Deep-merges disjoint sparse object fragments while rejecting terminal ownership collisions. */
 export function mergeEntryFragments(
   sharedValues: Readonly<Record<string, unknown>>,
   localizedValues: Readonly<Record<string, unknown>>,

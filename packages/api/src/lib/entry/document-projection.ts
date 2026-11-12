@@ -1,5 +1,3 @@
-// Projects stable-ID shared/localized entry fragments into API-key documents without owning strict publication policy.
-
 import type { CollectionFieldDefinition } from "../../contracts/schema";
 
 export interface EntryDocumentProjectionIssue {
@@ -17,21 +15,18 @@ export interface EntryDocumentProjectionIssueCollector {
 
 export type InheritedLocalization = "shared" | "localized" | null;
 
-/** Creates one bounded issue collector shared by strict publication and permissive Preview. */
 export function makeEntryDocumentProjectionIssueCollector(
   maximumIssues: number,
 ): EntryDocumentProjectionIssueCollector {
   return { issues: [], maximumIssues, capped: false };
 }
 
-/** Narrows values to inert plain JSON object containers. */
 export function isPlainEntryRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 }
 
-/** Appends a deterministic issue while preserving the configured response bound. */
 export function addEntryDocumentProjectionIssue(
   collector: EntryDocumentProjectionIssueCollector,
   issue: EntryDocumentProjectionIssue,
@@ -43,7 +38,6 @@ export function addEntryDocumentProjectionIssue(
   collector.issues.push(issue);
 }
 
-/** Resolves inherited localization through object/list descendants. */
 export function effectiveFieldLocalization(
   field: CollectionFieldDefinition,
   inherited: InheritedLocalization,
@@ -51,7 +45,6 @@ export function effectiveFieldLocalization(
   return inherited ?? field.localization;
 }
 
-/** Projects stable child identities recursively to the selected schema revision's API keys. */
 export function stableEntryValueToApi(field: CollectionFieldDefinition, value: unknown): unknown {
   if (field.kind === "object" && isPlainEntryRecord(value)) {
     const result: Record<string, unknown> = {};
@@ -71,7 +64,6 @@ export function stableEntryValueToApi(field: CollectionFieldDefinition, value: u
   return value;
 }
 
-/** Selects exact shared/localized ownership and merges only schema-approved mixed objects. */
 export function selectEntryFieldValue(
   field: CollectionFieldDefinition,
   sharedValue: unknown,
@@ -132,7 +124,6 @@ export function selectEntryFieldValue(
   return stableEntryValueToApi(field, selected);
 }
 
-/** Removes empty mixed structural containers after defaults and validation projection. */
 export function pruneEmptyProjectedObjects(
   field: CollectionFieldDefinition,
   value: unknown,

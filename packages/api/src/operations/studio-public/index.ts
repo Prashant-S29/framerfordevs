@@ -1,8 +1,6 @@
-// Orchestrates strict Studio bearer authentication, quota authority, and bootstrap reads.
-
 import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
 import { env } from "@framerfordevs/env/server";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { ApiErrorDetail } from "../../contracts/response/api";
 import {
@@ -16,7 +14,6 @@ import { RateLimitManager } from "../../services/rate-limit/manager";
 import { authenticateStudioBearer } from "../../services/studio/principal-authenticator";
 import { StudioRepository } from "../../services/studio/repository";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const bearerPattern = /^Bearer ([^\s,]+)$/u;
 
 function invalidStudioInput(
@@ -42,7 +39,10 @@ export function validateStudioEmptyQuery(rawQuery: string) {
 }
 
 export function decodeStudioBootstrapScope(projectId: string, environmentId: string) {
-  return SchemaStrict.decodeUnknownEffect(StudioBootstrapScope)({ projectId, environmentId }).pipe(
+  return Schema.decodeUnknownEffect(StudioBootstrapScope, { onExcessProperty: "error" })({
+    projectId,
+    environmentId,
+  }).pipe(
     Effect.mapError(() =>
       invalidStudioInput(
         "path",

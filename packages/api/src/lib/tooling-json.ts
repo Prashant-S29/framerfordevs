@@ -1,6 +1,3 @@
-// Projects internal contract values into the recursively exact public Tooling JSON boundary.
-
-/** Maps JavaScript-only undefined to canonical null without changing internal hash semantics. */
 export function toolingJsonData(value: unknown): unknown {
   if (value === undefined) return null;
   if (Array.isArray(value)) return value.map(toolingJsonData);

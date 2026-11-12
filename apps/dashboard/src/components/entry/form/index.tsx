@@ -1,7 +1,5 @@
-// Adapts dashboard form and validation authority to the private browser-safe renderer.
-
-import type { CollectionFieldDefinition } from "@framerfordevs/api/contracts/schema/index";
-import { validateFieldValue } from "@framerfordevs/api/lib/field/validation/index";
+import type { CollectionFieldDefinition } from "@framerfordevs/api/contracts/schema";
+import { validateFieldValue } from "@framerfordevs/api/lib/field/validation";
 import {
   adaptContentFormDefinition,
   ContentForm,

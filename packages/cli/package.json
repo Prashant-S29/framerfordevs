@@ -24,19 +24,19 @@
   "sideEffects": false,
   "exports": {
     ".": {
-      "types": "./dist/index.d",
+      "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
     },
     "./generator": {
-      "types": "./dist/generator.d",
+      "types": "./dist/generator.d.mts",
       "import": "./dist/generator.mjs"
     },
     "./schema-extractor": {
-      "types": "./dist/schema-extractor.d",
+      "types": "./dist/schema-extractor.d.mts",
       "import": "./dist/schema-extractor.mjs"
     },
     "./experimental-schema-build": {
-      "types": "./dist/experimental-schema-build.d",
+      "types": "./dist/experimental-schema-build.d.mts",
       "import": "./dist/experimental-schema-build.mjs"
     }
   },

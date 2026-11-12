@@ -21,27 +21,27 @@
   "sideEffects": false,
   "exports": {
     ".": {
-      "types": "./dist/index.d",
+      "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
     },
     "./client": {
-      "types": "./dist/client.d",
+      "types": "./dist/client.d.mts",
       "import": "./dist/client.mjs"
     },
     "./effect": {
-      "types": "./dist/effect.d",
+      "types": "./dist/effect.d.mts",
       "import": "./dist/effect.mjs"
     },
     "./authoring": {
-      "types": "./dist/authoring.d",
+      "types": "./dist/authoring.d.mts",
       "import": "./dist/authoring.mjs"
     },
     "./webhooks": {
-      "types": "./dist/webhooks.d",
+      "types": "./dist/webhooks.d.mts",
       "import": "./dist/webhooks.mjs"
     },
     "./invalidation": {
-      "types": "./dist/invalidation.d",
+      "types": "./dist/invalidation.d.mts",
       "import": "./dist/invalidation.mjs"
     }
   },

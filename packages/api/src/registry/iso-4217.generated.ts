@@ -1,7 +1,3 @@
-// Generated ISO 4217 currency/minor-unit profile for CMS money validation.
-// Source: https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml
-// Published: 2026-01-01
-
 export const iso4217RegistryProfile = "iso-4217@2026-01-01" as const;
 
 export const iso4217MinorUnits = {

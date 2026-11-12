@@ -1,5 +1,3 @@
-// Persists M9 Delivery configuration with tenant authorization, complete replacement, audit, and outbox atomicity.
-
 import { db } from "@framerfordevs/db";
 import { and, eq, inArray, sql } from "@framerfordevs/db/query";
 import {
@@ -12,7 +10,7 @@ import {
   outboxEvent,
 } from "@framerfordevs/db/schema/cms";
 import { auditEvent, environment, projectCapability } from "@framerfordevs/db/schema/platform";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 import {
   DeliveryCollectionConfiguration,
@@ -35,7 +33,6 @@ import { SchemaValidationIssue } from "../../contracts/schema";
 import type { ApplicationDb, ApplicationExecutor } from "../project-access";
 import { authorizeUserProject } from "../project-access";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const supportedKinds = new Set([
   "short_text",
   "slug",
@@ -96,7 +93,6 @@ function databaseFailure(operation: string, cause: unknown): DatabaseFailure {
   return DatabaseFailure.make({ operation, cause });
 }
 
-/** Finds a PostgreSQL constraint identifier through wrapped driver causes without exposing values. */
 function hasConstraint(cause: unknown, constraints: ReadonlySet<string>, depth = 0): boolean {
   if (depth > 4 || typeof cause !== "object" || cause === null) return false;
   const constraint = Reflect.get(cause, "constraint");
@@ -116,7 +112,6 @@ const deliveryUniqueConstraints = new Set([
   "cms_entry_locale_delivery_value_reference_unique",
 ]);
 
-/** Maps a race-safe unique-index rejection to value-free management guidance. */
 function configurationPersistenceFailure(cause: unknown) {
   return hasConstraint(cause, deliveryUniqueConstraints)
     ? SchemaInvalidFailure.make({
@@ -131,7 +126,6 @@ function configurationPersistenceFailure(cause: unknown) {
     : databaseFailure("delivery.configuration.update", cause);
 }
 
-/** Converts database timestamps and current field keys to the schema-backed management model. */
 function configurationValue(
   row: DeliveryConfigurationRow,
   fields: ReadonlyArray<DeliveryFieldCapability>,
@@ -150,17 +144,15 @@ function configurationValue(
   };
 }
 
-/** Decodes repository output at the persistence boundary. */
 function decodeConfiguration(
   row: DeliveryConfigurationRow,
   fields: ReadonlyArray<DeliveryFieldCapability>,
 ) {
-  return SchemaStrict.decodeUnknownEffect(DeliveryCollectionConfiguration)(
+  return Schema.decodeUnknownEffect(DeliveryCollectionConfiguration)(
     configurationValue(row, fields),
   ).pipe(Effect.mapError((cause) => databaseFailure("delivery.configuration.decode", cause)));
 }
 
-/** Loads one exact environment and requires enabled CMS authority. */
 async function authorizeEnvironment(
   executor: ApplicationExecutor,
   actorId: AuthUserId,
@@ -227,7 +219,6 @@ async function authorizeEnvironment(
   return row === undefined ? { kind: "not_found" } : { kind: "success", scope: row };
 }
 
-/** Maps scope outcomes without revealing cross-tenant resource existence. */
 function scopeFailure(outcome: Exclude<ScopeOutcome, { readonly kind: "success" }>) {
   if (outcome.kind === "forbidden") return ForbiddenFailure.make();
   if (outcome.kind === "cms_required") return CmsCapabilityRequiredFailure.make();
@@ -235,7 +226,6 @@ function scopeFailure(outcome: Exclude<ScopeOutcome, { readonly kind: "success" 
   return NotFoundFailure.make({ resource: "collection" });
 }
 
-/** Loads configured fields through the current published revision so API-key renames remain current. */
 async function loadConfigurationRows(
   executor: ApplicationExecutor,
   scope: ConfigurationScope,
@@ -274,7 +264,7 @@ async function loadConfigurationRows(
     .orderBy(cmsSchemaRevisionField.position, cmsSchemaRevisionField.fieldId)
     .then((rows) =>
       rows.map((row) =>
-        SchemaStrict.decodeUnknownSync(DeliveryFieldCapability)({
+        Schema.decodeUnknownSync(DeliveryFieldCapability)({
           fieldId: row.fieldId,
           fieldKey: row.fieldKey,
           kind: row.kind,
@@ -286,7 +276,6 @@ async function loadConfigurationRows(
     );
 }
 
-/** Loads the exact current published root fields used as configuration authority. */
 async function loadCurrentFields(
   executor: ApplicationExecutor,
   scope: ConfigurationScope,
@@ -313,7 +302,6 @@ async function loadCurrentFields(
     );
 }
 
-/** Produces bounded value-free configuration issues against current schema and projection kinds. */
 async function validateCapabilities(
   executor: ApplicationExecutor,
   scope: ConfigurationScope,
@@ -403,7 +391,6 @@ async function validateCapabilities(
   return issues;
 }
 
-/** Compares complete normalized configuration sets without depending on input ordering. */
 function sameConfiguration(
   current: ConfigurationScope["configuration"],
   currentFields: ReadonlyArray<DeliveryFieldCapability>,
@@ -456,7 +443,6 @@ export interface DeliveryRepositoryService {
   >;
 }
 
-/** Creates the production repository against the shared Drizzle pool. */
 export function makeDeliveryRepository(database: ApplicationDb = db): DeliveryRepositoryService {
   return {
     getConfiguration: Effect.fn("DeliveryRepository.getConfiguration")(function* (actorId, input) {

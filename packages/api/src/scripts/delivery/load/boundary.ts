@@ -1,13 +1,10 @@
-// Temporarily republishes a bounded subset of the deterministic fixture to exercise the 4 MiB Delivery response gate.
-
 import { randomUUID } from "node:crypto";
 
 import { Effect, Schema } from "effect";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 import { Uuid } from "../../../contracts/uuid";
 const serverEnvironmentPath = "../../apps/server/.env";
-const loadEnvironmentPath = "../../delivery-load.env";
+const loadEnvironmentPath = "../../apps/server/load/delivery.env";
 process.loadEnvFile(serverEnvironmentPath);
 process.loadEnvFile(loadEnvironmentPath);
 
@@ -135,7 +132,9 @@ try {
     throw new Error("The boundary fixture requires title and body fields.");
   }
 
-  const actorId = SchemaStrict.decodeUnknownSync(AuthUserId)(authority.actorId);
+  const actorId = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(
+    authority.actorId,
+  );
   const scope = {
     projectId,
     environmentId: authority.environmentId,
@@ -149,7 +148,7 @@ try {
     let draft = await run(
       entries.getDraft(
         actorId,
-        SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
+        Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput, { onExcessProperty: "error" })({
           ...scope,
           entryId: item.entryId,
         }),
@@ -168,7 +167,9 @@ try {
       await run(
         entries.saveDraft(
           actorId,
-          SchemaStrict.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
+          Schema.decodeUnknownSync(entryContracts.SaveEntryDraftInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             entryId: item.entryId,
             schemaRevisionId: draft.schemaRevisionId,
@@ -186,7 +187,9 @@ try {
       draft = await run(
         entries.getDraft(
           actorId,
-          SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
+          Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             entryId: item.entryId,
           }),
@@ -194,8 +197,9 @@ try {
       );
     }
 
-    const publicationScope = SchemaStrict.decodeUnknownSync(
+    const publicationScope = Schema.decodeUnknownSync(
       publicationContracts.ValidateEntryPublicationInput,
+      { onExcessProperty: "error" },
     )({ ...scope, entryId: item.entryId });
     const plan = await run(publications.validate(actorId, publicationScope, new Date()));
     if (!plan.valid || plan.authorityHash === null) {
@@ -205,7 +209,9 @@ try {
       await run(
         publications.publish(
           actorId,
-          SchemaStrict.decodeUnknownSync(publicationContracts.PublishEntryInput)({
+          Schema.decodeUnknownSync(publicationContracts.PublishEntryInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             entryId: item.entryId,
             commandId: randomUUID(),

@@ -1,5 +1,3 @@
-// Defines tenant-neutral exact-locale Authoring publication authority and commands.
-
 import { Schema } from "effect";
 
 import { ApiSuccessSchema } from "../../response/api";
@@ -121,20 +119,14 @@ export const AuthoringPublishEntryRequest = Schema.Struct({
   expectedSharedRevisionId: Schema.NullOr(EntryRevisionId),
   expectedLocalizedVersion: EntryDraftVersion,
   expectedLocalizedRevisionId: Schema.NullOr(EntryRevisionId),
-}).annotate({
-  identifier: "AuthoringPublishEntryRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "AuthoringPublishEntryRequest" });
 export type AuthoringPublishEntryRequest = typeof AuthoringPublishEntryRequest.Type;
 
 export const AuthoringUnpublishEntryRequest = Schema.Struct({
   commandId: EntryCommandId,
   expectedStateVersion: EntryPublicationStateVersion,
   expectedPublicationId: Schema.NullOr(EntryPublicationId),
-}).annotate({
-  identifier: "AuthoringUnpublishEntryRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "AuthoringUnpublishEntryRequest" });
 export type AuthoringUnpublishEntryRequest = typeof AuthoringUnpublishEntryRequest.Type;
 
 export class AuthoringPublishEntryResult extends Schema.Class<AuthoringPublishEntryResult>(

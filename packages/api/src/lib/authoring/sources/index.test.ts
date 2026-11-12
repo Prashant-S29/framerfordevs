@@ -4,8 +4,8 @@ import { EnumOptionId } from "../../../contracts/field";
 import { CollectionFieldId, CollectionId } from "../../../contracts/schema";
 import { validateCompleteProjectSchema } from "../schema-document";
 import { type PersistedProjectSourceIdentities, reconcileProjectSourceIdentities } from "./index";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 function project(includeStatus = true) {
   return {
     collections: [
@@ -69,9 +69,9 @@ function typedProject(value: unknown) {
   return result.project;
 }
 
-const decodeCollectionId = SchemaStrict.decodeUnknownSync(CollectionId);
-const decodeFieldId = SchemaStrict.decodeUnknownSync(CollectionFieldId);
-const decodeOptionId = SchemaStrict.decodeUnknownSync(EnumOptionId);
+const decodeCollectionId = Schema.decodeUnknownSync(CollectionId, { onExcessProperty: "error" });
+const decodeFieldId = Schema.decodeUnknownSync(CollectionFieldId, { onExcessProperty: "error" });
+const decodeOptionId = Schema.decodeUnknownSync(EnumOptionId, { onExcessProperty: "error" });
 const postsId = decodeCollectionId("019fae8b-1234-7000-8000-000000000201");
 const seoId = decodeFieldId("019fae8b-1234-7000-8000-000000000202");
 const titleId = decodeFieldId("019fae8b-1234-7000-8000-000000000203");

@@ -17,7 +17,6 @@ import {
 } from "../../contracts/access";
 import type { ProjectLocaleId } from "../../contracts/locale";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 export type PolicyDecisionReason =
   | "allowed"
   | "unknown_action"
@@ -170,7 +169,7 @@ const deny = (reason: Exclude<PolicyDecisionReason, "allowed">): PolicyDecision 
 });
 
 function decodeOption<A, I>(schema: Schema.Codec<A, I, never>, value: unknown): A | undefined {
-  return Option.getOrUndefined(SchemaStrict.decodeUnknownOption(schema)(value));
+  return Option.getOrUndefined(Schema.decodeUnknownOption(schema)(value));
 }
 
 export function isRoleAllowed(role: string, action: string): boolean {

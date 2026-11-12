@@ -1,5 +1,3 @@
-// Reads only current or immutable M8 publication artifacts through bounded M9 Delivery query authority.
-
 import { db } from "@framerfordevs/db";
 import { and, eq, inArray, sql, type SQL } from "@framerfordevs/db/query";
 import {
@@ -16,7 +14,7 @@ import {
 } from "@framerfordevs/db/schema/cms";
 import { projectLocale } from "@framerfordevs/db/schema/locale";
 import { environment, project, projectCapability } from "@framerfordevs/db/schema/platform";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 import { DeliveryItem, DeliveryPage, DeliveryQueryScalarKind } from "../../contracts/delivery";
 import {
@@ -39,7 +37,6 @@ import {
 import { DeliveryCursorSigner } from "./cursor-signer";
 import type { ApplicationDb, ApplicationExecutor, ApplicationTransaction } from "../project-access";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 export interface DeliveryRouteScopeInput {
   readonly projectId: string;
   readonly environmentKey: string;
@@ -100,7 +97,6 @@ function deliveryReadFailure(operation: string, cause: unknown) {
     : databaseFailure(operation, cause);
 }
 
-/** Safely maps persisted bigint authority into the JSON cursor number profile. */
 function generationNumber(value: bigint | null): number {
   if (value === null) return 0;
   if (value < 0n || value > maximumSafeGeneration) {
@@ -109,7 +105,6 @@ function generationNumber(value: bigint | null): number {
   return Number(value);
 }
 
-/** Resolves tenant scope before locale so unavailable locales retain their stable error contract. */
 async function resolveScope(
   executor: ApplicationExecutor,
   input: DeliveryRouteScopeInput,
@@ -231,7 +226,6 @@ async function resolveScope(
   };
 }
 
-/** Loads current configured capability keys through the exact current schema revision. */
 async function loadCapabilities(
   executor: ApplicationExecutor,
   scope: ResolvedDeliveryScope,
@@ -261,7 +255,7 @@ async function loadCapabilities(
           {
             fieldId: row.fieldId,
             fieldKey: row.fieldKey,
-            kind: SchemaStrict.decodeUnknownSync(DeliveryQueryScalarKind)(row.kind),
+            kind: Schema.decodeUnknownSync(DeliveryQueryScalarKind)(row.kind),
             filterable: row.filterable,
             sortable: row.sortable,
           },
@@ -269,7 +263,6 @@ async function loadCapabilities(
   );
 }
 
-/** Resolves one current configured unique field key through stable field identity. */
 async function loadUniqueCapability(
   executor: ApplicationExecutor,
   scope: ResolvedDeliveryScope,
@@ -303,11 +296,10 @@ async function loadUniqueCapability(
     ? null
     : {
         fieldId: row.fieldId,
-        kind: SchemaStrict.decodeUnknownSync(DeliveryQueryScalarKind)(row.kind),
+        kind: Schema.decodeUnknownSync(DeliveryQueryScalarKind)(row.kind),
       };
 }
 
-/** Chooses the one typed projection column for a closed field kind. */
 function projectionColumn(kind: DeliveryQueryScalarKind) {
   if (kind === "short_text" || kind === "slug" || kind === "email" || kind === "enum") {
     return cmsEntryLocaleDeliveryCurrentValue.textValue;
@@ -320,7 +312,6 @@ function projectionColumn(kind: DeliveryQueryScalarKind) {
   return cmsEntryLocaleDeliveryCurrentValue.referenceValue;
 }
 
-/** Compiles a closed operator to parameterized SQL; no caller token is interpolated. */
 function comparison(filter: DeliveryFilter): SQL {
   const column = projectionColumn(filter.kind);
   if (filter.operator === "eq") return sql`${column} = ${filter.value}`;
@@ -331,7 +322,6 @@ function comparison(filter: DeliveryFilter): SQL {
   return sql`${column} <= ${filter.value}`;
 }
 
-/** Uses EXISTS per bounded predicate so missing values never satisfy positive or `ne` filters. */
 function filterPredicates(
   scope: ResolvedDeliveryScope,
   query: ParsedDeliveryListQuery,
@@ -350,7 +340,6 @@ function filterPredicates(
   );
 }
 
-/** Produces the configured correlated sort scalar without accepting SQL identifiers from callers. */
 function sortExpression(scope: ResolvedDeliveryScope, query: ParsedDeliveryListQuery): SQL | null {
   if (query.sort === null) return null;
   const column = projectionColumn(query.sort.kind);
@@ -392,7 +381,6 @@ function manifestReference(value: unknown): ManifestReference | null {
     : null;
 }
 
-/** Converts compiler paths such as `related[0].author` to caller-visible key paths. */
 function normalizedManifestPath(path: string): string {
   return path
     .replace(/\[([0-9]+)\]/gu, ".$1")
@@ -408,7 +396,6 @@ function concretePathSegments(path: string): ReadonlyArray<string> {
     .filter((segment) => segment.length > 0);
 }
 
-/** Replaces one compiler-owned concrete path without evaluating caller-provided property access. */
 function replaceConcretePath(root: unknown, path: string, replacement: unknown): boolean {
   const segments = concretePathSegments(path);
   if (segments.length === 0) return false;
@@ -440,9 +427,8 @@ function replaceConcretePath(root: unknown, path: string, replacement: unknown):
   return true;
 }
 
-/** Builds the stable nested Delivery object from one authorized pinned publication artifact. */
 function expandedTargetValue(row: DeliveryArtifactRow, data: unknown) {
-  return SchemaStrict.decodeUnknownSync(DeliveryItem)({
+  return Schema.decodeUnknownSync(DeliveryItem)({
     id: row.entryId,
     collectionId: row.collectionId,
     collection: row.collectionKey,
@@ -457,7 +443,6 @@ function expandedTargetValue(row: DeliveryArtifactRow, data: unknown) {
   });
 }
 
-/** Loads one bounded breadth level and enforces current target collection access generically. */
 async function loadExpansionTargets(
   executor: ApplicationExecutor,
   scope: ResolvedDeliveryScope,
@@ -535,7 +520,6 @@ async function loadExpansionTargets(
   );
 }
 
-/** Expands at most two breadth-first pinned-reference levels with cycle and aggregate bounds. */
 async function expandArtifacts<A extends DeliveryArtifactRow>(
   executor: ApplicationExecutor,
   scope: ResolvedDeliveryScope,
@@ -702,10 +686,9 @@ async function expandArtifacts<A extends DeliveryArtifactRow>(
   });
 }
 
-/** Reconstructs only the public immutable outer contract from persisted snapshot data. */
 function decodeItem(row: DeliveryArtifactRow) {
   const data = Reflect.get(row.document, "data");
-  return SchemaStrict.decodeUnknownEffect(DeliveryItem)({
+  return Schema.decodeUnknownEffect(DeliveryItem)({
     id: row.entryId,
     collectionId: row.collectionId,
     collection: row.collectionKey,
@@ -720,12 +703,10 @@ function decodeItem(row: DeliveryArtifactRow) {
   }).pipe(Effect.mapError((cause) => databaseFailure("delivery.item.decode", cause)));
 }
 
-/** Ensures access did not become protected after the caller's authentication decision. */
 function accessAllowed(scope: ResolvedDeliveryScope, authenticated: boolean): boolean {
   return scope.access === "public" || authenticated;
 }
 
-/** Compares all traversal authority after entering the final repeatable-read snapshot. */
 function sameCursorAuthority(
   current: ResolvedDeliveryScope,
   expected: ResolvedDeliveryScope,
@@ -817,7 +798,6 @@ export interface DeliveryReadRepositoryOptions {
   ) => Promise<A>;
 }
 
-/** Creates the bounded Delivery read adapter over the shared pool. */
 export function makeDeliveryReadRepository(
   options: DeliveryReadRepositoryOptions = {},
 ): DeliveryReadRepositoryService {
@@ -1251,7 +1231,7 @@ export function makeDeliveryReadRepository(
               finalEntryId: final.entryId,
             })
           : null;
-      return yield* SchemaStrict.decodeUnknownEffect(DeliveryPage)({
+      return yield* Schema.decodeUnknownEffect(DeliveryPage)({
         items,
         page: { limit: parsed.value.limit, nextCursor, hasMore },
       }).pipe(Effect.mapError((cause) => databaseFailure("delivery.list.decode", cause)));

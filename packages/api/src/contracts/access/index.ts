@@ -1,5 +1,3 @@
-// Defines project access, membership, invitation, and environment credential boundary contracts.
-
 import { Schema, SchemaTransformation, Effect } from "effect";
 
 import { ApiSuccessSchema } from "../response/api";
@@ -15,9 +13,7 @@ import {
   WorkspaceId,
 } from "../platform";
 
-import * as SchemaStrict from "../../lib/schema-strict";
-import { UuidValue } from "../uuid";
-/** Detects control characters that are unsafe in normalized human-entered identity metadata. */
+import { Uuid } from "../uuid";
 function hasControlCharacter(value: string): boolean {
   for (const character of value) {
     const codePoint = character.codePointAt(0);
@@ -97,22 +93,22 @@ export const credentialScopeValues = [
   "preview.read",
 ] as const;
 
-export const ProjectMembershipId = UuidValue.pipe(Schema.brand("ProjectMembershipId"));
+export const ProjectMembershipId = Uuid.pipe(Schema.brand("ProjectMembershipId"));
 export type ProjectMembershipId = typeof ProjectMembershipId.Type;
 
-export const ProjectInvitationId = UuidValue.pipe(Schema.brand("ProjectInvitationId"));
+export const ProjectInvitationId = Uuid.pipe(Schema.brand("ProjectInvitationId"));
 export type ProjectInvitationId = typeof ProjectInvitationId.Type;
 
-export const ApiCredentialId = UuidValue.pipe(Schema.brand("ApiCredentialId"));
+export const ApiCredentialId = Uuid.pipe(Schema.brand("ApiCredentialId"));
 export type ApiCredentialId = typeof ApiCredentialId.Type;
 
-export const ApiCredentialRotationId = UuidValue.pipe(Schema.brand("ApiCredentialRotationId"));
+export const ApiCredentialRotationId = Uuid.pipe(Schema.brand("ApiCredentialRotationId"));
 export type ApiCredentialRotationId = typeof ApiCredentialRotationId.Type;
 
 export const ProjectActor = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("user"), id: AuthUserId }),
   Schema.Struct({ kind: Schema.Literal("credential"), id: ApiCredentialId }),
-]).annotate({ identifier: "ProjectActor", closedObject: true });
+]).annotate({ identifier: "ProjectActor" });
 export type ProjectActor = typeof ProjectActor.Type;
 
 export const ProjectRole = Schema.Literals(projectRoleValues);
@@ -176,12 +172,7 @@ export const ProjectMemberPolicy = Schema.Struct(ProjectPolicyFields)
       message: "Project owners must have all-locale access.",
     }),
   )
-  .pipe(
-    Schema.annotate({
-      identifier: "ProjectMemberPolicy",
-      closedObject: true,
-    }),
-  );
+  .pipe(Schema.annotate({ identifier: "ProjectMemberPolicy" }));
 export type ProjectMemberPolicy = typeof ProjectMemberPolicy.Type;
 
 export const ProjectInvitationPolicy = ProjectMemberPolicy.annotate({
@@ -344,12 +335,7 @@ export const CreateProjectInvitationInput = Schema.Struct({
       message: "Project owners must have all-locale access.",
     }),
   )
-  .pipe(
-    Schema.annotate({
-      identifier: "CreateProjectInvitationInput",
-      closedObject: true,
-    }),
-  );
+  .pipe(Schema.annotate({ identifier: "CreateProjectInvitationInput" }));
 export type CreateProjectInvitationInput = typeof CreateProjectInvitationInput.Type;
 
 export class ListProjectInvitationsInput extends Schema.Class<ListProjectInvitationsInput>(
@@ -415,12 +401,7 @@ export const UpdateProjectMemberPolicyInput = Schema.Struct({
       message: "Project owners must have all-locale access.",
     }),
   )
-  .pipe(
-    Schema.annotate({
-      identifier: "UpdateProjectMemberPolicyInput",
-      closedObject: true,
-    }),
-  );
+  .pipe(Schema.annotate({ identifier: "UpdateProjectMemberPolicyInput" }));
 export type UpdateProjectMemberPolicyInput = typeof UpdateProjectMemberPolicyInput.Type;
 
 export class RemoveProjectMemberInput extends Schema.Class<RemoveProjectMemberInput>(
@@ -622,77 +603,87 @@ export class ApiCredentialPage extends Schema.Class<ApiCredentialPage>("ApiCrede
   nextCursor: Schema.NullOr(Cursor),
 }) {}
 
-export const CreateProjectInvitationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const CreateProjectInvitationInputSchema = Schema.toStandardSchemaV1(
   CreateProjectInvitationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ListProjectInvitationsInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ListProjectInvitationsInputSchema = Schema.toStandardSchemaV1(
   ListProjectInvitationsInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const InspectProjectInvitationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const InspectProjectInvitationInputSchema = Schema.toStandardSchemaV1(
   InspectProjectInvitationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const AcceptProjectInvitationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const AcceptProjectInvitationInputSchema = Schema.toStandardSchemaV1(
   AcceptProjectInvitationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const RevokeProjectInvitationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const RevokeProjectInvitationInputSchema = Schema.toStandardSchemaV1(
   RevokeProjectInvitationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const GetCurrentProjectAccessInputSchema = SchemaStrict.toStandardSchemaV1(
+export const GetCurrentProjectAccessInputSchema = Schema.toStandardSchemaV1(
   GetCurrentProjectAccessInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ListProjectMembersInputSchema =
-  SchemaStrict.toStandardSchemaV1(ListProjectMembersInput);
-export const UpdateProjectMemberPolicyInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ListProjectMembersInputSchema = Schema.toStandardSchemaV1(ListProjectMembersInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const UpdateProjectMemberPolicyInputSchema = Schema.toStandardSchemaV1(
   UpdateProjectMemberPolicyInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const RemoveProjectMemberInputSchema =
-  SchemaStrict.toStandardSchemaV1(RemoveProjectMemberInput);
-export const IssueApiCredentialInputSchema =
-  SchemaStrict.toStandardSchemaV1(IssueApiCredentialInput);
-export const ListApiCredentialsInputSchema =
-  SchemaStrict.toStandardSchemaV1(ListApiCredentialsInput);
-export const StartApiCredentialRotationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const RemoveProjectMemberInputSchema = Schema.toStandardSchemaV1(RemoveProjectMemberInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const IssueApiCredentialInputSchema = Schema.toStandardSchemaV1(IssueApiCredentialInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const ListApiCredentialsInputSchema = Schema.toStandardSchemaV1(ListApiCredentialsInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const StartApiCredentialRotationInputSchema = Schema.toStandardSchemaV1(
   StartApiCredentialRotationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ChangeApiCredentialRotationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ChangeApiCredentialRotationInputSchema = Schema.toStandardSchemaV1(
   ChangeApiCredentialRotationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const RevokeApiCredentialInputSchema =
-  SchemaStrict.toStandardSchemaV1(RevokeApiCredentialInput);
+export const RevokeApiCredentialInputSchema = Schema.toStandardSchemaV1(RevokeApiCredentialInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
 
-export const CurrentProjectAccessOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const CurrentProjectAccessOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(CurrentProjectAccess),
 );
-export const ProjectMemberOutputSchema = SchemaStrict.toStandardSchemaV1(
-  ApiSuccessSchema(ProjectMember),
-);
-export const ProjectMemberPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ProjectMemberOutputSchema = Schema.toStandardSchemaV1(ApiSuccessSchema(ProjectMember));
+export const ProjectMemberPageOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(ProjectMemberPage),
 );
-export const ProjectInvitationOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ProjectInvitationOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(ProjectInvitation),
 );
-export const IssuedProjectInvitationOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const IssuedProjectInvitationOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(IssuedProjectInvitation),
 );
-export const InspectedProjectInvitationOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const InspectedProjectInvitationOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(InspectedProjectInvitation),
 );
-export const ProjectInvitationPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ProjectInvitationPageOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(ProjectInvitationPage),
 );
-export const ApiCredentialOutputSchema = SchemaStrict.toStandardSchemaV1(
-  ApiSuccessSchema(ApiCredential),
-);
-export const IssuedApiCredentialOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ApiCredentialOutputSchema = Schema.toStandardSchemaV1(ApiSuccessSchema(ApiCredential));
+export const IssuedApiCredentialOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(IssuedApiCredential),
 );
-export const ApiCredentialRotationOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ApiCredentialRotationOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(ApiCredentialRotation),
 );
-export const StartedApiCredentialRotationOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const StartedApiCredentialRotationOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(StartedApiCredentialRotation),
 );
-export const ApiCredentialPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ApiCredentialPageOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(ApiCredentialPage),
 );

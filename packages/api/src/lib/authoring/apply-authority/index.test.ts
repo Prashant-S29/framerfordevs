@@ -11,6 +11,7 @@ import {
 import { AcknowledgedAuthoringSchemaChangeIds } from "../../../contracts/authoring/schema";
 import { ApiCredentialId } from "../../../contracts/access";
 import { AuthUserId, EnvironmentId, ProjectId } from "../../../contracts/platform";
+import { Schema } from "effect";
 import {
   CollectionFieldId,
   SchemaChange,
@@ -24,7 +25,6 @@ import {
   qualifyProjectSchemaChanges,
 } from "./index";
 
-import * as SchemaStrict from "../../schema-strict";
 const fieldId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000701");
 const collectionChangeId = SchemaChangeId.make("a".repeat(64));
 
@@ -77,12 +77,15 @@ describe("Authoring project apply authority", () => {
     if (!qualified.valid) throw new Error("Expected qualified changes.");
     const changeId = qualified.changes[0]?.changeId;
     if (!changeId) throw new Error("Expected one qualified change.");
-    const exact = SchemaStrict.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([changeId]);
-    const missing = SchemaStrict.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([]);
-    const extra = SchemaStrict.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([
-      changeId,
-      SchemaChangeId.make("b".repeat(64)),
-    ]);
+    const exact = Schema.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds, {
+      onExcessProperty: "error",
+    })([changeId]);
+    const missing = Schema.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds, {
+      onExcessProperty: "error",
+    })([]);
+    const extra = Schema.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds, {
+      onExcessProperty: "error",
+    })([changeId, SchemaChangeId.make("b".repeat(64))]);
 
     assert.isTrue(hasExactProjectSchemaAcknowledgements(qualified.changes, exact));
     assert.isFalse(hasExactProjectSchemaAcknowledgements(qualified.changes, missing));
@@ -110,19 +113,17 @@ describe("Authoring project apply authority", () => {
     const expectedPlanHash = SchemaPlanHash.make("d".repeat(64));
     const firstChange = SchemaChangeId.make("e".repeat(64));
     const secondChange = SchemaChangeId.make("f".repeat(64));
-    const forward = SchemaStrict.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([
-      firstChange,
-      secondChange,
-    ]);
-    const reversed = SchemaStrict.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)([
-      secondChange,
-      firstChange,
-    ]);
-    const user = SchemaStrict.decodeUnknownSync(CmsActor)({
+    const forward = Schema.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds, {
+      onExcessProperty: "error",
+    })([firstChange, secondChange]);
+    const reversed = Schema.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds, {
+      onExcessProperty: "error",
+    })([secondChange, firstChange]);
+    const user = Schema.decodeUnknownSync(CmsActor, { onExcessProperty: "error" })({
       kind: "user",
       id: AuthUserId.make("user-apply"),
     });
-    const credential = SchemaStrict.decodeUnknownSync(CmsActor)({
+    const credential = Schema.decodeUnknownSync(CmsActor, { onExcessProperty: "error" })({
       kind: "credential",
       id: ApiCredentialId.make("019fae8b-1234-7000-8000-000000000706"),
     });

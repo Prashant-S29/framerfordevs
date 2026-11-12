@@ -1,5 +1,3 @@
-// Defines strict M13 complete-project schema plan/apply request and response contracts.
-
 import type { ProjectSchema } from "@framerfordevs/schema";
 import { isProjectSchema } from "@framerfordevs/schema/validate";
 import { Schema } from "effect";
@@ -65,7 +63,7 @@ const CandidateWithAllocatedIdentities = Schema.Struct({
   containsUnallocatedIdentities: Schema.Literal(false),
   candidateStructureHash: StructureHash,
   candidateContractHash: ContractHash,
-}).annotate({ closedObject: true });
+});
 
 const CandidateWithUnallocatedIdentities = Schema.Struct({
   collectionSourceKey: CollectionSourceKey,
@@ -74,12 +72,8 @@ const CandidateWithUnallocatedIdentities = Schema.Struct({
   containsUnallocatedIdentities: Schema.Literal(true),
   candidateStructureHash: Schema.Null,
   candidateContractHash: Schema.NullOr(ContractHash),
-}).annotate({ closedObject: true });
+});
 
-/**
- * `candidateStructureHash` is always present. It is exactly `null` when any candidate identity has
- * not yet received its server-generated ID; omission is never used to represent this state.
- */
 export const AuthoringSchemaCandidate = Schema.Union([
   CandidateWithAllocatedIdentities,
   CandidateWithUnallocatedIdentities,
@@ -101,10 +95,7 @@ export class AuthoringSchemaPlanInput extends Schema.Class<AuthoringSchemaPlanIn
 
 export const AuthoringSchemaPlanRequest = Schema.Struct({
   project: AuthoringProjectSchemaDocument,
-}).annotate({
-  identifier: "AuthoringSchemaPlanRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "AuthoringSchemaPlanRequest" });
 export type AuthoringSchemaPlanRequest = typeof AuthoringSchemaPlanRequest.Type;
 
 const AuthoringSchemaPlanBase = {
@@ -118,7 +109,7 @@ const ValidAuthoringSchemaPlan = Schema.Struct({
   valid: Schema.Literal(true),
   planHash: SchemaPlanHash,
   issues: Schema.Array(AuthoringSchemaValidationIssue).check(Schema.isMaxLength(50)),
-}).annotate({ closedObject: true });
+});
 
 const InvalidAuthoringSchemaPlan = Schema.Struct({
   ...AuthoringSchemaPlanBase,
@@ -128,7 +119,7 @@ const InvalidAuthoringSchemaPlan = Schema.Struct({
     Schema.isMinLength(1),
     Schema.isMaxLength(50),
   ),
-}).annotate({ closedObject: true });
+});
 
 export const AuthoringSchemaPlan = Schema.Union([
   ValidAuthoringSchemaPlan,
@@ -161,10 +152,7 @@ export const AuthoringSchemaApplyRequest = Schema.Struct({
   expectedCurrent: AuthoringSchemaAuthority,
   expectedPlanHash: SchemaPlanHash,
   acknowledgedChangeIds: AcknowledgedAuthoringSchemaChangeIds,
-}).annotate({
-  identifier: "AuthoringSchemaApplyRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "AuthoringSchemaApplyRequest" });
 export type AuthoringSchemaApplyRequest = typeof AuthoringSchemaApplyRequest.Type;
 
 export class AppliedCollectionSourceIdentity extends Schema.Class<AppliedCollectionSourceIdentity>(

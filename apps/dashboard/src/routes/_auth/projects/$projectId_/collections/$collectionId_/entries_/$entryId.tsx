@@ -1,5 +1,3 @@
-// Routes one exact-locale M7 generated draft editor and validates its locale search context.
-
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback } from "react";
 

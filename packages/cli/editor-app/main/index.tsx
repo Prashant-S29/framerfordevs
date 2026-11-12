@@ -37,7 +37,6 @@ import type { EditorOperationRequest } from "../../src/editor/protocol";
 import "../editor.css";
 import { projectLocalContentForm } from "../local-form";
 
-import * as SchemaStrict from "../../src/schema-strict";
 const ContentForm = lazy(() =>
   import("@framerfordevs/content-form/renderer").then((module) => ({
     default: module.ContentForm,
@@ -58,11 +57,11 @@ const ProjectDocument = Schema.declare<ProjectSchema>(isProjectSchema, {
 const LocalSchemaSnapshot = Schema.Struct({
   localProject: ProjectDocument,
   hostedProject: ProjectDocument,
-}).annotate({ closedObject: true });
+});
 const Collection = Schema.Struct({
   sourceKey: Schema.String,
   apiKey: Schema.String,
-}).annotate({ closedObject: true });
+});
 const Status = Schema.Struct({
   projectId: Schema.String,
   environment: Schema.String,
@@ -75,7 +74,7 @@ const Status = Schema.Struct({
     Schema.isMaxLength(100),
   ),
   collections: Schema.Array(Collection),
-}).annotate({ closedObject: true });
+});
 
 type EditorStatus = typeof Status.Type;
 
@@ -147,7 +146,9 @@ async function statusRequest(): Promise<EditorStatus> {
   });
   const payload = await responsePayload(response);
   if (!response.ok) throw new EditorRequestError(response.status, failureCode(payload));
-  return SchemaStrict.decodeUnknownSync(Status)(payload, { onExcessProperty: "error" });
+  return Schema.decodeUnknownSync(Status, { onExcessProperty: "error" })(payload, {
+    onExcessProperty: "error",
+  });
 }
 
 async function operationData<A, I>(
@@ -165,7 +166,9 @@ async function operationData<A, I>(
   if (!response.ok || envelope?.ok !== true) {
     throw new EditorRequestError(response.status, failureCode(payload));
   }
-  return SchemaStrict.decodeUnknownSync(schema)(envelope.data, { onExcessProperty: "error" });
+  return Schema.decodeUnknownSync(schema, { onExcessProperty: "error" })(envelope.data, {
+    onExcessProperty: "error",
+  });
 }
 
 function jsonValue(value: unknown, depth = 0): JsonValue {
@@ -300,18 +303,13 @@ function EditorApp() {
   const editingEnabled =
     status.data?.schemaValid === true && status.data.schemaMatchesHosted === true;
 
-  useEffect(() => {
-    if (collectionKey === "" && activeCollection !== null)
-      setCollectionKey(activeCollection.apiKey);
-  }, [activeCollection, collectionKey]);
+  if (collectionKey === "" && activeCollectionKey !== "") setCollectionKey(activeCollectionKey);
 
-  useEffect(() => {
-    const defaultLocale = locales[0];
-    if (locale === "" && defaultLocale !== undefined) {
-      setLocaleInput(defaultLocale);
-      setLocale(defaultLocale);
-    }
-  }, [locale, locales]);
+  const defaultLocale = locales[0] ?? "";
+  if (locale === "" && defaultLocale !== "") {
+    setLocaleInput(defaultLocale);
+    setLocale(defaultLocale);
+  }
 
   const localSchema = useQuery({
     queryKey: ["editor", "local-schema", status.data?.schemaGeneration ?? 0],

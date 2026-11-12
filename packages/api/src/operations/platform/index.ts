@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import {
   ControlPlaneCommandId,
@@ -25,9 +25,8 @@ import {
 } from "../../contracts/platform";
 import { PlatformRepository } from "../../services/platform-repository";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const decodeActorId = (actorId: string) =>
-  SchemaStrict.decodeUnknownEffect(AuthUserId)(actorId).pipe(
+  Schema.decodeUnknownEffect(AuthUserId, { onExcessProperty: "error" })(actorId).pipe(
     Effect.mapError(() => UnauthorizedFailure.make()),
   );
 

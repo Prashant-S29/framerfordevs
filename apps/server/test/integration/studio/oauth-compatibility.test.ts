@@ -1,5 +1,3 @@
-// Proves pinned Better Auth public-client Code + S256 PKCE behavior before M18A authority work.
-
 import { randomUUID } from "node:crypto";
 
 import { createAuth } from "@framerfordevs/auth";
@@ -65,7 +63,7 @@ const oauthAuth = createAuth({
   apiOrigin,
   dashboardOrigin,
   hostRoutingEnabled: true,
-  nodeEnv: "production",
+  nodeEnv: "test",
   oauthDeviceAuthorizationEnabled: true,
   oauthRateLimitStorage: {
     consume: (key, rule) => {
@@ -471,8 +469,6 @@ describe("M18A Studio OAuth provider compatibility", () => {
       .set("Host", "api.example.test")
       .type("form")
       .send(Object.fromEntries(wrongVerifier));
-
-    // Better Auth 1.7.21 returns the RFC 6749 section 5.2 response for a failed PKCE check.
     expect(denied.status).toBe(400);
     expect(denied.body.error).toBe("invalid_grant");
   });
@@ -745,5 +741,30 @@ describe("M18A Studio OAuth provider compatibility", () => {
       error_description: "Studio authorization requires explicit user acknowledgement.",
     });
     expect(response.headers.location).toBeUndefined();
+  });
+  it("rejects the loopback Studio redirect when the provider runs in production", async () => {
+    const productionAuth = createAuth({
+      apiOrigin,
+      dashboardOrigin,
+      hostRoutingEnabled: true,
+      nodeEnv: "production",
+      oauthDeviceAuthorizationEnabled: true,
+      oauthRateLimitStorage: {
+        consume: () => Promise.resolve({ allowed: true, retryAfter: null }),
+      },
+      studioOAuthRateLimit: () => Promise.resolve({ allowed: true, retryAfter: null }),
+    });
+    const productionApp = express();
+    productionApp.all("/api/auth{/*path}", toNodeHandler(productionAuth));
+    const attempt = harness.begin();
+    const authorizationUrl = new URL(attempt.authorizationUrl);
+    const authorize = await request(productionApp)
+      .get(`${authorizationUrl.pathname}${authorizationUrl.search}`)
+      .set("Host", "api.example.test");
+
+    const location = String(authorize.headers.location ?? "");
+    expect(location.startsWith(redirectUri)).toBe(false);
+    expect(new URL(location).searchParams.get("error")).toBe("invalid_request");
+    expect(new URL(location).searchParams.get("error_description")).toContain("must use HTTPS");
   });
 });

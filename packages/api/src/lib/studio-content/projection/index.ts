@@ -1,5 +1,3 @@
-// Classifies one published collection before any Studio nested operation can load entry data.
-
 import type { ProjectRole } from "../../../contracts/access";
 import type { StudioCollectionConfigurationReason } from "../../../contracts/studio-content";
 
@@ -22,7 +20,6 @@ function supportRole(role: ProjectRole): boolean {
   return role === "owner" || role === "developer";
 }
 
-/** Centralizes visible, non-enumerating, and owner/developer diagnostic outcomes. */
 export function decideStudioCollectionProjection(
   facts: StudioCollectionProjectionFacts,
 ): StudioCollectionProjectionDecision {

@@ -1,5 +1,3 @@
-// Classifies trusted effective hosts and enforces the closed server path inventory for each surface.
-
 export type ServerHostProfile = "dashboard" | "operator" | "public-api";
 
 export interface HostProfileOrigins {
@@ -80,7 +78,6 @@ function configuredHosts(origins: HostProfileOrigins): ReadonlyMap<string, Serve
   ]);
 }
 
-/** Returns one conservative host value from trusted headers, or null for malformed input. */
 export function normalizeEffectiveHost(value: string | undefined): string | null {
   if (value === undefined || value.length === 0 || value.length > 255 || value.includes(",")) {
     return null;
@@ -94,7 +91,6 @@ export function normalizeEffectiveHost(value: string | undefined): string | null
   }
 }
 
-/** Enforces the exact path inventory owned by the matched configured host. */
 export function classifyHostPath(
   effectiveHost: string | undefined,
   pathname: string,

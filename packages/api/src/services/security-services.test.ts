@@ -84,7 +84,6 @@ const NoopTelemetry: TelemetryService = {
   recordRateLimitStore: () => Effect.void,
 };
 
-/** Creates an isolated central manager for each credential limiter behavior test. */
 function makeTestCredentialLimiter() {
   const manager = makeRateLimitManager({
     primary: makeMemoryRateLimitStore({ maxEntries: 10 }),

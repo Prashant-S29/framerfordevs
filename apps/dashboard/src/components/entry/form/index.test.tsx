@@ -2,7 +2,7 @@
 
 // Verifies exhaustive generated controls remain accessible and preview-only validation is local.
 
-import { GeneratedFormDefinition } from "@framerfordevs/api/contracts/schema/index";
+import { GeneratedFormDefinition } from "@framerfordevs/api/contracts/schema";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
@@ -10,8 +10,8 @@ import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GeneratedForm } from "./index";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const editor = {
   helpText: "Generated from the schema contract.",
   placeholder: "Enter a value",
@@ -96,50 +96,52 @@ const fields = [
   },
 ];
 
-const definition = SchemaStrict.decodeUnknownSync(GeneratedFormDefinition)({
-  source: "draft",
-  collectionId: "019fae8b-1234-7000-8000-000000000040",
-  revisionId: null,
-  formatVersion: 2,
-  validationProfile: "ffd-fields@1",
-  currencyRegistryProfile: "iso-4217@2026-01-01",
-  contractHash: "c".repeat(64),
-  role: "owner",
-  canEdit: true,
-  fields,
-  editableFieldIds: fields.map((field) => field.id),
-  editorLayout: {
-    version: 1,
-    tabs: [
-      {
-        id: "00000000-0000-4000-8000-000000000041",
-        title: "Content",
-        description: "Preview controls",
-        position: 0,
-        visibleToRoles: ["owner", "developer"],
-        groups: [
-          {
-            id: "00000000-0000-4000-8000-000000000042",
-            title: "Main",
-            description: null,
-            position: 0,
-            columns: 2,
-            visibleToRoles: ["owner", "developer"],
-            fields: fields.map((field, position) => ({
-              id: field.id,
-              fieldId: field.id,
-              position,
-              helpTextOverride: null,
+const definition = Schema.decodeUnknownSync(GeneratedFormDefinition, { onExcessProperty: "error" })(
+  {
+    source: "draft",
+    collectionId: "019fae8b-1234-7000-8000-000000000040",
+    revisionId: null,
+    formatVersion: 2,
+    validationProfile: "ffd-fields@1",
+    currencyRegistryProfile: "iso-4217@2026-01-01",
+    contractHash: "c".repeat(64),
+    role: "owner",
+    canEdit: true,
+    fields,
+    editableFieldIds: fields.map((field) => field.id),
+    editorLayout: {
+      version: 1,
+      tabs: [
+        {
+          id: "00000000-0000-4000-8000-000000000041",
+          title: "Content",
+          description: "Preview controls",
+          position: 0,
+          visibleToRoles: ["owner", "developer"],
+          groups: [
+            {
+              id: "00000000-0000-4000-8000-000000000042",
+              title: "Main",
+              description: null,
+              position: 0,
+              columns: 2,
               visibleToRoles: ["owner", "developer"],
-            })),
-          },
-        ],
-      },
-    ],
-    sidebarGroups: [],
+              fields: fields.map((field, position) => ({
+                id: field.id,
+                fieldId: field.id,
+                position,
+                helpTextOverride: null,
+                visibleToRoles: ["owner", "developer"],
+              })),
+            },
+          ],
+        },
+      ],
+      sidebarGroups: [],
+    },
+    currencyMinorUnits: { USD: 2, JPY: 0 },
   },
-  currencyMinorUnits: { USD: 2, JPY: 0 },
-});
+);
 
 afterEach(cleanup);
 

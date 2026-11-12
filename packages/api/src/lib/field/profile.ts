@@ -1,5 +1,3 @@
-// Defines deterministic M6 field validation limits without importing server or Effect dependencies.
-
 export const fieldSystemValidationProfile = "ffd-fields@1" as const;
 
 export const fieldSystemLimits = {

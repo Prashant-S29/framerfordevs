@@ -1,15 +1,13 @@
-// Declares the only public contract sources behind the browser-safe closed registry metadata.
-
-import { authoringOpenApiDocument } from "@framerfordevs/api/contracts/authoring/openapi/index";
-import { controlPlaneOpenApiDocument } from "@framerfordevs/api/contracts/control-plane/openapi/index";
-import { deliveryOpenApiDocument } from "@framerfordevs/api/contracts/delivery/openapi/index";
-import { previewOpenApiDocument } from "@framerfordevs/api/contracts/preview/openapi/index";
-import { studioContentOpenApiDocument } from "@framerfordevs/api/contracts/studio-content/openapi/index";
+import { authoringOpenApiDocument } from "@framerfordevs/api/contracts/authoring/openapi";
+import { controlPlaneOpenApiDocument } from "@framerfordevs/api/contracts/control-plane/openapi";
+import { deliveryOpenApiDocument } from "@framerfordevs/api/contracts/delivery/openapi";
+import { previewOpenApiDocument } from "@framerfordevs/api/contracts/preview/openapi";
+import { studioContentOpenApiDocument } from "@framerfordevs/api/contracts/studio-content/openapi";
 import { studioContentV2OpenApiDocument } from "@framerfordevs/api/contracts/studio-content/openapi/v2";
-import { studioOpenApiDocument } from "@framerfordevs/api/contracts/studio/openapi/index";
-import { toolingOpenApiDocument } from "@framerfordevs/api/contracts/tooling/openapi/index";
-import { PublicationWebhookEvent } from "@framerfordevs/api/contracts/webhook/index";
-import { make as makeJsonSchema } from "@framerfordevs/api/contracts/response/json-schema/index";
+import { studioOpenApiDocument } from "@framerfordevs/api/contracts/studio/openapi";
+import { toolingOpenApiDocument } from "@framerfordevs/api/contracts/tooling/openapi";
+import { PublicationWebhookEvent } from "@framerfordevs/api/contracts/webhook";
+import { make as makeJsonSchema } from "@framerfordevs/api/contracts/response/json-schema";
 
 import {
   publicContractMetadata,

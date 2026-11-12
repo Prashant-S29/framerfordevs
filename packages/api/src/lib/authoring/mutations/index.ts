@@ -1,5 +1,3 @@
-// Validates public API-key mutations and resolves them to the stable-ID entry kernel boundary.
-
 import type { AuthoringMutationScope, AuthoringValueMutation } from "../../../contracts/authoring";
 import { authoringLimits } from "../../../contracts/authoring";
 import type { EntryValueMutation } from "../../../contracts/entry";
@@ -23,7 +21,6 @@ export interface AuthoringMutationFieldAuthority {
   readonly stablePath: ReadonlyArray<CollectionFieldId>;
   readonly scope: AuthoringMutationScope;
   readonly editable: boolean;
-  /** Structural containers translate nested API keys to stable IDs before entering M7. */
   readonly valueShape?: AuthoringValueShape;
 }
 
@@ -107,10 +104,6 @@ function translateValue(
   return { valid: true, value: translated };
 }
 
-/**
- * Resolves public API-key paths only through an already role-projected published authority.
- * It never traverses list indexes and returns no submitted value in diagnostics.
- */
 export function resolveAuthoringMutations(
   mutations: ReadonlyArray<AuthoringValueMutation>,
   fields: ReadonlyArray<AuthoringMutationFieldAuthority>,
@@ -179,7 +172,6 @@ export type ProjectAuthoringValueResult =
   | { readonly valid: true; readonly value: unknown }
   | { readonly valid: false };
 
-/** Projects stable-ID container keys to API keys and omits fields outside the role projection. */
 export function projectAuthoringValue(
   value: unknown,
   shape: AuthoringValueShape,
@@ -208,7 +200,6 @@ export function projectAuthoringValue(
   return { valid: true, value: projected };
 }
 
-/** Content-safe path formatter for CLI/API diagnostics. */
 export function formatAuthoringMutationPath(path: ReadonlyArray<string>): string {
   return displayPath(path);
 }

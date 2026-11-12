@@ -1,5 +1,3 @@
-// Builds the self-hosted MDX portal and emits only baseline-verified public contract artifacts.
-
 /// <reference types="vitest/config" />
 
 import { createHash } from "node:crypto";
@@ -14,7 +12,6 @@ import { fumadocsMdx } from "fumadocs-mdx/vite";
 import { nitro } from "nitro/vite";
 import { defineConfig, type Plugin } from "vite";
 
-/** Emits registry artifacts only after their source bytes match immutable baselines. */
 function publicContractArtifacts(): Plugin {
   return {
     name: "public-contract-artifacts",

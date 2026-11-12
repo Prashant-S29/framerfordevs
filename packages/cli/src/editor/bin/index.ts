@@ -1,5 +1,3 @@
-// Validates local editor authority before dynamically loading credentials, network, or loopback modules.
-
 import { isProjectSchema } from "@framerfordevs/schema/validate";
 import { Cause, Effect, Option } from "effect";
 

@@ -1,5 +1,3 @@
-// Adapts strictly decoded Studio field-ID projections into the transport-free content renderer.
-
 import {
   adaptContentFormDefinition,
   type ContentFormDefinition,
@@ -483,7 +481,6 @@ function adaptField(field: StudioFormFieldDto): ContentFormField {
   }
 }
 
-/** Removes transport/revision metadata after strict Studio DTO decoding. */
 export function adaptStudioContentForm(form: StudioFormDto): ContentFormDefinition {
   return adaptContentFormDefinition({
     canEdit: form.canEdit,

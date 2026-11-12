@@ -1,5 +1,3 @@
-// Verifies the core M8 publication lifecycle against PostgreSQL while rolling append-only artifacts back.
-
 import { createHash, randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, it } from "@effect/vitest";
@@ -88,12 +86,13 @@ import {
 } from "../../../src/services/publication/repository";
 import { makeSchemaRepository } from "../../../src/services/schema/repository";
 
-import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ownerId = `m8-publication-owner-${suffix}`;
-const ownerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(ownerId);
-const managementCredentialId = SchemaStrict.decodeUnknownSync(ApiCredentialId)(randomUUID());
-const managementActor = SchemaStrict.decodeUnknownSync(CmsActor)({
+const ownerActor = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(ownerId);
+const managementCredentialId = Schema.decodeUnknownSync(ApiCredentialId, {
+  onExcessProperty: "error",
+})(randomUUID());
+const managementActor = Schema.decodeUnknownSync(CmsActor, { onExcessProperty: "error" })({
   kind: "credential",
   id: managementCredentialId,
 });
@@ -138,14 +137,16 @@ beforeAll(async () => {
   workspaceModel = await Effect.runPromise(
     platform.createWorkspace(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M8 Publication Workspace" }),
+      Schema.decodeUnknownSync(CreateWorkspaceInput, { onExcessProperty: "error" })({
+        name: "M8 Publication Workspace",
+      }),
       `m8-workspace-${suffix}`,
     ),
   );
   projectModel = await Effect.runPromise(
     platform.createProject(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
+      Schema.decodeUnknownSync(CreateProjectInput, { onExcessProperty: "error" })({
         workspaceId: required(workspaceModel, "workspace").id,
         name: "M8 Publication Project",
         key: `pub-${suffix.slice(0, 8)}`,
@@ -158,7 +159,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     platform.enableCapability(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(EnableCapabilityInput)({
+      Schema.decodeUnknownSync(EnableCapabilityInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         capability: "cms",
       }),
@@ -189,7 +190,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     locales.createLocale(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateProjectLocaleInput)({
+      Schema.decodeUnknownSync(CreateProjectLocaleInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         tag: "hi",
         displayName: "Hindi",
@@ -201,7 +202,7 @@ beforeAll(async () => {
   collectionModel = await Effect.runPromise(
     schemas.createCollection(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateCollectionInput)({
+      Schema.decodeUnknownSync(CreateCollectionInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         apiKey: "publication_articles",
@@ -215,7 +216,7 @@ beforeAll(async () => {
   const draft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
+      Schema.decodeUnknownSync(CreateCollectionFieldInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -240,7 +241,7 @@ beforeAll(async () => {
   const referenceDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
+      Schema.decodeUnknownSync(CreateCollectionFieldInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -265,7 +266,7 @@ beforeAll(async () => {
   const sharedDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
+      Schema.decodeUnknownSync(CreateCollectionFieldInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -290,7 +291,7 @@ beforeAll(async () => {
   const validation = await Effect.runPromise(
     schemas.validateSchema(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(ValidateCollectionSchemaInput)({
+      Schema.decodeUnknownSync(ValidateCollectionSchemaInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -300,7 +301,7 @@ beforeAll(async () => {
   publishedModel = await Effect.runPromise(
     schemas.publishSchema(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(PublishCollectionSchemaInput)({
+      Schema.decodeUnknownSync(PublishCollectionSchemaInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -318,7 +319,7 @@ beforeAll(async () => {
   const created = await Effect.runPromise(
     entries.createEntry(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateEntryInput)({
+      Schema.decodeUnknownSync(CreateEntryInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -336,7 +337,7 @@ beforeAll(async () => {
   const target = await Effect.runPromise(
     entries.createEntry(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateEntryInput)({
+      Schema.decodeUnknownSync(CreateEntryInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -434,7 +435,9 @@ describe("publication repository PostgreSQL integration", () => {
     const invalid = await Effect.runPromise(
       makePublicationRepository().validate(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(ValidateEntryPublicationInput)(scope),
+        Schema.decodeUnknownSync(ValidateEntryPublicationInput, { onExcessProperty: "error" })(
+          scope,
+        ),
         new Date("2026-08-09T10:04:00.000Z"),
       ),
     );
@@ -443,7 +446,7 @@ describe("publication repository PostgreSQL integration", () => {
     await Effect.runPromise(
       entries.saveDraft(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(SaveEntryDraftInput)({
+        Schema.decodeUnknownSync(SaveEntryDraftInput, { onExcessProperty: "error" })({
           ...scope,
           schemaRevisionId: currentPublished.id,
           contractHash: currentPublished.contractHash,
@@ -468,7 +471,7 @@ describe("publication repository PostgreSQL integration", () => {
     await Effect.runPromise(
       entries.saveDraft(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(SaveEntryDraftInput)({
+        Schema.decodeUnknownSync(SaveEntryDraftInput, { onExcessProperty: "error" })({
           ...targetScope,
           schemaRevisionId: currentPublished.id,
           contractHash: currentPublished.contractHash,
@@ -490,7 +493,7 @@ describe("publication repository PostgreSQL integration", () => {
     await Effect.runPromise(
       entries.saveDraft(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(SaveEntryDraftInput)({
+        Schema.decodeUnknownSync(SaveEntryDraftInput, { onExcessProperty: "error" })({
           ...hindiTargetScope,
           schemaRevisionId: currentPublished.id,
           contractHash: currentPublished.contractHash,
@@ -531,7 +534,9 @@ describe("publication repository PostgreSQL integration", () => {
         const missingTargetPlan = await Effect.runPromise(
           publications.validate(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(ValidateEntryPublicationInput)(scope),
+            Schema.decodeUnknownSync(ValidateEntryPublicationInput, { onExcessProperty: "error" })(
+              scope,
+            ),
             new Date("2026-08-09T10:06:00.000Z"),
           ),
         );
@@ -545,14 +550,16 @@ describe("publication repository PostgreSQL integration", () => {
         const targetPlan = await Effect.runPromise(
           publications.validate(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(ValidateEntryPublicationInput)(targetScope),
+            Schema.decodeUnknownSync(ValidateEntryPublicationInput, { onExcessProperty: "error" })(
+              targetScope,
+            ),
             new Date("2026-08-09T10:06:15.000Z"),
           ),
         );
         const targetPublished = await Effect.runPromise(
           publications.publish(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(PublishEntryInput)({
+            Schema.decodeUnknownSync(PublishEntryInput, { onExcessProperty: "error" })({
               ...targetScope,
               commandId: randomUUID(),
               authorityHash: targetPlan.authorityHash,
@@ -572,14 +579,16 @@ describe("publication repository PostgreSQL integration", () => {
         const hindiTargetPlan = await Effect.runPromise(
           publications.validate(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(ValidateEntryPublicationInput)(hindiTargetScope),
+            Schema.decodeUnknownSync(ValidateEntryPublicationInput, { onExcessProperty: "error" })(
+              hindiTargetScope,
+            ),
             new Date("2026-08-09T10:06:20.000Z"),
           ),
         );
         const hindiTargetPublished = await Effect.runPromise(
           publications.publish(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(PublishEntryInput)({
+            Schema.decodeUnknownSync(PublishEntryInput, { onExcessProperty: "error" })({
               ...hindiTargetScope,
               commandId: randomUUID(),
               authorityHash: hindiTargetPlan.authorityHash,
@@ -602,14 +611,18 @@ describe("publication repository PostgreSQL integration", () => {
         const plan = await Effect.runPromise(
           publications.validate(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(ValidateEntryPublicationInput)(scope),
+            Schema.decodeUnknownSync(ValidateEntryPublicationInput, { onExcessProperty: "error" })(
+              scope,
+            ),
             new Date("2026-08-09T10:06:30.000Z"),
           ),
         );
         assert.isTrue(plan.valid);
         assert.isNotNull(plan.authorityHash);
         const commandId = randomUUID();
-        const publishInput = SchemaStrict.decodeUnknownSync(PublishEntryInput)({
+        const publishInput = Schema.decodeUnknownSync(PublishEntryInput, {
+          onExcessProperty: "error",
+        })({
           ...scope,
           commandId,
           authorityHash: plan.authorityHash,
@@ -762,13 +775,15 @@ describe("publication repository PostgreSQL integration", () => {
         const status = await Effect.runPromise(
           publications.getStatus(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(GetEntryPublicationStatusInput)(scope),
+            Schema.decodeUnknownSync(GetEntryPublicationStatusInput, { onExcessProperty: "error" })(
+              scope,
+            ),
           ),
         );
         const history = await Effect.runPromise(
           publications.list(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(ListEntryPublicationsInput)({
+            Schema.decodeUnknownSync(ListEntryPublicationsInput, { onExcessProperty: "error" })({
               ...scope,
               cursor: null,
               limit: 25,
@@ -782,7 +797,7 @@ describe("publication repository PostgreSQL integration", () => {
         const unpublished = await Effect.runPromise(
           publications.unpublish(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(UnpublishEntryInput)({
+            Schema.decodeUnknownSync(UnpublishEntryInput, { onExcessProperty: "error" })({
               ...scope,
               commandId: randomUUID(),
               expectedStateVersion: published.stateVersion,
@@ -825,7 +840,9 @@ describe("publication repository PostgreSQL integration", () => {
         );
         assert.strictEqual(failureTag(staleDeliveryCursor), "DeliveryCursorStaleFailure");
         const noOpCommandId = randomUUID();
-        const noOpInput = SchemaStrict.decodeUnknownSync(UnpublishEntryInput)({
+        const noOpInput = Schema.decodeUnknownSync(UnpublishEntryInput, {
+          onExcessProperty: "error",
+        })({
           ...scope,
           commandId: noOpCommandId,
           expectedStateVersion: unpublished.stateVersion,
@@ -850,7 +867,9 @@ describe("publication repository PostgreSQL integration", () => {
         const unpublishedStatus = await Effect.runPromise(
           publications.getStatus(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(GetEntryPublicationStatusInput)(scope),
+            Schema.decodeUnknownSync(GetEntryPublicationStatusInput, { onExcessProperty: "error" })(
+              scope,
+            ),
           ),
         );
         assert.strictEqual(noOp.resultKind, "no_op");
@@ -860,13 +879,17 @@ describe("publication repository PostgreSQL integration", () => {
           Effect.runPromise(
             publications.getStatus(
               ownerActor,
-              SchemaStrict.decodeUnknownSync(GetEntryPublicationStatusInput)(targetScope),
+              Schema.decodeUnknownSync(GetEntryPublicationStatusInput, {
+                onExcessProperty: "error",
+              })(targetScope),
             ),
           ),
           Effect.runPromise(
             publications.getStatus(
               ownerActor,
-              SchemaStrict.decodeUnknownSync(GetEntryPublicationStatusInput)(hindiTargetScope),
+              Schema.decodeUnknownSync(GetEntryPublicationStatusInput, {
+                onExcessProperty: "error",
+              })(hindiTargetScope),
             ),
           ),
         ]);
@@ -949,13 +972,17 @@ describe("publication repository PostgreSQL integration", () => {
           Effect.runPromise(
             publications.getStatus(
               ownerActor,
-              SchemaStrict.decodeUnknownSync(GetEntryPublicationStatusInput)(targetScope),
+              Schema.decodeUnknownSync(GetEntryPublicationStatusInput, {
+                onExcessProperty: "error",
+              })(targetScope),
             ),
           ),
           Effect.runPromise(
             publications.getStatus(
               ownerActor,
-              SchemaStrict.decodeUnknownSync(GetEntryPublicationStatusInput)(hindiTargetScope),
+              Schema.decodeUnknownSync(GetEntryPublicationStatusInput, {
+                onExcessProperty: "error",
+              })(hindiTargetScope),
             ),
           ),
         ]);
@@ -965,14 +992,16 @@ describe("publication repository PostgreSQL integration", () => {
         const hindiSharedPlan = await Effect.runPromise(
           publications.validate(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(ValidateEntryPublicationInput)(hindiTargetScope),
+            Schema.decodeUnknownSync(ValidateEntryPublicationInput, { onExcessProperty: "error" })(
+              hindiTargetScope,
+            ),
             new Date("2026-08-09T10:10:30.000Z"),
           ),
         );
         const hindiSharedPublished = await Effect.runPromise(
           publications.publish(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(PublishEntryInput)({
+            Schema.decodeUnknownSync(PublishEntryInput, { onExcessProperty: "error" })({
               ...hindiTargetScope,
               commandId: randomUUID(),
               authorityHash: hindiSharedPlan.authorityHash,
@@ -993,13 +1022,17 @@ describe("publication repository PostgreSQL integration", () => {
           Effect.runPromise(
             publications.getStatus(
               ownerActor,
-              SchemaStrict.decodeUnknownSync(GetEntryPublicationStatusInput)(targetScope),
+              Schema.decodeUnknownSync(GetEntryPublicationStatusInput, {
+                onExcessProperty: "error",
+              })(targetScope),
             ),
           ),
           Effect.runPromise(
             publications.getStatus(
               ownerActor,
-              SchemaStrict.decodeUnknownSync(GetEntryPublicationStatusInput)(hindiTargetScope),
+              Schema.decodeUnknownSync(GetEntryPublicationStatusInput, {
+                onExcessProperty: "error",
+              })(hindiTargetScope),
             ),
           ),
         ]);
@@ -1044,14 +1077,16 @@ describe("publication repository PostgreSQL integration", () => {
         const sourcePlanBeforeTargetUnpublish = await Effect.runPromise(
           publications.validate(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(ValidateEntryPublicationInput)(scope),
+            Schema.decodeUnknownSync(ValidateEntryPublicationInput, { onExcessProperty: "error" })(
+              scope,
+            ),
             new Date("2026-08-09T10:11:00.000Z"),
           ),
         );
         const targetUnpublishedBeforeResolution = await Effect.runPromise(
           publications.unpublish(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(UnpublishEntryInput)({
+            Schema.decodeUnknownSync(UnpublishEntryInput, { onExcessProperty: "error" })({
               ...targetScope,
               commandId: randomUUID(),
               expectedStateVersion: targetPublished.stateVersion,
@@ -1064,7 +1099,7 @@ describe("publication repository PostgreSQL integration", () => {
         const publishAfterTargetUnpublish = await Effect.runPromiseExit(
           publications.publish(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(PublishEntryInput)({
+            Schema.decodeUnknownSync(PublishEntryInput, { onExcessProperty: "error" })({
               ...scope,
               commandId: randomUUID(),
               authorityHash: sourcePlanBeforeTargetUnpublish.authorityHash,
@@ -1089,14 +1124,16 @@ describe("publication repository PostgreSQL integration", () => {
         const targetRepublishPlan = await Effect.runPromise(
           publications.validate(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(ValidateEntryPublicationInput)(targetScope),
+            Schema.decodeUnknownSync(ValidateEntryPublicationInput, { onExcessProperty: "error" })(
+              targetScope,
+            ),
             new Date("2026-08-09T10:12:00.000Z"),
           ),
         );
         const targetRepublished = await Effect.runPromise(
           publications.publish(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(PublishEntryInput)({
+            Schema.decodeUnknownSync(PublishEntryInput, { onExcessProperty: "error" })({
               ...targetScope,
               commandId: randomUUID(),
               authorityHash: targetRepublishPlan.authorityHash,
@@ -1119,7 +1156,9 @@ describe("publication repository PostgreSQL integration", () => {
         const sourcePlanAfterTargetRepublish = await Effect.runPromise(
           publications.validate(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(ValidateEntryPublicationInput)(scope),
+            Schema.decodeUnknownSync(ValidateEntryPublicationInput, { onExcessProperty: "error" })(
+              scope,
+            ),
             new Date("2026-08-09T10:12:30.000Z"),
           ),
         );
@@ -1137,7 +1176,7 @@ describe("publication repository PostgreSQL integration", () => {
             await Effect.runPromise(
               targetRepository.unpublish(
                 ownerActor,
-                SchemaStrict.decodeUnknownSync(UnpublishEntryInput)({
+                Schema.decodeUnknownSync(UnpublishEntryInput, { onExcessProperty: "error" })({
                   ...targetScope,
                   commandId: randomUUID(),
                   expectedStateVersion: targetRepublished.stateVersion,
@@ -1153,7 +1192,7 @@ describe("publication repository PostgreSQL integration", () => {
         const sourcePublishedBeforeTargetUnpublish = await Effect.runPromise(
           linearizedPublications.publish(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(PublishEntryInput)({
+            Schema.decodeUnknownSync(PublishEntryInput, { onExcessProperty: "error" })({
               ...scope,
               commandId: randomUUID(),
               authorityHash: sourcePlanAfterTargetRepublish.authorityHash,
@@ -1188,13 +1227,17 @@ describe("publication repository PostgreSQL integration", () => {
           Effect.runPromise(
             publications.getStatus(
               ownerActor,
-              SchemaStrict.decodeUnknownSync(GetEntryPublicationStatusInput)(scope),
+              Schema.decodeUnknownSync(GetEntryPublicationStatusInput, {
+                onExcessProperty: "error",
+              })(scope),
             ),
           ),
           Effect.runPromise(
             publications.getStatus(
               ownerActor,
-              SchemaStrict.decodeUnknownSync(GetEntryPublicationStatusInput)(targetScope),
+              Schema.decodeUnknownSync(GetEntryPublicationStatusInput, {
+                onExcessProperty: "error",
+              })(targetScope),
             ),
           ),
         ]);
@@ -1204,7 +1247,7 @@ describe("publication repository PostgreSQL integration", () => {
         const staleSameLocaleCommand = await Effect.runPromiseExit(
           publications.publish(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(PublishEntryInput)({
+            Schema.decodeUnknownSync(PublishEntryInput, { onExcessProperty: "error" })({
               ...scope,
               commandId: randomUUID(),
               authorityHash: sourcePlanAfterTargetRepublish.authorityHash,
@@ -1226,7 +1269,7 @@ describe("publication repository PostgreSQL integration", () => {
         const stalePublishVersusUnpublish = await Effect.runPromiseExit(
           publications.unpublish(
             ownerActor,
-            SchemaStrict.decodeUnknownSync(UnpublishEntryInput)({
+            Schema.decodeUnknownSync(UnpublishEntryInput, { onExcessProperty: "error" })({
               ...scope,
               commandId: randomUUID(),
               expectedStateVersion: sourcePlanAfterTargetRepublish.stateVersion,
@@ -1282,7 +1325,7 @@ describe("publication repository PostgreSQL integration", () => {
         failAfter: stage,
         onTransactionOpened: async (transaction) => {
           const result = await transaction.execute(sql`show transaction_isolation`);
-          const decoded = SchemaStrict.decodeUnknownSync(
+          const decoded = Schema.decodeUnknownSync(
             Schema.Struct({
               rows: Schema.Array(Schema.Struct({ transaction_isolation: Schema.String })),
             }),
@@ -1294,14 +1337,16 @@ describe("publication repository PostgreSQL integration", () => {
       const plan = await Effect.runPromise(
         repository.validate(
           ownerActor,
-          SchemaStrict.decodeUnknownSync(ValidateEntryPublicationInput)(scope),
+          Schema.decodeUnknownSync(ValidateEntryPublicationInput, { onExcessProperty: "error" })(
+            scope,
+          ),
           now,
         ),
       );
       const exit = await Effect.runPromiseExit(
         repository.publish(
           ownerActor,
-          SchemaStrict.decodeUnknownSync(PublishEntryInput)({
+          Schema.decodeUnknownSync(PublishEntryInput, { onExcessProperty: "error" })({
             ...scope,
             commandId: randomUUID(),
             authorityHash: plan.authorityHash,
@@ -1380,7 +1425,7 @@ describe("publication repository PostgreSQL integration", () => {
           const result = await transaction.execute(
             sql`select publication_event_sequence from cms_entry where id = ${currentEntryId} for update`,
           );
-          const decoded = SchemaStrict.decodeUnknownSync(
+          const decoded = Schema.decodeUnknownSync(
             Schema.Struct({
               rows: Schema.Array(Schema.Struct({ publication_event_sequence: Schema.Number })),
             }),
@@ -1439,12 +1484,15 @@ describe("publication repository PostgreSQL integration", () => {
     };
     const targetScope = { ...scope, entryId: currentTargetEntryId };
     const targetDraft = await Effect.runPromise(
-      entries.getDraft(ownerActor, SchemaStrict.decodeUnknownSync(GetEntryDraftInput)(targetScope)),
+      entries.getDraft(
+        ownerActor,
+        Schema.decodeUnknownSync(GetEntryDraftInput, { onExcessProperty: "error" })(targetScope),
+      ),
     );
     await Effect.runPromise(
       entries.saveDraft(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(SaveEntryDraftInput)({
+        Schema.decodeUnknownSync(SaveEntryDraftInput, { onExcessProperty: "error" })({
           ...targetScope,
           schemaRevisionId: currentPublished.id,
           contractHash: currentPublished.contractHash,
@@ -1475,7 +1523,9 @@ describe("publication repository PostgreSQL integration", () => {
         const targetPlan = await Effect.runPromise(
           publications.validate(
             managementActor,
-            SchemaStrict.decodeUnknownSync(ValidateEntryPublicationInput)(targetScope),
+            Schema.decodeUnknownSync(ValidateEntryPublicationInput, { onExcessProperty: "error" })(
+              targetScope,
+            ),
             new Date("2026-08-24T01:20:00.000Z"),
           ),
         );
@@ -1485,7 +1535,7 @@ describe("publication repository PostgreSQL integration", () => {
         await Effect.runPromise(
           publications.publish(
             managementActor,
-            SchemaStrict.decodeUnknownSync(PublishEntryInput)({
+            Schema.decodeUnknownSync(PublishEntryInput, { onExcessProperty: "error" })({
               ...targetScope,
               commandId: randomUUID(),
               authorityHash: targetPlan.authorityHash,
@@ -1505,7 +1555,9 @@ describe("publication repository PostgreSQL integration", () => {
         const plan = await Effect.runPromise(
           publications.validate(
             managementActor,
-            SchemaStrict.decodeUnknownSync(ValidateEntryPublicationInput)(scope),
+            Schema.decodeUnknownSync(ValidateEntryPublicationInput, { onExcessProperty: "error" })(
+              scope,
+            ),
             new Date("2026-08-24T01:20:01.000Z"),
           ),
         );
@@ -1516,7 +1568,7 @@ describe("publication repository PostgreSQL integration", () => {
         const published = await Effect.runPromise(
           publications.publish(
             managementActor,
-            SchemaStrict.decodeUnknownSync(PublishEntryInput)({
+            Schema.decodeUnknownSync(PublishEntryInput, { onExcessProperty: "error" })({
               ...scope,
               commandId: randomUUID(),
               authorityHash: plan.authorityHash,
@@ -1537,7 +1589,7 @@ describe("publication repository PostgreSQL integration", () => {
         await Effect.runPromise(
           publications.unpublish(
             managementActor,
-            SchemaStrict.decodeUnknownSync(UnpublishEntryInput)({
+            Schema.decodeUnknownSync(UnpublishEntryInput, { onExcessProperty: "error" })({
               ...scope,
               commandId: randomUUID(),
               expectedStateVersion: published.stateVersion,

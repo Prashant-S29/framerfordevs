@@ -1,5 +1,3 @@
-// Test-only public OAuth client for proving the Studio Code + S256 PKCE flow end to end.
-
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 const studioClientIdPattern =
@@ -190,7 +188,6 @@ function decodeTokenResponse(value: unknown): StudioOAuthTokenSet {
   return { accessToken, refreshToken, tokenType, expiresIn, scope };
 }
 
-/** Creates an in-memory, loopback-only public client for M18A compatibility evidence. */
 export function createStudioOAuthHarness(
   input: StudioOAuthHarnessConfiguration,
 ): StudioOAuthHarness {

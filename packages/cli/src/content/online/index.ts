@@ -1,5 +1,3 @@
-// Runs exact Authoring content workflows after all local files and flags are validated.
-
 import { authoringV1 } from "@framerfordevs/sdk/authoring";
 import { Effect, ManagedRuntime } from "effect";
 

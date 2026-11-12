@@ -1,5 +1,3 @@
-// Runs and cleans the approved 10,000-event no-endpoint canonical expansion baseline.
-
 import { randomUUID } from "node:crypto";
 
 import { db } from "@framerfordevs/db";

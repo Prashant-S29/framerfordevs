@@ -1,5 +1,3 @@
-// Runs isolated controlled-TLS webhook fan-out, throughput, slow-isolation, or retry-load gates.
-
 import { randomBytes, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";

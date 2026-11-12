@@ -1,6 +1,4 @@
-// Orchestrates strict public Preview authority, bearer verification, quotas, and audited reads.
-
-import { Clock, Effect } from "effect";
+import { Clock, Effect, Schema } from "effect";
 
 import type { CredentialPrincipal } from "../../contracts/access";
 import { ApiErrorDetail } from "../../contracts/response/api";
@@ -21,7 +19,6 @@ import { PreviewRepository } from "../../services/preview/repository";
 import { RateLimitManager } from "../../services/rate-limit/manager";
 import { observePreviewRead } from "./observation";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const bearerPattern = /^Bearer ([^\s,]+)$/u;
 const currentDate = Effect.map(Clock.currentTimeMillis, (millis) => new Date(millis));
 
@@ -45,10 +42,11 @@ export function makeCurrentPreviewRouteScope(input: {
   readonly rawQuery: string;
 }) {
   return Effect.gen(function* () {
-    const parsed = parseCurrentPreviewQuery(input.rawQuery);
+    const { rawQuery, ...route } = input;
+    const parsed = parseCurrentPreviewQuery(rawQuery);
     if (!parsed.ok) return yield* queryFailure(parsed.issues);
-    return yield* SchemaStrict.decodeUnknownEffect(PreviewRouteScope)({
-      ...input,
+    return yield* Schema.decodeUnknownEffect(PreviewRouteScope, { onExcessProperty: "error" })({
+      ...route,
       locale: parsed.value.locale,
     }).pipe(
       Effect.mapError(() =>
@@ -71,10 +69,13 @@ export function makeRevisionPreviewRouteScope(input: {
   readonly rawQuery: string;
 }) {
   return Effect.gen(function* () {
-    const parsed = parseRevisionPreviewQuery(input.rawQuery);
+    const { rawQuery, ...route } = input;
+    const parsed = parseRevisionPreviewQuery(rawQuery);
     if (!parsed.ok) return yield* queryFailure(parsed.issues);
-    return yield* SchemaStrict.decodeUnknownEffect(GetRevisionCredentialPreviewInput)({
-      ...input,
+    return yield* Schema.decodeUnknownEffect(GetRevisionCredentialPreviewInput, {
+      onExcessProperty: "error",
+    })({
+      ...route,
       locale: parsed.value.locale,
       sharedRevisionId: parsed.value.sharedRevision === "none" ? null : parsed.value.sharedRevision,
       localizedRevisionId:

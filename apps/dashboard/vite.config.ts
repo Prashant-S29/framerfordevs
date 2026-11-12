@@ -1,5 +1,3 @@
-// Builds the dashboard and provides only its approved same-origin reverse-proxy ingress paths.
-
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";

@@ -1,9 +1,8 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Schema } from "effect";
 
 import { makeCredentialStore, StoredOAuthAuthority } from "./index";
 
-import * as SchemaStrict from "../schema-strict";
 function memoryStore() {
   const values = new Map<string, string>();
   const accounts: Array<string> = [];
@@ -21,7 +20,7 @@ function memoryStore() {
   return { store, values, accounts };
 }
 
-const authority = SchemaStrict.decodeUnknownSync(StoredOAuthAuthority)({
+const authority = Schema.decodeUnknownSync(StoredOAuthAuthority, { onExcessProperty: "error" })({
   version: 1,
   accessToken: "access-secret",
   refreshToken: "refresh-secret",

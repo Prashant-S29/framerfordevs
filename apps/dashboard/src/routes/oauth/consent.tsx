@@ -1,5 +1,3 @@
-// Renders the dashboard-hosted consent decision required by the public API OAuth flow.
-
 import { Button } from "@framerfordevs/ui/components/button";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -20,23 +18,19 @@ interface ConsentClientProjection {
 
 export function OAuthConsentPage() {
   const session = authClient.useSession();
+  const [clientId] = useState(() => new URLSearchParams(window.location.search).get("client_id"));
   const [pending, setPending] = useState<"approve" | "deny" | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(() =>
+    clientId ? null : "This authorization request is invalid. Restart the login flow.",
+  );
   const [client, setClient] = useState<ConsentClientProjection | null>(null);
-  const [clientPending, setClientPending] = useState(true);
+  const [clientPending, setClientPending] = useState(() => Boolean(clientId));
   const headingRef = useRef<HTMLHeadingElement>(null);
   const messageRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
+    if (!clientId) return;
     let active = true;
-    const clientId = new URLSearchParams(window.location.search).get("client_id");
-    if (!clientId) {
-      setClientPending(false);
-      setMessage("This authorization request is invalid. Restart the login flow.");
-      return () => {
-        active = false;
-      };
-    }
     void authClient.oauth2
       .publicClientPrelogin({ client_id: clientId })
       .then((result) => {
@@ -63,7 +57,7 @@ export function OAuthConsentPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [clientId]);
 
   useEffect(() => {
     if (session.isPending || clientPending || !session.data?.user) return;

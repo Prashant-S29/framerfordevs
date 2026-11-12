@@ -18,7 +18,6 @@ const publicationActions = new Set([
   "cms.entry.locale.unpublished",
 ]);
 
-/** Classifies existing and future bounded audit actions without hiding unknown history. */
 export function projectAuditCategory(action: string): ProjectAuditCategory {
   if (
     action === "project.audit.read" ||

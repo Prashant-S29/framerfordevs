@@ -26,8 +26,7 @@ import {
   WorkspaceId,
 } from "../platform";
 
-import * as SchemaStrict from "../../lib/schema-strict";
-import { UuidValue } from "../uuid";
+import { Uuid } from "../uuid";
 const apiKeyPattern = /^[a-z][a-z0-9_]{0,62}$/u;
 const digestPattern = /^[0-9a-f]{64}$/u;
 
@@ -93,21 +92,19 @@ const CmsApiKey = NormalizedString.check(
   ),
 );
 
-export const CollectionId = UuidValue.pipe(Schema.brand("CollectionId"));
+export const CollectionId = Uuid.pipe(Schema.brand("CollectionId"));
 export type CollectionId = typeof CollectionId.Type;
 
-export const CollectionFieldId = UuidValue.pipe(Schema.brand("CollectionFieldId"));
+export const CollectionFieldId = Uuid.pipe(Schema.brand("CollectionFieldId"));
 export type CollectionFieldId = typeof CollectionFieldId.Type;
 
-export const SchemaRevisionId = UuidValue.pipe(Schema.brand("SchemaRevisionId"));
+export const SchemaRevisionId = Uuid.pipe(Schema.brand("SchemaRevisionId"));
 export type SchemaRevisionId = typeof SchemaRevisionId.Type;
 
-export const OutboxEventId = UuidValue.pipe(Schema.brand("OutboxEventId"));
+export const OutboxEventId = Uuid.pipe(Schema.brand("OutboxEventId"));
 export type OutboxEventId = typeof OutboxEventId.Type;
 
-export const SchemaPublicationCommandId = UuidValue.pipe(
-  Schema.brand("SchemaPublicationCommandId"),
-);
+export const SchemaPublicationCommandId = Uuid.pipe(Schema.brand("SchemaPublicationCommandId"));
 export type SchemaPublicationCommandId = typeof SchemaPublicationCommandId.Type;
 
 export const CollectionApiKey = CmsApiKey.pipe(Schema.brand("CollectionApiKey"));
@@ -315,7 +312,6 @@ const CollectionFieldChildren = Schema.Array(
   ).annotate({ identifier: "CollectionFieldDefinition" }),
 ).check(Schema.isMaxLength(fieldSystemLimits.directObjectProperties));
 
-/** Builds one strict kind-correlated recursive field-definition variant. */
 function collectionFieldVariant<Kind extends CollectionFieldKind, Encoded, Requirements>(
   kind: Kind,
   configuration: Schema.Codec<FieldConfigurationByKind[Kind], Encoded, Requirements>,
@@ -334,7 +330,7 @@ function collectionFieldVariant<Kind extends CollectionFieldKind, Encoded, Requi
     editor: FieldEditorMetadata,
     configuration,
     children: CollectionFieldChildren,
-  }).annotate({ closedObject: true });
+  });
 }
 
 export const CollectionFieldDefinition: Schema.Codec<
@@ -395,7 +391,6 @@ export type CollectionFieldMutationEncoded = {
   };
 }[CollectionFieldKind];
 
-/** Builds one strict kind-correlated field-mutation variant. */
 function collectionFieldMutationVariant<Kind extends CollectionFieldKind, Encoded, Requirements>(
   kind: Kind,
   configuration: Schema.Codec<FieldConfigurationByKind[Kind], Encoded, Requirements>,
@@ -409,7 +404,7 @@ function collectionFieldMutationVariant<Kind extends CollectionFieldKind, Encode
     deprecated: Schema.Boolean,
     editor: FieldEditorMetadata,
     configuration,
-  }).annotate({ closedObject: true });
+  });
 }
 
 export const CollectionFieldMutation: Schema.Codec<
@@ -473,7 +468,6 @@ const CollectionFieldAuthoringChildren = Schema.Array(
   ).annotate({ identifier: "CollectionFieldAuthoringNode" }),
 ).check(Schema.isMaxLength(fieldSystemLimits.directObjectProperties));
 
-/** Builds one strict kind-correlated recursive field-authoring variant. */
 function collectionFieldAuthoringVariant<Kind extends CollectionFieldKind, Encoded, Requirements>(
   kind: Kind,
   configuration: Schema.Codec<FieldConfigurationByKind[Kind], Encoded, Requirements>,
@@ -489,7 +483,7 @@ function collectionFieldAuthoringVariant<Kind extends CollectionFieldKind, Encod
     editor: FieldEditorMetadata,
     configuration,
     children: CollectionFieldAuthoringChildren,
-  }).annotate({ closedObject: true });
+  });
 }
 
 export const CollectionFieldAuthoringNode: Schema.Codec<
@@ -845,35 +839,42 @@ export class CmsCollectionPage extends Schema.Class<CmsCollectionPage>("CmsColle
   nextCursor: Schema.NullOr(Cursor),
 }) {}
 
-export const ListCollectionsInputSchema = SchemaStrict.toStandardSchemaV1(ListCollectionsInput);
-export const GetCollectionInputSchema = SchemaStrict.toStandardSchemaV1(GetCollectionInput);
-export const GetCollectionDraftInputSchema =
-  SchemaStrict.toStandardSchemaV1(GetCollectionDraftInput);
-export const GetLatestPublishedSchemaInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ListCollectionsInputSchema = Schema.toStandardSchemaV1(ListCollectionsInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const GetCollectionInputSchema = Schema.toStandardSchemaV1(GetCollectionInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const GetCollectionDraftInputSchema = Schema.toStandardSchemaV1(GetCollectionDraftInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const GetLatestPublishedSchemaInputSchema = Schema.toStandardSchemaV1(
   GetLatestPublishedSchemaInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const GetPublishedSchemaRevisionInputSchema = SchemaStrict.toStandardSchemaV1(
+export const GetPublishedSchemaRevisionInputSchema = Schema.toStandardSchemaV1(
   GetPublishedSchemaRevisionInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const GetDraftGeneratedFormInputSchema = SchemaStrict.toStandardSchemaV1(
+export const GetDraftGeneratedFormInputSchema = Schema.toStandardSchemaV1(
   GetDraftGeneratedFormInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const GetPublishedGeneratedFormInputSchema = SchemaStrict.toStandardSchemaV1(
+export const GetPublishedGeneratedFormInputSchema = Schema.toStandardSchemaV1(
   GetPublishedGeneratedFormInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
 
-export const CmsCollectionOutputSchema = SchemaStrict.toStandardSchemaV1(
-  ApiSuccessSchema(CmsCollection),
-);
-export const CmsCollectionPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const CmsCollectionOutputSchema = Schema.toStandardSchemaV1(ApiSuccessSchema(CmsCollection));
+export const CmsCollectionPageOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(CmsCollectionPage),
 );
-export const CollectionDraftSchemaOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const CollectionDraftSchemaOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(CollectionDraftSchema),
 );
-export const PublishedSchemaRevisionOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const PublishedSchemaRevisionOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(PublishedSchemaRevision),
 );
-export const GeneratedFormDefinitionOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const GeneratedFormDefinitionOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(GeneratedFormDefinition),
 );

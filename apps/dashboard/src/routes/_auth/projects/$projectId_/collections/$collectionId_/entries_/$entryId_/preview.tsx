@@ -1,5 +1,3 @@
-// Routes credential-free dashboard Preview with strict URL-authoritative current or historical source state.
-
 import { Button, buttonVariants } from "@framerfordevs/ui/components/button";
 import { createFileRoute, Link } from "@tanstack/react-router";
 

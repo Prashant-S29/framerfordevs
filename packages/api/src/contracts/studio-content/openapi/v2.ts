@@ -1,5 +1,3 @@
-// Generates the complete Studio Content v2 successor without mutating immutable v1 bytes.
-
 import { Schema } from "effect";
 
 import { make as makeJsonSchema } from "../../response/json-schema";

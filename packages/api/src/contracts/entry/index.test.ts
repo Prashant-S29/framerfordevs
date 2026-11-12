@@ -1,7 +1,5 @@
-// Verifies bounded M7 entry inputs, stable identities, conflict metadata, and OpenAPI conversion.
-
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Schema } from "effect";
 
 import { ApiErrorDetail } from "../response/api";
 import { EffectSchemaToJsonSchemaConverter } from "../response/effect-schema-converter";
@@ -28,7 +26,6 @@ import {
   SaveEntryDraftResultOutputSchema,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const collectionId = "019fae8b-1234-7000-8000-000000000003";
@@ -48,21 +45,33 @@ const scope = {
 describe("entry contracts", () => {
   it.effect("brands entry identities and permits missing-head version zero", () =>
     Effect.gen(function* () {
-      assert.strictEqual(yield* SchemaStrict.decodeUnknownEffect(EntryId)(entryId), entryId);
       assert.strictEqual(
-        yield* SchemaStrict.decodeUnknownEffect(EntryCommandId)(commandId),
+        yield* Schema.decodeUnknownEffect(EntryId, { onExcessProperty: "error" })(entryId),
+        entryId,
+      );
+      assert.strictEqual(
+        yield* Schema.decodeUnknownEffect(EntryCommandId, { onExcessProperty: "error" })(commandId),
         commandId,
       );
-      assert.strictEqual(yield* SchemaStrict.decodeUnknownEffect(EntryDraftVersion)(0), 0);
+      assert.strictEqual(
+        yield* Schema.decodeUnknownEffect(EntryDraftVersion, { onExcessProperty: "error" })(0),
+        0,
+      );
       assert.isTrue(
-        Exit.isFailure(yield* Effect.exit(SchemaStrict.decodeUnknownEffect(EntryDraftVersion)(-1))),
+        Exit.isFailure(
+          yield* Effect.exit(
+            Schema.decodeUnknownEffect(EntryDraftVersion, { onExcessProperty: "error" })(-1),
+          ),
+        ),
       );
     }),
   );
 
   it.effect("accepts bounded stable-path mutations for both draft partitions", () =>
     Effect.gen(function* () {
-      const decoded = yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
+      const decoded = yield* Schema.decodeUnknownEffect(SaveEntryDraftInput, {
+        onExcessProperty: "error",
+      })({
         ...scope,
         entryId,
         schemaRevisionId,
@@ -90,7 +99,9 @@ describe("entry contracts", () => {
         { operation: "merge", path: [fieldId], value: "x" },
       ];
       const exits = yield* Effect.forEach(inputs, (input) =>
-        Effect.exit(SchemaStrict.decodeUnknownEffect(EntryValueMutation)(input)),
+        Effect.exit(
+          Schema.decodeUnknownEffect(EntryValueMutation, { onExcessProperty: "error" })(input),
+        ),
       );
 
       assert.isTrue(exits.every(Exit.isFailure));
@@ -99,13 +110,19 @@ describe("entry contracts", () => {
 
   it.effect("retains the shared PageLimit ceiling for entries and revisions", () =>
     Effect.gen(function* () {
-      const accepted = yield* SchemaStrict.decodeUnknownEffect(ListEntriesInput)({
+      const accepted = yield* Schema.decodeUnknownEffect(ListEntriesInput, {
+        onExcessProperty: "error",
+      })({
         ...scope,
         cursor: null,
         limit: 50,
       });
       const rejected = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ListEntriesInput)({ ...scope, cursor: null, limit: 51 }),
+        Schema.decodeUnknownEffect(ListEntriesInput, { onExcessProperty: "error" })({
+          ...scope,
+          cursor: null,
+          limit: 51,
+        }),
       );
 
       assert.strictEqual(accepted.limit, 50);
@@ -117,7 +134,7 @@ describe("entry contracts", () => {
     Effect.gen(function* () {
       const mutation = { operation: "unset", path: [fieldId] } as const;
       const tooMany = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
+        Schema.decodeUnknownEffect(SaveEntryDraftInput, { onExcessProperty: "error" })({
           ...scope,
           entryId,
           schemaRevisionId,
@@ -130,7 +147,7 @@ describe("entry contracts", () => {
         }),
       );
       const tooDeep = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(EntryValueMutation)({
+        Schema.decodeUnknownEffect(EntryValueMutation, { onExcessProperty: "error" })({
           operation: "unset",
           path: Array.from({ length: 17 }, () => fieldId),
         }),
@@ -143,14 +160,18 @@ describe("entry contracts", () => {
 
   it.effect("decodes create authority and structured draft-conflict metadata", () =>
     Effect.gen(function* () {
-      const created = yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
+      const created = yield* Schema.decodeUnknownEffect(CreateEntryInput, {
+        onExcessProperty: "error",
+      })({
         ...scope,
         displayName: "  Homepage é  ",
         schemaRevisionId,
         contractHash,
         commandId,
       });
-      const detail = yield* SchemaStrict.decodeUnknownEffect(ApiErrorDetail)({
+      const detail = yield* Schema.decodeUnknownEffect(ApiErrorDetail, {
+        onExcessProperty: "error",
+      })({
         path: "sharedVersion",
         code: "stale_shared_version",
         message: "The shared draft changed.",
@@ -160,14 +181,18 @@ describe("entry contracts", () => {
         currentRevisionId: schemaRevisionId,
       });
 
-      const renamed = yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
+      const renamed = yield* Schema.decodeUnknownEffect(RenameEntryInput, {
+        onExcessProperty: "error",
+      })({
         ...scope,
         entryId,
         displayName: "Homepage",
         expectedNameVersion: 1,
       });
       const invalidName = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(EntryDisplayName)("Bad\u0000name"),
+        Schema.decodeUnknownEffect(EntryDisplayName, { onExcessProperty: "error" })(
+          "Bad\u0000name",
+        ),
       );
 
       assert.strictEqual(created.locale, "hi");

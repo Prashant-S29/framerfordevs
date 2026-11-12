@@ -90,8 +90,8 @@ fi
 if { docker image history --no-trunc framerfordevs-server; docker image history --no-trunc framerfordevs-worker; } 2>&1 | grep -F -e "$key_one" -e "$key_two" >/dev/null; then
   exit 1
 fi
-docker run --rm --entrypoint sh framerfordevs-server -c 'test ! -e /app/delivery-load.env && test ! -e /app/preview-load.env' >/dev/null
-docker run --rm --entrypoint sh framerfordevs-worker -c 'test ! -e /app/delivery-load.env && test ! -e /app/preview-load.env' >/dev/null
+docker run --rm --entrypoint sh framerfordevs-server -c 'test ! -e /app/apps/server/load/delivery.env && test ! -e /app/apps/server/load/preview.env' >/dev/null
+docker run --rm --entrypoint sh framerfordevs-worker -c 'test ! -e /app/apps/server/load/delivery.env && test ! -e /app/apps/server/load/preview.env' >/dev/null
 
 process_count="$(docker exec framerfordevs-postgres psql -U postgres -d framerfordevs -Atc "select count(*) from webhook_endpoint where id = '$endpoint_id'")"
 if [[ "$process_count" != "1" ]]; then

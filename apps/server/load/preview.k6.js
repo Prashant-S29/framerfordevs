@@ -1,4 +1,3 @@
-// Exercises the approved M10 Preview capacity and resilience gates as separate profiles.
 import http from "k6/http";
 import execution from "k6/execution";
 import { check } from "k6";

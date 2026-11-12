@@ -1,5 +1,3 @@
-// Exercises the strict raw Delivery list grammar, typed values, bounds, and canonical query authority.
-
 import { describe, expect, it } from "vitest";
 
 import { parseDeliveryListQuery, type DeliveryQueryCapability } from "./index";

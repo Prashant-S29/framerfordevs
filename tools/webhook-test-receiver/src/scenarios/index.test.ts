@@ -1,5 +1,3 @@
-// Locks deterministic HTTP behavior for every real-network webhook receiver scenario.
-
 import assert from "node:assert/strict";
 import { test } from "node:test";
 

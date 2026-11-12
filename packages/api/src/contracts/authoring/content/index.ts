@@ -1,5 +1,3 @@
-// Defines tenant-neutral exact-locale Authoring entry read and draft contracts.
-
 import { Schema } from "effect";
 
 import { ApiSuccessSchema } from "../../response/api";
@@ -99,10 +97,7 @@ export class AuthoringEntryDraft extends Schema.Class<AuthoringEntryDraft>("Auth
 export const AuthoringListEntriesQuery = Schema.Struct({
   cursor: Schema.NullOr(Cursor),
   limit: PageLimit,
-}).annotate({
-  identifier: "AuthoringListEntriesQuery",
-  closedObject: true,
-});
+}).annotate({ identifier: "AuthoringListEntriesQuery" });
 export type AuthoringListEntriesQuery = typeof AuthoringListEntriesQuery.Type;
 
 export const AuthoringCreateEntryRequest = Schema.Struct({
@@ -111,19 +106,13 @@ export const AuthoringCreateEntryRequest = Schema.Struct({
   contractHash: ContractHash,
   commandId: EntryCommandId,
   mutations: Schema.Array(AuthoringValueMutation).check(Schema.isMaxLength(500)),
-}).annotate({
-  identifier: "AuthoringCreateEntryRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "AuthoringCreateEntryRequest" });
 export type AuthoringCreateEntryRequest = typeof AuthoringCreateEntryRequest.Type;
 
 export const AuthoringRenameEntryRequest = Schema.Struct({
   displayName: EntryDisplayName,
   expectedNameVersion: EntryNameVersion,
-}).annotate({
-  identifier: "AuthoringRenameEntryRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "AuthoringRenameEntryRequest" });
 export type AuthoringRenameEntryRequest = typeof AuthoringRenameEntryRequest.Type;
 
 export const AuthoringSaveEntryDraftRequest = Schema.Struct({
@@ -133,10 +122,7 @@ export const AuthoringSaveEntryDraftRequest = Schema.Struct({
   expectedSharedVersion: EntryDraftVersion,
   expectedLocalizedVersion: EntryDraftVersion,
   mutations: AuthoringValueMutations,
-}).annotate({
-  identifier: "AuthoringSaveEntryDraftRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "AuthoringSaveEntryDraftRequest" });
 export type AuthoringSaveEntryDraftRequest = typeof AuthoringSaveEntryDraftRequest.Type;
 
 export class AuthoringCreateEntryResult extends Schema.Class<AuthoringCreateEntryResult>(

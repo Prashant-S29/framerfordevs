@@ -1,5 +1,3 @@
-// Narrows Tooling bearer credentials into OAuth-user or exact management-credential principals.
-
 import {
   type CliApiOAuthScope,
   TOOLING_READ_SCOPE,
@@ -37,7 +35,6 @@ export interface AuthenticateToolingBearerInput {
   readonly managementScopes?: ReadonlyArray<CredentialScope>;
 }
 
-/** Adapts Better Auth's protocol verifier into the application Effect error boundary. */
 export function makeToolingOAuthTokenVerifier(
   verify: (token: string, requiredScope: CliApiOAuthScope) => Promise<ToolingOAuthPrincipal | null>,
 ) {
@@ -64,7 +61,6 @@ export const ToolingOAuthTokenVerifierLive = Layer.succeed(
   makeToolingOAuthTokenVerifier(verifyToolingOAuthAccessToken),
 );
 
-/** Selects only the two approved Tooling bearer authorities without credential fallback. */
 export function makeToolingPrincipalAuthenticator<
   ManagementError,
   OAuthError,

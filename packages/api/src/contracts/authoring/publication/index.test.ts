@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Schema } from "effect";
 
 import {
   AuthoringPublicationStatus,
@@ -8,13 +8,14 @@ import {
   AuthoringValidatePublicationRequest,
 } from "./index";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const id = "019fae8b-1234-7000-8000-000000000001";
 
 describe("authoring publication contracts", () => {
   it.effect("keeps publication commands exact and closed", () =>
     Effect.gen(function* () {
-      const publish = yield* SchemaStrict.decodeUnknownEffect(AuthoringPublishEntryRequest)({
+      const publish = yield* Schema.decodeUnknownEffect(AuthoringPublishEntryRequest, {
+        onExcessProperty: "error",
+      })({
         commandId: id,
         authorityHash: "a".repeat(64),
         expectedStateVersion: 0,
@@ -26,14 +27,17 @@ describe("authoring publication contracts", () => {
         expectedLocalizedVersion: 0,
         expectedLocalizedRevisionId: null,
       });
-      const emptyValidation = yield* SchemaStrict.decodeUnknownEffect(
+      const emptyValidation = yield* Schema.decodeUnknownEffect(
         AuthoringValidatePublicationRequest,
+        { onExcessProperty: "error" },
       )({});
       const excessValidation = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(AuthoringValidatePublicationRequest)({ force: true }),
+        Schema.decodeUnknownEffect(AuthoringValidatePublicationRequest, {
+          onExcessProperty: "error",
+        })({ force: true }),
       );
       const excess = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(AuthoringUnpublishEntryRequest)({
+        Schema.decodeUnknownEffect(AuthoringUnpublishEntryRequest, { onExcessProperty: "error" })({
           commandId: id,
           expectedStateVersion: 0,
           expectedPublicationId: null,
@@ -49,7 +53,9 @@ describe("authoring publication contracts", () => {
 
   it.effect("excludes actor and tenant metadata from publication status", () =>
     Effect.gen(function* () {
-      const status = yield* SchemaStrict.decodeUnknownEffect(AuthoringPublicationStatus)({
+      const status = yield* Schema.decodeUnknownEffect(AuthoringPublicationStatus, {
+        onExcessProperty: "error",
+      })({
         entryId: id,
         locale: "en-US",
         state: "unpublished",

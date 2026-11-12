@@ -1,5 +1,3 @@
-// Defines typed application failures and their centralized public HTTP/error-envelope mapping.
-
 import { Schema } from "effect";
 
 import { ApiErrorDetail, type ApiErrorCode, type ApiFailure, apiFailure } from "../api";

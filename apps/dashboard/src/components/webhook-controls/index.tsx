@@ -1,10 +1,8 @@
-// Provides safe endpoint, subscription, secret-rotation, and invalidation-mapping controls.
-
 import type {
   InvalidationRouteMapping,
   WebhookEndpoint,
   WebhookPublicEventType,
-} from "@framerfordevs/api/contracts/webhook/index";
+} from "@framerfordevs/api/contracts/webhook";
 import {
   AlertDialog,
   AlertDialogAction,

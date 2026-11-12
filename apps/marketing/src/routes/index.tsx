@@ -1,5 +1,3 @@
-// Renders the deliberately minimal public product landing page.
-
 import { env } from "@framerfordevs/env/marketing";
 import { buttonVariants } from "@framerfordevs/ui/components/button";
 import { createFileRoute } from "@tanstack/react-router";

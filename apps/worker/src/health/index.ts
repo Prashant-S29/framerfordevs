@@ -1,5 +1,3 @@
-// Exposes dependency-free liveness and fail-closed readiness without outbound DNS or HTTP.
-
 import { createServer } from "node:http";
 
 export interface WorkerHealthChecks {

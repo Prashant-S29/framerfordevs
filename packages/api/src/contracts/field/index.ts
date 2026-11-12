@@ -1,12 +1,10 @@
-// Defines the schema-backed M6 field vocabulary, structured values, editor metadata, and limits.
-
 import { Schema } from "effect";
 
 import { ProjectRole } from "../access";
 import { fieldSystemLimits, fieldSystemValidationProfile } from "../../lib/field/profile";
 import { iso4217MinorUnits, iso4217RegistryProfile } from "../../registry/iso-4217.generated";
 
-import { Uuid, UuidValue } from "../uuid";
+import { Uuid } from "../uuid";
 export const collectionFieldKindValues = [
   "short_text",
   "long_text",
@@ -39,7 +37,6 @@ export const fieldLocalizationValues = ["localized", "shared", "mixed"] as const
 export const FieldLocalization = Schema.Literals(fieldLocalizationValues);
 export type FieldLocalization = typeof FieldLocalization.Type;
 
-/** Builds an exact optional bounded string property for field defaults. */
 const OptionalStringDefault = (maximum: number) =>
   Schema.optionalKey(Schema.String.check(Schema.isMaxLength(maximum)));
 const OptionalNumberDefault = Schema.optionalKey(Schema.Number);
@@ -63,7 +60,6 @@ export type ExactDecimalValue = typeof ExactDecimalValue.Type;
 const Iso4217CurrencyCode = Schema.String.check(
   Schema.isBetweenLength(3, 3),
   Schema.makeFilter((value) => Object.hasOwn(iso4217MinorUnits, value), {
-    /** Describes an unsupported or retired currency without leaking input. */
     message: "Use a supported active ISO 4217 currency code.",
   }),
 ).pipe(Schema.brand("Iso4217CurrencyCode"));
@@ -72,7 +68,6 @@ export type Iso4217CurrencyCode = typeof Iso4217CurrencyCode.Type;
 const UniqueProjectRoles = Schema.Array(ProjectRole).check(
   Schema.isMaxLength(7),
   Schema.makeFilter((roles) => new Set(roles).size === roles.length, {
-    /** Describes duplicate role metadata. */
     message: "Project roles must be unique.",
   }),
 );
@@ -83,10 +78,10 @@ export class FieldEditorMetadata extends Schema.Class<FieldEditorMetadata>("Fiel
     placeholder: Schema.NullOr(Schema.String.check(Schema.isMaxLength(200))),
     visibleToRoles: UniqueProjectRoles,
     editableByRoles: UniqueProjectRoles,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
-export const EditorLayoutNodeId = UuidValue.pipe(Schema.brand("EditorLayoutNodeId"));
+export const EditorLayoutNodeId = Uuid.pipe(Schema.brand("EditorLayoutNodeId"));
 export type EditorLayoutNodeId = typeof EditorLayoutNodeId.Type;
 
 const LayoutTitle = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100));
@@ -102,7 +97,7 @@ export class EditorFieldPlacement extends Schema.Class<EditorFieldPlacement>(
     position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 99 })),
     helpTextOverride: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
     visibleToRoles: VisibleProjectRoles,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class EditorLayoutGroup extends Schema.Class<EditorLayoutGroup>("EditorLayoutGroup")(
@@ -114,7 +109,7 @@ export class EditorLayoutGroup extends Schema.Class<EditorLayoutGroup>("EditorLa
     columns: Schema.Literals([1, 2]),
     visibleToRoles: VisibleProjectRoles,
     fields: Schema.Array(EditorFieldPlacement).check(Schema.isMaxLength(100)),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class EditorLayoutTab extends Schema.Class<EditorLayoutTab>("EditorLayoutTab")(
@@ -125,7 +120,7 @@ export class EditorLayoutTab extends Schema.Class<EditorLayoutTab>("EditorLayout
     position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 9 })),
     visibleToRoles: VisibleProjectRoles,
     groups: Schema.Array(EditorLayoutGroup).check(Schema.isMinLength(1), Schema.isMaxLength(20)),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class EditorLayout extends Schema.Class<EditorLayout>("EditorLayout")(
@@ -133,7 +128,7 @@ export class EditorLayout extends Schema.Class<EditorLayout>("EditorLayout")(
     version: Schema.Literal(1),
     tabs: Schema.Array(EditorLayoutTab).check(Schema.isMinLength(1), Schema.isMaxLength(10)),
     sidebarGroups: Schema.Array(EditorLayoutGroup).check(Schema.isMaxLength(10)),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const ShortTextConfiguration = Schema.Struct({
@@ -141,10 +136,7 @@ export const ShortTextConfiguration = Schema.Struct({
   maxLength: OptionalInteger,
   pattern: OptionalSafePattern,
   default: OptionalStringDefault(500),
-}).annotate({
-  identifier: "ShortTextConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "ShortTextConfiguration" });
 export type ShortTextConfiguration = typeof ShortTextConfiguration.Type;
 
 export const LongTextConfiguration = Schema.Struct({
@@ -152,10 +144,7 @@ export const LongTextConfiguration = Schema.Struct({
   maxLength: OptionalInteger,
   pattern: OptionalSafePattern,
   default: OptionalStringDefault(50_000),
-}).annotate({
-  identifier: "LongTextConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "LongTextConfiguration" });
 export type LongTextConfiguration = typeof LongTextConfiguration.Type;
 
 export const NumberConfiguration = Schema.Struct({
@@ -163,10 +152,7 @@ export const NumberConfiguration = Schema.Struct({
   minimum: OptionalNumberDefault,
   maximum: OptionalNumberDefault,
   default: OptionalNumberDefault,
-}).annotate({
-  identifier: "NumberConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "NumberConfiguration" });
 export type NumberConfiguration = typeof NumberConfiguration.Type;
 
 export const DecimalConfiguration = Schema.Struct({
@@ -179,24 +165,20 @@ export const DecimalConfiguration = Schema.Struct({
   minimum: Schema.optionalKey(ExactDecimalValue),
   maximum: Schema.optionalKey(ExactDecimalValue),
   default: Schema.optionalKey(ExactDecimalValue),
-}).annotate({
-  identifier: "DecimalConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "DecimalConfiguration" });
 export type DecimalConfiguration = typeof DecimalConfiguration.Type;
 
 export class MoneyValue extends Schema.Class<MoneyValue>("MoneyValue")(
   Schema.Struct({
     amount: ExactDecimalValue,
     currency: Iso4217CurrencyCode,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const MoneyCurrencies = Schema.Array(Iso4217CurrencyCode).check(
   Schema.isMinLength(1),
   Schema.isMaxLength(50),
   Schema.makeFilter((currencies) => new Set(currencies).size === currencies.length, {
-    /** Describes duplicate money currency configuration. */
     message: "Money currencies must be unique.",
   }),
 );
@@ -206,41 +188,29 @@ export const MoneyConfiguration = Schema.Struct({
   currencies: MoneyCurrencies,
   allowNegative: Schema.optionalKey(Schema.Boolean),
   default: Schema.optionalKey(MoneyValue),
-}).annotate({
-  identifier: "MoneyConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "MoneyConfiguration" });
 export type MoneyConfiguration = typeof MoneyConfiguration.Type;
 
 export const BooleanConfiguration = Schema.Struct({
   default: OptionalBooleanDefault,
-}).annotate({
-  identifier: "BooleanConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "BooleanConfiguration" });
 export type BooleanConfiguration = typeof BooleanConfiguration.Type;
 
 export const DateConfiguration = Schema.Struct({
   minimum: Schema.optionalKey(DateValue),
   maximum: Schema.optionalKey(DateValue),
   default: Schema.optionalKey(DateValue),
-}).annotate({
-  identifier: "DateConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "DateConfiguration" });
 export type DateConfiguration = typeof DateConfiguration.Type;
 
 export const DateTimeConfiguration = Schema.Struct({
   minimum: Schema.optionalKey(DateTimeValue),
   maximum: Schema.optionalKey(DateTimeValue),
   default: Schema.optionalKey(DateTimeValue),
-}).annotate({
-  identifier: "DateTimeConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "DateTimeConfiguration" });
 export type DateTimeConfiguration = typeof DateTimeConfiguration.Type;
 
-export const EnumOptionId = UuidValue.pipe(Schema.brand("EnumOptionId"));
+export const EnumOptionId = Uuid.pipe(Schema.brand("EnumOptionId"));
 export type EnumOptionId = typeof EnumOptionId.Type;
 
 export const EnumOptionValue = Schema.String.check(
@@ -256,32 +226,23 @@ export class EnumOption extends Schema.Class<EnumOption>("EnumOption")(
     value: EnumOptionValue,
     label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
     position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 99 })),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const EnumConfiguration = Schema.Struct({
   options: Schema.Array(EnumOption).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
   default: Schema.optionalKey(EnumOptionValue),
-}).annotate({
-  identifier: "EnumConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "EnumConfiguration" });
 export type EnumConfiguration = typeof EnumConfiguration.Type;
 
 export const UrlConfiguration = Schema.Struct({
   default: OptionalStringDefault(2_048),
-}).annotate({
-  identifier: "UrlConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "UrlConfiguration" });
 export type UrlConfiguration = typeof UrlConfiguration.Type;
 
 export const EmailConfiguration = Schema.Struct({
   default: OptionalStringDefault(254),
-}).annotate({
-  identifier: "EmailConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "EmailConfiguration" });
 export type EmailConfiguration = typeof EmailConfiguration.Type;
 
 export const SlugConfiguration = Schema.Struct({
@@ -289,28 +250,19 @@ export const SlugConfiguration = Schema.Struct({
   maxLength: OptionalInteger,
   pattern: OptionalSafePattern,
   default: OptionalStringDefault(200),
-}).annotate({
-  identifier: "SlugConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "SlugConfiguration" });
 export type SlugConfiguration = typeof SlugConfiguration.Type;
 
 export const JsonConfiguration = Schema.Struct({
   maxBytes: OptionalInteger,
   maxDepth: OptionalInteger,
   default: Schema.optionalKey(Schema.Unknown),
-}).annotate({
-  identifier: "JsonConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "JsonConfiguration" });
 export type JsonConfiguration = typeof JsonConfiguration.Type;
 
 export const ObjectConfiguration = Schema.Struct({
   default: Schema.optionalKey(Schema.Unknown),
-}).annotate({
-  identifier: "ObjectConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "ObjectConfiguration" });
 export type ObjectConfiguration = typeof ObjectConfiguration.Type;
 
 export const ListConfiguration = Schema.Struct({
@@ -318,18 +270,12 @@ export const ListConfiguration = Schema.Struct({
   maxItems: OptionalInteger,
   uniqueItems: Schema.optionalKey(Schema.Boolean),
   default: Schema.optionalKey(Schema.Unknown),
-}).annotate({
-  identifier: "ListConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "ListConfiguration" });
 export type ListConfiguration = typeof ListConfiguration.Type;
 
 export const ReferenceConfiguration = Schema.Struct({
   targetCollectionId: Uuid,
-}).annotate({
-  identifier: "ReferenceConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "ReferenceConfiguration" });
 export type ReferenceConfiguration = typeof ReferenceConfiguration.Type;
 
 export const ExternalAssetKind = Schema.Literals([
@@ -355,15 +301,12 @@ export class ExternalAssetValue extends Schema.Class<ExternalAssetValue>("Extern
     height: Schema.NullOr(
       Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 100_000 })),
     ),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const ExternalAssetConfiguration = Schema.Struct({
   default: Schema.optionalKey(ExternalAssetValue),
-}).annotate({
-  identifier: "ExternalAssetConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "ExternalAssetConfiguration" });
 export type ExternalAssetConfiguration = typeof ExternalAssetConfiguration.Type;
 
 export const PortableTextKey = Schema.String.check(
@@ -389,7 +332,7 @@ export class PortableTextLinkMark extends Schema.Class<PortableTextLinkMark>(
     _key: PortableTextKey,
     _type: Schema.Literal("link"),
     href: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class PortableTextSpan extends Schema.Class<PortableTextSpan>("PortableTextSpan")(
@@ -400,7 +343,7 @@ export class PortableTextSpan extends Schema.Class<PortableTextSpan>("PortableTe
     marks: Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))).check(
       Schema.isMaxLength(32),
     ),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class PortableTextBlock extends Schema.Class<PortableTextBlock>("PortableTextBlock")(
@@ -414,7 +357,7 @@ export class PortableTextBlock extends Schema.Class<PortableTextBlock>("Portable
     ),
     children: Schema.Array(PortableTextSpan).check(Schema.isMaxLength(5_000)),
     markDefs: Schema.Array(PortableTextLinkMark).check(Schema.isMaxLength(1_000)),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class PortableTextDocument extends Schema.Class<PortableTextDocument>(
@@ -424,7 +367,7 @@ export class PortableTextDocument extends Schema.Class<PortableTextDocument>(
     version: Schema.Literal(1),
     profile: Schema.Literal("ffd-portable-text"),
     blocks: Schema.Array(PortableTextBlock).check(Schema.isMaxLength(500)),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const RichTextConfiguration = Schema.Struct({
@@ -437,10 +380,7 @@ export const RichTextConfiguration = Schema.Struct({
   minLength: OptionalInteger,
   maxLength: OptionalInteger,
   default: Schema.optionalKey(PortableTextDocument),
-}).annotate({
-  identifier: "RichTextConfiguration",
-  closedObject: true,
-});
+}).annotate({ identifier: "RichTextConfiguration" });
 export type RichTextConfiguration = typeof RichTextConfiguration.Type;
 
 export const fieldConfigurationSchemas = {

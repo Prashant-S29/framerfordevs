@@ -1,6 +1,6 @@
 import { Worker } from "node:worker_threads";
 
-import { Effect, Result } from "effect";
+import { Effect, Result, Schema } from "effect";
 
 import {
   StaticSchemaExtractionError,
@@ -10,7 +10,6 @@ import {
 import type { ExtractedStaticProjectSchema, StaticSchemaExtractionInput } from "./static-extractor";
 import { staticSchemaExtractorLimits } from "./static-extractor";
 import { StaticSchemaWorkerInput, StaticSchemaWorkerResponse } from "./static-extractor/protocol";
-import * as SchemaStrict from "../schema-strict";
 export {
   validateStaticProjectSchema,
   type StaticSchemaValidationIssue,
@@ -47,9 +46,9 @@ function extractionError(
 export const extractStaticProjectSchema = Effect.fn("cli.schema.extract.static")(function* (
   input: StaticSchemaExtractionInput,
 ) {
-  const validatedInput = yield* SchemaStrict.decodeUnknownEffect(StaticSchemaWorkerInput)(
-    input,
-  ).pipe(Effect.mapError(() => extractionError("entry_invalid")));
+  const validatedInput = yield* Schema.decodeUnknownEffect(StaticSchemaWorkerInput, {
+    onExcessProperty: "error",
+  })(input).pipe(Effect.mapError(() => extractionError("entry_invalid")));
 
   return yield* Effect.callback<ExtractedStaticProjectSchema, StaticSchemaExtractionError>(
     (resume) => {
@@ -85,7 +84,9 @@ export const extractStaticProjectSchema = Effect.fn("cli.schema.extract.static")
       );
 
       worker.once("message", (message: unknown) => {
-        const decoded = SchemaStrict.decodeUnknownResult(StaticSchemaWorkerResponse)(message);
+        const decoded = Schema.decodeUnknownResult(StaticSchemaWorkerResponse, {
+          onExcessProperty: "error",
+        })(message);
         if (Result.isFailure(decoded)) {
           finish(Effect.fail(extractionError("worker_protocol_invalid")));
           return;

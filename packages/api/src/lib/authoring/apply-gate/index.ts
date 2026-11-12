@@ -1,5 +1,3 @@
-// Verifies stale authority, plan correlation, acknowledgements, and idempotent replay before writes.
-
 import type {
   AuthoringSchemaAuthority,
   SchemaApplyCommandId,
@@ -25,7 +23,6 @@ export type VerifyAuthoringSchemaApplyResult =
         | "schema_acknowledgement_mismatch";
     };
 
-/** Requires exact current manifest/revisions, recomputed plan hash, and exact risky acknowledgements. */
 export function verifyAuthoringSchemaApply(options: {
   readonly expectedCurrent: AuthoringSchemaAuthority;
   readonly actualCurrent: AuthoringSchemaAuthority;
@@ -54,7 +51,6 @@ export function verifyAuthoringSchemaApply(options: {
   return { accepted: true };
 }
 
-/** Proves post-allocation rebuilding produced the exact source-qualified plan changes. */
 export function hasExactAllocatedProjectChanges(
   planned: ReadonlyArray<AuthoringSchemaChange>,
   allocated: ReadonlyArray<AuthoringSchemaChange>,
@@ -77,7 +73,6 @@ export type SchemaApplyReplayDecision<Result> =
   | { readonly kind: "replay"; readonly result: Result }
   | { readonly kind: "command_conflict" };
 
-/** Distinguishes a safe exact replay from command-ID reuse with different authority or content. */
 export function decideSchemaApplyReplay<Result>(
   commandId: SchemaApplyCommandId,
   fingerprint: SchemaApplyFingerprint,

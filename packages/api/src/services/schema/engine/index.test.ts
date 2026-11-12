@@ -50,7 +50,6 @@ import {
   type SchemaDraftState,
 } from "./index";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const workspaceId = WorkspaceId.make("019fae8b-1234-7000-8000-000000000001");
 const projectId = ProjectId.make("019fae8b-1234-7000-8000-000000000002");
 const environmentId = EnvironmentId.make("019fae8b-1234-7000-8000-000000000003");
@@ -76,7 +75,7 @@ interface FieldOptions {
 }
 
 function makeField(options: FieldOptions): CollectionFieldDefinition {
-  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+  return Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })({
     id: options.id,
     parentFieldId: null,
     nodeRole: "root",
@@ -123,7 +122,7 @@ function makeCollection(options?: {
 }
 
 function makeLayout(fields: ReadonlyArray<CollectionFieldDefinition>) {
-  return SchemaStrict.decodeUnknownSync(EditorLayout)({
+  return Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })({
     version: 1,
     tabs: [
       {
@@ -336,7 +335,7 @@ describe("schema draft validation", () => {
     const draft = makeDraft([optionalTitle, requiredSummary]);
     const changed: SchemaDraftState = {
       ...draft,
-      editorLayout: SchemaStrict.decodeUnknownSync(EditorLayout)({
+      editorLayout: Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })({
         ...draft.editorLayout,
         tabs: draft.editorLayout.tabs.map((tab) => ({
           ...tab,
@@ -401,9 +400,12 @@ describe("schema draft validation", () => {
     const toolingContract = toolingJsonData(contract);
     assert.include(JSON.stringify(toolingContract), '"default":null');
     assert.doesNotThrow(() =>
-      SchemaStrict.decodeUnknownSync(ToolingCollectionContract)(toolingContract, {
-        onExcessProperty: "error",
-      }),
+      Schema.decodeUnknownSync(ToolingCollectionContract, { onExcessProperty: "error" })(
+        toolingContract,
+        {
+          onExcessProperty: "error",
+        },
+      ),
     );
   });
 

@@ -1,7 +1,5 @@
-// Verifies strict Preview route decoding, bearer-only authentication, closed quotas, and operation dispatch.
-
 import { assert, describe, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Layer } from "effect";
+import { Cause, Effect, Exit, Layer, Schema } from "effect";
 
 import { CredentialPrincipal } from "../../../contracts/access";
 import {
@@ -39,7 +37,6 @@ import {
   getUserRevisionPreview,
 } from "./index";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const ids = {
   workspace: "019fae8b-1234-7000-8000-000000000001",
   project: "019fae8b-1234-7000-8000-000000000002",
@@ -52,7 +49,7 @@ const ids = {
   credential: "019fae8b-1234-7000-8000-000000000009",
 };
 
-const principal = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
+const principal = Schema.decodeUnknownSync(CredentialPrincipal, { onExcessProperty: "error" })({
   credentialId: ids.credential,
   workspaceId: ids.workspace,
   projectId: ids.project,
@@ -61,7 +58,7 @@ const principal = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
   scopes: ["preview.read"],
 });
 
-const item = SchemaStrict.decodeUnknownSync(PreviewItem)({
+const item = Schema.decodeUnknownSync(PreviewItem, { onExcessProperty: "error" })({
   id: ids.entry,
   collectionId: ids.collection,
   collection: "articles",
@@ -110,7 +107,7 @@ function makeLayers(
     evaluate: (input) =>
       Effect.sync(() => {
         calls.push(`${input.policy}:${input.identity}`);
-        return SchemaStrict.decodeUnknownSync(RateLimitDecision)({
+        return Schema.decodeUnknownSync(RateLimitDecision, { onExcessProperty: "error" })({
           allowed: input.policy !== deniedPolicy,
           policy: input.policy,
           cost: 1,
@@ -246,7 +243,9 @@ describe("Preview operations", () => {
   });
 
   it("stops dashboard reads at the global or user quota before repository access", async () => {
-    const currentUser = SchemaStrict.decodeUnknownSync(GetCurrentUserPreviewInput)({
+    const currentUser = Schema.decodeUnknownSync(GetCurrentUserPreviewInput, {
+      onExcessProperty: "error",
+    })({
       projectId: ids.project,
       environmentId: ids.environment,
       collectionId: ids.collection,
@@ -291,14 +290,18 @@ describe("Preview operations", () => {
         rawQuery: `locale=gu&sharedRevision=${ids.shared}&localizedRevision=${ids.localized}`,
       }),
     );
-    const currentUser = SchemaStrict.decodeUnknownSync(GetCurrentUserPreviewInput)({
+    const currentUser = Schema.decodeUnknownSync(GetCurrentUserPreviewInput, {
+      onExcessProperty: "error",
+    })({
       projectId: ids.project,
       environmentId: ids.environment,
       collectionId: ids.collection,
       entryId: ids.entry,
       locale: "gu",
     });
-    const revisionUser = SchemaStrict.decodeUnknownSync(GetRevisionUserPreviewInput)({
+    const revisionUser = Schema.decodeUnknownSync(GetRevisionUserPreviewInput, {
+      onExcessProperty: "error",
+    })({
       ...currentUser,
       schemaRevisionId: ids.schema,
       sharedRevisionId: ids.shared,

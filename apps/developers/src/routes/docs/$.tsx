@@ -1,5 +1,3 @@
-// Renders source-controlled MDX through the shared Fumadocs layout and serialized public page tree.
-
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { useFumadocsLoader } from "fumadocs-core/source/client";

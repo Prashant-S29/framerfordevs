@@ -1,5 +1,3 @@
-// Defines the bounded, stable-ID Studio Content v1 navigation and entry-list contracts.
-
 import { Schema, SchemaTransformation, Effect } from "effect";
 
 import {
@@ -57,7 +55,7 @@ export class StudioContentScope extends Schema.Class<StudioContentScope>("Studio
   Schema.Struct({
     projectId: ProjectId,
     environmentId: EnvironmentId,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioCollectionLocaleScope extends Schema.Class<StudioCollectionLocaleScope>(
@@ -68,7 +66,7 @@ export class StudioCollectionLocaleScope extends Schema.Class<StudioCollectionLo
     environmentId: EnvironmentId,
     collectionId: CollectionId,
     locale: LocaleTag,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const StudioContentPageLimit = Schema.Number.check(
@@ -123,7 +121,7 @@ export class StudioContentLocale extends Schema.Class<StudioContentLocale>("Stud
     displayName: LocaleDisplayName,
     canRead: Schema.Literal(true),
     canWrite: Schema.Boolean,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioContentCollectionCapabilities extends Schema.Class<StudioContentCollectionCapabilities>(
@@ -134,7 +132,7 @@ export class StudioContentCollectionCapabilities extends Schema.Class<StudioCont
     canRename: Schema.Boolean,
     canSaveLocalized: Schema.Boolean,
     canSaveShared: Schema.Boolean,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioContentCollection extends Schema.Class<StudioContentCollection>(
@@ -144,7 +142,7 @@ export class StudioContentCollection extends Schema.Class<StudioContentCollectio
     id: CollectionId,
     displayName: CollectionDisplayName,
     capabilities: StudioContentCollectionCapabilities,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const StudioCollectionConfigurationReason = Schema.Literals([
@@ -188,7 +186,7 @@ export class StudioCollectionConfigurationNotice extends Schema.Class<StudioColl
     collectionId: CollectionId,
     displayName: CollectionDisplayName,
     reason: StudioCollectionConfigurationReason,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioContentContext extends Schema.Class<StudioContentContext>(
@@ -204,7 +202,7 @@ export class StudioContentContext extends Schema.Class<StudioContentContext>(
     configurationNotices: Schema.Array(StudioCollectionConfigurationNotice).check(
       Schema.isMaxLength(studioContentLimits.maximumConfigurationNotices),
     ),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioEntrySummary extends Schema.Class<StudioEntrySummary>("StudioEntrySummary")(
@@ -214,7 +212,7 @@ export class StudioEntrySummary extends Schema.Class<StudioEntrySummary>("Studio
     nameVersion: EntryNameVersion,
     createdAt: IsoDateTime,
     updatedAt: IsoDateTime,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const StudioBoundedMatchCount = Schema.Union([
@@ -224,11 +222,11 @@ export const StudioBoundedMatchCount = Schema.Union([
       Schema.isBetween({ minimum: 0, maximum: studioContentLimits.maximumCount }),
     ),
     relation: Schema.Literal("exact"),
-  }).annotate({ closedObject: true }),
+  }),
   Schema.Struct({
     value: Schema.Literal(studioContentLimits.maximumCount),
     relation: Schema.Literal("at_least"),
-  }).annotate({ closedObject: true }),
+  }),
 ]);
 export type StudioBoundedMatchCount = typeof StudioBoundedMatchCount.Type;
 
@@ -240,7 +238,7 @@ export class StudioEntryPage extends Schema.Class<StudioEntryPage>("StudioEntryP
     hasMore: Schema.Boolean,
     nextCursor: Schema.NullOr(StudioContentCursor),
     count: StudioBoundedMatchCount,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const StudioListEntriesQuery = Schema.Struct({
@@ -252,10 +250,7 @@ export const StudioListEntriesQuery = Schema.Struct({
       Effect.sync(() => StudioContentPageLimit.make(studioContentLimits.pageLimitDefault)),
     ),
   ),
-}).annotate({
-  identifier: "StudioListEntriesQuery",
-  closedObject: true,
-});
+}).annotate({ identifier: "StudioListEntriesQuery" });
 export type StudioListEntriesQuery = typeof StudioListEntriesQuery.Type;
 
 export const StudioSearchEntriesRequest = Schema.Struct({
@@ -268,10 +263,7 @@ export const StudioSearchEntriesRequest = Schema.Struct({
       Effect.sync(() => StudioContentPageLimit.make(studioContentLimits.pageLimitDefault)),
     ),
   ),
-}).annotate({
-  identifier: "StudioSearchEntriesRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "StudioSearchEntriesRequest" });
 export type StudioSearchEntriesRequest = typeof StudioSearchEntriesRequest.Type;
 
 export const StudioResolveEntryIds = Schema.Array(EntryId).check(
@@ -288,7 +280,7 @@ export class StudioResolveEntriesRequest extends Schema.Class<StudioResolveEntri
 )(
   Schema.Struct({
     entryIds: StudioResolveEntryIds,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioResolvedEntryLabel extends Schema.Class<StudioResolvedEntryLabel>(
@@ -297,7 +289,7 @@ export class StudioResolvedEntryLabel extends Schema.Class<StudioResolvedEntryLa
   Schema.Struct({
     id: EntryId,
     displayName: EntryDisplayName,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioResolvedEntryLabels extends Schema.Class<StudioResolvedEntryLabels>(
@@ -307,7 +299,7 @@ export class StudioResolvedEntryLabels extends Schema.Class<StudioResolvedEntryL
     items: Schema.Array(StudioResolvedEntryLabel).check(
       Schema.isMaxLength(studioContentLimits.maximumResolvedEntries),
     ),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 interface StudioFormFieldBase {
@@ -377,7 +369,7 @@ function studioFormFieldVariant<
     children: Schema.Array(
       Schema.suspend((): Schema.Codec<StudioFormField, StudioFormFieldEncoded> => StudioFormField),
     ).check(Schema.isMaxLength(100)),
-  }).annotate({ closedObject: true });
+  });
 }
 
 export const StudioFormField: Schema.Codec<StudioFormField, StudioFormFieldEncoded> = Schema.Union([
@@ -407,7 +399,7 @@ export class StudioFormPlacement extends Schema.Class<StudioFormPlacement>("Stud
     fieldId: CollectionFieldId,
     position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 99 })),
     helpTextOverride: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioFormGroup extends Schema.Class<StudioFormGroup>("StudioFormGroup")(
@@ -418,7 +410,7 @@ export class StudioFormGroup extends Schema.Class<StudioFormGroup>("StudioFormGr
     position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 19 })),
     columns: Schema.Literals([1, 2]),
     fields: Schema.Array(StudioFormPlacement).check(Schema.isMaxLength(100)),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioFormTab extends Schema.Class<StudioFormTab>("StudioFormTab")(
@@ -428,7 +420,7 @@ export class StudioFormTab extends Schema.Class<StudioFormTab>("StudioFormTab")(
     description: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
     position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 9 })),
     groups: Schema.Array(StudioFormGroup).check(Schema.isMinLength(1), Schema.isMaxLength(20)),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioFormProjection extends Schema.Class<StudioFormProjection>(
@@ -447,15 +439,13 @@ export class StudioFormProjection extends Schema.Class<StudioFormProjection>(
       Schema.String.check(Schema.isBetweenLength(3, 3)),
       Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 3 })),
     ),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const StudioValidationStatus = Schema.Literals(["valid", "invalid", "restricted_issues"]);
 export type StudioValidationStatus = typeof StudioValidationStatus.Type;
 
-const StudioEntryValidationIssue = EntryValidationIssue.annotate({
-  closedObject: true,
-});
+const StudioEntryValidationIssue = EntryValidationIssue;
 
 export class StudioEntryValidation extends Schema.Class<StudioEntryValidation>(
   "StudioEntryValidation",
@@ -464,7 +454,7 @@ export class StudioEntryValidation extends Schema.Class<StudioEntryValidation>(
     status: StudioValidationStatus,
     issues: Schema.Array(StudioEntryValidationIssue).check(Schema.isMaxLength(50)),
     capped: Schema.Boolean,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioNewEntryWorkspace extends Schema.Class<StudioNewEntryWorkspace>(
@@ -475,7 +465,7 @@ export class StudioNewEntryWorkspace extends Schema.Class<StudioNewEntryWorkspac
     locale: LocaleTag,
     form: StudioFormProjection,
     capabilities: StudioContentCollectionCapabilities,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioEntryDraftProjection extends Schema.Class<StudioEntryDraftProjection>(
@@ -492,7 +482,7 @@ export class StudioEntryDraftProjection extends Schema.Class<StudioEntryDraftPro
     localizedRevisionId: Schema.NullOr(EntryRevisionId),
     localizedValues: EntryValues,
     validation: StudioEntryValidation,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioEntryWorkspace extends Schema.Class<StudioEntryWorkspace>(
@@ -504,7 +494,7 @@ export class StudioEntryWorkspace extends Schema.Class<StudioEntryWorkspace>(
     form: StudioFormProjection,
     capabilities: StudioContentCollectionCapabilities,
     draft: StudioEntryDraftProjection,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioCreateEntryRequest extends Schema.Class<StudioCreateEntryRequest>(
@@ -517,7 +507,7 @@ export class StudioCreateEntryRequest extends Schema.Class<StudioCreateEntryRequ
     commandId: EntryCommandId,
     sharedMutations: EntryValueMutations,
     localizedMutations: EntryValueMutations,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioRenameEntryRequest extends Schema.Class<StudioRenameEntryRequest>(
@@ -526,7 +516,7 @@ export class StudioRenameEntryRequest extends Schema.Class<StudioRenameEntryRequ
   Schema.Struct({
     displayName: EntryDisplayName,
     expectedNameVersion: EntryNameVersion,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioSaveEntryDraftRequest extends Schema.Class<StudioSaveEntryDraftRequest>(
@@ -540,7 +530,7 @@ export class StudioSaveEntryDraftRequest extends Schema.Class<StudioSaveEntryDra
     expectedLocalizedVersion: EntryDraftVersion,
     sharedMutations: EntryValueMutations,
     localizedMutations: EntryValueMutations,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioCreateEntryResult extends Schema.Class<StudioCreateEntryResult>(
@@ -554,7 +544,7 @@ export class StudioCreateEntryResult extends Schema.Class<StudioCreateEntryResul
     localizedVersion: EntryDraftVersion,
     localizedRevisionId: Schema.NullOr(EntryRevisionId),
     validation: StudioEntryValidation,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioMutationReceipt extends Schema.Class<StudioMutationReceipt>(
@@ -570,7 +560,7 @@ export class StudioMutationReceipt extends Schema.Class<StudioMutationReceipt>(
     localizedVersion: EntryDraftVersion,
     localizedRevisionId: Schema.NullOr(EntryRevisionId),
     validation: StudioEntryValidation,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const StudioContentApiErrorCode = Schema.Literals([
@@ -598,9 +588,7 @@ export const StudioContentApiErrorCode = Schema.Literals([
 ]);
 export type StudioContentApiErrorCode = typeof StudioContentApiErrorCode.Type;
 
-const StudioContentApiErrorDetail = ApiErrorDetail.annotate({
-  closedObject: true,
-});
+const StudioContentApiErrorDetail = ApiErrorDetail;
 
 export class StudioContentApiError extends Schema.Class<StudioContentApiError>(
   "StudioContentApiError",
@@ -617,7 +605,7 @@ export class StudioContentApiError extends Schema.Class<StudioContentApiError>(
     configurationReason: Schema.optionalKey(StudioCollectionConfigurationReason),
     retryable: Schema.Boolean,
     requestId: RequestIdSchema,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class StudioContentApiFailure extends Schema.Class<StudioContentApiFailure>(
@@ -628,11 +616,11 @@ export class StudioContentApiFailure extends Schema.Class<StudioContentApiFailur
     data: Schema.Null,
     error: StudioContentApiError,
     message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 function studioContentSuccessSchema<A extends ApiData, I>(data: Schema.Codec<A, I, never>) {
-  return ApiSuccessSchema(data).annotate({ closedObject: true });
+  return ApiSuccessSchema(data);
 }
 
 export const StudioContentContextResponse = studioContentSuccessSchema(StudioContentContext);

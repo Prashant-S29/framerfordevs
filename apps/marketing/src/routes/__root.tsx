@@ -1,5 +1,3 @@
-// Defines the minimal marketing document shell and baseline public security metadata.
-
 import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-router";
 
 import styles from "../index.css?url";

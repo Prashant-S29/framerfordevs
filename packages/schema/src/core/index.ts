@@ -1,5 +1,3 @@
-// Type-only, dependency-free contracts for the closed M13 Tier 1 schema grammar.
-
 export type SchemaJsonPrimitive = null | boolean | number | string;
 export type SchemaJsonValue =
   | SchemaJsonPrimitive

@@ -1,5 +1,3 @@
-// Exercises credential lifecycle, policy, isolation, verification, concurrency, audit, and query-plan behavior against PostgreSQL.
-
 import { randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, layer } from "@effect/vitest";
@@ -20,7 +18,7 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Cause, Effect, Exit, Layer, Option } from "effect";
+import { Cause, Effect, Exit, Layer, Option, Schema } from "effect";
 
 import {
   ChangeApiCredentialRotationInput,
@@ -61,12 +59,11 @@ import {
   type Workspace as WorkspaceModel,
 } from "../../../src/contracts/platform";
 
-import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ownerId = `m3-credential-owner-${suffix}`;
 const developerId = `m3-credential-developer-${suffix}`;
 const editorId = `m3-credential-editor-${suffix}`;
-const ownerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(ownerId);
+const ownerActor = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(ownerId);
 const platform = makePlatformRepository();
 const RateLimitManagerTest = makeRateLimitManagerLive({
   fingerprintSecret: "credential-integration-rate-limit-secret-32-bytes",
@@ -131,14 +128,16 @@ beforeAll(async () => {
   workspaceModel = await Effect.runPromise(
     platform.createWorkspace(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M3 Credential Workspace" }),
+      Schema.decodeUnknownSync(CreateWorkspaceInput, { onExcessProperty: "error" })({
+        name: "M3 Credential Workspace",
+      }),
       "request-m3-credential-workspace",
     ),
   );
   projectModel = await Effect.runPromise(
     platform.createProject(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
+      Schema.decodeUnknownSync(CreateProjectInput, { onExcessProperty: "error" })({
         workspaceId: required(workspaceModel, "workspace").id,
         name: "M3 Credential Project",
         key: `credential-${suffix.slice(0, 8)}`,
@@ -225,33 +224,39 @@ describe("credential repository PostgreSQL integration", () => {
         };
         managementCredential = yield* issueApiCredential(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
-            ...common,
-            family: "management",
-            name: "Management integration",
-            scopes: ["project.read", "content.read", "content.write"],
-          }),
+          yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, { onExcessProperty: "error" })(
+            {
+              ...common,
+              family: "management",
+              name: "Management integration",
+              scopes: ["project.read", "content.read", "content.write"],
+            },
+          ),
           "request-m3-credential-management",
         );
         deliveryCredential = yield* issueApiCredential(
           developerId,
-          yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
-            ...common,
-            family: "delivery",
-            name: "Delivery integration",
-            scopes: ["delivery.read"],
-          }),
+          yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, { onExcessProperty: "error" })(
+            {
+              ...common,
+              family: "delivery",
+              name: "Delivery integration",
+              scopes: ["delivery.read"],
+            },
+          ),
           "request-m3-credential-delivery",
         );
         previewCredential = yield* issueApiCredential(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
-            ...common,
-            family: "preview",
-            name: "Preview integration",
-            scopes: ["preview.read"],
-            previewAuthorityAcknowledged: true,
-          }),
+          yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, { onExcessProperty: "error" })(
+            {
+              ...common,
+              family: "preview",
+              name: "Preview integration",
+              scopes: ["preview.read"],
+              previewAuthorityAcknowledged: true,
+            },
+          ),
           "request-m3-credential-preview",
         );
 
@@ -284,7 +289,9 @@ describe("credential repository PostgreSQL integration", () => {
           const incompatible = yield* Effect.exit(
             issueApiCredential(
               ownerId,
-              yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
+              yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, {
+                onExcessProperty: "error",
+              })({
                 ...base,
                 family: "delivery",
                 scopes: ["content.read"],
@@ -296,7 +303,9 @@ describe("credential repository PostgreSQL integration", () => {
           const expired = yield* Effect.exit(
             issueApiCredential(
               ownerId,
-              yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
+              yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, {
+                onExcessProperty: "error",
+              })({
                 ...base,
                 family: "preview",
                 scopes: ["preview.read"],
@@ -309,7 +318,9 @@ describe("credential repository PostgreSQL integration", () => {
           const editor = yield* Effect.exit(
             issueApiCredential(
               editorId,
-              yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
+              yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, {
+                onExcessProperty: "error",
+              })({
                 ...base,
                 family: "preview",
                 scopes: ["preview.read"],
@@ -340,7 +351,9 @@ describe("credential repository PostgreSQL integration", () => {
           Effect.exit(
             issueApiCredential(
               ownerId,
-              yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
+              yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, {
+                onExcessProperty: "error",
+              })({
                 ...base,
                 expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
               }),
@@ -350,7 +363,9 @@ describe("credential repository PostgreSQL integration", () => {
           Effect.exit(
             issueApiCredential(
               ownerId,
-              yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
+              yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, {
+                onExcessProperty: "error",
+              })({
                 ...base,
                 expiresAt: null,
                 previewAuthorityAcknowledged: true,
@@ -361,7 +376,9 @@ describe("credential repository PostgreSQL integration", () => {
           Effect.exit(
             issueApiCredential(
               ownerId,
-              yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
+              yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, {
+                onExcessProperty: "error",
+              })({
                 ...base,
                 expiresAt: new Date(Date.now() + 31 * 86_400_000).toISOString(),
                 previewAuthorityAcknowledged: true,
@@ -392,7 +409,9 @@ describe("credential repository PostgreSQL integration", () => {
         const issue = yield* Effect.exit(
           issueApiCredential(
             developerId,
-            yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
+            yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, {
+              onExcessProperty: "error",
+            })({
               projectId: currentProject.id,
               environmentId: currentProject.environment.id,
               family: "management",
@@ -407,7 +426,9 @@ describe("credential repository PostgreSQL integration", () => {
         const rotate = yield* Effect.exit(
           startApiCredentialRotation(
             developerId,
-            yield* SchemaStrict.decodeUnknownEffect(StartApiCredentialRotationInput)({
+            yield* Schema.decodeUnknownEffect(StartApiCredentialRotationInput, {
+              onExcessProperty: "error",
+            })({
               projectId: currentProject.id,
               environmentId: currentProject.environment.id,
               credentialId: currentManagement.credential.id,
@@ -440,24 +461,28 @@ describe("credential repository PostgreSQL integration", () => {
         const currentProject = required(projectModel, "project");
         const first = yield* listApiCredentials(
           developerId,
-          yield* SchemaStrict.decodeUnknownEffect(ListApiCredentialsInput)({
-            projectId: currentProject.id,
-            environmentId: currentProject.environment.id,
-            cursor: null,
-            limit: 2,
-          }),
+          yield* Schema.decodeUnknownEffect(ListApiCredentialsInput, { onExcessProperty: "error" })(
+            {
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
+              cursor: null,
+              limit: 2,
+            },
+          ),
         );
         assert.strictEqual(first.items.length, 2);
         assert.isNotNull(first.nextCursor);
         if (!first.nextCursor) return;
         const second = yield* listApiCredentials(
           developerId,
-          yield* SchemaStrict.decodeUnknownEffect(ListApiCredentialsInput)({
-            projectId: currentProject.id,
-            environmentId: currentProject.environment.id,
-            cursor: first.nextCursor,
-            limit: 2,
-          }),
+          yield* Schema.decodeUnknownEffect(ListApiCredentialsInput, { onExcessProperty: "error" })(
+            {
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
+              cursor: first.nextCursor,
+              limit: 2,
+            },
+          ),
         );
         const ids = [...first.items, ...second.items].map((item) => item.id);
         const serialized = JSON.stringify([...first.items, ...second.items]);
@@ -557,7 +582,9 @@ describe("credential repository PostgreSQL integration", () => {
           const rotation = yield* Effect.exit(
             startApiCredentialRotation(
               ownerId,
-              yield* SchemaStrict.decodeUnknownEffect(StartApiCredentialRotationInput)({
+              yield* Schema.decodeUnknownEffect(StartApiCredentialRotationInput, {
+                onExcessProperty: "error",
+              })({
                 projectId: currentProject.id,
                 environmentId: currentProject.environment.id,
                 credentialId: preview.credential.id,
@@ -587,7 +614,9 @@ describe("credential repository PostgreSQL integration", () => {
         const preview = required(previewCredential, "preview");
         const revoked = yield* revokeApiCredential(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(RevokeApiCredentialInput)({
+          yield* Schema.decodeUnknownEffect(RevokeApiCredentialInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             credentialId: preview.credential.id,
@@ -619,7 +648,9 @@ describe("credential repository PostgreSQL integration", () => {
         const management = required(managementCredential, "management");
         const started = yield* startApiCredentialRotation(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(StartApiCredentialRotationInput)({
+          yield* Schema.decodeUnknownEffect(StartApiCredentialRotationInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             credentialId: management.credential.id,
@@ -644,7 +675,9 @@ describe("credential repository PostgreSQL integration", () => {
 
         const activated = yield* changeApiCredentialRotation(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(ChangeApiCredentialRotationInput)({
+          yield* Schema.decodeUnknownEffect(ChangeApiCredentialRotationInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             rotationId: started.rotation.id,
@@ -680,7 +713,9 @@ describe("credential repository PostgreSQL integration", () => {
 
         const completed = yield* changeApiCredentialRotation(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(ChangeApiCredentialRotationInput)({
+          yield* Schema.decodeUnknownEffect(ChangeApiCredentialRotationInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             rotationId: activated.id,
@@ -704,12 +739,14 @@ describe("credential repository PostgreSQL integration", () => {
         assert.strictEqual(failureTag(predecessor), "CredentialInvalidFailure");
         const listed = yield* listApiCredentials(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(ListApiCredentialsInput)({
-            projectId: currentProject.id,
-            environmentId: currentProject.environment.id,
-            cursor: null,
-            limit: 50,
-          }),
+          yield* Schema.decodeUnknownEffect(ListApiCredentialsInput, { onExcessProperty: "error" })(
+            {
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
+              cursor: null,
+              limit: 50,
+            },
+          ),
         );
         managementCredential = {
           credential: required(
@@ -727,20 +764,24 @@ describe("credential repository PostgreSQL integration", () => {
         const currentProject = required(projectModel, "project");
         const issued = yield* issueApiCredential(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
-            projectId: currentProject.id,
-            environmentId: currentProject.environment.id,
-            family: "management",
-            name: "Canceled rotation predecessor",
-            scopes: ["content.read"],
-            expiresAt: null,
-            nonExpiringAcknowledged: true,
-          }),
+          yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, { onExcessProperty: "error" })(
+            {
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
+              family: "management",
+              name: "Canceled rotation predecessor",
+              scopes: ["content.read"],
+              expiresAt: null,
+              nonExpiringAcknowledged: true,
+            },
+          ),
           "request-m16-cancel-restart-issue",
         );
         const started = yield* startApiCredentialRotation(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(StartApiCredentialRotationInput)({
+          yield* Schema.decodeUnknownEffect(StartApiCredentialRotationInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             credentialId: issued.credential.id,
@@ -752,7 +793,9 @@ describe("credential repository PostgreSQL integration", () => {
         );
         const canceled = yield* changeApiCredentialRotation(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(ChangeApiCredentialRotationInput)({
+          yield* Schema.decodeUnknownEffect(ChangeApiCredentialRotationInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             rotationId: started.rotation.id,
@@ -774,7 +817,9 @@ describe("credential repository PostgreSQL integration", () => {
         );
         const replacement = yield* startApiCredentialRotation(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(StartApiCredentialRotationInput)({
+          yield* Schema.decodeUnknownEffect(StartApiCredentialRotationInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             credentialId: issued.credential.id,
@@ -790,7 +835,9 @@ describe("credential repository PostgreSQL integration", () => {
         assert.notStrictEqual(replacement.rotation.id, started.rotation.id);
         yield* changeApiCredentialRotation(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(ChangeApiCredentialRotationInput)({
+          yield* Schema.decodeUnknownEffect(ChangeApiCredentialRotationInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             rotationId: replacement.rotation.id,
@@ -808,20 +855,24 @@ describe("credential repository PostgreSQL integration", () => {
         const currentProject = required(projectModel, "project");
         const issued = yield* issueApiCredential(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
-            projectId: currentProject.id,
-            environmentId: currentProject.environment.id,
-            family: "delivery",
-            name: "Overlap expiry predecessor",
-            scopes: ["delivery.read"],
-            expiresAt: null,
-            nonExpiringAcknowledged: true,
-          }),
+          yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, { onExcessProperty: "error" })(
+            {
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
+              family: "delivery",
+              name: "Overlap expiry predecessor",
+              scopes: ["delivery.read"],
+              expiresAt: null,
+              nonExpiringAcknowledged: true,
+            },
+          ),
           "request-m16-overlap-expiry-issue",
         );
         const started = yield* startApiCredentialRotation(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(StartApiCredentialRotationInput)({
+          yield* Schema.decodeUnknownEffect(StartApiCredentialRotationInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             credentialId: issued.credential.id,
@@ -833,7 +884,9 @@ describe("credential repository PostgreSQL integration", () => {
         );
         const activated = yield* changeApiCredentialRotation(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(ChangeApiCredentialRotationInput)({
+          yield* Schema.decodeUnknownEffect(ChangeApiCredentialRotationInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             rotationId: started.rotation.id,
@@ -874,7 +927,9 @@ describe("credential repository PostgreSQL integration", () => {
 
         yield* changeApiCredentialRotation(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(ChangeApiCredentialRotationInput)({
+          yield* Schema.decodeUnknownEffect(ChangeApiCredentialRotationInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             rotationId: activated.id,
@@ -892,20 +947,24 @@ describe("credential repository PostgreSQL integration", () => {
         const currentProject = required(projectModel, "project");
         const issued = yield* issueApiCredential(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
-            projectId: currentProject.id,
-            environmentId: currentProject.environment.id,
-            family: "management",
-            name: "Emergency overlap predecessor",
-            scopes: ["content.read"],
-            expiresAt: null,
-            nonExpiringAcknowledged: true,
-          }),
+          yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, { onExcessProperty: "error" })(
+            {
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
+              family: "management",
+              name: "Emergency overlap predecessor",
+              scopes: ["content.read"],
+              expiresAt: null,
+              nonExpiringAcknowledged: true,
+            },
+          ),
           "request-m16-overlap-revoke-issue",
         );
         const started = yield* startApiCredentialRotation(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(StartApiCredentialRotationInput)({
+          yield* Schema.decodeUnknownEffect(StartApiCredentialRotationInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             credentialId: issued.credential.id,
@@ -917,7 +976,9 @@ describe("credential repository PostgreSQL integration", () => {
         );
         yield* changeApiCredentialRotation(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(ChangeApiCredentialRotationInput)({
+          yield* Schema.decodeUnknownEffect(ChangeApiCredentialRotationInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             rotationId: started.rotation.id,
@@ -928,12 +989,14 @@ describe("credential repository PostgreSQL integration", () => {
         );
         const listed = yield* listApiCredentials(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(ListApiCredentialsInput)({
-            projectId: currentProject.id,
-            environmentId: currentProject.environment.id,
-            cursor: null,
-            limit: 50,
-          }),
+          yield* Schema.decodeUnknownEffect(ListApiCredentialsInput, { onExcessProperty: "error" })(
+            {
+              projectId: currentProject.id,
+              environmentId: currentProject.environment.id,
+              cursor: null,
+              limit: 50,
+            },
+          ),
         );
         const successor = required(
           listed.items.find((credential) => credential.id === started.successor.id),
@@ -941,7 +1004,9 @@ describe("credential repository PostgreSQL integration", () => {
         );
         yield* revokeApiCredential(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(RevokeApiCredentialInput)({
+          yield* Schema.decodeUnknownEffect(RevokeApiCredentialInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             credentialId: successor.id,
@@ -987,7 +1052,9 @@ describe("credential repository PostgreSQL integration", () => {
         const delivery = required(deliveryCredential, "delivery");
         const started = yield* startApiCredentialRotation(
           ownerId,
-          yield* SchemaStrict.decodeUnknownEffect(StartApiCredentialRotationInput)({
+          yield* Schema.decodeUnknownEffect(StartApiCredentialRotationInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             credentialId: delivery.credential.id,
@@ -997,16 +1064,18 @@ describe("credential repository PostgreSQL integration", () => {
           }),
           "request-m16-concurrent-start",
         );
-        const activateInput = yield* SchemaStrict.decodeUnknownEffect(
-          ChangeApiCredentialRotationInput,
-        )({
+        const activateInput = yield* Schema.decodeUnknownEffect(ChangeApiCredentialRotationInput, {
+          onExcessProperty: "error",
+        })({
           projectId: currentProject.id,
           environmentId: currentProject.environment.id,
           rotationId: started.rotation.id,
           expectedVersion: started.rotation.version,
           action: "activate",
         });
-        const revokeInput = yield* SchemaStrict.decodeUnknownEffect(RevokeApiCredentialInput)({
+        const revokeInput = yield* Schema.decodeUnknownEffect(RevokeApiCredentialInput, {
+          onExcessProperty: "error",
+        })({
           projectId: currentProject.id,
           environmentId: currentProject.environment.id,
           credentialId: delivery.credential.id,

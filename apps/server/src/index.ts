@@ -3,8 +3,8 @@ import {
   evaluateStudioOAuthClientRateLimit,
   evaluateStudioOAuthGlobalRateLimit,
   evaluateStudioOAuthUserRateLimit,
-} from "@framerfordevs/api/operations/studio-public/index";
-import { applicationRuntime, disposeApplicationRuntime } from "@framerfordevs/api/runtime/index";
+} from "@framerfordevs/api/operations/studio-public";
+import { applicationRuntime, disposeApplicationRuntime } from "@framerfordevs/api/runtime";
 import { createAuth, ensureOfficialCliOAuthAuthority } from "@framerfordevs/auth";
 import { env } from "@framerfordevs/env/server";
 import { Effect } from "effect";

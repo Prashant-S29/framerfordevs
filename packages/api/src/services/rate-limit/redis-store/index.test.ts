@@ -1,5 +1,3 @@
-// Verifies Redis script-cache handling, reply validation, typed failures, and reset behavior without network access.
-
 import { assert, describe, it } from "@effect/vitest";
 import { Effect } from "effect";
 

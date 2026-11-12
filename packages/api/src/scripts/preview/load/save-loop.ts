@@ -1,13 +1,10 @@
-// Alternates one Preview fixture draft through normal audited save controls for coherence load.
-
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const serverEnvironmentPath = "../../apps/server/.env";
-const loadEnvironmentPath = "../../preview-load.env";
+const loadEnvironmentPath = "../../apps/server/load/preview.env";
 process.loadEnvFile(serverEnvironmentPath);
 process.loadEnvFile(loadEnvironmentPath);
 
@@ -94,7 +91,9 @@ const [authority] = await db
   .limit(1);
 if (authority === undefined) throw new Error("The current Preview fixture scope was not found.");
 
-const actorId = SchemaStrict.decodeUnknownSync(AuthUserId)(authority.actorId);
+const actorId = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(
+  authority.actorId,
+);
 const entries = makeEntryRepository();
 const run = Effect.runPromise;
 const scope = {
@@ -107,7 +106,9 @@ const scope = {
 const original = await run(
   entries.getDraft(
     actorId,
-    SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)(scope),
+    Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput, { onExcessProperty: "error" })(
+      scope,
+    ),
   ),
 );
 const mutableFieldId = Object.keys(original.localizedValues)[0];
@@ -130,23 +131,27 @@ try {
     const draft = await run(
       entries.getDraft(
         actorId,
-        SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)(scope),
+        Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput, { onExcessProperty: "error" })(
+          scope,
+        ),
       ),
     );
     const value = iteration % 2 === 0 ? `${originalValue} [coherence]` : originalValue;
     const result = await run(
       entries.saveDraft(
         actorId,
-        SchemaStrict.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
-          ...scope,
-          schemaRevisionId: draft.schemaRevisionId,
-          contractHash: draft.contractHash,
-          commandId: randomUUID(),
-          expectedSharedVersion: draft.sharedVersion,
-          expectedLocalizedVersion: draft.localizedVersion,
-          sharedMutations: [],
-          localizedMutations: [{ operation: "set", path: [mutableFieldId], value }],
-        }),
+        Schema.decodeUnknownSync(entryContracts.SaveEntryDraftInput, { onExcessProperty: "error" })(
+          {
+            ...scope,
+            schemaRevisionId: draft.schemaRevisionId,
+            contractHash: draft.contractHash,
+            commandId: randomUUID(),
+            expectedSharedVersion: draft.sharedVersion,
+            expectedLocalizedVersion: draft.localizedVersion,
+            sharedMutations: [],
+            localizedMutations: [{ operation: "set", path: [mutableFieldId], value }],
+          },
+        ),
         new Date(),
         `m10-preview-coherence-save-${iteration}`,
       ),
@@ -161,23 +166,29 @@ try {
   const draft = await run(
     entries.getDraft(
       actorId,
-      SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)(scope),
+      Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput, { onExcessProperty: "error" })(
+        scope,
+      ),
     ),
   );
   if (Reflect.get(draft.localizedValues, mutableFieldId) !== originalValue) {
     const result = await run(
       entries.saveDraft(
         actorId,
-        SchemaStrict.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
-          ...scope,
-          schemaRevisionId: draft.schemaRevisionId,
-          contractHash: draft.contractHash,
-          commandId: randomUUID(),
-          expectedSharedVersion: draft.sharedVersion,
-          expectedLocalizedVersion: draft.localizedVersion,
-          sharedMutations: [],
-          localizedMutations: [{ operation: "set", path: [mutableFieldId], value: originalValue }],
-        }),
+        Schema.decodeUnknownSync(entryContracts.SaveEntryDraftInput, { onExcessProperty: "error" })(
+          {
+            ...scope,
+            schemaRevisionId: draft.schemaRevisionId,
+            contractHash: draft.contractHash,
+            commandId: randomUUID(),
+            expectedSharedVersion: draft.sharedVersion,
+            expectedLocalizedVersion: draft.localizedVersion,
+            sharedMutations: [],
+            localizedMutations: [
+              { operation: "set", path: [mutableFieldId], value: originalValue },
+            ],
+          },
+        ),
         new Date(),
         "m10-preview-coherence-restore",
       ),

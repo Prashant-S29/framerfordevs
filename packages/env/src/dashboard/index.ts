@@ -1,5 +1,3 @@
-// Validates public dashboard service and cross-surface navigation origins.
-
 import { createEnv } from "@t3-oss/env-core";
 
 import { exactOriginSchema } from "../origin";

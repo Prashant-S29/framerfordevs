@@ -1,5 +1,3 @@
-// Verifies webhook secret generation, scoped AES-GCM, corruption rejection, and key-ring rotation.
-
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Exit } from "effect";
 

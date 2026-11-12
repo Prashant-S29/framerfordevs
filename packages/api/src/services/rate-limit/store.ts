@@ -1,5 +1,3 @@
-// Defines the replaceable rate-limit state boundary and its bounded deterministic in-memory implementation.
-
 import { Clock, Context, Effect, Layer, Schema } from "effect";
 
 import type {
@@ -70,7 +68,6 @@ const defaultMemoryOptions: MemoryRateLimitStoreOptions = {
   maxEntries: 10_000,
 };
 
-/** Finds the least recently used opaque key when the bounded store reaches capacity. */
 function oldestKey(entries: ReadonlyMap<string, MemoryRateLimitEntry>): string | undefined {
   let candidate: string | undefined;
   let oldestSeenAt = Number.POSITIVE_INFINITY;
@@ -83,13 +80,11 @@ function oldestKey(entries: ReadonlyMap<string, MemoryRateLimitEntry>): string |
   return candidate;
 }
 
-/** Computes the bounded idle lifetime needed for a bucket to refill and then expire. */
 function bucketTtlMs(policy: RateLimitPolicyConfiguration): number {
   const refillPerMs = policy.limitPerInterval / policy.intervalMs;
   return Math.ceil(policy.capacity / refillPerMs) + policy.intervalMs;
 }
 
-/** Evaluates one weighted token bucket using the supplied monotonic test/live clock value. */
 function evaluateMemoryBucket(
   previous: MemoryRateLimitEntry | undefined,
   request: RateLimitStoreRequest,
@@ -126,7 +121,6 @@ function evaluateMemoryBucket(
   };
 }
 
-/** Creates a process-local store with deterministic refill, expiry, and least-recent eviction. */
 export function makeMemoryRateLimitStore(
   options: MemoryRateLimitStoreOptions = defaultMemoryOptions,
 ): RateLimitStoreService {

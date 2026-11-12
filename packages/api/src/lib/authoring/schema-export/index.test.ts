@@ -8,8 +8,8 @@ import {
 } from "../../../contracts/schema";
 import { defaultFieldEditorMetadata } from "../../../contracts/schema";
 import { buildAuthoringSchemaExport } from "./index";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 const postsId = CollectionId.make("019fae8b-1234-7000-8000-000000000001");
 const authorsId = CollectionId.make("019fae8b-1234-7000-8000-000000000002");
 const statusId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000003");
@@ -19,7 +19,7 @@ const seoId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000006");
 const titleId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000007");
 
 function field(value: unknown) {
-  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)(value);
+  return Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })(value);
 }
 
 const status = field({

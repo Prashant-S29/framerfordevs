@@ -1,5 +1,3 @@
-// Implements bounded RFC 8628 login, refresh rotation, explicit browser intent, and keychain persistence.
-
 import { spawn } from "node:child_process";
 
 import { Clock, Context, Duration, Effect, Layer, Schema } from "effect";
@@ -12,7 +10,6 @@ import {
   ToolingTransportError,
 } from "../errors";
 
-import * as SchemaStrict from "../schema-strict";
 const clientId = "framerfordevs-cli";
 const scope =
   "openid profile offline_access tooling:read authoring:read authoring:draft:write authoring:content:publish authoring:schema:push control-plane:read control-plane:write control-plane:project:lifecycle control-plane:governance:read control-plane:governance:write control-plane:operations:read control-plane:operations:write control-plane:security:read";
@@ -150,7 +147,9 @@ export function makeOAuthDeviceClient(options: OAuthDeviceClientOptions) {
     });
 
   const decodeError = (status: number, value: unknown) =>
-    SchemaStrict.decodeUnknownEffect(OAuthErrorResponse)(value, { onExcessProperty: "error" }).pipe(
+    Schema.decodeUnknownEffect(OAuthErrorResponse, { onExcessProperty: "error" })(value, {
+      onExcessProperty: "error",
+    }).pipe(
       Effect.map((failure) =>
         OAuthDeviceError.make({
           code: failure.error,
@@ -177,9 +176,12 @@ export function makeOAuthDeviceClient(options: OAuthDeviceClientOptions) {
         catch: (cause) => ToolingTransportError.make({ operation: "oauth.device.response", cause }),
       });
       if (!response.ok) return yield* yield* decodeError(response.status, value);
-      return yield* SchemaStrict.decodeUnknownEffect(TokenResponse)(value, {
-        onExcessProperty: "error",
-      }).pipe(
+      return yield* Schema.decodeUnknownEffect(TokenResponse, { onExcessProperty: "error" })(
+        value,
+        {
+          onExcessProperty: "error",
+        },
+      ).pipe(
         Effect.mapError(() =>
           OAuthDeviceError.make({ code: "oauth_response_invalid", retryable: false }),
         ),
@@ -198,9 +200,12 @@ export function makeOAuthDeviceClient(options: OAuthDeviceClientOptions) {
         catch: (cause) => ToolingTransportError.make({ operation: "oauth.device.response", cause }),
       });
       if (!response.ok) return yield* yield* decodeError(response.status, value);
-      return yield* SchemaStrict.decodeUnknownEffect(DeviceAuthorization)(value, {
-        onExcessProperty: "error",
-      }).pipe(
+      return yield* Schema.decodeUnknownEffect(DeviceAuthorization, { onExcessProperty: "error" })(
+        value,
+        {
+          onExcessProperty: "error",
+        },
+      ).pipe(
         Effect.mapError(() =>
           OAuthDeviceError.make({ code: "oauth_response_invalid", retryable: false }),
         ),

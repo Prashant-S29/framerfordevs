@@ -1,5 +1,3 @@
-// Renders projected content authority through an exhaustive, instance-isolated control registry.
-
 import { Button } from "@framerfordevs/ui/components/button";
 import { Checkbox } from "@framerfordevs/ui/components/checkbox";
 import {
@@ -866,7 +864,8 @@ export function ContentForm({
     [definition.editorLayout.tabs],
   );
   const [activeTabId, setActiveTabId] = useState(() => tabs[0]?.id ?? "");
-  const [pendingFocusFieldId, setPendingFocusFieldId] = useState<string | null>(null);
+  const [focusRequest, setFocusRequest] = useState<{ readonly fieldId: string } | null>(null);
+  const handledFocusRequest = useRef<{ readonly fieldId: string } | null>(null);
   const [localValues, setLocalValues] = useState<Readonly<Record<string, unknown>>>(() =>
     applyGeneratedFormDefaults(
       definition.fields,
@@ -882,6 +881,17 @@ export function ContentForm({
   const values = controlledValues ?? localValues;
   const decodedServerIssues = serverIssueMap(serverIssues);
   const serverIssueSignature = Object.keys(decodedServerIssues).sort().join("\u0000");
+  const [previousServerIssueSignature, setPreviousServerIssueSignature] =
+    useState(serverIssueSignature);
+  if (serverIssueSignature !== previousServerIssueSignature) {
+    setPreviousServerIssueSignature(serverIssueSignature);
+    if (serverIssueSignature.length > 0) {
+      const currentServerIssueIds = new Set(serverIssueSignature.split("\u0000"));
+      setEditedFieldIds(
+        (current) => new Set([...current].filter((fieldId) => !currentServerIssueIds.has(fieldId))),
+      );
+    }
+  }
   const issues = {
     ...Object.fromEntries(
       Object.entries(decodedServerIssues).filter(([fieldId]) => !editedFieldIds.has(fieldId)),
@@ -897,44 +907,43 @@ export function ContentForm({
     [definition.editableFieldIds],
   );
 
-  useEffect(() => {
-    if (!tabs.some((tab) => tab.id === activeTabId)) setActiveTabId(tabs[0]?.id ?? "");
-  }, [activeTabId, tabs]);
+  const fallbackTabId = tabs[0]?.id ?? "";
+  if (activeTabId !== fallbackTabId && !tabs.some((tab) => tab.id === activeTabId)) {
+    setActiveTabId(fallbackTabId);
+  }
+
+  const [focusIssueSource, setFocusIssueSource] = useState<{
+    readonly fieldId: string | null;
+    readonly tabs: typeof tabs;
+  }>(() => ({ fieldId: null, tabs }));
+  if (focusIssueSource.fieldId !== (focusIssueFieldId ?? null) || focusIssueSource.tabs !== tabs) {
+    setFocusIssueSource({ fieldId: focusIssueFieldId ?? null, tabs });
+    if (focusIssueFieldId) {
+      setEditedFieldIds((current) => {
+        const next = new Set(current);
+        next.delete(focusIssueFieldId);
+        return next;
+      });
+      const tab = tabs.find((candidate) =>
+        candidate.groups.some((group) =>
+          group.fields.some((placement) => placement.fieldId === focusIssueFieldId),
+        ),
+      );
+      if (tab) setActiveTabId(tab.id);
+      setFocusRequest({ fieldId: focusIssueFieldId });
+    }
+  }
 
   useEffect(() => {
-    if (serverIssueSignature.length === 0) return;
-    const currentServerIssueIds = new Set(serverIssueSignature.split("\u0000"));
-    setEditedFieldIds(
-      (current) => new Set([...current].filter((fieldId) => !currentServerIssueIds.has(fieldId))),
-    );
-  }, [serverIssueSignature]);
-
-  useEffect(() => {
-    if (!focusIssueFieldId) return;
-    setEditedFieldIds((current) => {
-      const next = new Set(current);
-      next.delete(focusIssueFieldId);
-      return next;
-    });
-    const tab = tabs.find((candidate) =>
-      candidate.groups.some((group) =>
-        group.fields.some((placement) => placement.fieldId === focusIssueFieldId),
-      ),
-    );
-    if (tab) setActiveTabId(tab.id);
-    setPendingFocusFieldId(focusIssueFieldId);
-  }, [focusIssueFieldId, tabs]);
-
-  useEffect(() => {
-    if (pendingFocusFieldId === null) return;
+    if (focusRequest === null || handledFocusRequest.current === focusRequest) return;
+    handledFocusRequest.current = focusRequest;
     const field = formRef.current?.querySelector<HTMLElement>(
-      `[data-content-field-id="${pendingFocusFieldId}"]`,
+      `[data-content-field-id="${focusRequest.fieldId}"]`,
     );
     field
       ?.querySelector<HTMLElement>("input, textarea, select, button, [contenteditable='true']")
       ?.focus();
-    setPendingFocusFieldId(null);
-  }, [activeTabId, pendingFocusFieldId]);
+  }, [focusRequest]);
 
   const updateField = (fieldId: string, value: unknown) => {
     const next = { ...values, [fieldId]: value };
@@ -984,7 +993,7 @@ export function ContentForm({
             ),
           );
           if (tab) setActiveTabId(tab.id);
-          setPendingFocusFieldId(firstId);
+          setFocusRequest({ fieldId: firstId });
         }
         onSubmit?.();
       }}

@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { WebhookEndpoint } from "@framerfordevs/api/contracts/webhook/index";
+import { WebhookEndpoint } from "@framerfordevs/api/contracts/webhook";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -8,6 +8,7 @@ import axe from "axe-core";
 
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Schema } from "effect";
 
 const submittedInputs: Array<{ readonly operation: string; readonly input: unknown }> = [];
 const issuedSecret = "whsec_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -169,7 +170,6 @@ import {
   WebhookEndpointActions,
 } from "./index";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 function renderWithQueryClient(component: ReactNode) {
   return render(
     <QueryClientProvider
@@ -180,7 +180,7 @@ function renderWithQueryClient(component: ReactNode) {
   );
 }
 
-const endpoint = SchemaStrict.decodeUnknownSync(WebhookEndpoint)({
+const endpoint = Schema.decodeUnknownSync(WebhookEndpoint, { onExcessProperty: "error" })({
   id: ids.endpoint,
   projectId: ids.project,
   environmentId: ids.environment,

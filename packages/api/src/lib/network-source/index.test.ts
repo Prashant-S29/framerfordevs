@@ -1,5 +1,3 @@
-// Verifies stable, dependency-light source identities for trusted-proxy rate-limit boundaries.
-
 import { describe, expect, it } from "vitest";
 
 import { canonicalizeNetworkSource, selectCanonicalNetworkSource } from "./index";

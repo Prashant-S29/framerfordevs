@@ -1,5 +1,3 @@
-// Owns excluded schema and Presentation-mutation transport for CLI operator workflows.
-
 import type { ProjectSchema } from "@framerfordevs/schema";
 import { isProjectSchema } from "@framerfordevs/schema/validate";
 import {
@@ -11,7 +9,6 @@ import { Schema } from "effect";
 
 import type { JsonObject, JsonValue } from "../../schema";
 
-import * as SchemaStrict from "../../schema-strict";
 export interface AuthoringOperatorClientOptions {
   readonly baseUrl: string;
   readonly projectId: string;
@@ -179,7 +176,7 @@ const AllocatedSchemaCandidate = Schema.Struct({
   containsUnallocatedIdentities: Schema.Literal(false),
   candidateStructureHash: Digest,
   candidateContractHash: Digest,
-}).annotate({ closedObject: true });
+});
 const UnallocatedSchemaCandidate = Schema.Struct({
   collectionSourceKey: SourceKey,
   collectionId: Schema.NullOr(Uuid),
@@ -187,7 +184,7 @@ const UnallocatedSchemaCandidate = Schema.Struct({
   containsUnallocatedIdentities: Schema.Literal(true),
   candidateStructureHash: Schema.Null,
   candidateContractHash: Schema.NullOr(Digest),
-}).annotate({ closedObject: true });
+});
 export const AuthoringSchemaCandidate = Schema.Union([
   AllocatedSchemaCandidate,
   UnallocatedSchemaCandidate,
@@ -226,7 +223,7 @@ export const AuthoringSchemaPlan = Schema.Union([
     valid: Schema.Literal(true),
     planHash: Digest,
     issues: Schema.Array(AuthoringSchemaValidationIssue).check(Schema.isMaxLength(50)),
-  }).annotate({ closedObject: true }),
+  }),
   Schema.Struct({
     ...AuthoringSchemaPlanBase,
     valid: Schema.Literal(false),
@@ -235,7 +232,7 @@ export const AuthoringSchemaPlan = Schema.Union([
       Schema.isMinLength(1),
       Schema.isMaxLength(50),
     ),
-  }).annotate({ closedObject: true }),
+  }),
 ]).annotate({ identifier: "CliAuthoringSchemaPlan" });
 
 export class AuthoringSchemaApply extends Schema.Class<AuthoringSchemaApply>(
@@ -282,7 +279,7 @@ const AuthoringErrorDetail = Schema.Struct({
     Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   ),
   currentRevisionId: Schema.optionalKey(Schema.NullOr(Uuid)),
-}).annotate({ closedObject: true });
+});
 const AuthoringErrorCode = Schema.Literals([
   "VALIDATION_ERROR",
   "UNAUTHORIZED",
@@ -316,7 +313,7 @@ const AuthoringPublicError = Schema.Struct({
     Schema.isMaxLength(128),
     Schema.isPattern(/^[A-Za-z0-9._:-]+$/u),
   ),
-}).annotate({ closedObject: true });
+});
 
 const maximumRequestBytes = 1_048_576;
 const maximumResponseBytes = 4_194_304;
@@ -357,7 +354,11 @@ function jsonObject(value: unknown): JsonObject {
 }
 
 function requestBody<A, I>(schema: Schema.Codec<A, I, never>, value: unknown): JsonObject {
-  return jsonObject(SchemaStrict.decodeUnknownSync(schema)(value, { onExcessProperty: "error" }));
+  return jsonObject(
+    Schema.decodeUnknownSync(schema, { onExcessProperty: "error" })(value, {
+      onExcessProperty: "error",
+    }),
+  );
 }
 
 function decodeEnvelope<A, I>(value: unknown, dataSchema: Schema.Codec<A, I, never>) {
@@ -375,15 +376,20 @@ function decodeEnvelope<A, I>(value: unknown, dataSchema: Schema.Codec<A, I, nev
     if (value.error !== null) throw new Error("CLI_AUTHORING_RESPONSE_INVALID");
     return {
       ok: true as const,
-      data: SchemaStrict.decodeUnknownSync(dataSchema)(value.data, { onExcessProperty: "error" }),
+      data: Schema.decodeUnknownSync(dataSchema, { onExcessProperty: "error" })(value.data, {
+        onExcessProperty: "error",
+      }),
       error: null,
       message: value.message,
     };
   }
   if (value.data !== null) throw new Error("CLI_AUTHORING_RESPONSE_INVALID");
-  const error = SchemaStrict.decodeUnknownSync(AuthoringPublicError)(value.error, {
-    onExcessProperty: "error",
-  });
+  const error = Schema.decodeUnknownSync(AuthoringPublicError, { onExcessProperty: "error" })(
+    value.error,
+    {
+      onExcessProperty: "error",
+    },
+  );
   return {
     ok: false as const,
     data: null,
@@ -410,7 +416,7 @@ function origin(value: string): URL {
 }
 
 function segment<I>(schema: Schema.Codec<string, I, never>, value: unknown) {
-  return encodeURIComponent(SchemaStrict.decodeUnknownSync(schema)(value));
+  return encodeURIComponent(Schema.decodeUnknownSync(schema, { onExcessProperty: "error" })(value));
 }
 
 function requestSignal(input: AbortSignal | undefined, timeoutMs: number) {

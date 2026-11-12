@@ -1,5 +1,3 @@
-// Defines the credential-free editable Presentation document exchanged through CLI stdout/files.
-
 import { AuthoringCollectionPresentation } from "@framerfordevs/sdk/authoring";
 import { Schema } from "effect";
 
@@ -31,5 +29,5 @@ export class PresentationEditDocument extends Schema.Class<PresentationEditDocum
     expectedRevisionId: Uuid,
     expectedSequence: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1)),
     presentation: AuthoringCollectionPresentation,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}

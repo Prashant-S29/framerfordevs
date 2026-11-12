@@ -1,5 +1,3 @@
-// Verifies deterministic full-schema canonicalization and the aggregate one-mebibyte safety bound.
-
 import { assert, describe, it } from "@effect/vitest";
 
 import {

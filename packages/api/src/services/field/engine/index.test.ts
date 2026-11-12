@@ -1,5 +1,3 @@
-// Verifies the Effect service boundary around strict field configuration and pure value validation.
-
 import { assert, describe, it } from "@effect/vitest";
 import { Effect } from "effect";
 

@@ -1,5 +1,3 @@
-// Orchestrates Tooling bearer authority, strict inputs, signed pagination, and tenant-scoped reads.
-
 import { Effect, Schema } from "effect";
 
 import { ApiErrorDetail } from "../../contracts/response/api";
@@ -30,7 +28,6 @@ import {
 import { RateLimitManager } from "../../services/rate-limit/manager";
 import { ToolingRepository } from "../../services/tooling/repository";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const bearerPattern = /^Bearer ([^\s,]+)$/u;
 const allowedQueryKeys = new Set(["limit", "cursor"]);
 
@@ -41,7 +38,7 @@ function validationFailure(path: string, code: string, message: string) {
 }
 
 function decodeInput<A, I>(schema: Schema.Codec<A, I, never>, value: unknown, path: string) {
-  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
+  return Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(value).pipe(
     Effect.mapError(() =>
       validationFailure(path, "tooling_input_invalid", "Use valid Tooling route and query values."),
     ),
@@ -205,7 +202,7 @@ export const listToolingProjects = Effect.fn("tooling.public.projects.list")(fun
     limit: query.limit,
   });
   const nextCursor = yield* signNextCursor(page.nextAfterId, authority);
-  return yield* SchemaStrict.decodeUnknownEffect(ToolingProjectPage)({
+  return yield* Schema.decodeUnknownEffect(ToolingProjectPage, { onExcessProperty: "error" })({
     items: page.items,
     nextCursor,
   }).pipe(Effect.orDie);
@@ -232,7 +229,7 @@ export const listToolingEnvironments = Effect.fn("tooling.public.environments.li
     limit: query.limit,
   });
   const nextCursor = yield* signNextCursor(page.nextAfterId, authority);
-  return yield* SchemaStrict.decodeUnknownEffect(ToolingEnvironmentPage)({
+  return yield* Schema.decodeUnknownEffect(ToolingEnvironmentPage, { onExcessProperty: "error" })({
     projectId: page.projectId,
     items: page.items,
     nextCursor,
@@ -262,7 +259,9 @@ export const getToolingManifestPage = Effect.fn("tooling.public.manifest.get")(f
     limit: query.limit,
   });
   const nextCursor = yield* signNextCursor(page.nextAfterId ?? null, authority);
-  return yield* SchemaStrict.decodeUnknownEffect(ToolingSchemaManifestPage)({
+  return yield* Schema.decodeUnknownEffect(ToolingSchemaManifestPage, {
+    onExcessProperty: "error",
+  })({
     projectId: page.projectId,
     environmentId: page.environmentId,
     environmentKey: page.environmentKey,

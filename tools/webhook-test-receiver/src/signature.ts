@@ -1,5 +1,3 @@
-// Verifies Standard Webhooks-compatible signatures over exact raw bytes before parsing events.
-
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { parseWebhookEvent } from "./event.js";
@@ -8,7 +6,6 @@ import type { VerificationResult } from "./types.js";
 const eventIdPattern = /^[0-9a-f-]{36}$/u;
 const signaturePattern = /^v1,([A-Za-z0-9+/]+={0,2})$/u;
 
-/** Decodes one strict endpoint signing secret into its 32-byte HMAC key. */
 function signingKey(secret: string): Buffer | null {
   if (!/^whsec_[A-Za-z0-9_-]{43}$/u.test(secret)) return null;
   const encoded = secret.slice(6);
@@ -16,7 +13,6 @@ function signingKey(secret: string): Buffer | null {
   return key.length === 32 && key.toString("base64url") === encoded ? key : null;
 }
 
-/** Parses one or two bounded Standard Webhooks v1 signatures. */
 function parseSignatures(value: string): ReadonlyArray<Buffer> | null {
   const entries = value.split(" ").filter((entry) => entry.length > 0);
   if (entries.length < 1 || entries.length > 2) return null;
@@ -31,7 +27,6 @@ function parseSignatures(value: string): ReadonlyArray<Buffer> | null {
   return signatures;
 }
 
-/** Compares fixed-length HMAC values without timing-dependent string equality. */
 function signatureMatches(expected: Buffer, received: Buffer): boolean {
   return expected.length === received.length && timingSafeEqual(expected, received);
 }
@@ -46,7 +41,6 @@ export interface SignatureVerificationInput {
   readonly toleranceSeconds: number;
 }
 
-/** Verifies headers, freshness, HMAC, and the approved event body in security order. */
 export function verifyWebhook(input: SignatureVerificationInput): VerificationResult {
   if (input.secrets.length < 1) return { ok: false, category: "missing_secret" };
   if (

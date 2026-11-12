@@ -1,5 +1,5 @@
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Exit, Layer } from "effect";
+import { Effect, Exit, Layer, Schema } from "effect";
 
 import {
   AuthoringCollectionPresentation,
@@ -32,7 +32,6 @@ import {
   publishCollectionPresentation,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const collectionId = "019fae8b-1234-7000-8000-000000000003";
@@ -88,7 +87,7 @@ const editorLayout = {
   sidebarGroups: [],
 };
 
-const draft = SchemaStrict.decodeUnknownSync(CollectionDraftSchema)({
+const draft = Schema.decodeUnknownSync(CollectionDraftSchema, { onExcessProperty: "error" })({
   formatVersion: 2,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
@@ -129,7 +128,7 @@ const draft = SchemaStrict.decodeUnknownSync(CollectionDraftSchema)({
   ],
 });
 
-const revision = SchemaStrict.decodeUnknownSync(PublishedSchemaRevision)({
+const revision = Schema.decodeUnknownSync(PublishedSchemaRevision, { onExcessProperty: "error" })({
   id: revisionId,
   workspaceId,
   projectId,
@@ -156,7 +155,9 @@ const revision = SchemaStrict.decodeUnknownSync(PublishedSchemaRevision)({
   editorLayout,
 });
 
-const presentation = SchemaStrict.decodeUnknownSync(AuthoringCollectionPresentation)({
+const presentation = Schema.decodeUnknownSync(AuthoringCollectionPresentation, {
+  onExcessProperty: "error",
+})({
   displayName: "Articles",
   description: null,
   fields: [
@@ -170,7 +171,9 @@ const presentation = SchemaStrict.decodeUnknownSync(AuthoringCollectionPresentat
   ],
   editorLayout,
 });
-const presentationRevision = SchemaStrict.decodeUnknownSync(AuthoringPresentationRevision)({
+const presentationRevision = Schema.decodeUnknownSync(AuthoringPresentationRevision, {
+  onExcessProperty: "error",
+})({
   collectionId,
   revisionId,
   previousRevisionId: null,
@@ -214,15 +217,21 @@ describe("schema operations", () => {
         const scope = { projectId, environmentId, collectionId };
         yield* getCollectionDraft(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)(scope),
+          yield* Schema.decodeUnknownEffect(GetCollectionDraftInput, { onExcessProperty: "error" })(
+            scope,
+          ),
         );
         yield* getCollectionPresentation(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(GetCollectionPresentationInput)(scope),
+          yield* Schema.decodeUnknownEffect(GetCollectionPresentationInput, {
+            onExcessProperty: "error",
+          })(scope),
         );
         yield* publishCollectionPresentation(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(PublishCollectionPresentationInput)({
+          yield* Schema.decodeUnknownEffect(PublishCollectionPresentationInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             commandId,
             expectedRevisionId: revisionId,
@@ -233,11 +242,15 @@ describe("schema operations", () => {
         );
         yield* getLatestPublishedSchema(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(GetLatestPublishedSchemaInput)(scope),
+          yield* Schema.decodeUnknownEffect(GetLatestPublishedSchemaInput, {
+            onExcessProperty: "error",
+          })(scope),
         );
         yield* getPublishedSchemaRevision(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(GetPublishedSchemaRevisionInput)({
+          yield* Schema.decodeUnknownEffect(GetPublishedSchemaRevisionInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             revisionId,
           }),
@@ -261,7 +274,9 @@ describe("schema operations", () => {
         const exit = yield* Effect.exit(
           getCollectionDraft(
             "",
-            yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)({
+            yield* Schema.decodeUnknownEffect(GetCollectionDraftInput, {
+              onExcessProperty: "error",
+            })({
               projectId,
               environmentId,
               collectionId,

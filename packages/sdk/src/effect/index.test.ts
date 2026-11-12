@@ -9,7 +9,6 @@ import {
   recognizeDeliveryContract,
 } from "./index";
 
-import * as SchemaStrict from "../schema-strict";
 const entry = {
   id: "019fae8b-1234-7000-8000-000000000001",
   collectionId: "019fae8b-1234-7000-8000-000000000002",
@@ -91,7 +90,7 @@ describe("SDK Effect validators", () => {
 
   it.effect("never narrows an unrecognized immutable revision to the locked type", () =>
     Effect.gen(function* () {
-      const item = SchemaStrict.decodeUnknownSync(DeliveryItem)(entry);
+      const item = Schema.decodeUnknownSync(DeliveryItem, { onExcessProperty: "error" })(entry);
       const recognized = yield* recognizeDeliveryContract(
         item,
         item.publication.schemaRevisionId,

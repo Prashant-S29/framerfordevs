@@ -22,23 +22,28 @@ import {
   WorkspaceName,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
-const workspaceId = SchemaStrict.decodeUnknownSync(WorkspaceId)(
+const workspaceId = Schema.decodeUnknownSync(WorkspaceId, { onExcessProperty: "error" })(
   "019fae8b-1234-7000-8000-000000000001",
 );
-const membershipId = SchemaStrict.decodeUnknownSync(WorkspaceMembershipId)(
+const membershipId = Schema.decodeUnknownSync(WorkspaceMembershipId, { onExcessProperty: "error" })(
   "019fae8b-1234-7000-8000-000000000002",
 );
-const projectId = SchemaStrict.decodeUnknownSync(ProjectId)("019fae8b-1234-7000-8000-000000000003");
+const projectId = Schema.decodeUnknownSync(ProjectId, { onExcessProperty: "error" })(
+  "019fae8b-1234-7000-8000-000000000003",
+);
 const createdAt = "2026-07-29T12:00:00.000Z";
 
 describe("platform contracts", () => {
   it.effect("normalizes trimmed Unicode workspace and project names", () =>
     Effect.gen(function* () {
-      const workspace = yield* SchemaStrict.decodeUnknownEffect(CreateWorkspaceInput)({
+      const workspace = yield* Schema.decodeUnknownEffect(CreateWorkspaceInput, {
+        onExcessProperty: "error",
+      })({
         name: "  Cafe\u0301  ",
       });
-      const project = yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
+      const project = yield* Schema.decodeUnknownEffect(CreateProjectInput, {
+        onExcessProperty: "error",
+      })({
         workspaceId,
         name: "  Product Site  ",
         key: "product-site",
@@ -55,7 +60,7 @@ describe("platform contracts", () => {
     Effect.gen(function* () {
       const values = ["   ", "x".repeat(101), "unsafe\nname"];
       const exits = yield* Effect.forEach(values, (name) =>
-        Effect.exit(SchemaStrict.decodeUnknownEffect(WorkspaceName)(name)),
+        Effect.exit(Schema.decodeUnknownEffect(WorkspaceName, { onExcessProperty: "error" })(name)),
       );
 
       assert.isTrue(exits.every(Exit.isFailure));
@@ -68,10 +73,10 @@ describe("platform contracts", () => {
       const invalid = ["Site", "-site", "site-", "site--docs", "site_docs", "x".repeat(64)];
 
       const validExits = yield* Effect.forEach(valid, (key) =>
-        Effect.exit(SchemaStrict.decodeUnknownEffect(ProjectKey)(key)),
+        Effect.exit(Schema.decodeUnknownEffect(ProjectKey, { onExcessProperty: "error" })(key)),
       );
       const invalidExits = yield* Effect.forEach(invalid, (key) =>
-        Effect.exit(SchemaStrict.decodeUnknownEffect(ProjectKey)(key)),
+        Effect.exit(Schema.decodeUnknownEffect(ProjectKey, { onExcessProperty: "error" })(key)),
       );
 
       assert.isTrue(validExits.every(Exit.isSuccess));
@@ -82,13 +87,15 @@ describe("platform contracts", () => {
   it.effect("rejects malformed branded IDs and timestamps", () =>
     Effect.gen(function* () {
       const invalidWorkspace = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(WorkspaceId)("workspace-1"),
+        Schema.decodeUnknownEffect(WorkspaceId, { onExcessProperty: "error" })("workspace-1"),
       );
       const invalidProject = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ProjectId)(workspaceId),
+        Schema.decodeUnknownEffect(ProjectId, { onExcessProperty: "error" })(workspaceId),
       );
       const invalidTimestamp = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(IsoDateTime)("2026-07-29T12:00:00+05:30"),
+        Schema.decodeUnknownEffect(IsoDateTime, { onExcessProperty: "error" })(
+          "2026-07-29T12:00:00+05:30",
+        ),
       );
 
       assert.isTrue(Exit.isFailure(invalidWorkspace));
@@ -117,9 +124,13 @@ describe("platform contracts", () => {
     [Schema.String],
     ([value]) =>
       Effect.gen(function* () {
-        const first = yield* Effect.option(SchemaStrict.decodeUnknownEffect(ProjectName)(value));
+        const first = yield* Effect.option(
+          Schema.decodeUnknownEffect(ProjectName, { onExcessProperty: "error" })(value),
+        );
         if (first._tag === "Some") {
-          const second = yield* SchemaStrict.decodeUnknownEffect(ProjectName)(first.value);
+          const second = yield* Schema.decodeUnknownEffect(ProjectName, {
+            onExcessProperty: "error",
+          })(first.value);
           assert.strictEqual(second, first.value);
         }
       }),
@@ -154,7 +165,9 @@ describe("platform cursor contracts", () => {
 
   it.effect("rejects malformed, wrong-kind, and oversized cursor values", () =>
     Effect.gen(function* () {
-      const malformed = yield* SchemaStrict.decodeUnknownEffect(Cursor)("bm90LWpzb24");
+      const malformed = yield* Schema.decodeUnknownEffect(Cursor, { onExcessProperty: "error" })(
+        "bm90LWpzb24",
+      );
       const projectCursor = yield* encodeProjectCursor({
         status: "active",
         sortAt: createdAt,
@@ -163,7 +176,7 @@ describe("platform cursor contracts", () => {
       const malformedExit = yield* Effect.exit(decodeWorkspaceCursor(malformed));
       const wrongKindExit = yield* Effect.exit(decodeWorkspaceCursor(projectCursor));
       const oversizedExit = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(Cursor)("a".repeat(513)),
+        Schema.decodeUnknownEffect(Cursor, { onExcessProperty: "error" })("a".repeat(513)),
       );
 
       assert.isTrue(Exit.isFailure(malformedExit));

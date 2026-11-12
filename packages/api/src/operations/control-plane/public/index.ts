@@ -1,5 +1,3 @@
-// Defines Control Plane bearer grants and principal adaptation without introducing cookie authority.
-
 import {
   CONTROL_PLANE_GOVERNANCE_READ_SCOPE,
   CONTROL_PLANE_GOVERNANCE_WRITE_SCOPE,
@@ -99,7 +97,6 @@ import {
   type ToolingPrincipal,
 } from "../../../services/tooling/principal-authenticator";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const bearerPattern = /^Bearer ([^\s,]+)$/u;
 const positiveIntegerPattern = /^[1-9]\d*$/u;
 
@@ -116,7 +113,9 @@ function validationFailure(path: string) {
 }
 
 function decodeInput<A, I>(schema: Schema.Codec<A, I, never>, value: unknown, path: string) {
-  return SchemaStrict.decodeUnknownEffect(schema)(value, { onExcessProperty: "error" }).pipe(
+  return Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(value, {
+    onExcessProperty: "error",
+  }).pipe(
     Effect.mapError(() => validationFailure(path)),
     Effect.withSpan("control-plane.public.input.decode"),
   );
@@ -812,14 +811,12 @@ export const evaluateControlPlanePrincipalRateLimit = Effect.fn(
   });
 });
 
-/** Maps every Control Plane transport principal to the shared domain actor authority. */
 export function controlPlanePrincipalActor(principal: ControlPlanePrincipal): ControlPlaneActor {
   return principal.kind === "management_credential"
     ? { kind: "credential", id: principal.credential.credentialId }
     : { kind: "user", id: AuthUserId.make(principal.userId) };
 }
 
-/** Returns a transport-distinct, content-free rate-limit and idempotency identity. */
 export function controlPlanePrincipalKey(principal: ControlPlanePrincipal): string {
   if (principal.kind === "management_credential") {
     return `credential:${principal.credential.credentialId}`;

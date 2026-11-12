@@ -1,5 +1,3 @@
-// Generates the deterministic browser-safe ISO 4217 registry used by CMS money fields.
-
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +9,6 @@ const outputPath = resolve(
   "../packages/api/src/registry/iso-4217.generated",
 );
 
-/** Downloads the authoritative registry without introducing a runtime network dependency. */
 async function loadRegistryXml() {
   const response = await fetch(SOURCE_URL, {
     headers: { accept: "application/xml" },
@@ -24,7 +21,6 @@ async function loadRegistryXml() {
   return response.text();
 }
 
-/** Parses and deduplicates active alphabetic codes with numeric minor units. */
 function parseRegistry(xml) {
   const publishedMatch = /<ISO_4217\s+Pblshd="([0-9]{4}-[0-9]{2}-[0-9]{2})">/u.exec(xml);
   if (!publishedMatch?.[1]) throw new Error("ISO 4217 registry is missing its publication date.");
@@ -56,7 +52,6 @@ function parseRegistry(xml) {
   return { publishedAt: publishedMatch[1], currencies };
 }
 
-/** Renders a deterministic TypeScript artifact with no generated runtime logic. */
 function renderRegistry(registry) {
   const codes = [...registry.currencies.keys()].sort();
   const rows = [];

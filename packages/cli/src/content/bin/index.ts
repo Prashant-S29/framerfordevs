@@ -1,5 +1,3 @@
-// Validates all local flags and mutation files before loading credential or network modules.
-
 import { AuthoringMutationSchema, type AuthoringMutation } from "@framerfordevs/sdk/authoring";
 import { lstat, readFile, realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
@@ -14,7 +12,6 @@ import { parseArguments, stringFlag, validateFlags } from "../../command-argumen
 import { CliConfigFileSystemLive, loadCliConfig } from "../../config";
 import type { CliConfigV2 } from "../../schema";
 
-import * as SchemaStrict from "../../schema-strict";
 const maximumMutationBytes = 1_048_576;
 export type ContentCommand =
   | "entry list"
@@ -117,7 +114,9 @@ async function readMutations(
     const mutationsSchema = requireItems
       ? Schema.Array(AuthoringMutationSchema).check(Schema.isMinLength(1), Schema.isMaxLength(500))
       : Schema.Array(AuthoringMutationSchema).check(Schema.isMaxLength(500));
-    return SchemaStrict.decodeUnknownSync(mutationsSchema)(value, { onExcessProperty: "error" });
+    return Schema.decodeUnknownSync(mutationsSchema, { onExcessProperty: "error" })(value, {
+      onExcessProperty: "error",
+    });
   } catch {
     throw new Error("CLI_MUTATION_FILE_INVALID");
   }

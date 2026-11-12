@@ -1,17 +1,14 @@
 import { request as requestHttp, type OutgoingHttpHeaders } from "node:http";
 
 import type { ApplicationEffectTransform } from "@framerfordevs/api/context";
-import { StudioBootstrap } from "@framerfordevs/api/contracts/studio/index";
-import { StudioCollectionConfigurationInvalidFailure } from "@framerfordevs/api/contracts/studio-content/index";
-import {
-  RateLimitDecision,
-  rateLimitPolicies,
-} from "@framerfordevs/api/contracts/rate-limit/index";
-import { disposeApplicationRuntime } from "@framerfordevs/api/runtime/index";
+import { StudioBootstrap } from "@framerfordevs/api/contracts/studio";
+import { StudioCollectionConfigurationInvalidFailure } from "@framerfordevs/api/contracts/studio-content";
+import { RateLimitDecision, rateLimitPolicies } from "@framerfordevs/api/contracts/rate-limit";
+import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
 import {
   RateLimitManager,
   type RateLimitManagerService,
-} from "@framerfordevs/api/services/rate-limit/manager/index";
+} from "@framerfordevs/api/services/rate-limit/manager";
 import {
   makeStudioOAuthTokenVerifier,
   StudioOAuthTokenVerifier,
@@ -23,15 +20,14 @@ import {
 import {
   makeStudioContentRepository,
   StudioContentRepository,
-} from "@framerfordevs/api/services/studio-content/repository/index";
+} from "@framerfordevs/api/services/studio-content/repository";
 import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import request from "supertest";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { createApp, encodeStudioContentResponse } from "../../../src/app";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const projectId = "019fae8b-1234-7000-8000-000000000002";
 const environmentId = "019fae8b-1234-7000-8000-000000000003";
 const collectionId = "019fae8b-1234-7000-8000-000000000004";
@@ -53,7 +49,7 @@ const principal: StudioOAuthPrincipal = {
   scopes: ["studio:session", "offline_access"],
   expiresAtEpochSeconds: 1_800_000_000,
 };
-const bootstrap = SchemaStrict.decodeUnknownSync(StudioBootstrap)({
+const bootstrap = Schema.decodeUnknownSync(StudioBootstrap, { onExcessProperty: "error" })({
   formatVersion: 1,
   registration: {
     id: registrationId,
@@ -96,7 +92,7 @@ const contentRepository: ReturnType<typeof makeStudioContentRepository> = {
 const rateLimitManager: RateLimitManagerService = {
   evaluate: (input) =>
     Effect.succeed(
-      SchemaStrict.decodeUnknownSync(RateLimitDecision)({
+      Schema.decodeUnknownSync(RateLimitDecision, { onExcessProperty: "error" })({
         allowed: rateLimitAllowed,
         policy: input.policy,
         cost: input.cost,

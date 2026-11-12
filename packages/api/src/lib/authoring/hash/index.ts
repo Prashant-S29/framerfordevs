@@ -1,5 +1,3 @@
-// Projects code-owned schema structure onto persisted stable identities and hashes canonical bytes.
-
 import { createHash } from "node:crypto";
 
 import type { CollectionSchema, FieldSchema, ListItemSchema } from "@framerfordevs/schema";
@@ -208,7 +206,6 @@ function projectNode(
   };
 }
 
-/** Computes one revision's `structureHash` after every source key resolves to a server ID. */
 export function computeCollectionStructureHash(
   collection: CollectionSchema,
   identities: StructureIdentityMap,
@@ -262,7 +259,6 @@ export interface ProjectStructureManifestItem {
   readonly structureHash: StructureHashType;
 }
 
-/** Hashes current per-collection revision authority into one stale-plan manifest boundary. */
 export function computeProjectStructureManifestHash(
   items: ReadonlyArray<ProjectStructureManifestItem>,
 ): ProjectStructureManifestHashType {

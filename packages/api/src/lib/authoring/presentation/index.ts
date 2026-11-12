@@ -1,5 +1,3 @@
-// Merges a complete presentation-only projection into immutable published schema authority.
-
 import { createHash } from "node:crypto";
 
 import { projectRoleValues } from "../../../contracts/access";
@@ -21,6 +19,7 @@ import {
 import { canonicalizeSchemaDocument } from "../../field/document";
 import { flattenFieldTree } from "../../field/tree";
 import { generatedFormDefinition } from "../../field/form-definition";
+import { Schema } from "effect";
 import {
   hashCollectionContract,
   hashCollectionDraft,
@@ -28,7 +27,6 @@ import {
   validateCollectionDraft,
 } from "../../../services/schema/engine";
 
-import * as SchemaStrict from "../../schema-strict";
 export function fingerprintAuthoringPresentation(options: {
   readonly actor: CmsActor;
   readonly projectId: string;
@@ -100,7 +98,6 @@ function structuralField(field: CollectionFieldDefinition): unknown {
   };
 }
 
-/** Compares every code-owned field property while intentionally excluding presentation order. */
 export function hasEqualPublishedStructure(
   current: ReadonlyArray<CollectionFieldDefinition>,
   candidate: ReadonlyArray<CollectionFieldDefinition>,
@@ -199,7 +196,6 @@ function mergeFieldPresentation(
   };
 }
 
-/** Projects one immutable revision back to the complete stable-ID presentation contract. */
 export function publishedPresentation(
   revision: PublishedSchemaRevision,
 ): AuthoringCollectionPresentation {
@@ -228,7 +224,6 @@ export function publishedPresentation(
   });
 }
 
-/** Strictly merges presentation onto current structure and proves hash-contract separation. */
 export function buildAuthoringPresentationCandidate(options: {
   readonly current: PublishedSchemaRevision;
   readonly presentation: {
@@ -286,7 +281,7 @@ export function buildAuthoringPresentationCandidate(options: {
     formatVersion: 2,
     validationProfile: options.current.validationProfile,
     currencyRegistryProfile: options.current.currencyRegistryProfile,
-    collection: SchemaStrict.decodeUnknownSync(CmsCollection)({
+    collection: Schema.decodeUnknownSync(CmsCollection, { onExcessProperty: "error" })({
       id: options.current.collectionId,
       workspaceId: options.current.workspaceId,
       projectId: options.current.projectId,

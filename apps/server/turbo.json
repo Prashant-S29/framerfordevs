@@ -1,0 +1,6 @@
+{
+  "extends": ["//"],
+  "boundaries": {
+    "implicitDependencies": ["k6"]
+  }
+}

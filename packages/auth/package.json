@@ -1,16 +1,15 @@
 {
   "name": "@framerfordevs/auth",
+  "private": true,
   "type": "module",
   "exports": {
-    ".": {
-      "default": "./src/index.ts"
-    },
-    "./*": {
-      "default": "./src/*.ts"
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run src",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@better-auth/core": "1.7.21",
@@ -27,6 +26,8 @@
   },
   "devDependencies": {
     "@framerfordevs/config": "workspace:*",
-    "typescript": "catalog:"
+    "@vitest/coverage-v8": "5.1.0",
+    "typescript": "catalog:",
+    "vitest": "5.1.0"
   }
 }

@@ -1,5 +1,3 @@
-// Verifies the replaceable M7 EntryEngine Layer delegates to deterministic bounded kernel behavior.
-
 import { assert, describe, it } from "@effect/vitest";
 import { Effect } from "effect";
 

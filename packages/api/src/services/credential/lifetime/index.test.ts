@@ -1,5 +1,3 @@
-// Verifies exact Preview credential lifetime boundaries independently from persistence and transport.
-
 import { assert, describe, it } from "@effect/vitest";
 import { Effect } from "effect";
 
@@ -11,7 +9,6 @@ import {
 
 const issuedAt = new Date("2026-08-12T00:00:00.000Z");
 
-/** Creates an expiry at an exact offset from the fixed issuance instant. */
 function expiresAfter(offsetMs: number): Date {
   return new Date(issuedAt.getTime() + offsetMs);
 }

@@ -1,5 +1,3 @@
-// Verifies partition-safe draft mutation paths for atomic and mixed-object fields.
-
 import { describe, expect, it } from "vitest";
 
 import { fieldMutations } from "./index";

@@ -2,20 +2,20 @@ import type {
   AuthoringCollectionPresentation,
   AuthoringFieldPresentation,
   AuthoringPresentationSnapshot,
-} from "@framerfordevs/api/contracts/authoring/presentation/index";
-import { projectRoleValues, type ProjectRole } from "@framerfordevs/api/contracts/access/index";
+} from "@framerfordevs/api/contracts/authoring/presentation";
+import { projectRoleValues, type ProjectRole } from "@framerfordevs/api/contracts/access";
 import {
   EditorLayoutNodeId,
   type EditorLayout,
   type EditorLayoutGroup,
-} from "@framerfordevs/api/contracts/field/index";
+} from "@framerfordevs/api/contracts/field";
 import {
   CollectionDescription,
   CollectionDisplayName,
   CollectionFieldDisplayLabel,
   type CollectionFieldDefinition,
   type PublishedSchemaRevision,
-} from "@framerfordevs/api/contracts/schema/index";
+} from "@framerfordevs/api/contracts/schema";
 import { Alert, AlertDescription, AlertTitle } from "@framerfordevs/ui/components/alert";
 import { Badge } from "@framerfordevs/ui/components/badge";
 import { Button } from "@framerfordevs/ui/components/button";

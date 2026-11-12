@@ -1,5 +1,3 @@
-// Exercises the approved M9 Delivery capacity, limiter, revalidation, and response-boundary gates.
-
 import http from "k6/http";
 import execution from "k6/execution";
 import { check } from "k6";

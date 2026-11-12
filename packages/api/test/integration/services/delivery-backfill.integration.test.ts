@@ -1,5 +1,3 @@
-// Exercises the operator backfill's read-only whole-database preflight without mutating publication authority.
-
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Exit } from "effect";
 

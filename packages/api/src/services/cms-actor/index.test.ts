@@ -4,13 +4,15 @@ import { ApiCredentialId } from "../../contracts/access";
 import { CmsActor } from "../../contracts/authoring";
 import { AuthUserId } from "../../contracts/platform";
 import { cmsActorMatches, cmsActorReferences, cmsAuditActor, normalizeCmsActor } from "./index";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../lib/schema-strict";
-const userId = SchemaStrict.decodeUnknownSync(AuthUserId)("m13-actor-user");
-const credentialId = SchemaStrict.decodeUnknownSync(ApiCredentialId)(
+const userId = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(
+  "m13-actor-user",
+);
+const credentialId = Schema.decodeUnknownSync(ApiCredentialId, { onExcessProperty: "error" })(
   "019fae8b-1234-7000-8000-000000000301",
 );
-const credential = SchemaStrict.decodeUnknownSync(CmsActor)({
+const credential = Schema.decodeUnknownSync(CmsActor, { onExcessProperty: "error" })({
   kind: "credential",
   id: credentialId,
 });

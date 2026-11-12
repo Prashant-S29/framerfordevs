@@ -1,5 +1,3 @@
-// Generates the tenant-neutral Studio v1 bootstrap OpenAPI contract from Effect schemas.
-
 import { Schema } from "effect";
 
 import { make as makeJsonSchema } from "../../response/json-schema";

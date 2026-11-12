@@ -1,5 +1,3 @@
-// Proves generated API-reference pages preserve canonical operation paths and the closed family allowlist.
-
 import authoringDocument from "@framerfordevs/public-contracts/artifacts/authoring/v1/openapi.json";
 import controlPlaneDocument from "@framerfordevs/public-contracts/artifacts/control-plane/v1/openapi.json";
 import deliveryDocument from "@framerfordevs/public-contracts/artifacts/delivery/v1/openapi.json";

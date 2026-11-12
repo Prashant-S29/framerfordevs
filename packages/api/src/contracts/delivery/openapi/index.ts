@@ -1,5 +1,3 @@
-// Generates the tenant-neutral public Delivery OpenAPI contract from Effect response schemas and protocol metadata.
-
 import { Schema } from "effect";
 
 import { make as makeJsonSchema } from "../../response/json-schema";
@@ -17,7 +15,6 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Repoints Effect's local definitions into one OpenAPI components registry. */
 function rewriteSchemaReferences(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(rewriteSchemaReferences);
   if (!isRecord(value)) return value;

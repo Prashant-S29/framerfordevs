@@ -1,5 +1,3 @@
-// Loads credential and network authority only after local schema extraction has succeeded.
-
 import type { ProjectSchema } from "@framerfordevs/schema";
 import { Effect, ManagedRuntime } from "effect";
 

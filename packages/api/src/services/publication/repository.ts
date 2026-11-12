@@ -1,5 +1,3 @@
-// Persists exact-locale publication heads and immutable delivery artifacts atomically.
-
 import { createHash } from "node:crypto";
 
 import { db } from "@framerfordevs/db";
@@ -95,7 +93,6 @@ import { authorizeCmsActorProject, selectUserProjectAccess } from "../project-ac
 import { PublicationEngine } from "./engine";
 import { hashSchemaContract } from "../schema/engine";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 import { Uuid } from "../../contracts/uuid";
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
@@ -129,7 +126,6 @@ const deliveryUniqueConstraints = new Set([
   "cms_entry_locale_delivery_value_reference_unique",
 ]);
 
-/** Finds a known PostgreSQL constraint through bounded wrapped causes. */
 function hasConstraint(cause: unknown, constraints: ReadonlySet<string>, depth = 0): boolean {
   if (depth > 4 || typeof cause !== "object" || cause === null) return false;
   const constraint = Reflect.get(cause, "constraint");
@@ -140,7 +136,6 @@ function hasConstraint(cause: unknown, constraints: ReadonlySet<string>, depth =
   );
 }
 
-/** Maps the final race-safe unique authority without exposing the conflicting value. */
 function publicationPersistenceFailure(operation: string, cause: unknown) {
   return hasConstraint(cause, deliveryUniqueConstraints)
     ? EntryPublicationInvalidFailure.make({
@@ -156,7 +151,6 @@ function publicationPersistenceFailure(operation: string, cause: unknown) {
     : databaseFailure(operation, cause);
 }
 
-/** Converts one pure typed projection into exactly one populated database value column. */
 function projectionInsertValue(options: {
   readonly row: DeliveryProjectionRow;
   readonly publicationId: string;
@@ -195,7 +189,6 @@ function projectionInsertValue(options: {
   return { ...common, referenceValue: String(options.row.value) };
 }
 
-/** Serializes potential unique claims in deterministic digest order before index enforcement. */
 async function lockUniqueDeliveryClaims(
   transaction: ApplicationTransaction,
   rows: ReadonlyArray<DeliveryProjectionRow>,
@@ -222,7 +215,6 @@ async function lockUniqueDeliveryClaims(
   }
 }
 
-/** Increments the conservative collection-locale traversal generation once per state change. */
 async function incrementDeliveryGeneration(
   transaction: ApplicationTransaction,
   options: {
@@ -255,11 +247,11 @@ async function incrementDeliveryGeneration(
 }
 
 function entryValues(value: unknown): EntryValues {
-  return SchemaStrict.decodeUnknownSync(Schema.Record(Uuid, Schema.Unknown))(value);
+  return Schema.decodeUnknownSync(Schema.Record(Uuid, Schema.Unknown))(value);
 }
 
 function fieldValue(row: typeof cmsSchemaRevisionField.$inferSelect): CollectionField {
-  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+  return Schema.decodeUnknownSync(CollectionFieldDefinition)({
     id: row.fieldId,
     parentFieldId: row.parentFieldId,
     nodeRole: row.nodeRole,
@@ -446,7 +438,7 @@ async function authorizeScope(
 
 async function allocatePublicationId(executor: ApplicationExecutor): Promise<string> {
   const result = await executor.execute(sql`select uuidv7()::text as id`);
-  const decoded = SchemaStrict.decodeUnknownSync(
+  const decoded = Schema.decodeUnknownSync(
     Schema.Struct({ rows: Schema.Array(Schema.Struct({ id: Schema.String })) }),
   )(result);
   const row = decoded.rows[0];
@@ -802,7 +794,7 @@ function publicationSummary(
   locale: typeof projectLocale.$inferSelect,
   current: boolean,
 ) {
-  return SchemaStrict.decodeUnknownSync(EntryPublicationSummary)({
+  return Schema.decodeUnknownSync(EntryPublicationSummary)({
     id: row.publication.id,
     snapshotId: row.snapshot.publicationId,
     entryId: row.publication.entryId,
@@ -921,7 +913,7 @@ function publicIssues(
     });
   return result
     .slice(0, 50)
-    .map((issue) => SchemaStrict.decodeUnknownSync(EntryPublicationValidationIssue)(issue));
+    .map((issue) => Schema.decodeUnknownSync(EntryPublicationValidationIssue)(issue));
 }
 
 interface AuthorityState {
@@ -1072,7 +1064,7 @@ function planValue(
       ? canonicalizeEntryValue(state.current.snapshot.referenceManifest) !==
         candidate.canonicalReferenceManifest
       : candidate !== null && candidate.referenceManifest.length > 0;
-  return SchemaStrict.decodeUnknownSync(EntryPublicationPlan)({
+  return Schema.decodeUnknownSync(EntryPublicationPlan)({
     entryId: state.entry.id,
     localeId: access.locale.id,
     locale: access.locale.tag,
@@ -1258,7 +1250,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
         current !== null &&
         (current.schemaRevisionId !== state.contract.revision.id ||
           current.contractHash !== state.contract.contractHash);
-      return SchemaStrict.decodeUnknownSync(EntryPublicationStatus)({
+      return Schema.decodeUnknownSync(EntryPublicationStatus)({
         entryId: state.entry.id,
         localeId: access.locale.id,
         locale: access.locale.tag,
@@ -1468,7 +1460,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
                     fieldId:
                       issue.fieldId === null
                         ? null
-                        : SchemaStrict.decodeUnknownSync(CollectionFieldId)(issue.fieldId),
+                        : Schema.decodeUnknownSync(CollectionFieldId)(issue.fieldId),
                     path: issue.path,
                     code: issue.code,
                     message: issue.message,
@@ -1762,7 +1754,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
       const stateVersion =
         result.kind === "replay" ? result.receipt.resultHeadVersion : result.stateVersion;
       const resultKind = result.kind === "replay" ? result.receipt.resultKind : result.resultKind;
-      return SchemaStrict.decodeUnknownSync(PublishEntryResult)({
+      return Schema.decodeUnknownSync(PublishEntryResult)({
         entryId: result.artifact.publication.entryId,
         localeId: result.access.locale.id,
         locale: result.access.locale.tag,
@@ -2059,7 +2051,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
         result.kind === "replay" ? result.receipt.resultHeadVersion : result.stateVersion;
       const finalResultKind =
         result.kind === "replay" ? result.receipt.resultKind : result.resultKind;
-      return SchemaStrict.decodeUnknownSync(UnpublishEntryResult)({
+      return Schema.decodeUnknownSync(UnpublishEntryResult)({
         entryId: input.entryId,
         localeId: result.access.locale.id,
         locale: result.access.locale.tag,
@@ -2141,12 +2133,10 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               collectionId: input.collectionId,
               entryId: input.entryId,
               locale: input.locale,
-              sequence: SchemaStrict.decodeUnknownSync(EntryPublicationSequence)(
+              sequence: Schema.decodeUnknownSync(EntryPublicationSequence)(
                 last.publication.publicationSequence,
               ),
-              publicationId: SchemaStrict.decodeUnknownSync(EntryPublicationId)(
-                last.publication.id,
-              ),
+              publicationId: Schema.decodeUnknownSync(EntryPublicationId)(last.publication.id),
             })
           : null;
       return EntryPublicationPage.make({ items, nextCursor });

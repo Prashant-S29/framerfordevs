@@ -1,5 +1,3 @@
-// Builds one deterministic read-only complete-project plan without reserving stable IDs.
-
 import { createHash } from "node:crypto";
 
 import type { CollectionSchema } from "@framerfordevs/schema";
@@ -34,8 +32,8 @@ import {
   reconcileProjectSourceIdentities,
 } from "../sources";
 import type { StructureIdentityMap } from "../hash";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 export interface CurrentCollectionPlanState {
   readonly sourceKey: string;
   readonly collection: CmsCollection;
@@ -74,7 +72,7 @@ function invalidPlan(
   current: AuthoringSchemaAuthority,
   issues: ReadonlyArray<{ readonly path: string; readonly code: string }>,
 ): AuthoringSchemaPlan {
-  return SchemaStrict.decodeUnknownSync(AuthoringSchemaPlan)({
+  return Schema.decodeUnknownSync(AuthoringSchemaPlan, { onExcessProperty: "error" })({
     valid: false,
     current,
     planHash: null,
@@ -114,10 +112,6 @@ function provisionalCollection(
   });
 }
 
-/**
- * Uses deterministic ephemeral UUIDs only inside read-only validation/classification. They are not
- * returned as mappings, reserved, persisted, or accepted by apply; apply allocates real server IDs.
- */
 export function buildAuthoringProjectPlan(
   value: unknown,
   context: AuthoringProjectPlanContext,
@@ -245,7 +239,7 @@ export function buildAuthoringProjectPlan(
           identity.collectionSourceKey === schema.sourceKey && identity.status === "new",
       );
     candidates.push(
-      SchemaStrict.decodeUnknownSync(AuthoringSchemaCandidate)({
+      Schema.decodeUnknownSync(AuthoringSchemaCandidate, { onExcessProperty: "error" })({
         collectionSourceKey: schema.sourceKey,
         collectionId: reconciledCollection.collectionId,
         currentRevisionId: state?.published?.id ?? null,
@@ -261,7 +255,7 @@ export function buildAuthoringProjectPlan(
   }
   if (issues.length > 0) return invalidPlan(context.current, issues);
 
-  return SchemaStrict.decodeUnknownSync(AuthoringSchemaPlan)({
+  return Schema.decodeUnknownSync(AuthoringSchemaPlan, { onExcessProperty: "error" })({
     valid: true,
     current: context.current,
     planHash,

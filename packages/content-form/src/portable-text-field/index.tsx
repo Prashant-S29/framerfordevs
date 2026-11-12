@@ -1,5 +1,3 @@
-// Adapts the approved Portable Text profile to the official editor without app or server imports.
-
 import {
   defineSchema,
   EditorProvider,
@@ -29,12 +27,12 @@ const portableTextSpan = Schema.Struct({
   marks: Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))).check(
     Schema.isMaxLength(32),
   ),
-}).annotate({ closedObject: true });
+});
 const portableTextLink = Schema.Struct({
   _key: portableTextKey,
   _type: Schema.Literal("link"),
   href: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)),
-}).annotate({ closedObject: true });
+});
 const portableTextBlock = Schema.Struct({
   _key: portableTextKey,
   _type: Schema.Literal("block"),
@@ -45,12 +43,12 @@ const portableTextBlock = Schema.Struct({
   ),
   children: Schema.Array(portableTextSpan).check(Schema.isMaxLength(5_000)),
   markDefs: Schema.Array(portableTextLink).check(Schema.isMaxLength(1_000)),
-}).annotate({ closedObject: true });
+});
 const portableTextDocument = Schema.Struct({
   version: Schema.Literal(1),
   profile: Schema.Literal("ffd-portable-text"),
   blocks: Schema.Array(portableTextBlock).check(Schema.isMaxLength(500)),
-}).annotate({ closedObject: true });
+});
 
 const defaultDecorators = ["strong", "em", "underline", "strike-through", "code"] as const;
 const defaultStyles = ["normal", "h2", "h3", "h4", "h5", "h6", "blockquote"] as const;
@@ -180,7 +178,6 @@ export default function PortableTextField({
   ariaDescribedBy,
   onChange,
 }: PortableTextFieldProps) {
-  // Every struct in the document is closed, so parse-wide strictness matches the v3 closed-object contract.
   const decoded = Schema.decodeUnknownOption(portableTextDocument, { onExcessProperty: "error" })(
     value,
   );

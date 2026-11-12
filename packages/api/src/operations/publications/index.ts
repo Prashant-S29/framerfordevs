@@ -1,6 +1,4 @@
-// Defines named M8 exact-locale publication workflows at the Effect boundary.
-
-import { Cause, Clock, Effect, Exit, Option } from "effect";
+import { Cause, Clock, Effect, Exit, Option, Schema } from "effect";
 
 import { UnauthorizedFailure } from "../../contracts/response/errors";
 import type {
@@ -14,9 +12,8 @@ import { AuthUserId } from "../../contracts/platform";
 import { Telemetry, type EntryPublicationValidationCategory } from "../../observability/telemetry";
 import { PublicationRepository } from "../../services/publication/repository";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const decodeActorId = (actorId: string) =>
-  SchemaStrict.decodeUnknownEffect(AuthUserId)(actorId).pipe(
+  Schema.decodeUnknownEffect(AuthUserId, { onExcessProperty: "error" })(actorId).pipe(
     Effect.mapError(() => UnauthorizedFailure.make()),
   );
 

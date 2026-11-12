@@ -1,6 +1,6 @@
 import { Worker } from "node:worker_threads";
 
-import { Effect, Result } from "effect";
+import { Effect, Result, Schema } from "effect";
 
 import {
   ExperimentalSchemaBuildError,
@@ -17,7 +17,6 @@ import {
   type ExperimentalSchemaBuildOutput,
 } from "./schema/experimental-build/runner";
 
-import * as SchemaStrict from "./schema-strict";
 export type { ExperimentalSchemaBuildInput, ExperimentalSchemaBuildOutput };
 export {
   ExperimentalSchemaBuildError,
@@ -48,9 +47,9 @@ function buildError(
 export const runExperimentalSchemaBuild = Effect.fn("cli.schema.build.experimental")(function* (
   input: ExperimentalSchemaBuildInput,
 ) {
-  const validatedInput = yield* SchemaStrict.decodeUnknownEffect(
-    ExperimentalSchemaBuildWorkerInput,
-  )(input).pipe(Effect.mapError(() => buildError("entry_invalid")));
+  const validatedInput = yield* Schema.decodeUnknownEffect(ExperimentalSchemaBuildWorkerInput, {
+    onExcessProperty: "error",
+  })(input).pipe(Effect.mapError(() => buildError("entry_invalid")));
   if (!validatedInput.experimental)
     return yield* Effect.fail(buildError("experimental_opt_in_required"));
 
@@ -87,9 +86,9 @@ export const runExperimentalSchemaBuild = Effect.fn("cli.schema.build.experiment
       );
 
       worker.once("message", (message: unknown) => {
-        const decoded = SchemaStrict.decodeUnknownResult(ExperimentalSchemaBuildWorkerResponse)(
-          message,
-        );
+        const decoded = Schema.decodeUnknownResult(ExperimentalSchemaBuildWorkerResponse, {
+          onExcessProperty: "error",
+        })(message);
         if (Result.isFailure(decoded)) {
           finish(Effect.fail(buildError("worker_protocol_invalid")));
           return;

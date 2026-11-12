@@ -1,5 +1,3 @@
-// Locks the dedicated Preview OpenAPI surface, bearer authority, source grammar, and isolation metadata.
-
 import { describe, expect, it } from "vitest";
 
 import { previewOpenApiDocument } from "./index";

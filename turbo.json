@@ -1,14 +1,25 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  "boundaries": {
+    "tags": {
+      "client-safe": {
+        "dependencies": {
+          "deny": ["server"]
+        }
+      },
+      "published": {
+        "dependencies": {
+          "deny": ["server"]
+        }
+      }
+    }
+  },
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**", ".output/**"]
-    },
-    "lint": {
-      "dependsOn": ["^lint"]
     },
     "check-types": {
       "dependsOn": ["^check-types"]

@@ -1,5 +1,3 @@
-// Loads the finite, package-owned Studio browser artifact into an exact immutable allowlist.
-
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";

@@ -1,5 +1,3 @@
-// Defines the exact browser-safe role-projected Authoring generated-form response DTO.
-
 import { Schema } from "effect";
 
 const Uuid = Schema.String.check(
@@ -60,12 +58,12 @@ const PortableTextSpan = Schema.Struct({
   marks: Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))).check(
     Schema.isMaxLength(32),
   ),
-}).annotate({ closedObject: true });
+});
 const PortableTextLink = Schema.Struct({
   _key: PortableTextKey,
   _type: Schema.Literal("link"),
   href: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)),
-}).annotate({ closedObject: true });
+});
 const PortableTextBlock = Schema.Struct({
   _key: PortableTextKey,
   _type: Schema.Literal("block"),
@@ -76,12 +74,12 @@ const PortableTextBlock = Schema.Struct({
   ),
   children: Schema.Array(PortableTextSpan).check(Schema.isMaxLength(5_000)),
   markDefs: Schema.Array(PortableTextLink).check(Schema.isMaxLength(1_000)),
-}).annotate({ closedObject: true });
+});
 const PortableTextDocument = Schema.Struct({
   version: Schema.Literal(1),
   profile: Schema.Literal("ffd-portable-text"),
   blocks: Schema.Array(PortableTextBlock).check(Schema.isMaxLength(500)),
-}).annotate({ closedObject: true });
+});
 
 const TextConfiguration = (maximum: number) =>
   Schema.Struct({
@@ -89,7 +87,7 @@ const TextConfiguration = (maximum: number) =>
     maxLength: optionalInteger,
     pattern: optionalString(256),
     default: optionalString(maximum),
-  }).annotate({ closedObject: true });
+  });
 const RichTextConfiguration = Schema.Struct({
   styles: Schema.optionalKey(
     Schema.Array(Schema.Literals(["normal", "h2", "h3", "h4", "h5", "h6", "blockquote"])),
@@ -102,13 +100,13 @@ const RichTextConfiguration = Schema.Struct({
   minLength: optionalInteger,
   maxLength: optionalInteger,
   default: Schema.optionalKey(PortableTextDocument),
-}).annotate({ closedObject: true });
+});
 const NumberConfiguration = Schema.Struct({
   mode: Schema.optionalKey(Schema.Literals(["integer", "floating_point"])),
   minimum: optionalNumber,
   maximum: optionalNumber,
   default: optionalNumber,
-}).annotate({ closedObject: true });
+});
 const Decimal = Schema.String.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(58),
@@ -124,11 +122,9 @@ const DecimalConfiguration = Schema.Struct({
   minimum: Schema.optionalKey(Decimal),
   maximum: Schema.optionalKey(Decimal),
   default: Schema.optionalKey(Decimal),
-}).annotate({ closedObject: true });
-const Currency = Schema.String.check(Schema.isBetweenLength(3, 3), Schema.isPattern(/^[A-Z]{3}$/u));
-const MoneyValue = Schema.Struct({ amount: Decimal, currency: Currency }).annotate({
-  closedObject: true,
 });
+const Currency = Schema.String.check(Schema.isBetweenLength(3, 3), Schema.isPattern(/^[A-Z]{3}$/u));
+const MoneyValue = Schema.Struct({ amount: Decimal, currency: Currency });
 const MoneyConfiguration = Schema.Struct({
   currencies: Schema.Array(Currency).check(
     Schema.isMinLength(1),
@@ -137,10 +133,8 @@ const MoneyConfiguration = Schema.Struct({
   ),
   allowNegative: optionalBoolean,
   default: Schema.optionalKey(MoneyValue),
-}).annotate({ closedObject: true });
-const BooleanConfiguration = Schema.Struct({ default: optionalBoolean }).annotate({
-  closedObject: true,
 });
+const BooleanConfiguration = Schema.Struct({ default: optionalBoolean });
 const DateValue = Schema.String.check(
   Schema.isBetweenLength(10, 10),
   Schema.isPattern(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/u),
@@ -149,40 +143,38 @@ const DateConfiguration = Schema.Struct({
   minimum: Schema.optionalKey(DateValue),
   maximum: Schema.optionalKey(DateValue),
   default: Schema.optionalKey(DateValue),
-}).annotate({ closedObject: true });
+});
 const DateTimeValue = Schema.String.check(Schema.isMinLength(20), Schema.isMaxLength(35));
 const DateTimeConfiguration = Schema.Struct({
   minimum: Schema.optionalKey(DateTimeValue),
   maximum: Schema.optionalKey(DateTimeValue),
   default: Schema.optionalKey(DateTimeValue),
-}).annotate({ closedObject: true });
+});
 const EnumOption = Schema.Struct({
   id: Uuid,
   value: ApiKey,
   label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
   position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 99 })),
-}).annotate({ closedObject: true });
+});
 const EnumConfiguration = Schema.Struct({
   options: Schema.Array(EnumOption).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
   default: Schema.optionalKey(ApiKey),
-}).annotate({ closedObject: true });
+});
 const JsonConfiguration = Schema.Struct({
   maxBytes: optionalInteger,
   maxDepth: optionalInteger,
   default: Schema.optionalKey(JsonValue),
-}).annotate({ closedObject: true });
+});
 const ObjectConfiguration = Schema.Struct({
   default: Schema.optionalKey(JsonValue),
-}).annotate({ closedObject: true });
+});
 const ListConfiguration = Schema.Struct({
   minItems: optionalInteger,
   maxItems: optionalInteger,
   uniqueItems: optionalBoolean,
   default: Schema.optionalKey(JsonValue),
-}).annotate({ closedObject: true });
-const ReferenceConfiguration = Schema.Struct({ targetCollectionId: Uuid }).annotate({
-  closedObject: true,
 });
+const ReferenceConfiguration = Schema.Struct({ targetCollectionId: Uuid });
 const ExternalAsset = Schema.Struct({
   source: Schema.Literal("external"),
   url: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)),
@@ -195,10 +187,10 @@ const ExternalAsset = Schema.Struct({
   height: Schema.NullOr(
     Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 100_000 })),
   ),
-}).annotate({ closedObject: true });
+});
 const ExternalAssetConfiguration = Schema.Struct({
   default: Schema.optionalKey(ExternalAsset),
-}).annotate({ closedObject: true });
+});
 const configurations = {
   short_text: TextConfiguration(500),
   long_text: TextConfiguration(50_000),
@@ -210,12 +202,8 @@ const configurations = {
   date: DateConfiguration,
   date_time: DateTimeConfiguration,
   enum: EnumConfiguration,
-  url: Schema.Struct({ default: optionalString(2_048) }).annotate({
-    closedObject: true,
-  }),
-  email: Schema.Struct({ default: optionalString(254) }).annotate({
-    closedObject: true,
-  }),
+  url: Schema.Struct({ default: optionalString(2_048) }),
+  email: Schema.Struct({ default: optionalString(254) }),
   slug: TextConfiguration(200),
   json: JsonConfiguration,
   object: ObjectConfiguration,
@@ -250,7 +238,7 @@ export const AuthoringFieldEditor = Schema.Struct({
   placeholder: Schema.NullOr(Schema.String.check(Schema.isMaxLength(200))),
   visibleToRoles: Roles,
   editableByRoles: Roles,
-}).annotate({ closedObject: true });
+});
 const Children: Schema.Codec<ReadonlyArray<AuthoringFormField>> = Schema.Array(
   Schema.suspend((): Schema.Codec<AuthoringFormField> => AuthoringFormField),
 ).check(Schema.isMaxLength(100));
@@ -271,7 +259,7 @@ function fieldVariant<Kind extends keyof typeof configurations>(kind: Kind) {
     editor: AuthoringFieldEditor,
     configuration: configurations[kind],
     children: Children,
-  }).annotate({ closedObject: true });
+  });
 }
 export const AuthoringFormField: Schema.Codec<AuthoringFormField> = Schema.Union([
   fieldVariant("short_text"),
@@ -300,7 +288,7 @@ const Placement = Schema.Struct({
   position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 99 })),
   helpTextOverride: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
   visibleToRoles: VisibleRoles,
-}).annotate({ closedObject: true });
+});
 const Group = Schema.Struct({
   id: Uuid,
   title: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
@@ -309,7 +297,7 @@ const Group = Schema.Struct({
   columns: Schema.Literals([1, 2]),
   visibleToRoles: VisibleRoles,
   fields: Schema.Array(Placement).check(Schema.isMaxLength(100)),
-}).annotate({ closedObject: true });
+});
 const Tab = Schema.Struct({
   id: Uuid,
   title: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
@@ -317,12 +305,12 @@ const Tab = Schema.Struct({
   position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 9 })),
   visibleToRoles: VisibleRoles,
   groups: Schema.Array(Group).check(Schema.isMinLength(1), Schema.isMaxLength(20)),
-}).annotate({ closedObject: true });
+});
 export const AuthoringEditorLayout = Schema.Struct({
   version: Schema.Literal(1),
   tabs: Schema.Array(Tab).check(Schema.isMinLength(1), Schema.isMaxLength(10)),
   sidebarGroups: Schema.Array(Group).check(Schema.isMaxLength(10)),
-}).annotate({ closedObject: true });
+});
 
 export class AuthoringGeneratedForm extends Schema.Class<AuthoringGeneratedForm>(
   "SdkAuthoringGeneratedForm",

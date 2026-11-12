@@ -25,7 +25,7 @@ export const ExperimentalSchemaBuildWorkerSuccess = Schema.Struct({
         Schema.isBetweenLength(64, 64),
         Schema.isPattern(/^[0-9a-f]{64}$/u),
       ),
-    }).annotate({ closedObject: true }),
+    }),
   ).check(Schema.isMaxLength(32)),
   runtime: Schema.Literal("quickjs-emscripten-0.32.0-experimental"),
   memoryLimitHard: Schema.Literal(false),

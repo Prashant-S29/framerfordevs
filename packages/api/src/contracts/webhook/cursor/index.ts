@@ -1,5 +1,3 @@
-// Encodes scope- and filter-bound keyset cursors for M11 management history lists.
-
 import { Effect, Schema } from "effect";
 
 import { ApiErrorDetail } from "../../response/api";
@@ -14,7 +12,6 @@ import {
   WebhookPublicEventType,
 } from "..";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const Scope = { projectId: ProjectId, environmentId: EnvironmentId };
 
 class EndpointCursorPayload extends Schema.Class<EndpointCursorPayload>("EndpointCursorPayload")({
@@ -66,7 +63,7 @@ const invalidCursor = () =>
 
 const encodePayload = Effect.fn("webhookCursor.encode")(function* (payload: object) {
   const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  return yield* SchemaStrict.decodeUnknownEffect(Cursor)(encoded).pipe(
+  return yield* Schema.decodeUnknownEffect(Cursor, { onExcessProperty: "error" })(encoded).pipe(
     Effect.mapError(() => invalidCursor()),
   );
 });
@@ -79,7 +76,7 @@ const decodePayload = Effect.fn("webhookCursor.decode")(function* <A, I>(
     try: (): unknown => JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")),
     catch: () => invalidCursor(),
   });
-  return yield* SchemaStrict.decodeUnknownEffect(schema)(payload).pipe(
+  return yield* Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(payload).pipe(
     Effect.mapError(() => invalidCursor()),
   );
 });

@@ -1,5 +1,3 @@
-// Persists and verifies tenant-bound credential lifecycle state with atomic audits and safe projections.
-
 import { db } from "@framerfordevs/db";
 import { and, eq, inArray, lt, or, sql } from "@framerfordevs/db/query";
 import {
@@ -62,13 +60,10 @@ import {
 import { areScopesAllowedForFamily, isRoleAllowed } from "../policy";
 import { type ApplicationDb, authorizeUserProject } from "../project-access";
 
-import * as SchemaStrict from "../../lib/schema-strict";
-/** Creates a discriminated repository outcome without attaching mutable state. */
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
 }
 
-/** Creates a discriminated repository outcome with its bounded result projection. */
 function outcomeWith<K extends string, A extends object>(
   kind: K,
   value: A,
@@ -76,28 +71,24 @@ function outcomeWith<K extends string, A extends object>(
   return { kind, ...value };
 }
 
-/** Translates foreign database failures into the shared redacted infrastructure error. */
 function databaseFailure(operation: string, cause: unknown) {
   return DatabaseFailure.make({ operation, cause });
 }
 
-/** Decodes persisted values before they can enter credential domain workflows. */
 function decodeDatabaseValue<A, I>(
   operation: string,
   schema: Schema.Codec<A, I, never>,
   value: unknown,
 ) {
-  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
+  return Schema.decodeUnknownEffect(schema)(value).pipe(
     Effect.mapError((cause) => databaseFailure(`${operation}.decode`, cause)),
   );
 }
 
-/** Encodes database timestamps in the canonical application instant representation. */
 function toIso(value: Date): string {
   return value.toISOString();
 }
 
-/** Returns the bounded validation failure for family-incompatible credential scopes. */
 function invalidScopes() {
   return ValidationFailure.make({
     details: [
@@ -110,7 +101,6 @@ function invalidScopes() {
   });
 }
 
-/** Returns the existing generic invalid-expiry failure for non-Preview credentials. */
 function invalidExpiry() {
   return ValidationFailure.make({
     details: [
@@ -123,7 +113,6 @@ function invalidExpiry() {
   });
 }
 
-/** Returns the approved expiring-only maximum-lifetime failure for Preview credentials. */
 function invalidPreviewExpiry() {
   return ValidationFailure.make({
     details: [
@@ -136,7 +125,6 @@ function invalidPreviewExpiry() {
   });
 }
 
-/** Requires explicit consent before creating management or Delivery authority without expiry. */
 function nonExpiringNotAcknowledged() {
   return ValidationFailure.make({
     details: [
@@ -149,7 +137,6 @@ function nonExpiringNotAcknowledged() {
   });
 }
 
-/** Requires explicit consent to environment-wide unpublished and hidden-field Preview authority. */
 function previewAuthorityNotAcknowledged() {
   return ValidationFailure.make({
     details: [
@@ -162,7 +149,6 @@ function previewAuthorityNotAcknowledged() {
   });
 }
 
-/** Constructs content-free immutable credential lifecycle audit values. */
 function makeAuditValues(options: {
   readonly workspaceId: string;
   readonly projectId: string;
@@ -191,7 +177,6 @@ interface CredentialRowWithScopes {
   readonly scopes: ReadonlyArray<string>;
 }
 
-/** Derives the bounded read status without weakening the persisted lifecycle state. */
 function credentialStatus(
   credential: typeof apiCredential.$inferSelect,
   asOf: Date,
@@ -206,7 +191,6 @@ function credentialStatus(
   return credential.status as CredentialLifecycleStatus;
 }
 
-/** Projects credential rows to the public metadata contract without key digests. */
 function credentialValue(value: CredentialRowWithScopes, asOf: Date) {
   return {
     id: value.credential.id,
@@ -228,7 +212,6 @@ function credentialValue(value: CredentialRowWithScopes, asOf: Date) {
   };
 }
 
-/** Projects a persisted rotation without credential secret material. */
 function rotationValue(rotation: typeof apiCredentialRotation.$inferSelect) {
   return {
     id: rotation.id,
@@ -247,7 +230,6 @@ function rotationValue(rotation: typeof apiCredentialRotation.$inferSelect) {
   };
 }
 
-/** Loads normalized scope rows for a bounded set of credential identities. */
 async function selectCredentialScopes(
   executor: ApplicationDb | Parameters<Parameters<ApplicationDb["transaction"]>[0]>[0],
   credentialIds: ReadonlyArray<string>,
@@ -267,7 +249,6 @@ interface RepositoryOptions {
   readonly database?: ApplicationDb;
 }
 
-/** Creates the credential repository over the shared database or an explicit test database. */
 export function makeCredentialRepository(options: RepositoryOptions = {}) {
   const database = options.database ?? db;
 
@@ -571,7 +552,7 @@ export function makeCredentialRepository(options: RepositoryOptions = {}) {
         const last = visible.at(-1);
         const nextCursor =
           result.rows.length > input.limit && last
-            ? yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCursor)(
+            ? yield* Schema.decodeUnknownEffect(ControlPlaneCursor)(
                 yield* signer.sign(authority, {
                   finalSortAtEpochMs: last.createdAt.getTime(),
                   finalId: last.id,

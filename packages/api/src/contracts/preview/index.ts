@@ -1,5 +1,3 @@
-// Defines M10 Preview source authority, renderer-neutral documents, validation feedback, and public errors.
-
 import { Schema } from "effect";
 
 import { ApiErrorDetail, ApiSuccessSchema, RequestIdSchema } from "../response/api";
@@ -14,7 +12,6 @@ import {
   SchemaRevisionId,
 } from "../schema";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 export const previewLimits = {
   queryBytes: 4_096,
   responseBytes: 2_621_440,
@@ -164,16 +161,19 @@ export class PreviewApiFailure extends Schema.Class<PreviewApiFailure>("PreviewA
   message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
 }) {}
 
-export const PreviewRouteScopeInputSchema = SchemaStrict.toStandardSchemaV1(PreviewRouteScope);
-export const GetRevisionCredentialPreviewInputSchema = SchemaStrict.toStandardSchemaV1(
+export const PreviewRouteScopeInputSchema = Schema.toStandardSchemaV1(PreviewRouteScope, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const GetRevisionCredentialPreviewInputSchema = Schema.toStandardSchemaV1(
   GetRevisionCredentialPreviewInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const GetCurrentUserPreviewInputSchema = SchemaStrict.toStandardSchemaV1(
+export const GetCurrentUserPreviewInputSchema = Schema.toStandardSchemaV1(
   GetCurrentUserPreviewInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const GetRevisionUserPreviewInputSchema = SchemaStrict.toStandardSchemaV1(
+export const GetRevisionUserPreviewInputSchema = Schema.toStandardSchemaV1(
   GetRevisionUserPreviewInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const PreviewItemOutputSchema = SchemaStrict.toStandardSchemaV1(
-  ApiSuccessSchema(PreviewItem),
-);
+export const PreviewItemOutputSchema = Schema.toStandardSchemaV1(ApiSuccessSchema(PreviewItem));

@@ -1,5 +1,3 @@
-// Adapts shared credential lifecycle authority to the portable Control Plane projection.
-
 import { Effect, Schema } from "effect";
 
 import {
@@ -31,9 +29,8 @@ import {
 import { CredentialRepository } from "../../../services/credential/repository";
 import { ApiCredentialId, ApiCredentialRotationId } from "../../../contracts/access";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const decode = <A, I>(schema: Schema.Codec<A, I, never>, value: unknown) =>
-  SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
+  Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(value).pipe(
     Effect.mapError(() => UnauthorizedFailure.make()),
   );
 

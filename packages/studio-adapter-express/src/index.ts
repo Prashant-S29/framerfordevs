@@ -1,5 +1,3 @@
-// Thin Express 5 bridge preserving the untouched request target for the Studio core guard.
-
 import type {
   Request as ExpressRequest,
   RequestHandler,
@@ -73,7 +71,6 @@ function adapterFailure(response: ExpressResponse, status: number): void {
     );
 }
 
-/** Mount before body parsers so the adapter can bound and preserve the request body itself. */
 export function createExpressStudioMiddleware(handler: StudioFetchHandler): RequestHandler {
   return async (request, response, next) => {
     const rawTarget = request.originalUrl;

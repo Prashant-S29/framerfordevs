@@ -1,8 +1,6 @@
-// Coordinates closed rate-limit policies, opaque HMAC identities, shared enforcement, and bounded degraded fallback.
-
 import { createHmac } from "node:crypto";
 
-import { Cause, Clock, Context, Effect, Layer, Option } from "effect";
+import { Cause, Clock, Context, Effect, Layer, Option, Schema } from "effect";
 
 import {
   RateLimitCost,
@@ -21,7 +19,6 @@ import {
   type RateLimitStoreService,
 } from "../store";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 export interface EvaluateRateLimitInput {
   readonly policy: RateLimitPolicy;
   readonly identity: string;
@@ -48,12 +45,10 @@ export interface MakeRateLimitManagerOptions {
   readonly fingerprintSecret: string;
 }
 
-/** Converts invalid manager input or cryptographic failures into the typed infrastructure channel. */
 function managerFailure(operation: string, cause: unknown): SecurityServiceFailure {
   return SecurityServiceFailure.make({ operation, cause });
 }
 
-/** Hashes each identity with policy domain separation before it can reach Redis or process memory. */
 function opaqueIdentity(
   secret: string,
   policy: RateLimitPolicy,
@@ -73,13 +68,12 @@ function opaqueIdentity(
   });
 }
 
-/** Converts a store result into the schema-backed manager decision without exposing its key. */
 function makeDecision(
   input: EvaluateRateLimitInput,
   result: RateLimitStoreResult,
   mode: RateLimitEnforcementMode,
 ): Effect.Effect<RateLimitDecision, SecurityServiceFailure> {
-  return SchemaStrict.decodeUnknownEffect(RateLimitDecision)({
+  return Schema.decodeUnknownEffect(RateLimitDecision)({
     allowed: result.allowed,
     policy: input.policy,
     cost: input.cost,
@@ -91,12 +85,10 @@ function makeDecision(
   }).pipe(Effect.mapError((cause) => managerFailure("rate_limit.decision.decode", cause)));
 }
 
-/** Maps store failures to bounded telemetry categories without logging their foreign causes. */
 function storeFailureResult(error: RateLimitStoreFailure) {
   return error.reason;
 }
 
-/** Creates the reusable manager over explicit primary/fallback implementations for live and tests. */
 export function makeRateLimitManager(
   options: MakeRateLimitManagerOptions,
 ): RateLimitManagerService {
@@ -104,7 +96,7 @@ export function makeRateLimitManager(
 
   return {
     evaluate: Effect.fn("RateLimitManager.evaluate")(function* (input) {
-      const cost = yield* SchemaStrict.decodeUnknownEffect(RateLimitCost)(input.cost).pipe(
+      const cost = yield* Schema.decodeUnknownEffect(RateLimitCost)(input.cost).pipe(
         Effect.mapError((cause) => managerFailure("rate_limit.cost.decode", cause)),
       );
       const key = yield* opaqueIdentity(options.fingerprintSecret, input.policy, input.identity);
@@ -181,7 +173,6 @@ export interface RateLimitManagerLiveOptions {
   readonly fingerprintSecret: string;
 }
 
-/** Builds the manager once from the configured store services and dedicated installation secret. */
 export function makeRateLimitManagerLive(options: RateLimitManagerLiveOptions) {
   return Layer.effect(
     RateLimitManager,

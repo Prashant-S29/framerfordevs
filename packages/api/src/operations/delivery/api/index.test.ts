@@ -1,7 +1,5 @@
-// Verifies M9 management/public orchestration through replaceable repositories, credentials, and central quotas.
-
 import { assert, describe, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Layer } from "effect";
+import { Cause, Effect, Exit, Layer, Schema } from "effect";
 
 import { TelemetryLive } from "../../../observability/telemetry";
 import { CredentialPrincipal } from "../../../contracts/access";
@@ -48,7 +46,6 @@ import {
 } from "../public";
 import { getDeliveryConfiguration, updateDeliveryConfiguration } from "./index";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const ids = {
   workspace: "019fae8b-1234-7000-8000-000000000001",
   project: "019fae8b-1234-7000-8000-000000000002",
@@ -83,7 +80,7 @@ const resolvedScope: ResolvedDeliveryScope = {
   generationChangedAt: new Date(timestamp),
   schemaUpdatedAt: new Date(timestamp),
 };
-const item = SchemaStrict.decodeUnknownSync(DeliveryItem)({
+const item = Schema.decodeUnknownSync(DeliveryItem, { onExcessProperty: "error" })({
   id: ids.entry,
   collectionId: ids.collection,
   collection: "articles",
@@ -96,11 +93,13 @@ const item = SchemaStrict.decodeUnknownSync(DeliveryItem)({
   },
   data: { title: "Published" },
 });
-const page = SchemaStrict.decodeUnknownSync(DeliveryPage)({
+const page = Schema.decodeUnknownSync(DeliveryPage, { onExcessProperty: "error" })({
   items: [item],
   page: { limit: 20, nextCursor: null, hasMore: false },
 });
-const configuration = SchemaStrict.decodeUnknownSync(DeliveryCollectionConfiguration)({
+const configuration = Schema.decodeUnknownSync(DeliveryCollectionConfiguration, {
+  onExcessProperty: "error",
+})({
   projectId: ids.project,
   environmentId: ids.environment,
   collectionId: ids.collection,
@@ -112,14 +111,16 @@ const configuration = SchemaStrict.decodeUnknownSync(DeliveryCollectionConfigura
   updatedByCredentialId: null,
   updatedAt: timestamp,
 });
-const anonymous = SchemaStrict.decodeUnknownSync(DeliveryAccessPrincipal)({
+const anonymous = Schema.decodeUnknownSync(DeliveryAccessPrincipal, { onExcessProperty: "error" })({
   kind: "anonymous",
   credentialId: null,
 });
-const credential = SchemaStrict.decodeUnknownSync(DeliveryAccessPrincipal)({
-  kind: "credential",
-  credentialId: ids.credential,
-});
+const credential = Schema.decodeUnknownSync(DeliveryAccessPrincipal, { onExcessProperty: "error" })(
+  {
+    kind: "credential",
+    credentialId: ids.credential,
+  },
+);
 
 function makeLayers(calls: Array<string>) {
   const management: DeliveryRepositoryService = {
@@ -133,7 +134,7 @@ function makeLayers(calls: Array<string>) {
     getImmutable: () => Effect.sync(() => (calls.push("immutable"), item)),
     list: () => Effect.sync(() => (calls.push("list"), page)),
   };
-  const rateDecision = SchemaStrict.decodeUnknownSync(RateLimitDecision)({
+  const rateDecision = Schema.decodeUnknownSync(RateLimitDecision, { onExcessProperty: "error" })({
     allowed: true,
     policy: "delivery.global",
     cost: 1,
@@ -152,7 +153,7 @@ function makeLayers(calls: Array<string>) {
     reset: () => Effect.void,
     retainedFallbackEntryCount: Effect.succeed(0),
   };
-  const principal = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
+  const principal = Schema.decodeUnknownSync(CredentialPrincipal, { onExcessProperty: "error" })({
     credentialId: ids.credential,
     workspaceId: ids.workspace,
     projectId: ids.project,
@@ -216,12 +217,16 @@ describe("Delivery operations", () => {
   it("forwards management reads and optimistic updates with decoded actors", async () => {
     const calls: Array<string> = [];
     const layer = makeLayers(calls);
-    const input = SchemaStrict.decodeUnknownSync(GetDeliveryConfigurationInput)({
+    const input = Schema.decodeUnknownSync(GetDeliveryConfigurationInput, {
+      onExcessProperty: "error",
+    })({
       projectId: ids.project,
       environmentId: ids.environment,
       collectionId: ids.collection,
     });
-    const update = SchemaStrict.decodeUnknownSync(UpdateDeliveryConfigurationInput)({
+    const update = Schema.decodeUnknownSync(UpdateDeliveryConfigurationInput, {
+      onExcessProperty: "error",
+    })({
       ...input,
       expectedVersion: 1,
       access: "protected",

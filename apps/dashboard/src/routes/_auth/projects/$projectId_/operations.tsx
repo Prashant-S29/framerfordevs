@@ -1,5 +1,3 @@
-// Provides the hosted project operations and security workspace for bounded recovery visibility.
-
 import { Button } from "@framerfordevs/ui/components/button";
 import {
   Card,
@@ -15,7 +13,7 @@ import { Spinner } from "@framerfordevs/ui/components/spinner";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, WebhookIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { AuditFilters } from "@/lib/operations/audit-search";
 import {
@@ -64,9 +62,11 @@ function OperationsWorkspace() {
   const access = useQuery(orpc.platform.projects.access.queryOptions({ input: { projectId } }));
   const filters = useMemo(() => auditFiltersFromSearch(search, initial), [search, initial]);
   const [draft, setDraft] = useState<AuditFilters>(() => filters);
-  useEffect(() => {
+  const [draftSource, setDraftSource] = useState(filters);
+  if (draftSource !== filters) {
+    setDraftSource(filters);
     setDraft(filters);
-  }, [filters]);
+  }
   const allowed = new Set(access.data?.data.effectiveProjectActions ?? []);
   const canReadAudit = allowed.has("project.audit.read");
   const canReadWebhooks = allowed.has("webhook.read");

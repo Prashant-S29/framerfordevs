@@ -1,5 +1,3 @@
-// Validates local authority before dynamically loading credentials or HTTP clients.
-
 import { isProjectSchema } from "@framerfordevs/schema/validate";
 import { Cause, Effect, Option } from "effect";
 

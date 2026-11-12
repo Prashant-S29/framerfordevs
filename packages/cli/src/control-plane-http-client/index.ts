@@ -1,5 +1,3 @@
-// Executes bounded, redirect-free Control Plane v1 requests with exact response decoding.
-
 import { Context, Effect, Schema } from "effect";
 
 import {
@@ -48,7 +46,6 @@ import {
   controlPlaneSuccessResponse,
 } from "./schema";
 
-import * as SchemaStrict from "../schema-strict";
 const maximumRequestBytes = 64 * 1_024;
 const maximumResponseBytes = 512 * 1_024;
 const maximumTokenBytes = 16_384;
@@ -232,21 +229,20 @@ export function makeControlPlaneHttpClient(options: ControlPlaneHttpClientOption
         catch: (cause) => transportError("control-plane.response.json", cause),
       });
       if (response.ok) {
-        const success = yield* SchemaStrict.decodeUnknownEffect(
-          controlPlaneSuccessResponse(dataSchema),
-        )(unknownBody, { onExcessProperty: "error" }).pipe(
+        const success = yield* Schema.decodeUnknownEffect(controlPlaneSuccessResponse(dataSchema), {
+          onExcessProperty: "error",
+        })(unknownBody, { onExcessProperty: "error" }).pipe(
           Effect.mapError((cause) =>
             transportError("control-plane.response.decode_success", cause),
           ),
         );
         return success.data;
       }
-      const failure = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneFailureResponse)(
-        unknownBody,
-        {
-          onExcessProperty: "error",
-        },
-      ).pipe(
+      const failure = yield* Schema.decodeUnknownEffect(ControlPlaneFailureResponse, {
+        onExcessProperty: "error",
+      })(unknownBody, {
+        onExcessProperty: "error",
+      }).pipe(
         Effect.mapError((cause) => transportError("control-plane.response.decode_failure", cause)),
       );
       return yield* ControlPlaneHttpError.make({

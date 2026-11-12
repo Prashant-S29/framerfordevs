@@ -1,5 +1,3 @@
-// Signs and verifies rolling, scope/query/config/schema/generation-bound public Delivery cursors.
-
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { Clock, Context, Effect, Layer, Schema } from "effect";
@@ -15,7 +13,6 @@ import { ProjectLocaleId } from "../../../contracts/locale";
 import { EnvironmentId, ProjectId, ResourceVersion } from "../../../contracts/platform";
 import { CollectionId, SchemaRevisionId } from "../../../contracts/schema";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const cursorLifetimeMs = 15 * 60 * 1_000;
 const cursorMaximumLength = 1_024;
 const Digest = Schema.String.check(
@@ -121,12 +118,10 @@ export interface DeliveryCursorSignerService {
   >;
 }
 
-/** Contains cryptographic runtime failures without exposing key or cursor material. */
 function securityFailure(operation: string, cause: unknown): SecurityServiceFailure {
   return SecurityServiceFailure.make({ operation, cause });
 }
 
-/** Produces a base64url HMAC over the exact encoded payload. */
 function signature(secret: string, payload: string): Effect.Effect<string, SecurityServiceFailure> {
   return Effect.try({
     try: () => createHmac("sha256", secret).update(payload, "utf8").digest("base64url"),
@@ -134,7 +129,6 @@ function signature(secret: string, payload: string): Effect.Effect<string, Secur
   });
 }
 
-/** Compares equal-length signatures without value-dependent early exit. */
 function signatureMatches(expected: string, received: string): boolean {
   try {
     const expectedBytes = Buffer.from(expected, "base64url");
@@ -147,12 +141,10 @@ function signatureMatches(expected: string, received: string): boolean {
   }
 }
 
-/** Returns one generic cursor failure for syntax, signature, expiry, and authority mismatch. */
 function invalidCursor(): DeliveryCursorInvalidFailure {
   return DeliveryCursorInvalidFailure.make();
 }
 
-/** Decodes the bounded outer envelope before any signature or payload work. */
 function decodeEnvelope(
   cursor: string,
 ): Effect.Effect<DeliveryCursorEnvelope, DeliveryCursorInvalidFailure> {
@@ -165,13 +157,12 @@ function decodeEnvelope(
     return Effect.fail(invalidCursor());
   }
   const signatureStart = cursor.length - 43;
-  return SchemaStrict.decodeUnknownEffect(DeliveryCursorEnvelope)({
+  return Schema.decodeUnknownEffect(DeliveryCursorEnvelope, { onExcessProperty: "error" })({
     payload: cursor.slice(0, signatureStart),
     signature: cursor.slice(signatureStart),
   }).pipe(Effect.mapError(() => invalidCursor()));
 }
 
-/** Decodes a signed payload only after the envelope signature has been accepted. */
 function decodePayload(
   payload: string,
 ): Effect.Effect<DeliveryCursorPayload, DeliveryCursorInvalidFailure> {
@@ -179,12 +170,13 @@ function decodePayload(
     try: (): unknown => JSON.parse(Buffer.from(payload, "base64url").toString("utf8")),
     catch: () => invalidCursor(),
   }).pipe(
-    Effect.flatMap(SchemaStrict.decodeUnknownEffect(DeliveryCursorPayload)),
+    Effect.flatMap(
+      Schema.decodeUnknownEffect(DeliveryCursorPayload, { onExcessProperty: "error" }),
+    ),
     Effect.mapError(() => invalidCursor()),
   );
 }
 
-/** Checks every non-generation authority before generation receives its recoverable stale outcome. */
 function authorityMatches(
   payload: DeliveryCursorPayload,
   authority: DeliveryCursorAuthority,
@@ -200,14 +192,15 @@ function authorityMatches(
   );
 }
 
-/** Creates a signer with one active key and one optional bounded rotation-overlap key. */
 export function makeDeliveryCursorSigner(
   options: DeliveryCursorSignerOptions,
 ): DeliveryCursorSignerService {
   return {
     sign: Effect.fn("DeliveryCursorSigner.sign")(function* (input) {
       const now = yield* Clock.currentTimeMillis;
-      const payload = yield* SchemaStrict.decodeUnknownEffect(DeliveryCursorPayload)({
+      const payload = yield* Schema.decodeUnknownEffect(DeliveryCursorPayload, {
+        onExcessProperty: "error",
+      })({
         version: 1,
         kind: "delivery_list",
         ...input,
@@ -263,7 +256,6 @@ export class DeliveryCursorSigner extends Context.Service<
   DeliveryCursorSignerService
 >()("DeliveryCursorSigner") {}
 
-/** Builds the stateless signer once; secret-length validation remains at environment startup. */
 export function makeDeliveryCursorSignerLive(options: DeliveryCursorSignerOptions) {
   return Layer.succeed(DeliveryCursorSigner, makeDeliveryCursorSigner(options));
 }

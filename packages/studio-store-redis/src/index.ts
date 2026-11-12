@@ -1,5 +1,3 @@
-// Redis-backed encrypted Studio store with atomic quotas, one-shot attempts, and pre-dispatch refresh fencing.
-
 import { createClient } from "@redis/client";
 import { Effect } from "effect";
 
@@ -27,11 +25,9 @@ interface RedisPort {
 
 export interface RedisStudioStoreOptions {
   readonly url: string;
-  /** Operator assertion that Redis persistence/replication survives application process restarts. */
   readonly durability: "restart-stable";
   readonly timeoutMs?: number;
   readonly reconnectAttempts?: number;
-  /** Stable deployment namespace epoch; rotate it after restoring an older Redis snapshot. */
   readonly namespace: string;
 }
 
@@ -262,7 +258,6 @@ function admission(value: unknown): AdmissionResult {
   throw new Error("invalid response");
 }
 
-/** Builds the store over a minimal Redis command port for conformance tests and production. */
 export function makeRedisStudioStore(
   port: RedisPort,
   namespace = "ffd:studio:v1",
@@ -664,7 +659,6 @@ function booleanCommand(
   );
 }
 
-/** Creates a lazy bounded client. Redis outages fail closed; there is no in-memory fallback. */
 export function createRedisStudioStore(options: RedisStudioStoreOptions): StudioSessionStore {
   const allowedKeys = new Set(["url", "durability", "timeoutMs", "reconnectAttempts", "namespace"]);
   const timeoutMs = options.timeoutMs ?? 1_000;

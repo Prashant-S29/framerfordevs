@@ -1,5 +1,3 @@
-// Defines the closed Studio v1 token authority, acknowledgement, bootstrap, and error contracts.
-
 import { Schema } from "effect";
 
 import { CanonicalEmail, ProjectRole } from "../access";
@@ -17,7 +15,7 @@ import {
 } from "../platform";
 import { ApiErrorDetail, ApiSuccessSchema, RequestIdSchema } from "../response/api";
 
-import { UuidValue } from "../uuid";
+import { Uuid } from "../uuid";
 export const studioLimits = {
   requestBytes: 16_384,
   responseBytes: 65_536,
@@ -32,7 +30,7 @@ export const STUDIO_SESSION_SCOPE = "studio:session" as const;
 export const STUDIO_OFFLINE_SCOPE = "offline_access" as const;
 export const STUDIO_RESOURCE_PATH = "/api/studio/v1" as const;
 
-export const StudioGrantId = UuidValue.pipe(Schema.brand("StudioGrantId"));
+export const StudioGrantId = Uuid.pipe(Schema.brand("StudioGrantId"));
 export type StudioGrantId = typeof StudioGrantId.Type;
 
 export const StudioClientKind = Schema.Literal(STUDIO_CLIENT_KIND);

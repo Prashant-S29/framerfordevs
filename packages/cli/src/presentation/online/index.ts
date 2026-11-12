@@ -1,5 +1,3 @@
-// Runs excluded Presentation operator workflows through the CLI-owned Authoring client.
-
 import { Effect, ManagedRuntime } from "effect";
 
 import { makeAuthoringOperatorClient } from "../../authoring/client";

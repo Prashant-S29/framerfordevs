@@ -1,10 +1,8 @@
-// Implements Standard Webhooks-compatible signing and raw-byte verification with replay reservation.
-
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { PublicationWebhookEvent } from "../../../contracts/webhook";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 const signaturePattern = /^v1,([A-Za-z0-9+/]+={0,2})$/u;
 const maximumSignatures = 2;
 const defaultToleranceSeconds = 5 * 60;
@@ -50,7 +48,6 @@ function signedBytes(eventId: string, timestamp: number, body: Uint8Array): Buff
   ]);
 }
 
-/** Signs the exact raw body without parsing or reserializing its JSON. */
 export function signWebhookRequest(
   secret: string,
   eventId: string,
@@ -90,7 +87,6 @@ function parseSignatures(value: string): ReadonlyArray<string> | null {
   return signatures;
 }
 
-/** Verifies signature and timestamp before event parsing and atomic replay reservation. */
 export function verifyWebhookRequest(input: VerifyWebhookInput): WebhookVerificationResult {
   if (
     !/^[0-9a-f-]{36}$/u.test(input.webhookId) ||
@@ -129,7 +125,7 @@ export function verifyWebhookRequest(input: VerifyWebhookInput): WebhookVerifica
 
   let event: PublicationWebhookEvent;
   try {
-    event = SchemaStrict.decodeUnknownSync(PublicationWebhookEvent)(
+    event = Schema.decodeUnknownSync(PublicationWebhookEvent, { onExcessProperty: "error" })(
       JSON.parse(Buffer.from(input.body).toString("utf8")),
     );
   } catch {

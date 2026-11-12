@@ -6,7 +6,7 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 requested="${PREVIEW_SCENARIO:-}"
 set -a
 # shellcheck disable=SC1091
-source "$root/preview-load.env"
+source "$root/apps/server/load/preview.env"
 set +a
 if [[ -n "$requested" ]]; then PREVIEW_SCENARIO="$requested"; export PREVIEW_SCENARIO; fi
 

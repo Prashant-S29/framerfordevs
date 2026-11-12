@@ -1,4 +1,4 @@
-import type { ProjectLocale } from "@framerfordevs/api/contracts/locale/index";
+import type { ProjectLocale } from "@framerfordevs/api/contracts/locale";
 import {
   AlertDialog,
   AlertDialogAction,

@@ -1,5 +1,3 @@
-// Creates, verifies, rotates, and removes one secret-safe Docker key-continuity fixture.
-
 import { randomUUID } from "node:crypto";
 
 import { db } from "@framerfordevs/db";

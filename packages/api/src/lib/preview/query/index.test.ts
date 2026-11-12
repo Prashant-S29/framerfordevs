@@ -1,5 +1,3 @@
-// Verifies strict bounded current and historical Preview query parsing without fallback.
-
 import { assert, describe, it } from "@effect/vitest";
 import { Effect } from "effect";
 
@@ -8,7 +6,6 @@ import { parseCurrentPreviewQuery, parseRevisionPreviewQuery } from "./index";
 
 const revisionId = "019fae8b-1234-7000-8000-000000000001";
 
-/** Returns the first stable issue code for a rejected parser result. */
 function issueCode(result: ReturnType<typeof parseCurrentPreviewQuery>): string | undefined {
   return result.ok ? undefined : result.issues[0]?.code;
 }

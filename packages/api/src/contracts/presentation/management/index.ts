@@ -1,5 +1,3 @@
-// Defines dashboard-session inputs for the shared immutable presentation publication kernel.
-
 import { Schema } from "effect";
 
 import { ApiSuccessSchema } from "../../response/api";
@@ -16,7 +14,6 @@ import {
   SchemaRevisionSequence,
 } from "../../schema";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 export class GetCollectionPresentationInput extends Schema.Class<GetCollectionPresentationInput>(
   "GetCollectionPresentationInput",
 )({
@@ -37,15 +34,17 @@ export class PublishCollectionPresentationInput extends Schema.Class<PublishColl
   presentation: AuthoringCollectionPresentation,
 }) {}
 
-export const CollectionPresentationOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const CollectionPresentationOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(AuthoringPresentationSnapshot),
 );
-export const PublishCollectionPresentationOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const PublishCollectionPresentationOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(AuthoringPublishPresentationResult),
 );
-export const GetCollectionPresentationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const GetCollectionPresentationInputSchema = Schema.toStandardSchemaV1(
   GetCollectionPresentationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const PublishCollectionPresentationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const PublishCollectionPresentationInputSchema = Schema.toStandardSchemaV1(
   PublishCollectionPresentationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );

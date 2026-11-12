@@ -3,7 +3,7 @@ import {
   localeTagMaxLength,
   localeTagValidationMessage,
   validateAndCanonicalizeLocaleTag,
-} from "@framerfordevs/api/contracts/locale/tag/index";
+} from "@framerfordevs/api/contracts/locale/tag";
 import { z } from "zod";
 
 const projectKeyPattern = /^[a-z][a-z0-9-]{0,62}$/u;

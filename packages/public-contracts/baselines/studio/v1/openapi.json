@@ -59,20 +59,20 @@
       }
     },
     "schemas": {
-      "ApiErrorDetail": {
+      "ApiErrorDetailEncoded": {
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "a string at most 64 character(s) long",
             "maxLength": 64,
             "minLength": 1,
-            "title": "maxLength(64)",
             "type": "string"
           },
           "currentRevisionId": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UUID"
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
               },
               {
                 "type": "null"
@@ -80,28 +80,22 @@
             ]
           },
           "currentVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "expectedVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "path": {
-            "description": "a string at most 256 character(s) long",
             "maxLength": 256,
-            "title": "maxLength(256)",
             "type": "string"
           },
           "scope": {
@@ -118,7 +112,7 @@
         ],
         "type": "object"
       },
-      "StudioApiError": {
+      "StudioApiErrorEncoded": {
         "additionalProperties": false,
         "properties": {
           "code": {
@@ -140,28 +134,21 @@
             "type": "string"
           },
           "details": {
-            "description": "an array of at most 20 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ApiErrorDetail"
+              "$ref": "#/components/schemas/ApiErrorDetailEncoded"
             },
             "maxItems": 20,
             "minItems": 1,
-            "title": "maxItems(20)",
             "type": "array"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "requestId": {
-            "description": "a string matching the pattern ^[A-Za-z0-9._:-]+$",
             "maxLength": 128,
             "minLength": 1,
-            "pattern": "^[A-Za-z0-9._:-]+$",
-            "title": "maxLength(128)",
             "type": "string"
           },
           "retryable": {
@@ -177,19 +164,20 @@
         "type": "object"
       },
       "StudioApiFailure": {
+        "$ref": "#/components/schemas/StudioApiFailureEncoded"
+      },
+      "StudioApiFailureEncoded": {
         "additionalProperties": false,
         "properties": {
           "data": {
             "type": "null"
           },
           "error": {
-            "$ref": "#/components/schemas/StudioApiError"
+            "$ref": "#/components/schemas/StudioApiErrorEncoded"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -207,11 +195,10 @@
         ],
         "type": "object"
       },
-      "StudioBootstrap": {
+      "StudioBootstrapEncoded": {
         "additionalProperties": false,
         "properties": {
           "effectiveActions": {
-            "description": "an array of at most 2 item(s)",
             "items": {
               "enum": [
                 "project.read",
@@ -220,11 +207,10 @@
               "type": "string"
             },
             "maxItems": 2,
-            "title": "maxItems(2)",
             "type": "array"
           },
           "environment": {
-            "$ref": "#/components/schemas/StudioEnvironmentIdentity"
+            "$ref": "#/components/schemas/StudioEnvironmentIdentityEncoded"
           },
           "formatVersion": {
             "enum": [
@@ -233,10 +219,10 @@
             "type": "number"
           },
           "project": {
-            "$ref": "#/components/schemas/StudioProjectIdentity"
+            "$ref": "#/components/schemas/StudioProjectIdentityEncoded"
           },
           "registration": {
-            "$ref": "#/components/schemas/StudioRegistrationAuthority"
+            "$ref": "#/components/schemas/StudioRegistrationAuthorityEncoded"
           },
           "role": {
             "enum": [
@@ -251,10 +237,10 @@
             "type": "string"
           },
           "session": {
-            "$ref": "#/components/schemas/StudioSessionAuthority"
+            "$ref": "#/components/schemas/StudioSessionAuthorityEncoded"
           },
           "user": {
-            "$ref": "#/components/schemas/StudioUserIdentity"
+            "$ref": "#/components/schemas/StudioUserIdentityEncoded"
           }
         },
         "required": [
@@ -273,16 +259,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/StudioBootstrap"
+            "$ref": "#/components/schemas/StudioBootstrapEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -300,13 +284,12 @@
         ],
         "type": "object"
       },
-      "StudioEnvironmentIdentity": {
+      "StudioEnvironmentIdentityEncoded": {
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "key": {
@@ -329,22 +312,20 @@
         ],
         "type": "object"
       },
-      "StudioProjectIdentity": {
+      "StudioProjectIdentityEncoded": {
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "name": {
             "type": "string"
           },
           "workspaceId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           }
         },
@@ -355,33 +336,27 @@
         ],
         "type": "object"
       },
-      "StudioRegistrationAuthority": {
+      "StudioRegistrationAuthorityEncoded": {
         "additionalProperties": false,
         "properties": {
           "applicationOrigin": {
-            "description": "a string at most 2048 character(s) long",
             "maxLength": 2048,
             "minLength": 1,
-            "title": "maxLength(2048)",
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "mountPath": {
-            "description": "a string at most 240 character(s) long",
             "maxLength": 240,
             "minLength": 1,
-            "title": "maxLength(240)",
             "type": "string"
           },
           "version": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -393,11 +368,10 @@
         ],
         "type": "object"
       },
-      "StudioSessionAuthority": {
+      "StudioSessionAuthorityEncoded": {
         "additionalProperties": false,
         "properties": {
           "expiresAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           }
@@ -407,24 +381,20 @@
         ],
         "type": "object"
       },
-      "StudioUserIdentity": {
+      "StudioUserIdentityEncoded": {
         "additionalProperties": false,
         "properties": {
           "email": {
             "type": "string"
           },
           "id": {
-            "description": "a string at most 255 character(s) long",
             "maxLength": 255,
             "minLength": 1,
-            "title": "maxLength(255)",
             "type": "string"
           },
           "name": {
-            "description": "a string at most 100 character(s) long",
             "maxLength": 100,
             "minLength": 1,
-            "title": "maxLength(100)",
             "type": "string"
           }
         },
@@ -434,12 +404,6 @@
           "email"
         ],
         "type": "object"
-      },
-      "UUID": {
-        "description": "a Universally Unique Identifier",
-        "format": "uuid",
-        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-        "type": "string"
       }
     },
     "securitySchemes": {

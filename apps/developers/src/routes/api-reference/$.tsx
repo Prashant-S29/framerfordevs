@@ -1,5 +1,3 @@
-// Renders lazy, read-only API contracts from server-loaded canonical OpenAPI artifacts.
-
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { useFumadocsLoader } from "fumadocs-core/source/client";

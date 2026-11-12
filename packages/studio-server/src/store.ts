@@ -1,5 +1,3 @@
-// Store port for encrypted Studio OAuth attempts/sessions and atomic refresh fencing.
-
 import { Data, Effect } from "effect";
 
 export interface StudioCiphertext {
@@ -50,7 +48,6 @@ export interface CreateSessionInput {
   readonly record: StudioSessionRecord;
   readonly nowEpochMs: number;
   readonly maximumSessionsPerRegistration: number;
-  /** Atomically removes this prior browser-session digest when re-authenticating. */
   readonly previousSessionDigest?: string;
 }
 

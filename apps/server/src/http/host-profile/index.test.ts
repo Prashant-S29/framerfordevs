@@ -1,5 +1,3 @@
-// Verifies exact host/path ownership and fail-closed host normalization.
-
 import { describe, expect, it } from "vitest";
 
 import { classifyHostPath, normalizeEffectiveHost } from "./index";

@@ -1,5 +1,3 @@
-// Orchestrates public Delivery scope, explicit credentials, central quotas, and immutable read adapters.
-
 import { Effect, Schema } from "effect";
 
 import { ApiErrorDetail } from "../../contracts/response/api";
@@ -24,7 +22,6 @@ import {
 } from "../../services/delivery/read-repository";
 import { RateLimitManager } from "../../services/rate-limit/manager";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const bearerPattern = /^Bearer ([^\s,]+)$/u;
 const DeliveryEnvironmentKey = Schema.String.check(
   Schema.isMinLength(1),
@@ -63,7 +60,6 @@ function lookupExpansion(
     : Effect.fail(DeliveryQueryInvalidFailure.make({ details: [...decoded.issues] }));
 }
 
-/** Canonicalizes the mandatory locale before persistence without consulting request headers. */
 export function makeDeliveryRouteScope(input: {
   readonly projectId: string;
   readonly environmentKey: string;
@@ -84,19 +80,21 @@ export function makeDeliveryRouteScope(input: {
     if (locale === undefined) {
       return yield* fail("locale", "locale_invalid", "Use a supported canonical locale tag.");
     }
-    const projectId = yield* SchemaStrict.decodeUnknownEffect(ProjectId)(input.projectId).pipe(
+    const projectId = yield* Schema.decodeUnknownEffect(ProjectId, { onExcessProperty: "error" })(
+      input.projectId,
+    ).pipe(
       Effect.mapError(() => fail("projectId", "project_id_invalid", "Use a valid project ID.")),
     );
-    const environmentKey = yield* SchemaStrict.decodeUnknownEffect(DeliveryEnvironmentKey)(
-      input.environmentKey,
-    ).pipe(
+    const environmentKey = yield* Schema.decodeUnknownEffect(DeliveryEnvironmentKey, {
+      onExcessProperty: "error",
+    })(input.environmentKey).pipe(
       Effect.mapError(() =>
         fail("environmentKey", "environment_key_invalid", "Use a valid environment key."),
       ),
     );
-    const collectionKey = yield* SchemaStrict.decodeUnknownEffect(CollectionApiKey)(
-      input.collectionKey,
-    ).pipe(
+    const collectionKey = yield* Schema.decodeUnknownEffect(CollectionApiKey, {
+      onExcessProperty: "error",
+    })(input.collectionKey).pipe(
       Effect.mapError(() =>
         fail("collectionKey", "collection_key_invalid", "Use a valid collection key."),
       ),
@@ -117,7 +115,6 @@ export const resolveDeliveryScope = Effect.fn("delivery.public.scope.resolve")(f
   return yield* (yield* DeliveryReadRepository).resolve(input);
 });
 
-/** Public requests remain anonymous only when no Authorization header was supplied. */
 export const authenticateDeliveryRequest = Effect.fn("delivery.public.authenticate")(function* (
   scope: ResolvedDeliveryScope,
   authorization: string | null,
@@ -125,7 +122,9 @@ export const authenticateDeliveryRequest = Effect.fn("delivery.public.authentica
 ) {
   if (authorization === null) {
     if (scope.access === "protected") return yield* UnauthorizedFailure.make();
-    return yield* SchemaStrict.decodeUnknownEffect(DeliveryAccessPrincipal)({
+    return yield* Schema.decodeUnknownEffect(DeliveryAccessPrincipal, {
+      onExcessProperty: "error",
+    })({
       kind: "anonymous",
       credentialId: null,
     }).pipe(Effect.mapError(() => CredentialInvalidFailure.make()));
@@ -142,13 +141,12 @@ export const authenticateDeliveryRequest = Effect.fn("delivery.public.authentica
     environmentId: scope.environmentId,
     source,
   });
-  return yield* SchemaStrict.decodeUnknownEffect(DeliveryAccessPrincipal)({
+  return yield* Schema.decodeUnknownEffect(DeliveryAccessPrincipal, { onExcessProperty: "error" })({
     kind: "credential",
     credentialId: principal.credentialId,
   }).pipe(Effect.mapError(() => CredentialInvalidFailure.make()));
 });
 
-/** Applies the high-ceiling installation budget before tenant or credential database work. */
 export const evaluateDeliveryGlobalRateLimit = Effect.fn("delivery.public.rate_limit.global")(
   function* (cost: number) {
     return yield* (yield* RateLimitManager).evaluate({
@@ -159,7 +157,6 @@ export const evaluateDeliveryGlobalRateLimit = Effect.fn("delivery.public.rate_l
   },
 );
 
-/** Applies only the anonymous source or authenticated credential identity budget. */
 export const evaluateDeliveryIdentityRateLimit = Effect.fn("delivery.public.rate_limit.identity")(
   function* (principal: DeliveryAccessPrincipal, source: string, cost: number) {
     return yield* (yield* RateLimitManager).evaluate({
@@ -189,7 +186,9 @@ export const getCurrentDeliveryEntry = Effect.fn("delivery.public.entry.current"
   principal: DeliveryAccessPrincipal,
 ) {
   const requestedPaths = yield* lookupExpansion(rawQuery, false);
-  const entryId = yield* SchemaStrict.decodeUnknownEffect(EntryId)(rawEntryId).pipe(
+  const entryId = yield* Schema.decodeUnknownEffect(EntryId, { onExcessProperty: "error" })(
+    rawEntryId,
+  ).pipe(
     Effect.mapError(() =>
       DeliveryQueryInvalidFailure.make({
         details: [
@@ -230,7 +229,9 @@ export const getUniqueDeliveryEntry = Effect.fn("delivery.public.entry.unique")(
       ],
     });
   }
-  const fieldKey = yield* SchemaStrict.decodeUnknownEffect(CollectionApiKey)(rawFieldKey).pipe(
+  const fieldKey = yield* Schema.decodeUnknownEffect(CollectionApiKey, {
+    onExcessProperty: "error",
+  })(rawFieldKey).pipe(
     Effect.mapError(() =>
       DeliveryQueryInvalidFailure.make({
         details: [
@@ -261,8 +262,8 @@ export const getImmutableDeliveryEntry = Effect.fn("delivery.public.entry.immuta
 ) {
   const requestedPaths = yield* lookupExpansion(rawQuery, false);
   const [entryId, publicationId] = yield* Effect.all([
-    SchemaStrict.decodeUnknownEffect(EntryId)(rawEntryId),
-    SchemaStrict.decodeUnknownEffect(EntryPublicationId)(rawPublicationId),
+    Schema.decodeUnknownEffect(EntryId, { onExcessProperty: "error" })(rawEntryId),
+    Schema.decodeUnknownEffect(EntryPublicationId, { onExcessProperty: "error" })(rawPublicationId),
   ]).pipe(
     Effect.mapError(() =>
       DeliveryQueryInvalidFailure.make({

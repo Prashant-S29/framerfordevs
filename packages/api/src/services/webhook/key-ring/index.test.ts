@@ -1,5 +1,3 @@
-// Verifies strict persistent key-ring parsing without exposing or normalizing key material.
-
 import { assert, describe, it } from "@effect/vitest";
 
 import { parseWebhookKeyRing } from "./index";

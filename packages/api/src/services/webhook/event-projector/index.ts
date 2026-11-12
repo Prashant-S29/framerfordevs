@@ -1,5 +1,3 @@
-// Exposes strict publication-event projection through a replaceable Effect service.
-
 import { Context, Effect, Layer } from "effect";
 
 import { WebhookEventInvalidFailure } from "../../../contracts/response/errors";

@@ -1,5 +1,3 @@
-// Verifies traversal-safe capture hierarchy, atomic persistence, and event-id reservation behavior.
-
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,7 +8,6 @@ import { createCapture, finalizeCapture, reserveAcceptedEvent } from "../../src/
 import type { CaptureRecord } from "../../src/types.js";
 import { testEvent, testEventId } from "../support/helpers.js";
 
-/** Creates one safe capture record without signatures, secrets, or arbitrary headers. */
 function captureRecord(): CaptureRecord {
   return {
     schemaVersion: 1,

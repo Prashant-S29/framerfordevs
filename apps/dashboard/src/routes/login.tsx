@@ -1,5 +1,3 @@
-// Owns dashboard credentials and resumes only server-signed OAuth or validated UI destinations.
-
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
@@ -21,6 +19,11 @@ function hasSignedOAuthContinuation(search: Record<string, unknown>): boolean {
     (typeof search.ba_param === "string" ||
       (Array.isArray(search.ba_param) && search.ba_param.length <= 64))
   );
+}
+
+async function requestOAuthContinuation(): Promise<string | null> {
+  const result = await authClient.oauth2.continue({ postLogin: true });
+  return result.error || !result.data?.url ? null : result.data.url;
 }
 
 export const Route = createFileRoute("/login")({
@@ -50,19 +53,20 @@ function RouteComponent() {
   const [oauthError, setOAuthError] = useState<string | null>(null);
   const oauthErrorRef = useRef<HTMLParagraphElement>(null);
 
-  async function continueOAuth() {
-    const result = await authClient.oauth2.continue({ postLogin: true });
-    if (result.error || !result.data?.url) {
-      setOAuthError(
-        "The authorization request is invalid or expired. Restart authorization from the application that sent you here.",
-      );
-      return;
-    }
-    window.location.assign(result.data.url);
+  function continueOAuth() {
+    void requestOAuthContinuation().then((url) => {
+      if (url === null) {
+        setOAuthError(
+          "The authorization request is invalid or expired. Restart authorization from the application that sent you here.",
+        );
+        return;
+      }
+      window.location.assign(url);
+    });
   }
 
   useEffect(() => {
-    if (oauth && session.data?.user) void continueOAuth();
+    if (oauth && session.data?.user) continueOAuth();
   }, [oauth, session.data?.user]);
 
   useEffect(() => {
@@ -71,7 +75,7 @@ function RouteComponent() {
 
   function handleAuthenticated() {
     if (oauth) {
-      void continueOAuth();
+      continueOAuth();
       return;
     }
     const token = parseInvitationTokenHash(window.location.hash);

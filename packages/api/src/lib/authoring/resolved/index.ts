@@ -1,5 +1,3 @@
-// Builds and validates one fully allocated M13 collection candidate through existing M5/M6 kernels.
-
 import type { CollectionSchema } from "@framerfordevs/schema";
 
 import {
@@ -57,10 +55,6 @@ function candidateIssue(issue: CodeSchemaCandidateIssue | StructureHashIssue) {
   };
 }
 
-/**
- * Runs only with server-allocated identities. It merges current hosted presentation, then delegates
- * validation, contract hashing, management hashing, and change classification to existing kernels.
- */
 export function buildResolvedSchemaCandidate(options: {
   readonly schema: CollectionSchema;
   readonly collection: CmsCollection;

@@ -1,5 +1,3 @@
-// Routes the server-prefetched locale-neutral M7 list using one authorized locale internally.
-
 import { createFileRoute } from "@tanstack/react-router";
 
 import { CollectionEntries } from "@/components/entry/collection-entries";

@@ -1,5 +1,3 @@
-// Compiles bounded typed root-scalar projections from an already validated immutable publication snapshot.
-
 import type { DeliveryQueryScalarKind } from "../../../contracts/delivery";
 import type { CollectionFieldDefinition } from "../../../contracts/schema";
 import { canonicalDateTime, parseExactDecimal, validDate } from "../../field/validation";
@@ -43,14 +41,12 @@ const supportedKinds = new Set<string>([
   "reference",
 ]);
 
-/** Narrows the wider authoring vocabulary to the closed Delivery projection kinds. */
 function isDeliveryKind(kind: string): kind is DeliveryQueryScalarKind {
   return supportedKinds.has(kind);
 }
 const referencePattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
-/** Converts one strict publication value to its exact database comparison representation. */
 function projectionValue(
   kind: DeliveryQueryScalarKind,
   value: unknown,
@@ -75,10 +71,6 @@ function projectionValue(
   return null;
 }
 
-/**
- * Materializes every present supported root terminal, independently of current query capabilities.
- * Unsupported/missing values produce no row; malformed supported values fail closed as invariant drift.
- */
 export function compileDeliveryProjections(
   fields: ReadonlyArray<CollectionFieldDefinition>,
   snapshotData: Readonly<Record<string, unknown>>,

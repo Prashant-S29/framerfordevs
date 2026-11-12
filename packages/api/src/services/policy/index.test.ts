@@ -1,5 +1,5 @@
 import { assert, describe, it, layer } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import {
   credentialScopeValues,
@@ -14,16 +14,21 @@ import {
   projectPolicyProjection,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const workspaceId = "019fae8b-1234-7000-8000-000000000001";
 const projectId = "019fae8b-1234-7000-8000-000000000002";
 const environmentId = "019fae8b-1234-7000-8000-000000000003";
 const localeId = "019fae8b-1234-7000-8000-000000000004";
 const otherLocaleId = "019fae8b-1234-7000-8000-000000000005";
 const disabledLocaleId = "019fae8b-1234-7000-8000-000000000006";
-const projectLocaleId = SchemaStrict.decodeUnknownSync(ProjectLocaleId)(localeId);
-const otherProjectLocaleId = SchemaStrict.decodeUnknownSync(ProjectLocaleId)(otherLocaleId);
-const disabledProjectLocaleId = SchemaStrict.decodeUnknownSync(ProjectLocaleId)(disabledLocaleId);
+const projectLocaleId = Schema.decodeUnknownSync(ProjectLocaleId, { onExcessProperty: "error" })(
+  localeId,
+);
+const otherProjectLocaleId = Schema.decodeUnknownSync(ProjectLocaleId, {
+  onExcessProperty: "error",
+})(otherLocaleId);
+const disabledProjectLocaleId = Schema.decodeUnknownSync(ProjectLocaleId, {
+  onExcessProperty: "error",
+})(disabledLocaleId);
 
 const expectedAllowedActions = {
   owner: new Set(projectPermissionActionValues),

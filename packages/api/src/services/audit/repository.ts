@@ -1,9 +1,7 @@
-// Provides bounded, content-free project audit visibility with fixed-snapshot pagination.
-
 import { db } from "@framerfordevs/db";
 import { and, eq, lt, lte, or, sql } from "@framerfordevs/db/query";
 import { auditEvent } from "@framerfordevs/db/schema/platform";
-import { Clock, Context, Effect, Layer } from "effect";
+import { Clock, Context, Effect, Layer, Schema } from "effect";
 
 import {
   ControlPlaneCursor,
@@ -25,7 +23,6 @@ import {
 } from "../control-plane/cursor-signer";
 import { type ApplicationDb, authorizeUserProject } from "../project-access";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 function databaseFailure(operation: string, cause: unknown) {
   return DatabaseFailure.make({ operation, cause });
 }
@@ -164,17 +161,17 @@ export function makeAuditRepository(database: ApplicationDb = db) {
       const hasNextPage = result.rows.length > input.limit;
       const visible = result.rows.slice(0, input.limit);
       const items = yield* Effect.forEach(visible, (row) =>
-        SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditEvent)(auditValue(row)).pipe(
+        Schema.decodeUnknownEffect(ControlPlaneProjectAuditEvent)(auditValue(row)).pipe(
           Effect.mapError((cause) => databaseFailure("audit.project.list.decode", cause)),
         ),
       );
       const last = visible.at(-1);
       const nextCursor =
         hasNextPage && last
-          ? yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCursor)(
+          ? yield* Schema.decodeUnknownEffect(ControlPlaneCursor)(
               yield* signer.sign(authority, {
                 finalSortAtEpochMs: last.occurredAt.getTime(),
-                finalId: yield* SchemaStrict.decodeUnknownEffect(ProjectAuditEventId)(last.id).pipe(
+                finalId: yield* Schema.decodeUnknownEffect(ProjectAuditEventId)(last.id).pipe(
                   Effect.mapError((cause) => databaseFailure("audit.project.cursor.decode", cause)),
                 ),
                 asOfEpochMs: asOf.getTime(),

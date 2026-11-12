@@ -1,14 +1,11 @@
-// Encrypts persisted webhook authority with AES-256-GCM and endpoint-bound additional data.
-
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
 
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 import { WebhookSecret } from "../../../contracts/webhook";
 import { SecurityServiceFailure } from "../../../contracts/response/errors";
 import { canonicalizeEntryValue } from "../../../lib/entry/values";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 export interface WebhookEncryptionScope {
   readonly workspaceId: string;
   readonly projectId: string;
@@ -73,7 +70,6 @@ function additionalData(scope: WebhookEncryptionScope): Buffer {
   return Buffer.from(canonicalizeEntryValue({ version: 1, ...scope }), "utf8");
 }
 
-/** Builds one validated key-ring service without retaining plaintext beyond each operation. */
 export function makeWebhookCrypto(options: WebhookCryptoOptions): WebhookCryptoService {
   const keys = decodeKeys(options);
   const activeKey = keys.get(options.activeKeyId);
@@ -86,7 +82,7 @@ export function makeWebhookCrypto(options: WebhookCryptoOptions): WebhookCryptoS
         try: () => `whsec_${generateRandom(32).toString("base64url")}`,
         catch: (cause) => failure("webhook.crypto.secret.generate", cause),
       });
-      return yield* SchemaStrict.decodeUnknownEffect(WebhookSecret)(value).pipe(
+      return yield* Schema.decodeUnknownEffect(WebhookSecret)(value).pipe(
         Effect.mapError((cause) => failure("webhook.crypto.secret.decode", cause)),
       );
     }),
@@ -154,7 +150,6 @@ export class WebhookCrypto extends Context.Service<WebhookCrypto, WebhookCryptoS
   "WebhookCrypto",
 ) {}
 
-/** Keeps management paths fail-closed when no persistent deployment key ring is configured. */
 export const WebhookCryptoUnavailableLive = Layer.succeed(WebhookCrypto, {
   generateSigningSecret: () => Effect.fail(failure("webhook.crypto.configuration", "missing")),
   encrypt: () => Effect.fail(failure("webhook.crypto.configuration", "missing")),

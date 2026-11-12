@@ -5,14 +5,14 @@ import { EditorLayout } from "../../../contracts/field";
 import { CollectionFieldDefinition, ContractHash } from "../../../contracts/schema";
 import { projectStudioForm } from "../../studio-content/form-projection";
 import { generatedFormDefinition } from "./index";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 const visibleId = "019fae8b-1234-7000-8000-000000000001";
 const hiddenId = "019fae8b-1234-7000-8000-000000000002";
 const visibleRoles = ["owner", "developer"] as const;
 
 function field(id: string, apiKey: string, roles: ReadonlyArray<typeof ProjectRole.Type>) {
-  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+  return Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })({
     id,
     parentFieldId: null,
     nodeRole: "root",
@@ -34,7 +34,7 @@ function field(id: string, apiKey: string, roles: ReadonlyArray<typeof ProjectRo
   });
 }
 
-const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
+const layout = Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })({
   version: 1,
   tabs: [
     {
@@ -113,29 +113,31 @@ describe("generated form definition", () => {
   });
 
   it("preserves a visible sidebar when the role has no visible tab placements", () => {
-    const sidebarOnlyLayout = SchemaStrict.decodeUnknownSync(EditorLayout)({
-      version: 1,
-      tabs: layout.tabs,
-      sidebarGroups: [
-        {
-          id: "019fae8b-1234-7000-8000-000000000006",
-          title: "Sidebar",
-          description: null,
-          position: 0,
-          columns: 1,
-          visibleToRoles: ["owner", "developer", "editor"],
-          fields: [
-            {
-              id: "019fae8b-1234-7000-8000-000000000007",
-              fieldId: hiddenId,
-              position: 0,
-              helpTextOverride: null,
-              visibleToRoles: ["owner", "developer", "editor"],
-            },
-          ],
-        },
-      ],
-    });
+    const sidebarOnlyLayout = Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })(
+      {
+        version: 1,
+        tabs: layout.tabs,
+        sidebarGroups: [
+          {
+            id: "019fae8b-1234-7000-8000-000000000006",
+            title: "Sidebar",
+            description: null,
+            position: 0,
+            columns: 1,
+            visibleToRoles: ["owner", "developer", "editor"],
+            fields: [
+              {
+                id: "019fae8b-1234-7000-8000-000000000007",
+                fieldId: hiddenId,
+                position: 0,
+                helpTextOverride: null,
+                visibleToRoles: ["owner", "developer", "editor"],
+              },
+            ],
+          },
+        ],
+      },
+    );
     const form = generatedFormDefinition({
       source: "published",
       collectionId: "019fae8b-1234-7000-8000-000000000010",

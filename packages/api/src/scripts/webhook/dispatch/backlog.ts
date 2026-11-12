@@ -1,5 +1,3 @@
-// Drains the operator-approved supported outbox backlog without enabling outbound webhook delivery.
-
 import { db } from "@framerfordevs/db";
 import { isNull, sql } from "@framerfordevs/db/query";
 import { outboxEvent } from "@framerfordevs/db/schema/cms";

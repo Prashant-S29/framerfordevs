@@ -1,5 +1,5 @@
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Exit, Layer } from "effect";
+import { Effect, Exit, Layer, Schema } from "effect";
 
 import {
   CreateProjectLocaleInput,
@@ -20,11 +20,10 @@ import {
   updateProjectLocaleStatus,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const localeId = "019fae8b-1234-7000-8000-000000000002";
 const timestamp = "2026-08-01T12:00:00.000Z";
-const locale = SchemaStrict.decodeUnknownSync(ProjectLocale)({
+const locale = Schema.decodeUnknownSync(ProjectLocale, { onExcessProperty: "error" })({
   id: localeId,
   workspaceId: "019fae8b-1234-7000-8000-000000000003",
   projectId,
@@ -58,15 +57,19 @@ describe("locale operations", () => {
         const requestId = "request-locale-operations";
         yield* listProjectLocales(
           actorId,
-          yield* SchemaStrict.decodeUnknownEffect(ListProjectLocalesInput)({
-            projectId,
-            view: "settings",
-            includeRemoved: false,
-          }),
+          yield* Schema.decodeUnknownEffect(ListProjectLocalesInput, { onExcessProperty: "error" })(
+            {
+              projectId,
+              view: "settings",
+              includeRemoved: false,
+            },
+          ),
         );
         yield* createProjectLocale(
           actorId,
-          yield* SchemaStrict.decodeUnknownEffect(CreateProjectLocaleInput)({
+          yield* Schema.decodeUnknownEffect(CreateProjectLocaleInput, {
+            onExcessProperty: "error",
+          })({
             projectId,
             tag: "hi",
             displayName: "Hindi",
@@ -75,7 +78,9 @@ describe("locale operations", () => {
         );
         yield* updateProjectLocaleDisplayName(
           actorId,
-          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleDisplayNameInput)({
+          yield* Schema.decodeUnknownEffect(UpdateProjectLocaleDisplayNameInput, {
+            onExcessProperty: "error",
+          })({
             projectId,
             localeId,
             version: 1,
@@ -85,7 +90,9 @@ describe("locale operations", () => {
         );
         yield* reorderProjectLocales(
           actorId,
-          yield* SchemaStrict.decodeUnknownEffect(ReorderProjectLocalesInput)({
+          yield* Schema.decodeUnknownEffect(ReorderProjectLocalesInput, {
+            onExcessProperty: "error",
+          })({
             projectId,
             locales: [{ localeId, version: 1 }],
           }),
@@ -93,7 +100,9 @@ describe("locale operations", () => {
         );
         yield* updateProjectLocaleStatus(
           actorId,
-          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectLocaleStatusInput)({
+          yield* Schema.decodeUnknownEffect(UpdateProjectLocaleStatusInput, {
+            onExcessProperty: "error",
+          })({
             projectId,
             localeId,
             version: 1,
@@ -119,7 +128,9 @@ describe("locale operations", () => {
         const exit = yield* Effect.exit(
           listProjectLocales(
             "",
-            yield* SchemaStrict.decodeUnknownEffect(ListProjectLocalesInput)({
+            yield* Schema.decodeUnknownEffect(ListProjectLocalesInput, {
+              onExcessProperty: "error",
+            })({
               projectId,
               view: "enabled",
               includeRemoved: false,

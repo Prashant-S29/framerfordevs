@@ -1,5 +1,3 @@
-// Proves atomic outbox projection, zero-endpoint completion, and duplicate-safe dispatch claims.
-
 import { randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, it } from "@effect/vitest";

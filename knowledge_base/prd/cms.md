@@ -482,7 +482,7 @@ Webhook delivery guarantees at-least-once delivery, not exactly-once. It require
 
 ### 16.1 Effect policy
 
-Application business logic uses stable Effect v3 as the default computational model:
+Application business logic uses Effect 4.1 as the default computational model:
 
 ```text
 Effect<Success, TypedError, Requirements>

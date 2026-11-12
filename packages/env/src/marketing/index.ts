@@ -1,5 +1,3 @@
-// Validates the public origins used by marketing navigation and authentication entry redirects.
-
 import { createEnv } from "@t3-oss/env-core";
 
 import { exactOriginSchema } from "../origin";

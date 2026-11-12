@@ -4,7 +4,6 @@ import type { SchemaRevisionId } from "../../../contracts/schema";
 
 const projectionInvalidAuditNamespace = "ffd:cms.schema.projection_invalid_detected:v1";
 
-/** Derives the audit primary key that serializes detection of one invalid immutable revision. */
 export function projectionInvalidAuditId(schemaRevisionId: SchemaRevisionId): string {
   const bytes = createHash("sha256")
     .update(`${projectionInvalidAuditNamespace}:${schemaRevisionId}`, "utf8")
@@ -16,7 +15,6 @@ export function projectionInvalidAuditId(schemaRevisionId: SchemaRevisionId): st
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-/** Binds the durable audit request marker to the same deterministic primary key. */
 export function projectionInvalidAuditRequestId(auditId: string): string {
   return `studio-projection-invalid:${auditId}`;
 }

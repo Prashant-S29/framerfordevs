@@ -11,7 +11,6 @@ export interface CredentialAuthenticationState {
   readonly retireAt: Date | null;
 }
 
-/** Evaluates key usability without relying on asynchronous cleanup of expired lifecycle rows. */
 export function canCredentialAuthenticate(
   credential: CredentialAuthenticationState,
   now: Date,
@@ -25,7 +24,6 @@ export function canCredentialAuthenticate(
 
 export type CredentialRotationAction = "activate" | "cancel" | "complete";
 
-/** Keeps the staged rotation transition graph closed and explicit. */
 export function canChangeCredentialRotation(
   status: CredentialRotationStatus | string,
   action: CredentialRotationAction,

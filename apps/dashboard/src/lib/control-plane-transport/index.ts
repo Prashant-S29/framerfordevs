@@ -1,5 +1,3 @@
-// Routes dashboard governance and operations calls to canonical same-origin Control Plane v1 paths.
-
 type HttpMethod = "GET" | "PATCH" | "POST" | "PUT";
 
 export interface ControlPlaneRequestPlan {
@@ -493,7 +491,6 @@ function webhookPlan(procedure: string, input: Readonly<Record<string, unknown>>
   return null;
 }
 
-/** Returns a canonical Control Plane request for migrated dashboard procedures, otherwise null. */
 export function planControlPlaneRequest(
   path: ReadonlyArray<string>,
   input: unknown,
@@ -520,7 +517,6 @@ export function planControlPlaneRequest(
   return null;
 }
 
-/** Reads one Control Plane response without accepting an unbounded browser payload. */
 export async function readControlPlaneResponse(response: Response): Promise<unknown> {
   const contentLength = response.headers.get("content-length");
   if (contentLength !== null && Number(contentLength) > maximumResponseBytes) {
@@ -556,7 +552,6 @@ export async function readControlPlaneResponse(response: Response): Promise<unkn
   return parsed;
 }
 
-/** Adapts one canonical HTTP envelope to the existing typed dashboard query result shape. */
 export function adaptControlPlaneResponse(
   response: Response,
   body: unknown,

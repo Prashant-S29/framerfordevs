@@ -1,10 +1,8 @@
-// Persists only idempotency authority; credentials and mutation/schema bodies are forbidden.
-
 import { link, open, lstat, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { canonicalJsonBytes, toJsonValue } from "../canonical";
 import { CliRetryJournalConflictError, CliRetryJournalError } from "../errors";
@@ -17,7 +15,6 @@ import {
   type ControlPlaneMutationOperation,
 } from "../schema";
 
-import * as SchemaStrict from "../schema-strict";
 const relativePath = ".framerfordevs/retry/schema-apply.json";
 const contentRelativePath = ".framerfordevs/retry/content-command.json";
 const presentationRelativePath = ".framerfordevs/retry/presentation-publish.json";
@@ -40,9 +37,12 @@ async function readExisting(path: string) {
       throw CliRetryJournalConflictError.make();
     }
     const value: unknown = JSON.parse(await readFile(path, "utf8"));
-    return SchemaStrict.decodeUnknownSync(SchemaMutationRetryJournal)(value, {
-      onExcessProperty: "error",
-    });
+    return Schema.decodeUnknownSync(SchemaMutationRetryJournal, { onExcessProperty: "error" })(
+      value,
+      {
+        onExcessProperty: "error",
+      },
+    );
   } catch (cause) {
     if (typeof cause === "object" && cause !== null && Reflect.get(cause, "code") === "ENOENT") {
       return null;
@@ -129,7 +129,9 @@ async function readExistingControlPlane(path: string) {
       throw CliRetryJournalConflictError.make();
     }
     const value: unknown = JSON.parse(await readFile(path, "utf8"));
-    return SchemaStrict.decodeUnknownSync(ControlPlaneMutationRetryJournal)(value, {
+    return Schema.decodeUnknownSync(ControlPlaneMutationRetryJournal, {
+      onExcessProperty: "error",
+    })(value, {
       onExcessProperty: "error",
     });
   } catch (cause) {
@@ -252,9 +254,12 @@ async function readExistingContent(path: string) {
       throw CliRetryJournalConflictError.make();
     }
     const value: unknown = JSON.parse(await readFile(path, "utf8"));
-    return SchemaStrict.decodeUnknownSync(ContentMutationRetryJournal)(value, {
-      onExcessProperty: "error",
-    });
+    return Schema.decodeUnknownSync(ContentMutationRetryJournal, { onExcessProperty: "error" })(
+      value,
+      {
+        onExcessProperty: "error",
+      },
+    );
   } catch (cause) {
     if (typeof cause === "object" && cause !== null && Reflect.get(cause, "code") === "ENOENT") {
       return null;
@@ -384,7 +389,9 @@ async function readExistingPresentation(path: string) {
       throw CliRetryJournalConflictError.make();
     }
     const value: unknown = JSON.parse(await readFile(path, "utf8"));
-    return SchemaStrict.decodeUnknownSync(PresentationMutationRetryJournal)(value, {
+    return Schema.decodeUnknownSync(PresentationMutationRetryJournal, {
+      onExcessProperty: "error",
+    })(value, {
       onExcessProperty: "error",
     });
   } catch (cause) {

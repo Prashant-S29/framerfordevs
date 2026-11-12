@@ -1,5 +1,3 @@
-// Watches only the verified Tier 1 module graph and preserves the last valid structural view.
-
 import { watch, type FSWatcher } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 

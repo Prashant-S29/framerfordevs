@@ -1,4 +1,4 @@
-import { Clock, Effect, Exit } from "effect";
+import { Clock, Effect, Exit, Schema } from "effect";
 
 import { UnauthorizedFailure } from "../../contracts/response/errors";
 import type {
@@ -12,9 +12,8 @@ import { AuthUserId } from "../../contracts/platform";
 import { Telemetry } from "../../observability/telemetry";
 import { LocaleRepository } from "../../services/locale/repository";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const decodeActorId = (actorId: string) =>
-  SchemaStrict.decodeUnknownEffect(AuthUserId)(actorId).pipe(
+  Schema.decodeUnknownEffect(AuthUserId, { onExcessProperty: "error" })(actorId).pipe(
     Effect.mapError(() => UnauthorizedFailure.make()),
   );
 

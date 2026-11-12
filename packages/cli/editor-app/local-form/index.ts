@@ -1,5 +1,3 @@
-// Projects verified local code structure through hosted source-identity presentation for read-only drift views.
-
 import type { ProjectSchema, FieldSchema, ListItemSchema } from "@framerfordevs/schema";
 import type { AuthoringFormField, AuthoringGeneratedForm } from "@framerfordevs/sdk/authoring";
 import type {

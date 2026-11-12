@@ -1,5 +1,3 @@
-// Resolves exact Preview authority, compiles bounded draft sources, and audits successful reads atomically.
-
 import { db } from "@framerfordevs/db";
 import { and, eq, sql } from "@framerfordevs/db/query";
 import {
@@ -65,7 +63,6 @@ import { authorizeUserProject, selectUserProjectAccess } from "../project-access
 import { PreviewDocumentEngine } from "./document-engine";
 import { hashSchemaContract } from "../schema/engine";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 import { Uuid } from "../../contracts/uuid";
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
@@ -85,12 +82,12 @@ function databaseFailure(operation: string, cause: unknown) {
 const EntryValuesSchema = Schema.Record(Uuid, Schema.Unknown);
 
 function decodeEntryValues(value: unknown): EntryValues | null {
-  const decoded = SchemaStrict.decodeUnknownResult(EntryValuesSchema)(value);
+  const decoded = Schema.decodeUnknownResult(EntryValuesSchema)(value);
   return Result.isFailure(decoded) ? null : decoded.success;
 }
 
 function decodeField(row: typeof cmsSchemaRevisionField.$inferSelect): CollectionField | null {
-  const decoded = SchemaStrict.decodeUnknownResult(CollectionFieldDefinition)({
+  const decoded = Schema.decodeUnknownResult(CollectionFieldDefinition)({
     id: row.fieldId,
     parentFieldId: row.parentFieldId,
     nodeRole: row.nodeRole,
@@ -287,7 +284,7 @@ async function resolveUserScope(
   if (authorization.kind === "not_found") return outcome("not_found");
   if (authorization.kind === "forbidden") return outcome("forbidden");
   if (authorization.access.project.archivedAt !== null) return outcome("invalid_state");
-  const role = SchemaStrict.decodeUnknownResult(ProjectRole)(authorization.access.role);
+  const role = Schema.decodeUnknownResult(ProjectRole)(authorization.access.role);
   if (Result.isFailure(role)) return outcome("corrupt");
   const [environmentRow] = await executor
     .select({ id: environment.id })
@@ -694,7 +691,6 @@ export interface PreviewRepositoryOptions {
   readonly testAfterSharedHeadRead?: () => Promise<void>;
 }
 
-/** Creates the short repeatable-read Preview adapter over the shared database pool. */
 export function makePreviewRepository(options: PreviewRepositoryOptions = {}) {
   const database = options.database ?? db;
   const compile = options.compile ?? compilePreviewDocument;
@@ -753,7 +749,7 @@ export function makePreviewRepository(options: PreviewRepositoryOptions = {}) {
       });
       if (!compilation.ok) return outcome("corrupt");
       if (compilation.responseBytes > previewLimits.responseBytes) return outcome("too_large");
-      const item = SchemaStrict.decodeUnknownResult(PreviewItem)(compilation.item);
+      const item = Schema.decodeUnknownResult(PreviewItem)(compilation.item);
       if (Result.isFailure(item)) return outcome("corrupt");
       try {
         if (options.testFailBeforeAudit) throw new Error("Injected Preview audit failure.");

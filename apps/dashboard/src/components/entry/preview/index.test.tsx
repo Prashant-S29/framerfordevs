@@ -1,14 +1,14 @@
 /** @vitest-environment jsdom */
 
-import { EntryRevisionPage, EntryRevisionSummary } from "@framerfordevs/api/contracts/entry/index";
-import { ProjectLocale, ProjectLocaleList } from "@framerfordevs/api/contracts/locale/index";
-import { PreviewItem } from "@framerfordevs/api/contracts/preview/index";
-import { Project } from "@framerfordevs/api/contracts/platform/index";
+import { EntryRevisionPage, EntryRevisionSummary } from "@framerfordevs/api/contracts/entry";
+import { ProjectLocale, ProjectLocaleList } from "@framerfordevs/api/contracts/locale";
+import { PreviewItem } from "@framerfordevs/api/contracts/preview";
+import { Project } from "@framerfordevs/api/contracts/platform";
 import {
   EntryPublicationStatus,
   EntryPublicationSummary,
-} from "@framerfordevs/api/contracts/publication/index";
-import { CmsCollection } from "@framerfordevs/api/contracts/schema/index";
+} from "@framerfordevs/api/contracts/publication";
+import { CmsCollection } from "@framerfordevs/api/contracts/schema";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -20,8 +20,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PersistedDraftPreviewLink } from "../editor";
 import { EntryPreview, isValidRevisionPreviewSearch } from "./index";
 import { orpc } from "@/utils/orpc";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 vi.mock("@tanstack/react-router", async (importOriginal) => {
   const original = await importOriginal<typeof import("@tanstack/react-router")>();
   return {
@@ -57,7 +57,7 @@ const ids = {
   snapshot: "019fae8b-1234-7000-8000-000000000011",
 };
 const timestamp = "2026-08-12T12:00:00.000Z";
-const project = SchemaStrict.decodeUnknownSync(Project)({
+const project = Schema.decodeUnknownSync(Project, { onExcessProperty: "error" })({
   id: ids.project,
   workspaceId: ids.workspace,
   name: "Preview project",
@@ -69,8 +69,6 @@ const project = SchemaStrict.decodeUnknownSync(Project)({
   updatedAt: timestamp,
   environment: {
     id: ids.environment,
-    workspaceId: ids.workspace,
-    projectId: ids.project,
     key: "main",
     name: "main",
     isPrimary: true,
@@ -78,7 +76,7 @@ const project = SchemaStrict.decodeUnknownSync(Project)({
   },
   capabilities: [],
 });
-const locale = SchemaStrict.decodeUnknownSync(ProjectLocale)({
+const locale = Schema.decodeUnknownSync(ProjectLocale, { onExcessProperty: "error" })({
   id: ids.locale,
   workspaceId: ids.workspace,
   projectId: ids.project,
@@ -90,7 +88,7 @@ const locale = SchemaStrict.decodeUnknownSync(ProjectLocale)({
   createdAt: timestamp,
   updatedAt: timestamp,
 });
-const collection = SchemaStrict.decodeUnknownSync(CmsCollection)({
+const collection = Schema.decodeUnknownSync(CmsCollection, { onExcessProperty: "error" })({
   id: ids.collection,
   workspaceId: ids.workspace,
   projectId: ids.project,
@@ -106,7 +104,9 @@ const collection = SchemaStrict.decodeUnknownSync(CmsCollection)({
   createdAt: timestamp,
   updatedAt: timestamp,
 });
-const sharedRevision = SchemaStrict.decodeUnknownSync(EntryRevisionSummary)({
+const sharedRevision = Schema.decodeUnknownSync(EntryRevisionSummary, {
+  onExcessProperty: "error",
+})({
   id: ids.shared,
   entryId: ids.entry,
   localeId: null,
@@ -121,13 +121,15 @@ const sharedRevision = SchemaStrict.decodeUnknownSync(EntryRevisionSummary)({
   authoredByCredentialId: null,
   authoredAt: timestamp,
 });
-const localizedRevision = SchemaStrict.decodeUnknownSync(EntryRevisionSummary)({
+const localizedRevision = Schema.decodeUnknownSync(EntryRevisionSummary, {
+  onExcessProperty: "error",
+})({
   ...sharedRevision,
   id: ids.localized,
   localeId: ids.locale,
   scope: "localized",
 });
-const preview = SchemaStrict.decodeUnknownSync(PreviewItem)({
+const preview = Schema.decodeUnknownSync(PreviewItem, { onExcessProperty: "error" })({
   id: ids.entry,
   collectionId: ids.collection,
   collection: "articles",
@@ -156,7 +158,9 @@ const preview = SchemaStrict.decodeUnknownSync(PreviewItem)({
     capped: false,
   },
 });
-const publicationSummary = SchemaStrict.decodeUnknownSync(EntryPublicationSummary)({
+const publicationSummary = Schema.decodeUnknownSync(EntryPublicationSummary, {
+  onExcessProperty: "error",
+})({
   id: ids.publication,
   snapshotId: ids.snapshot,
   entryId: ids.entry,
@@ -185,24 +189,26 @@ const publicationSummary = SchemaStrict.decodeUnknownSync(EntryPublicationSummar
   publishedAt: timestamp,
   current: true,
 });
-const publication = SchemaStrict.decodeUnknownSync(EntryPublicationStatus)({
-  entryId: ids.entry,
-  localeId: ids.locale,
-  locale: "gu",
-  state: "unpublished",
-  stateVersion: 0,
-  currentPublication: null,
-  currentSchemaRevisionId: ids.schema,
-  currentContractHash: "a".repeat(64),
-  currentSharedRevisionId: ids.shared,
-  currentSharedVersion: 1,
-  currentLocalizedRevisionId: ids.localized,
-  currentLocalizedVersion: 1,
-  sharedChanged: true,
-  localizedChanged: true,
-  schemaChanged: false,
-  changedSincePublication: true,
-});
+const publication = Schema.decodeUnknownSync(EntryPublicationStatus, { onExcessProperty: "error" })(
+  {
+    entryId: ids.entry,
+    localeId: ids.locale,
+    locale: "gu",
+    state: "unpublished",
+    stateVersion: 0,
+    currentPublication: null,
+    currentSchemaRevisionId: ids.schema,
+    currentContractHash: "a".repeat(64),
+    currentSharedRevisionId: ids.shared,
+    currentSharedVersion: 1,
+    currentLocalizedRevisionId: ids.localized,
+    currentLocalizedVersion: 1,
+    sharedChanged: true,
+    localizedChanged: true,
+    schemaChanged: false,
+    changedSincePublication: true,
+  },
+);
 
 function response<A>(data: A, message: string) {
   return { ok: true as const, data, error: null, message };
@@ -347,7 +353,7 @@ describe("Entry Preview", () => {
       entryId: ids.entry,
       locale: "gu",
     };
-    const revisionPreview = SchemaStrict.decodeUnknownSync(PreviewItem)({
+    const revisionPreview = Schema.decodeUnknownSync(PreviewItem, { onExcessProperty: "error" })({
       ...preview,
       preview: { ...preview.preview, source: "revision" },
     });
@@ -366,7 +372,7 @@ describe("Entry Preview", () => {
       orpc.platform.projects.collections.entries.publications.status.queryOptions({ input: scope })
         .queryKey,
       response(
-        SchemaStrict.decodeUnknownSync(EntryPublicationStatus)({
+        Schema.decodeUnknownSync(EntryPublicationStatus, { onExcessProperty: "error" })({
           ...publication,
           state: "published",
           stateVersion: 3,
@@ -482,7 +488,7 @@ describe("Entry Preview", () => {
 
   it("renders valid and capped validation status without hiding Preview data", () => {
     const queryClient = makeQueryClient();
-    const validPreview = SchemaStrict.decodeUnknownSync(PreviewItem)({
+    const validPreview = Schema.decodeUnknownSync(PreviewItem, { onExcessProperty: "error" })({
       ...preview,
       validation: { valid: true, issues: [], capped: false },
     });
@@ -510,7 +516,7 @@ describe("Entry Preview", () => {
     expect(screen.getByText("Valid")).toBeTruthy();
     expect(screen.getByText("No validation issues were reported.")).toBeTruthy();
 
-    const cappedPreview = SchemaStrict.decodeUnknownSync(PreviewItem)({
+    const cappedPreview = Schema.decodeUnknownSync(PreviewItem, { onExcessProperty: "error" })({
       ...preview,
       validation: { ...preview.validation, capped: true },
     });
@@ -528,7 +534,10 @@ describe("Entry Preview", () => {
     );
     expect(screen.getByText(/reached the 50-issue limit/i)).toBeTruthy();
 
-    const emptyPreview = SchemaStrict.decodeUnknownSync(PreviewItem)({ ...validPreview, data: {} });
+    const emptyPreview = Schema.decodeUnknownSync(PreviewItem, { onExcessProperty: "error" })({
+      ...validPreview,
+      data: {},
+    });
     queryClient.setQueryData(queryKey, response(emptyPreview, "Preview entry loaded."));
     rerender(
       <QueryClientProvider client={queryClient}>

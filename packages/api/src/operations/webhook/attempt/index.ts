@@ -1,5 +1,3 @@
-// Executes one claimed webhook attempt outside database transactions and finalizes by lease token.
-
 import { Cause, Clock, Effect, Exit, Option, Random } from "effect";
 
 import type { WebhookPublicEventType } from "../../../contracts/webhook";

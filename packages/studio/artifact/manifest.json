@@ -1,6 +1,6 @@
 {
   "../content-form/src/portable-text-field/index.tsx": {
-    "file": "assets/chunk/portable-text-field-Dg7FOgeq.js",
+    "file": "assets/chunk/portable-text-field-DyGnm8Oe.js",
     "name": "portable-text-field",
     "src": "../content-form/src/portable-text-field/index.tsx",
     "isDynamicEntry": true,
@@ -18,8 +18,8 @@
       "_react-dom-iITjFaYY.js"
     ]
   },
-  "_data-DzWE2oV4.js": {
-    "file": "assets/chunk/data-DzWE2oV4.js",
+  "_data-gaCHnyhs.js": {
+    "file": "assets/chunk/data-gaCHnyhs.js",
     "name": "data",
     "imports": [
       "_rolldown-runtime-XKyaHtl9.js",
@@ -82,7 +82,7 @@
     ]
   },
   "src/app/content/navigation.tsx": {
-    "file": "assets/chunk/navigation-C3EmIwd0.js",
+    "file": "assets/chunk/navigation-Bi1bYcvg.js",
     "name": "navigation",
     "src": "src/app/content/navigation.tsx",
     "isDynamicEntry": true,
@@ -91,11 +91,11 @@
       "_react-dom-iITjFaYY.js",
       "_shell-DRdwJ8qG.js",
       "_button-CxET-oXT.js",
-      "_data-DzWE2oV4.js"
+      "_data-gaCHnyhs.js"
     ]
   },
   "src/app/content/workspace.tsx": {
-    "file": "assets/chunk/workspace-D2dCQJNd.js",
+    "file": "assets/chunk/workspace-DjPGAumj.js",
     "name": "workspace",
     "src": "src/app/content/workspace.tsx",
     "isDynamicEntry": true,
@@ -105,7 +105,7 @@
       "_shell-DRdwJ8qG.js",
       "src/app/index.tsx",
       "_button-CxET-oXT.js",
-      "_data-DzWE2oV4.js",
+      "_data-gaCHnyhs.js",
       "_dialog-DduVHQJa.js",
       "_useBaseUiId-MvB3LQIh.js"
     ],
@@ -114,7 +114,7 @@
     ]
   },
   "src/app/index.tsx": {
-    "file": "assets/studio-DSn_GBJc.js",
+    "file": "assets/studio-DXcaR1uV.js",
     "name": "index",
     "src": "src/app/index.tsx",
     "isEntry": true,

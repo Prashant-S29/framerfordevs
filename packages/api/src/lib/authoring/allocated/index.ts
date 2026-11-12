@@ -1,5 +1,3 @@
-// Rebuilds every collection with real server allocations before the atomic apply persistence phase.
-
 import type { ProjectSchema } from "@framerfordevs/schema";
 
 import type { AuthoringSchemaChange } from "../../../contracts/authoring/schema";
@@ -35,10 +33,6 @@ export type BuildAllocatedProjectCandidatesResult =
       }>;
     };
 
-/**
- * Rebuilds from the exact submitted document after IDs are allocated under project locks. No
- * provisional identity can cross this boundary into persistence.
- */
 export function buildAllocatedProjectCandidates(options: {
   readonly project: ProjectSchema;
   readonly identities: StructureIdentityMap;

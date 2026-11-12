@@ -1,5 +1,3 @@
-// Validates the public origins used by developer-documentation navigation.
-
 import { createEnv } from "@t3-oss/env-core";
 
 import { exactOriginSchema } from "../origin";

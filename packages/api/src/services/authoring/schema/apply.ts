@@ -64,7 +64,6 @@ import { cmsActorMatches, cmsActorReferences, cmsAuditActor } from "../../cms-ac
 import type { ApplicationTransaction } from "../../project-access";
 import { loadAuthoringProjectPlanContext } from "./repository";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 export type AuthoringSchemaApplyFailureStage =
   | "identities"
   | "revisions"
@@ -88,7 +87,7 @@ export type AuthoringSchemaApplyDecision =
 const JsonObject = Schema.Record(Schema.String, Schema.Unknown);
 
 function jsonObject(value: unknown): Readonly<Record<string, unknown>> {
-  return SchemaStrict.decodeUnknownSync(JsonObject)(JSON.parse(JSON.stringify(value)));
+  return Schema.decodeUnknownSync(JsonObject)(JSON.parse(JSON.stringify(value)));
 }
 
 function displayName(apiKey: string): string {
@@ -106,7 +105,7 @@ function collectionModel(options: {
   readonly sourceApiKey: string;
   readonly now: Date;
 }): CmsCollection {
-  return SchemaStrict.decodeUnknownSync(CmsCollection)({
+  return Schema.decodeUnknownSync(CmsCollection)({
     id: options.id,
     workspaceId: options.workspaceId,
     projectId: options.projectId,
@@ -158,14 +157,13 @@ async function loadReplay(
   ) {
     return { kind: "command_conflict" };
   }
-  const result = SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyResult)(receipt.result);
+  const result = Schema.decodeUnknownSync(AuthoringSchemaApplyResult)(receipt.result);
   return {
     kind: "success",
     result: AuthoringSchemaApplyResult.make({ ...result, replayed: true }),
   };
 }
 
-/** Executes only after project authorization and inside one project-scoped transaction. */
 export async function applyAuthoringProjectSchema(options: {
   readonly transaction: ApplicationTransaction;
   readonly workspaceId: string;

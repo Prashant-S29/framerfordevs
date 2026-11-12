@@ -1,5 +1,3 @@
-// Defines the closed repository-wide rate-limit policies, weighted costs, and transport-neutral decisions.
-
 import { Schema } from "effect";
 
 export const rateLimitPolicyValues = [

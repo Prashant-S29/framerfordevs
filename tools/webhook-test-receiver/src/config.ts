@@ -1,5 +1,3 @@
-// Loads bounded receiver configuration and scenario-specific signing secrets without exposing values.
-
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -7,7 +5,6 @@ import type { RuntimeConfig, ScenarioKey } from "./types.js";
 
 const secretPattern = /^whsec_[A-Za-z0-9_-]{43}$/u;
 
-/** Parses one bounded integer environment setting or fails startup. */
 function boundedInteger(
   name: string,
   value: string | undefined,
@@ -22,7 +19,6 @@ function boundedInteger(
   return parsed;
 }
 
-/** Loads the complete non-secret runtime configuration from environment variables. */
 export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env): RuntimeConfig {
   return {
     port: boundedInteger("PORT", environment.PORT, 8_787, 1_024, 65_535),
@@ -45,7 +41,6 @@ export function loadRuntimeConfig(environment: NodeJS.ProcessEnv = process.env):
   };
 }
 
-/** Reads up to two active/overlap secrets for one scenario from its ignored secret file. */
 export async function loadScenarioSecrets(
   secretsDirectory: string,
   scenario: ScenarioKey,

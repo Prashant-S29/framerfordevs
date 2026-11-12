@@ -31,8 +31,8 @@ import {
   SchemaRevisionId,
 } from "../../../contracts/schema";
 import { type AuthoringProjectPlanContext, buildAuthoringProjectPlan } from "./index";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 const workspaceId = WorkspaceId.make("019fae8b-1234-7000-8000-000000000801");
 const projectId = ProjectId.make("019fae8b-1234-7000-8000-000000000802");
 const environmentId = EnvironmentId.make("019fae8b-1234-7000-8000-000000000803");
@@ -42,7 +42,7 @@ const summaryId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000806")
 const revisionId = SchemaRevisionId.make("019fae8b-1234-7000-8000-000000000807");
 const postsSourceKey = CollectionSourceKey.make("posts");
 
-const title = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+const title = Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })({
   id: titleId,
   parentFieldId: null,
   nodeRole: "root",
@@ -57,7 +57,7 @@ const title = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   configuration: { maxLength: 160 },
   children: [],
 });
-const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
+const layout = Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })({
   version: 1,
   tabs: [
     {

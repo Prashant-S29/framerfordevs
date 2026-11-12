@@ -1,5 +1,3 @@
-// Compiles bounded current or historical draft fragments into renderer-neutral Preview documents.
-
 import type { ProjectRole } from "../../../contracts/access";
 import type { EntryValues } from "../../../contracts/entry";
 import { previewLimits } from "../../../contracts/preview";
@@ -65,12 +63,10 @@ export type PreviewDocumentCompilationResult =
 
 const textEncoder = new TextEncoder();
 
-/** Returns whether the authenticated dashboard role may observe one field contract. */
 function isFieldVisible(field: CollectionFieldDefinition, role: ProjectRole | null): boolean {
   return role === null || field.editor.visibleToRoles.includes(role);
 }
 
-/** Removes server-hidden values recursively without exposing list length or nested structure. */
 function projectVisibleValue(
   field: CollectionFieldDefinition,
   value: unknown,
@@ -94,13 +90,11 @@ function projectVisibleValue(
   return value;
 }
 
-/** Collects API-path prefixes hidden from one dashboard role. */
 function collectHiddenPaths(
   fields: ReadonlyArray<CollectionFieldDefinition>,
   role: ProjectRole,
 ): ReadonlyArray<string> {
   const hidden: Array<string> = [];
-  /** Stops at hidden containers so descendant identities never enter dashboard feedback. */
   const visit = (field: CollectionFieldDefinition, path: string): void => {
     if (!isFieldVisible(field, role)) {
       hidden.push(path);
@@ -117,14 +111,12 @@ function collectHiddenPaths(
   return hidden;
 }
 
-/** Checks whether a validation path falls inside a field hidden from the dashboard role. */
 function isHiddenIssuePath(path: string, hiddenPaths: ReadonlyArray<string>): boolean {
   return hiddenPaths.some(
     (hidden) => path === hidden || path.startsWith(`${hidden}.`) || path.startsWith(`${hidden}[`),
   );
 }
 
-/** Projects full machine issues or coalesced role-safe dashboard feedback. */
 function projectValidationIssues(
   issues: ReadonlyArray<EntryDocumentProjectionIssue>,
   fields: ReadonlyArray<CollectionFieldDefinition>,
@@ -153,7 +145,6 @@ function projectValidationIssues(
   return { issues: collector.issues, capped: sourceCapped || collector.capped };
 }
 
-/** Compiles one safe persisted source selection without requiring publication or reference expansion. */
 export function compilePreviewDocument(
   input: CompilePreviewDocumentInput,
 ): PreviewDocumentCompilationResult {

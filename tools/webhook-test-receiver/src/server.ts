@@ -1,5 +1,3 @@
-// Hosts the bounded signed-webhook receiver and persists safe real-network attempt evidence.
-
 import { createHash, randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -18,27 +16,23 @@ import {
 
 const scenarioSet = new Set<string>(scenarioKeys);
 
-/** Returns one singleton request-header value without accepting ambiguous duplicates. */
 function singletonHeader(request: IncomingMessage, name: string): string | null {
   const value = request.headers[name];
   return typeof value === "string" ? value : null;
 }
 
-/** Parses the positive attempt number used by deterministic retry scenarios. */
 function attemptNumber(value: string | null): number | null {
   if (value === null || !/^\d{1,2}$/u.test(value)) return null;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed >= 1 && parsed <= 99 ? parsed : null;
 }
 
-/** Parses the fixed boolean replay marker without coercing arbitrary strings. */
 function replayMarker(value: string | null): boolean | null {
   if (value === "true") return true;
   if (value === "false") return false;
   return null;
 }
 
-/** Selects only non-secret headers that are safe to persist and report. */
 function safeHeaders(request: IncomingMessage): SafeWebhookHeaders {
   return {
     contentType: singletonHeader(request, "content-type"),
@@ -53,7 +47,6 @@ function safeHeaders(request: IncomingMessage): SafeWebhookHeaders {
   };
 }
 
-/** Reads one request body while aborting as soon as the configured byte bound is crossed. */
 async function readBody(request: IncomingMessage, maximumBytes: number): Promise<Buffer> {
   const chunks: Array<Buffer> = [];
   let total = 0;
@@ -66,7 +59,6 @@ async function readBody(request: IncomingMessage, maximumBytes: number): Promise
   return Buffer.concat(chunks, total);
 }
 
-/** Sends one bounded JSON response, omitting the body for successful no-content scenarios. */
 function sendResponse(response: ServerResponse, status: number, code: string): void {
   if (response.destroyed) return;
   if (status === 204) {
@@ -86,7 +78,6 @@ function sendResponse(response: ServerResponse, status: number, code: string): v
   response.end(body);
 }
 
-/** Handles one verified scenario request from raw bytes through durable terminal capture. */
 async function handleWebhook(
   request: IncomingMessage,
   response: ServerResponse,
@@ -176,7 +167,6 @@ async function handleWebhook(
   );
 }
 
-/** Resolves a public hook path to the closed scenario registry. */
 function scenarioFromPath(pathname: string): ScenarioKey | null {
   const prefix = "/hooks/";
   if (!pathname.startsWith(prefix)) return null;
@@ -186,7 +176,6 @@ function scenarioFromPath(pathname: string): ScenarioKey | null {
   return null;
 }
 
-/** Creates the HTTP server while keeping configuration and secret loading injectable for tests. */
 export function createReceiverServer(config: RuntimeConfig): Server {
   return createServer((request, response) => {
     const run = async (): Promise<void> => {

@@ -1,18 +1,16 @@
 {
   "$defs": {
-    "CollectionWebhookAggregateAuthority": {
+    "CollectionWebhookAggregateAuthorityEncoded": {
       "additionalProperties": false,
       "properties": {
         "id": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "sequence": {
-          "description": "a number greater than or equal to 1",
+          "maximum": 9007199254740991,
           "minimum": 1,
-          "title": "greaterThanOrEqualTo(1)",
           "type": "integer"
         },
         "type": {
@@ -29,50 +27,46 @@
       ],
       "type": "object"
     },
-    "EntryPublishedWebhookData": {
+    "EntryPublishedWebhookDataEncoded": {
       "additionalProperties": false,
       "properties": {
         "aggregate": {
-          "$ref": "#/$defs/EntryWebhookAggregateAuthority"
+          "$ref": "#/$defs/EntryWebhookAggregateAuthorityEncoded"
         },
         "changes": {
-          "$ref": "#/$defs/WebhookChangeAuthority"
+          "$ref": "#/$defs/WebhookChangeAuthorityEncoded"
         },
         "collectionId": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "entryId": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "environmentId": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "invalidation": {
-          "$ref": "#/$defs/WebhookInvalidationAuthority"
+          "$ref": "#/$defs/WebhookInvalidationAuthorityEncoded"
         },
         "locale": {
-          "$ref": "#/$defs/WebhookLocaleAuthority"
+          "$ref": "#/$defs/WebhookLocaleAuthorityEncoded"
         },
         "projectId": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "publication": {
-          "$ref": "#/$defs/WebhookPublicationAuthority"
+          "$ref": "#/$defs/WebhookPublicationAuthorityEncoded"
         },
         "schema": {
-          "$ref": "#/$defs/EntryWebhookSchemaAuthority"
+          "$ref": "#/$defs/EntryWebhookSchemaAuthorityEncoded"
         },
         "version": {
           "enum": [
@@ -96,11 +90,11 @@
       ],
       "type": "object"
     },
-    "EntryPublishedWebhookEvent": {
+    "EntryPublishedWebhookEventEncoded": {
       "additionalProperties": false,
       "properties": {
         "data": {
-          "$ref": "#/$defs/EntryPublishedWebhookData"
+          "$ref": "#/$defs/EntryPublishedWebhookDataEncoded"
         },
         "datacontenttype": {
           "enum": [
@@ -109,17 +103,14 @@
           "type": "string"
         },
         "id": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "source": {
-          "description": "a string matching the pattern ^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
           "maxLength": 160,
           "minLength": 1,
           "pattern": "^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
-          "title": "maxLength(160)",
           "type": "string"
         },
         "specversion": {
@@ -129,15 +120,12 @@
           "type": "string"
         },
         "subject": {
-          "description": "a string matching the pattern ^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
           "maxLength": 64,
-          "minLength": 46,
+          "minLength": 23,
           "pattern": "^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
-          "title": "maxLength(64)",
           "type": "string"
         },
         "time": {
-          "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
           "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
           "type": "string"
         },
@@ -160,50 +148,46 @@
       ],
       "type": "object"
     },
-    "EntryUnpublishedWebhookData": {
+    "EntryUnpublishedWebhookDataEncoded": {
       "additionalProperties": false,
       "properties": {
         "aggregate": {
-          "$ref": "#/$defs/EntryWebhookAggregateAuthority"
+          "$ref": "#/$defs/EntryWebhookAggregateAuthorityEncoded"
         },
         "changes": {
-          "$ref": "#/$defs/WebhookChangeAuthority"
+          "$ref": "#/$defs/WebhookChangeAuthorityEncoded"
         },
         "collectionId": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "entryId": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "environmentId": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "invalidation": {
-          "$ref": "#/$defs/WebhookInvalidationAuthority"
+          "$ref": "#/$defs/WebhookInvalidationAuthorityEncoded"
         },
         "locale": {
-          "$ref": "#/$defs/WebhookLocaleAuthority"
+          "$ref": "#/$defs/WebhookLocaleAuthorityEncoded"
         },
         "projectId": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "publication": {
-          "$ref": "#/$defs/WebhookPublicationAuthority"
+          "$ref": "#/$defs/WebhookPublicationAuthorityEncoded"
         },
         "schema": {
-          "$ref": "#/$defs/EntryWebhookSchemaAuthority"
+          "$ref": "#/$defs/EntryWebhookSchemaAuthorityEncoded"
         },
         "version": {
           "enum": [
@@ -227,11 +211,11 @@
       ],
       "type": "object"
     },
-    "EntryUnpublishedWebhookEvent": {
+    "EntryUnpublishedWebhookEventEncoded": {
       "additionalProperties": false,
       "properties": {
         "data": {
-          "$ref": "#/$defs/EntryUnpublishedWebhookData"
+          "$ref": "#/$defs/EntryUnpublishedWebhookDataEncoded"
         },
         "datacontenttype": {
           "enum": [
@@ -240,17 +224,14 @@
           "type": "string"
         },
         "id": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "source": {
-          "description": "a string matching the pattern ^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
           "maxLength": 160,
           "minLength": 1,
           "pattern": "^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
-          "title": "maxLength(160)",
           "type": "string"
         },
         "specversion": {
@@ -260,15 +241,12 @@
           "type": "string"
         },
         "subject": {
-          "description": "a string matching the pattern ^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
           "maxLength": 64,
-          "minLength": 46,
+          "minLength": 23,
           "pattern": "^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
-          "title": "maxLength(64)",
           "type": "string"
         },
         "time": {
-          "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
           "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
           "type": "string"
         },
@@ -291,19 +269,17 @@
       ],
       "type": "object"
     },
-    "EntryWebhookAggregateAuthority": {
+    "EntryWebhookAggregateAuthorityEncoded": {
       "additionalProperties": false,
       "properties": {
         "id": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "sequence": {
-          "description": "a number greater than or equal to 1",
+          "maximum": 9007199254740991,
           "minimum": 1,
-          "title": "greaterThanOrEqualTo(1)",
           "type": "integer"
         },
         "type": {
@@ -320,21 +296,18 @@
       ],
       "type": "object"
     },
-    "EntryWebhookSchemaAuthority": {
+    "EntryWebhookSchemaAuthorityEncoded": {
       "additionalProperties": false,
       "properties": {
         "contractHash": {
-          "description": "a string matching the pattern ^[0-9a-f]{64}$",
           "maxLength": 64,
-          "minLength": 64,
+          "minLength": 32,
           "pattern": "^[0-9a-f]{64}$",
-          "title": "length(64)",
           "type": "string"
         },
         "revisionId": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         }
       },
@@ -344,29 +317,24 @@
       ],
       "type": "object"
     },
-    "PublishedWebhookSchemaAuthority": {
+    "PublishedWebhookSchemaAuthorityEncoded": {
       "additionalProperties": false,
       "properties": {
         "contractHash": {
-          "description": "a string matching the pattern ^[0-9a-f]{64}$",
           "maxLength": 64,
-          "minLength": 64,
+          "minLength": 32,
           "pattern": "^[0-9a-f]{64}$",
-          "title": "length(64)",
           "type": "string"
         },
         "revisionId": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "schemaHash": {
-          "description": "a string matching the pattern ^[0-9a-f]{64}$",
           "maxLength": 64,
-          "minLength": 64,
+          "minLength": 32,
           "pattern": "^[0-9a-f]{64}$",
-          "title": "length(64)",
           "type": "string"
         }
       },
@@ -377,38 +345,35 @@
       ],
       "type": "object"
     },
-    "SchemaPublishedWebhookData": {
+    "SchemaPublishedWebhookDataEncoded": {
       "additionalProperties": false,
       "properties": {
         "aggregate": {
-          "$ref": "#/$defs/CollectionWebhookAggregateAuthority"
+          "$ref": "#/$defs/CollectionWebhookAggregateAuthorityEncoded"
         },
         "changes": {
-          "$ref": "#/$defs/WebhookChangeAuthority"
+          "$ref": "#/$defs/WebhookChangeAuthorityEncoded"
         },
         "collectionId": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "environmentId": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "invalidation": {
-          "$ref": "#/$defs/WebhookInvalidationAuthority"
+          "$ref": "#/$defs/WebhookInvalidationAuthorityEncoded"
         },
         "projectId": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "schema": {
-          "$ref": "#/$defs/PublishedWebhookSchemaAuthority"
+          "$ref": "#/$defs/PublishedWebhookSchemaAuthorityEncoded"
         },
         "version": {
           "enum": [
@@ -429,11 +394,11 @@
       ],
       "type": "object"
     },
-    "SchemaPublishedWebhookEvent": {
+    "SchemaPublishedWebhookEventEncoded": {
       "additionalProperties": false,
       "properties": {
         "data": {
-          "$ref": "#/$defs/SchemaPublishedWebhookData"
+          "$ref": "#/$defs/SchemaPublishedWebhookDataEncoded"
         },
         "datacontenttype": {
           "enum": [
@@ -442,17 +407,14 @@
           "type": "string"
         },
         "id": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "source": {
-          "description": "a string matching the pattern ^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
           "maxLength": 160,
           "minLength": 1,
           "pattern": "^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
-          "title": "maxLength(160)",
           "type": "string"
         },
         "specversion": {
@@ -462,15 +424,12 @@
           "type": "string"
         },
         "subject": {
-          "description": "a string matching the pattern ^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
           "maxLength": 64,
-          "minLength": 46,
+          "minLength": 23,
           "pattern": "^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
-          "title": "maxLength(64)",
           "type": "string"
         },
         "time": {
-          "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
           "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
           "type": "string"
         },
@@ -493,19 +452,16 @@
       ],
       "type": "object"
     },
-    "WebhookChangeAuthority": {
+    "WebhookChangeAuthorityEncoded": {
       "additionalProperties": false,
       "properties": {
         "fieldIds": {
-          "description": "an array of at most 1000 item(s)",
           "items": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "maxItems": 1000,
-          "title": "maxItems(1000)",
           "type": "array"
         }
       },
@@ -514,43 +470,33 @@
       ],
       "type": "object"
     },
-    "WebhookInvalidationAuthority": {
+    "WebhookInvalidationAuthorityEncoded": {
       "additionalProperties": false,
       "properties": {
         "routes": {
-          "description": "an array of at most 100 item(s)",
           "items": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "maxItems": 100,
-          "title": "maxItems(100)",
           "type": "array"
         },
         "semanticTags": {
-          "description": "an array of at most 100 item(s)",
           "items": {
             "type": "string"
           },
           "maxItems": 100,
-          "title": "maxItems(100)",
           "type": "array"
         },
         "systemTags": {
-          "description": "an array of at most 1005 item(s)",
           "items": {
-            "description": "a string matching the pattern ^(?:project|environment|collection|entry|locale|field):[0-9a-f-]{36}$",
             "maxLength": 64,
-            "minLength": 38,
+            "minLength": 19,
             "pattern": "^(?:project|environment|collection|entry|locale|field):[0-9a-f-]{36}$",
-            "title": "maxLength(64)",
             "type": "string"
           },
           "maxItems": 1005,
-          "title": "maxItems(1005)",
           "type": "array"
         }
       },
@@ -561,13 +507,12 @@
       ],
       "type": "object"
     },
-    "WebhookLocaleAuthority": {
+    "WebhookLocaleAuthorityEncoded": {
       "additionalProperties": false,
       "properties": {
         "id": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "tag": {
@@ -580,19 +525,17 @@
       ],
       "type": "object"
     },
-    "WebhookPublicationAuthority": {
+    "WebhookPublicationAuthorityEncoded": {
       "additionalProperties": false,
       "properties": {
         "id": {
-          "description": "a Universally Unique Identifier",
           "format": "uuid",
-          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
           "type": "string"
         },
         "sequence": {
-          "description": "a number greater than or equal to 1",
+          "maximum": 9007199254740991,
           "minimum": 1,
-          "title": "greaterThanOrEqualTo(1)",
           "type": "integer"
         }
       },
@@ -607,13 +550,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "anyOf": [
     {
-      "$ref": "#/$defs/SchemaPublishedWebhookEvent"
+      "$ref": "#/$defs/SchemaPublishedWebhookEventEncoded"
     },
     {
-      "$ref": "#/$defs/EntryPublishedWebhookEvent"
+      "$ref": "#/$defs/EntryPublishedWebhookEventEncoded"
     },
     {
-      "$ref": "#/$defs/EntryUnpublishedWebhookEvent"
+      "$ref": "#/$defs/EntryUnpublishedWebhookEventEncoded"
     }
   ],
   "title": "Framer for Developers publication webhook event",

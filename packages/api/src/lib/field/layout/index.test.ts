@@ -1,12 +1,10 @@
-// Verifies deterministic editor-layout coverage, ordering, role narrowing, and identity rules.
-
 import { assert, describe, it } from "@effect/vitest";
 
 import type { ProjectRole } from "../../../contracts/access";
 import { EditorLayout, FieldEditorMetadata } from "../../../contracts/field";
 import { type LayoutFieldDefinition, validateEditorLayout } from "./index";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 const firstFieldId = "019fd0d2-e52b-7488-b062-e25722913e01";
 const secondFieldId = "019fd0d2-e52b-7488-b062-e25722913e02";
 const tabId = "019fd0d2-e52b-7488-b062-e25722913e03";
@@ -14,7 +12,9 @@ const groupId = "019fd0d2-e52b-7488-b062-e25722913e04";
 const firstPlacementId = "019fd0d2-e52b-7488-b062-e25722913e05";
 const secondPlacementId = "019fd0d2-e52b-7488-b062-e25722913e06";
 
-const editableMetadata = SchemaStrict.decodeUnknownSync(FieldEditorMetadata)({
+const editableMetadata = Schema.decodeUnknownSync(FieldEditorMetadata, {
+  onExcessProperty: "error",
+})({
   helpText: null,
   placeholder: null,
   visibleToRoles: ["owner", "developer", "content_admin", "editor"],
@@ -26,12 +26,11 @@ const fields: ReadonlyArray<LayoutFieldDefinition> = [
   { id: secondFieldId, nodeRole: "root", editor: editableMetadata },
 ];
 
-/** Builds a valid two-field layout fixture with optional placement overrides. */
 function layoutFixture(
   secondField = secondFieldId,
   visibleToRoles: ReadonlyArray<ProjectRole> = ["owner", "developer", "content_admin", "editor"],
 ) {
-  return SchemaStrict.decodeUnknownSync(EditorLayout)({
+  return Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })({
     version: 1,
     tabs: [
       {
@@ -91,7 +90,9 @@ describe("editor layout validation", () => {
   });
 
   it("prevents placements from widening field visibility", () => {
-    const restrictedMetadata = SchemaStrict.decodeUnknownSync(FieldEditorMetadata)({
+    const restrictedMetadata = Schema.decodeUnknownSync(FieldEditorMetadata, {
+      onExcessProperty: "error",
+    })({
       helpText: null,
       placeholder: null,
       visibleToRoles: ["owner", "developer"],

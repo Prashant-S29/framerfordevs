@@ -8,8 +8,8 @@ import {
   GeneratedFormDefinition,
 } from "../../../contracts/schema";
 import { projectStudioForm, projectStudioValues } from ".";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 const fieldId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000001");
 const unplacedFieldId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000007");
 const readOnlyFieldId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000008");
@@ -18,7 +18,9 @@ const roles = ["owner", "developer"] as const;
 
 describe("Studio form projection", () => {
   it("keeps stable editing authority while removing source keys and role arrays", () => {
-    const field = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+    const field = Schema.decodeUnknownSync(CollectionFieldDefinition, {
+      onExcessProperty: "error",
+    })({
       id: fieldId,
       parentFieldId: null,
       nodeRole: "root",
@@ -38,14 +40,18 @@ describe("Studio form projection", () => {
       configuration: { maxLength: 100 },
       children: [],
     });
-    const unplacedField = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+    const unplacedField = Schema.decodeUnknownSync(CollectionFieldDefinition, {
+      onExcessProperty: "error",
+    })({
       ...field,
       id: unplacedFieldId,
       apiKey: "unplaced_source_key",
       displayLabel: "Unplaced",
       position: 1,
     });
-    const readOnlyField = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+    const readOnlyField = Schema.decodeUnknownSync(CollectionFieldDefinition, {
+      onExcessProperty: "error",
+    })({
       ...field,
       id: readOnlyFieldId,
       apiKey: "read_only_source_key",
@@ -53,7 +59,7 @@ describe("Studio form projection", () => {
       position: 2,
       editor: { ...field.editor, editableByRoles: [] },
     });
-    const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
+    const layout = Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })({
       version: 1,
       tabs: [
         {
@@ -160,7 +166,7 @@ describe("Studio form projection", () => {
         },
       ],
     });
-    const form = SchemaStrict.decodeUnknownSync(GeneratedFormDefinition)({
+    const form = Schema.decodeUnknownSync(GeneratedFormDefinition, { onExcessProperty: "error" })({
       source: "published",
       collectionId: "019fae8b-1234-7000-8000-000000000005",
       revisionId: "019fae8b-1234-7000-8000-000000000006",
@@ -290,7 +296,7 @@ describe("Studio form projection", () => {
                 : []),
             ]
           : [];
-      return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+      return Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })({
         id: rootId,
         parentFieldId: null,
         nodeRole: "root",
@@ -311,7 +317,7 @@ describe("Studio form projection", () => {
         children,
       });
     });
-    const editorLayout = SchemaStrict.decodeUnknownSync(EditorLayout)({
+    const editorLayout = Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })({
       version: 1,
       tabs: [
         {
@@ -341,7 +347,7 @@ describe("Studio form projection", () => {
       ],
       sidebarGroups: [],
     });
-    const form = SchemaStrict.decodeUnknownSync(GeneratedFormDefinition)({
+    const form = Schema.decodeUnknownSync(GeneratedFormDefinition, { onExcessProperty: "error" })({
       source: "published",
       collectionId: id(1),
       revisionId: id(2),

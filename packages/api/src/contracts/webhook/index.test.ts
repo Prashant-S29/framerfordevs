@@ -1,7 +1,5 @@
-// Verifies bounded M11 webhook inputs, event discrimination, invalidation rules, and OpenAPI conversion.
-
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Schema } from "effect";
 
 import { EffectSchemaToJsonSchemaConverter } from "../response/effect-schema-converter";
 import {
@@ -38,7 +36,6 @@ import {
   InvalidationRoutePath,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const collectionId = "019fae8b-1234-7000-8000-000000000003";
@@ -63,7 +60,9 @@ const commonEvent = {
 describe("webhook contracts", () => {
   it.effect("accepts bounded endpoint authority and normalizes human metadata", () =>
     Effect.gen(function* () {
-      const decoded = yield* SchemaStrict.decodeUnknownEffect(CreateWebhookEndpointInput)({
+      const decoded = yield* Schema.decodeUnknownEffect(CreateWebhookEndpointInput, {
+        onExcessProperty: "error",
+      })({
         projectId,
         environmentId,
         name: "  Production rebuild  ",
@@ -80,15 +79,17 @@ describe("webhook contracts", () => {
   it.effect("rejects unsafe destination syntax before the DNS security service", () =>
     Effect.gen(function* () {
       const http = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(WebhookDestinationUrl)("http://hooks.example.com/build"),
+        Schema.decodeUnknownEffect(WebhookDestinationUrl, { onExcessProperty: "error" })(
+          "http://hooks.example.com/build",
+        ),
       );
       const customPort = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(WebhookDestinationUrl)(
+        Schema.decodeUnknownEffect(WebhookDestinationUrl, { onExcessProperty: "error" })(
           "https://hooks.example.com:8443/build",
         ),
       );
       const credentials = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(WebhookDestinationUrl)(
+        Schema.decodeUnknownEffect(WebhookDestinationUrl, { onExcessProperty: "error" })(
           "https://user:pass@hooks.example.com/build",
         ),
       );
@@ -102,25 +103,35 @@ describe("webhook contracts", () => {
   it.effect("rejects duplicate subscriptions, reserved semantic tags, and unsafe routes", () =>
     Effect.gen(function* () {
       const duplicateTypes = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(WebhookEventTypes)([
+        Schema.decodeUnknownEffect(WebhookEventTypes, { onExcessProperty: "error" })([
           "cms.entry.published",
           "cms.entry.published",
         ]),
       );
       const reservedTag = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(SemanticInvalidationTag)("entry:homepage"),
+        Schema.decodeUnknownEffect(SemanticInvalidationTag, { onExcessProperty: "error" })(
+          "entry:homepage",
+        ),
       );
       const traversal = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(InvalidationRoutePath)("/posts/../admin"),
+        Schema.decodeUnknownEffect(InvalidationRoutePath, { onExcessProperty: "error" })(
+          "/posts/../admin",
+        ),
       );
       const query = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(InvalidationRoutePath)("/posts?draft=true"),
+        Schema.decodeUnknownEffect(InvalidationRoutePath, { onExcessProperty: "error" })(
+          "/posts?draft=true",
+        ),
       );
       const encodedTraversal = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(InvalidationRoutePath)("/posts/%2e%2e/admin"),
+        Schema.decodeUnknownEffect(InvalidationRoutePath, { onExcessProperty: "error" })(
+          "/posts/%2e%2e/admin",
+        ),
       );
       const wildcard = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(InvalidationRoutePath)("/posts/*"),
+        Schema.decodeUnknownEffect(InvalidationRoutePath, { onExcessProperty: "error" })(
+          "/posts/*",
+        ),
       );
 
       assert.isTrue(Exit.isFailure(duplicateTypes));
@@ -138,12 +149,14 @@ describe("webhook contracts", () => {
         { length: 1_001 },
         (_, index) => `00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`,
       );
-      const acceptedChanges = yield* SchemaStrict.decodeUnknownEffect(WebhookChangeAuthority)({
+      const acceptedChanges = yield* Schema.decodeUnknownEffect(WebhookChangeAuthority, {
+        onExcessProperty: "error",
+      })({
         fieldIds: fieldIds.slice(0, 1_000),
       });
-      const acceptedInvalidation = yield* SchemaStrict.decodeUnknownEffect(
-        WebhookInvalidationAuthority,
-      )({
+      const acceptedInvalidation = yield* Schema.decodeUnknownEffect(WebhookInvalidationAuthority, {
+        onExcessProperty: "error",
+      })({
         systemTags: fieldIds.slice(0, 1_000).map((id) => `field:${id}`),
         semanticTags: [],
         routes: [],
@@ -153,7 +166,9 @@ describe("webhook contracts", () => {
       assert.isTrue(
         Exit.isFailure(
           yield* Effect.exit(
-            SchemaStrict.decodeUnknownEffect(WebhookChangeAuthority)({ fieldIds }),
+            Schema.decodeUnknownEffect(WebhookChangeAuthority, { onExcessProperty: "error" })({
+              fieldIds,
+            }),
           ),
         ),
       );
@@ -162,7 +177,9 @@ describe("webhook contracts", () => {
 
   it.effect("keeps event type and event data as one discriminated authority", () =>
     Effect.gen(function* () {
-      const valid = yield* SchemaStrict.decodeUnknownEffect(PublicationWebhookEvent)({
+      const valid = yield* Schema.decodeUnknownEffect(PublicationWebhookEvent, {
+        onExcessProperty: "error",
+      })({
         ...commonEvent,
         type: "cms.schema.published",
         data: {
@@ -181,7 +198,7 @@ describe("webhook contracts", () => {
         },
       });
       const mismatched = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(PublicationWebhookEvent)({
+        Schema.decodeUnknownEffect(PublicationWebhookEvent, { onExcessProperty: "error" })({
           ...valid,
           type: "cms.entry.published",
         }),

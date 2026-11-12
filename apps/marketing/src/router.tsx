@@ -1,5 +1,3 @@
-// Creates the independent marketing router with intent preloading and bounded not-found output.
-
 import { createRouter } from "@tanstack/react-router";
 
 import { routeTree } from "./routeTree.gen";

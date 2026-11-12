@@ -17,7 +17,7 @@ import { Spinner } from "@framerfordevs/ui/components/spinner";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { MailWarningIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { authClient } from "@/lib/auth/client";
@@ -32,9 +32,8 @@ export const Route = createFileRoute("/invitations/accept")({
 function InvitationAcceptance() {
   const navigate = useNavigate();
   const session = authClient.useSession();
-  const [token, setToken] = useState<string | null>(null);
-  const [hasInvalidFragment, setHasInvalidFragment] = useState(false);
-  const [hasReadFragment, setHasReadFragment] = useState(false);
+  const [token, setToken] = useState(() => parseInvitationTokenHash(window.location.hash));
+  const fragmentHandled = useRef(false);
   const inspect = useMutation(
     orpc.platform.projects.invitations.inspect.mutationOptions({
       onError: () => undefined,
@@ -54,17 +53,14 @@ function InvitationAcceptance() {
   );
 
   useEffect(() => {
-    if (session.isPending || hasReadFragment) return;
-    const invitationToken = parseInvitationTokenHash(window.location.hash);
-    setToken(invitationToken);
-    setHasInvalidFragment(invitationToken === null);
-    setHasReadFragment(true);
-    if (invitationToken && session.data) {
+    if (session.isPending || fragmentHandled.current) return;
+    fragmentHandled.current = true;
+    if (token && session.data) {
       window.history.replaceState(null, "", window.location.pathname);
     }
-  }, [hasReadFragment, session.data, session.isPending]);
+  }, [session.data, session.isPending, token]);
 
-  if (session.isPending || !hasReadFragment) {
+  if (session.isPending) {
     return (
       <main className="mx-auto flex min-h-[60vh] max-w-lg items-center justify-center px-4 py-10">
         <div className="flex items-center gap-2" aria-label="Loading invitation">
@@ -75,7 +71,7 @@ function InvitationAcceptance() {
     );
   }
 
-  if (!token || hasInvalidFragment) return <InvalidInvitation />;
+  if (!token) return <InvalidInvitation />;
 
   if (!session.data) {
     return (

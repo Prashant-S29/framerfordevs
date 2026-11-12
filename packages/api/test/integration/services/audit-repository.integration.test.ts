@@ -1,5 +1,3 @@
-// Exercises bounded project audit authorization, fixed-snapshot pagination, and self-auditing.
-
 import { randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, layer } from "@effect/vitest";
@@ -15,7 +13,7 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Cause, Effect, Exit, Layer, Option } from "effect";
+import { Cause, Effect, Exit, Layer, Option, Schema } from "effect";
 
 import { ControlPlaneProjectAuditQuery } from "../../../src/contracts/control-plane";
 import {
@@ -30,11 +28,10 @@ import { AuditRepositoryLive } from "../../../src/services/audit/repository";
 import { makeControlPlaneCursorSignerLive } from "../../../src/services/control-plane/cursor-signer";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 
-import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ownerId = `m16-audit-owner-${suffix}`;
 const restrictedDeveloperId = `m16-audit-restricted-${suffix}`;
-const ownerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(ownerId);
+const ownerActor = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(ownerId);
 const platform = makePlatformRepository();
 const AuditLayer = Layer.mergeAll(
   AuditRepositoryLive,
@@ -74,14 +71,16 @@ beforeAll(async () => {
   workspaceModel = await Effect.runPromise(
     platform.createWorkspace(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M16 Audit Workspace" }),
+      Schema.decodeUnknownSync(CreateWorkspaceInput, { onExcessProperty: "error" })({
+        name: "M16 Audit Workspace",
+      }),
       `m16-audit-workspace-${suffix}`,
     ),
   );
   projectModel = await Effect.runPromise(
     platform.createProject(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
+      Schema.decodeUnknownSync(CreateProjectInput, { onExcessProperty: "error" })({
         workspaceId: required(workspaceModel, "workspace").id,
         name: "M16 Audit Project",
         key: `m16-audit-${suffix.slice(0, 8)}`,
@@ -166,7 +165,9 @@ describe("audit repository PostgreSQL integration", () => {
             restrictedDeveloperId,
             `oauth:cli:${restrictedDeveloperId}`,
             current.id,
-            yield* SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
+            yield* Schema.decodeUnknownEffect(ControlPlaneProjectAuditQuery, {
+              onExcessProperty: "error",
+            })({
               environmentId: null,
               category: "all",
               actorKind: "all",
@@ -207,7 +208,9 @@ describe("audit repository PostgreSQL integration", () => {
           ownerId,
           `oauth:cli:${ownerId}`,
           current.id,
-          yield* SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
+          yield* Schema.decodeUnknownEffect(ControlPlaneProjectAuditQuery, {
+            onExcessProperty: "error",
+          })({
             environmentId: current.environment.id,
             category: "webhook",
             actorKind: "credential",
@@ -281,7 +284,9 @@ describe("audit repository PostgreSQL integration", () => {
           ownerId,
           `oauth:cli:${ownerId}`,
           current.id,
-          yield* SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
+          yield* Schema.decodeUnknownEffect(ControlPlaneProjectAuditQuery, {
+            onExcessProperty: "error",
+          })({
             ...base,
             cursor: null,
           }),
@@ -293,7 +298,9 @@ describe("audit repository PostgreSQL integration", () => {
           ownerId,
           `oauth:cli:${ownerId}`,
           current.id,
-          yield* SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
+          yield* Schema.decodeUnknownEffect(ControlPlaneProjectAuditQuery, {
+            onExcessProperty: "error",
+          })({
             ...base,
             cursor: first.nextCursor,
           }),
@@ -327,7 +334,9 @@ describe("audit repository PostgreSQL integration", () => {
             ownerId,
             `oauth:cli:${ownerId}`,
             current.id,
-            yield* SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
+            yield* Schema.decodeUnknownEffect(ControlPlaneProjectAuditQuery, {
+              onExcessProperty: "error",
+            })({
               ...base,
               cursor: tampered,
             }),

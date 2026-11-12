@@ -1,5 +1,3 @@
-// Owns browser-safe content-form partition, default, value-projection, and mutation helpers.
-
 import type {
   ContentEditorLayout,
   ContentFormDefinition,
@@ -38,7 +36,6 @@ function mapNestedValue(
   return value;
 }
 
-/** Converts API-keyed root and nested object values into stable field-ID authority. */
 export function apiKeyValuesToStableIds(
   fields: ReadonlyArray<ContentFormField>,
   values: Readonly<Record<string, unknown>>,
@@ -62,7 +59,6 @@ export function apiKeyValuesToStableIds(
   return result;
 }
 
-/** Converts stable field-ID root and nested object values into API-key projections. */
 export function stableIdValuesToApiKeys(
   fields: ReadonlyArray<ContentFormField>,
   values: Readonly<Record<string, unknown>>,
@@ -147,7 +143,6 @@ export interface ContentDefaultOptions {
   readonly editableFieldIds?: ReadonlySet<string>;
 }
 
-/** Applies configured defaults only where no stable-ID root value exists. */
 export function applyGeneratedFormDefaults(
   fields: ReadonlyArray<ContentFormField>,
   values: Readonly<Record<string, unknown>>,
@@ -179,7 +174,6 @@ function hasEditableDefaultAuthority(
   );
 }
 
-/** Applies defaults only before the first persisted partition revision exists. */
 export function applyNewEntryPartitionDefaults(
   fields: ReadonlyArray<ContentFormField>,
   values: Readonly<Record<string, unknown>>,
@@ -239,7 +233,6 @@ function partitionLayout(
   };
 }
 
-/** Projects one shared/localized form while preserving nested mixed-object boundaries. */
 export function partitionContentFormDefinition(
   definition: ContentFormDefinition,
   scope: "shared" | "localized",
@@ -325,7 +318,6 @@ function appendFieldMutations(
   }
 }
 
-/** Emits atomic roots except where mixed objects require partition-safe descendant paths. */
 export function fieldMutations(
   current: Readonly<Record<string, unknown>>,
   baseline: Readonly<Record<string, unknown>>,

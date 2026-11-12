@@ -40,20 +40,20 @@
       }
     },
     "schemas": {
-      "ApiErrorDetail": {
+      "ApiErrorDetailEncoded": {
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "a string at most 64 character(s) long",
             "maxLength": 64,
             "minLength": 1,
-            "title": "maxLength(64)",
             "type": "string"
           },
           "currentRevisionId": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UUID"
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
               },
               {
                 "type": "null"
@@ -61,28 +61,22 @@
             ]
           },
           "currentVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "expectedVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "path": {
-            "description": "a string at most 256 character(s) long",
             "maxLength": 256,
-            "title": "maxLength(256)",
             "type": "string"
           },
           "scope": {
@@ -99,7 +93,7 @@
         ],
         "type": "object"
       },
-      "ToolingApiError": {
+      "ToolingApiErrorEncoded": {
         "additionalProperties": false,
         "properties": {
           "code": {
@@ -121,28 +115,21 @@
             "type": "string"
           },
           "details": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ApiErrorDetail"
+              "$ref": "#/components/schemas/ApiErrorDetailEncoded"
             },
             "maxItems": 50,
             "minItems": 1,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "requestId": {
-            "description": "a string matching the pattern ^[A-Za-z0-9._:-]+$",
             "maxLength": 128,
             "minLength": 1,
-            "pattern": "^[A-Za-z0-9._:-]+$",
-            "title": "maxLength(128)",
             "type": "string"
           },
           "retryable": {
@@ -158,19 +145,20 @@
         "type": "object"
       },
       "ToolingApiFailure": {
+        "$ref": "#/components/schemas/ToolingApiFailureEncoded"
+      },
+      "ToolingApiFailureEncoded": {
         "additionalProperties": false,
         "properties": {
           "data": {
             "type": "null"
           },
           "error": {
-            "$ref": "#/components/schemas/ToolingApiError"
+            "$ref": "#/components/schemas/ToolingApiErrorEncoded"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -188,13 +176,12 @@
         ],
         "type": "object"
       },
-      "ToolingCollectionContractRevision": {
+      "ToolingCollectionContractRevisionEncoded": {
         "additionalProperties": false,
         "properties": {
           "collectionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "collectionKey": {
@@ -204,53 +191,42 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/ToolingJsonValue"
             },
-            "properties": {},
-            "required": [],
             "type": "object"
           },
           "contractHash": {
-            "description": "a string matching the pattern ^[0-9a-f]{64}$",
             "maxLength": 64,
-            "minLength": 64,
+            "minLength": 32,
             "pattern": "^[0-9a-f]{64}$",
-            "title": "length(64)",
             "type": "string"
           },
           "environmentId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "environmentKey": {
-            "description": "a string matching the pattern ^[a-z][a-z0-9-]{0,62}$",
             "maxLength": 63,
             "minLength": 1,
             "pattern": "^[a-z][a-z0-9-]{0,62}$",
-            "title": "maxLength(63)",
             "type": "string"
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "publishedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "revisionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "revisionSequence": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -272,16 +248,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ToolingCollectionContractRevision"
+            "$ref": "#/components/schemas/ToolingCollectionContractRevisionEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -299,36 +273,31 @@
         ],
         "type": "object"
       },
-      "ToolingCollectionSummary": {
+      "ToolingCollectionSummaryEncoded": {
         "additionalProperties": false,
         "properties": {
           "contractHash": {
-            "description": "a string matching the pattern ^[0-9a-f]{64}$",
             "maxLength": 64,
-            "minLength": 64,
+            "minLength": 32,
             "pattern": "^[0-9a-f]{64}$",
-            "title": "length(64)",
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "key": {
             "type": "string"
           },
           "revisionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "revisionSequence": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -341,26 +310,22 @@
         ],
         "type": "object"
       },
-      "ToolingEnvironmentPage": {
+      "ToolingEnvironmentPageEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ToolingEnvironmentSummary"
+              "$ref": "#/components/schemas/ToolingEnvironmentSummaryEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "nextCursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 512,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(512)",
                 "type": "string"
               },
               {
@@ -369,9 +334,8 @@
             ]
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           }
         },
@@ -386,16 +350,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ToolingEnvironmentPage"
+            "$ref": "#/components/schemas/ToolingEnvironmentPageEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -413,28 +375,23 @@
         ],
         "type": "object"
       },
-      "ToolingEnvironmentSummary": {
+      "ToolingEnvironmentSummaryEncoded": {
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "key": {
-            "description": "a string matching the pattern ^[a-z][a-z0-9-]{0,62}$",
             "maxLength": 63,
             "minLength": 1,
             "pattern": "^[a-z][a-z0-9-]{0,62}$",
-            "title": "maxLength(63)",
             "type": "string"
           },
           "name": {
-            "description": "a string at most 100 character(s) long",
             "maxLength": 100,
             "minLength": 1,
-            "title": "maxLength(100)",
             "type": "string"
           },
           "primary": {
@@ -461,6 +418,14 @@
             "type": "number"
           },
           {
+            "enum": [
+              "Infinity",
+              "-Infinity",
+              "NaN"
+            ],
+            "type": "string"
+          },
+          {
             "type": "string"
           },
           {
@@ -473,19 +438,16 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/ToolingJsonValue"
             },
-            "properties": {},
-            "required": [],
             "type": "object"
           }
         ]
       },
-      "ToolingLocaleSummary": {
+      "ToolingLocaleSummaryEncoded": {
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "tag": {
@@ -498,26 +460,22 @@
         ],
         "type": "object"
       },
-      "ToolingProjectPage": {
+      "ToolingProjectPageEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ToolingProjectSummary"
+              "$ref": "#/components/schemas/ToolingProjectSummaryEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "nextCursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 512,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(512)",
                 "type": "string"
               },
               {
@@ -536,16 +494,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ToolingProjectPage"
+            "$ref": "#/components/schemas/ToolingProjectPageEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -563,27 +519,22 @@
         ],
         "type": "object"
       },
-      "ToolingProjectSummary": {
+      "ToolingProjectSummaryEncoded": {
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "key": {
-            "description": "a string at most 63 character(s) long",
             "maxLength": 63,
             "minLength": 1,
-            "title": "maxLength(63)",
             "type": "string"
           },
           "name": {
-            "description": "a string at most 100 character(s) long",
             "maxLength": 100,
             "minLength": 1,
-            "title": "maxLength(100)",
             "type": "string"
           }
         },
@@ -594,57 +545,46 @@
         ],
         "type": "object"
       },
-      "ToolingSchemaManifestPage": {
+      "ToolingSchemaManifestPageEncoded": {
         "additionalProperties": false,
         "properties": {
           "collections": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ToolingCollectionSummary"
+              "$ref": "#/components/schemas/ToolingCollectionSummaryEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "environmentId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "environmentKey": {
-            "description": "a string matching the pattern ^[a-z][a-z0-9-]{0,62}$",
             "maxLength": 63,
             "minLength": 1,
             "pattern": "^[a-z][a-z0-9-]{0,62}$",
-            "title": "maxLength(63)",
             "type": "string"
           },
           "localeContractHash": {
-            "description": "a string matching the pattern ^[0-9a-f]{64}$",
             "maxLength": 64,
-            "minLength": 64,
+            "minLength": 32,
             "pattern": "^[0-9a-f]{64}$",
-            "title": "length(64)",
             "type": "string"
           },
           "locales": {
-            "description": "an array of at most 100 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ToolingLocaleSummary"
+              "$ref": "#/components/schemas/ToolingLocaleSummaryEncoded"
             },
             "maxItems": 100,
-            "title": "maxItems(100)",
             "type": "array"
           },
           "nextCursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 512,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(512)",
                 "type": "string"
               },
               {
@@ -653,9 +593,8 @@
             ]
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           }
         },
@@ -674,16 +613,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ToolingSchemaManifestPage"
+            "$ref": "#/components/schemas/ToolingSchemaManifestPageEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -700,12 +637,6 @@
           "message"
         ],
         "type": "object"
-      },
-      "UUID": {
-        "description": "a Universally Unique Identifier",
-        "format": "uuid",
-        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-        "type": "string"
       }
     },
     "securitySchemes": {

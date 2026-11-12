@@ -1,5 +1,6 @@
 {
   "name": "worker",
+  "private": true,
   "type": "module",
   "main": "src/index.ts",
   "scripts": {

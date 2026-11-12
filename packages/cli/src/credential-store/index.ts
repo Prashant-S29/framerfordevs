@@ -1,5 +1,3 @@
-// Stores OAuth authority only in native OS credential storage and provides no file fallback.
-
 import { createHash } from "node:crypto";
 
 import { AsyncEntry } from "@napi-rs/keyring";
@@ -7,7 +5,6 @@ import { Context, Effect, Layer, Schema } from "effect";
 
 import { CredentialStoreUnavailableError, StoredCredentialInvalidError } from "../errors";
 
-import * as SchemaStrict from "../schema-strict";
 const serviceName = "framerfordevs-cli";
 const maximumCredentialBytes = 32 * 1_024;
 
@@ -22,7 +19,7 @@ export class StoredOAuthAuthority extends Schema.Class<StoredOAuthAuthority>(
       Schema.isInt(),
       Schema.isGreaterThanOrEqualTo(0),
     ),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 interface NativeEntry {
@@ -74,9 +71,9 @@ export function makeCredentialStore(
           try: (): unknown => JSON.parse(value),
           catch: () => StoredCredentialInvalidError.make(),
         });
-        return yield* SchemaStrict.decodeUnknownEffect(StoredOAuthAuthority)(parsed).pipe(
-          Effect.mapError(() => StoredCredentialInvalidError.make()),
-        );
+        return yield* Schema.decodeUnknownEffect(StoredOAuthAuthority, {
+          onExcessProperty: "error",
+        })(parsed).pipe(Effect.mapError(() => StoredCredentialInvalidError.make()));
       }),
     remove: (apiOrigin) =>
       Effect.tryPromise({

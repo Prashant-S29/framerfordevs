@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { assert, describe, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { sha256 } from "../canonical";
 import { GeneratorCommitError } from "../errors";
@@ -20,7 +20,6 @@ import { commitGenerationPlan, GeneratorFileSystemLive, type GeneratorCommitStag
 import type { GenerationPlan, GeneratedFile } from "../generator";
 import { SchemaLock } from "../schema";
 
-import * as SchemaStrict from "../schema-strict";
 const paths = [
   "client.ts",
   "index.ts",
@@ -35,7 +34,7 @@ function plan(version: string): GenerationPlan {
     const bytes = path.endsWith(".ts") ? `// generated ${version}\n` : `{"version":"${version}"}\n`;
     return { path, bytes, sha256: sha256(bytes) };
   });
-  const lock = SchemaStrict.decodeUnknownSync(SchemaLock)({
+  const lock = Schema.decodeUnknownSync(SchemaLock, { onExcessProperty: "error" })({
     lockVersion: 1,
     generatorVersion: "1.0.0",
     sdkCompatibility: "^0.1.0",

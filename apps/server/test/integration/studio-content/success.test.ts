@@ -6,32 +6,29 @@ import {
   CmsEntryDraft,
   CreateEntryWithDraftResult,
   SaveEntryDraftResult,
-} from "@framerfordevs/api/contracts/entry/index";
-import { EditorLayout } from "@framerfordevs/api/contracts/field/index";
-import { LocaleTag, ProjectLocaleId } from "@framerfordevs/api/contracts/locale/index";
-import { IsoDateTime, WorkspaceId } from "@framerfordevs/api/contracts/platform/index";
+} from "@framerfordevs/api/contracts/entry";
+import { EditorLayout } from "@framerfordevs/api/contracts/field";
+import { LocaleTag, ProjectLocaleId } from "@framerfordevs/api/contracts/locale";
+import { IsoDateTime, WorkspaceId } from "@framerfordevs/api/contracts/platform";
 import {
   CollectionFieldDefinition,
   ContractHash,
   GeneratedFormDefinition,
   SchemaRevisionId,
-} from "@framerfordevs/api/contracts/schema/index";
-import { StudioBootstrap } from "@framerfordevs/api/contracts/studio/index";
+} from "@framerfordevs/api/contracts/schema";
+import { StudioBootstrap } from "@framerfordevs/api/contracts/studio";
 import {
   StudioContentContext,
   StudioEntryPage,
   StudioResolvedEntryLabel,
-} from "@framerfordevs/api/contracts/studio-content/index";
-import {
-  RateLimitDecision,
-  rateLimitPolicies,
-} from "@framerfordevs/api/contracts/rate-limit/index";
-import { disposeApplicationRuntime } from "@framerfordevs/api/runtime/index";
+} from "@framerfordevs/api/contracts/studio-content";
+import { RateLimitDecision, rateLimitPolicies } from "@framerfordevs/api/contracts/rate-limit";
+import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
 import { makeEntryRepository, EntryRepository } from "@framerfordevs/api/services/entry/repository";
 import {
   RateLimitManager,
   type RateLimitManagerService,
-} from "@framerfordevs/api/services/rate-limit/manager/index";
+} from "@framerfordevs/api/services/rate-limit/manager";
 import {
   makeSchemaRepository,
   SchemaRepository,
@@ -47,15 +44,14 @@ import {
 import {
   makeStudioContentRepository,
   StudioContentRepository,
-} from "@framerfordevs/api/services/studio-content/repository/index";
+} from "@framerfordevs/api/services/studio-content/repository";
 import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import request from "supertest";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../../../src/app";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const ids = {
   workspace: "019fae8b-1234-7000-8000-000000000001",
   project: "019fae8b-1234-7000-8000-000000000002",
@@ -93,7 +89,7 @@ const principal: StudioOAuthPrincipal = {
   scopes: ["studio:session", "offline_access"],
   expiresAtEpochSeconds: 1_900_000_000,
 };
-const bootstrap = SchemaStrict.decodeUnknownSync(StudioBootstrap)({
+const bootstrap = Schema.decodeUnknownSync(StudioBootstrap, { onExcessProperty: "error" })({
   formatVersion: 1,
   registration: {
     id: ids.registration,
@@ -108,7 +104,7 @@ const bootstrap = SchemaStrict.decodeUnknownSync(StudioBootstrap)({
   effectiveActions: ["project.read", "project.update"],
   session: { expiresAt: "2027-01-15T08:00:00.000Z" },
 });
-const field = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+const field = Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })({
   id: ids.field,
   parentFieldId: null,
   nodeRole: "root",
@@ -128,7 +124,7 @@ const field = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   configuration: { maxLength: 100 },
   children: [],
 });
-const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
+const layout = Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })({
   version: 1,
   tabs: [
     {
@@ -160,7 +156,7 @@ const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
   ],
   sidebarGroups: [],
 });
-const form = SchemaStrict.decodeUnknownSync(GeneratedFormDefinition)({
+const form = Schema.decodeUnknownSync(GeneratedFormDefinition, { onExcessProperty: "error" })({
   source: "published",
   collectionId: ids.collection,
   revisionId: ids.revision,
@@ -175,7 +171,7 @@ const form = SchemaStrict.decodeUnknownSync(GeneratedFormDefinition)({
   editorLayout: layout,
   currencyMinorUnits: {},
 });
-const entry = SchemaStrict.decodeUnknownSync(CmsEntry)({
+const entry = Schema.decodeUnknownSync(CmsEntry, { onExcessProperty: "error" })({
   id: ids.entry,
   workspaceId: ids.workspace,
   projectId: ids.project,
@@ -191,7 +187,7 @@ const entry = SchemaStrict.decodeUnknownSync(CmsEntry)({
   updatedAt: now,
 });
 const validation = { valid: true, issues: [], capped: false } as const;
-const draft = SchemaStrict.decodeUnknownSync(CmsEntryDraft)({
+const draft = Schema.decodeUnknownSync(CmsEntryDraft, { onExcessProperty: "error" })({
   entry,
   localeId: ids.locale,
   locale: "en",
@@ -206,7 +202,7 @@ const draft = SchemaStrict.decodeUnknownSync(CmsEntryDraft)({
   canEditShared: true,
   validation,
 });
-const context = SchemaStrict.decodeUnknownSync(StudioContentContext)({
+const context = Schema.decodeUnknownSync(StudioContentContext, { onExcessProperty: "error" })({
   locales: [{ id: ids.locale, tag: "en", displayName: "English", canRead: true, canWrite: true }],
   collections: [
     {
@@ -222,7 +218,7 @@ const context = SchemaStrict.decodeUnknownSync(StudioContentContext)({
   ],
   configurationNotices: [],
 });
-const page = SchemaStrict.decodeUnknownSync(StudioEntryPage)({
+const page = Schema.decodeUnknownSync(StudioEntryPage, { onExcessProperty: "error" })({
   items: [
     {
       id: ids.entry,
@@ -247,11 +243,17 @@ const studioRepository: ReturnType<typeof makeStudioRepository> = {
 const contentRepository: ReturnType<typeof makeStudioContentRepository> = {
   authorizeCollection: () =>
     Effect.succeed({
-      workspaceId: SchemaStrict.decodeUnknownSync(WorkspaceId)(ids.workspace),
+      workspaceId: Schema.decodeUnknownSync(WorkspaceId, { onExcessProperty: "error" })(
+        ids.workspace,
+      ),
       role: "developer" as const,
-      localeId: SchemaStrict.decodeUnknownSync(ProjectLocaleId)(ids.locale),
-      locale: SchemaStrict.decodeUnknownSync(LocaleTag)("en"),
-      schemaRevisionId: SchemaStrict.decodeUnknownSync(SchemaRevisionId)(ids.revision),
+      localeId: Schema.decodeUnknownSync(ProjectLocaleId, { onExcessProperty: "error" })(
+        ids.locale,
+      ),
+      locale: Schema.decodeUnknownSync(LocaleTag, { onExcessProperty: "error" })("en"),
+      schemaRevisionId: Schema.decodeUnknownSync(SchemaRevisionId, { onExcessProperty: "error" })(
+        ids.revision,
+      ),
       canCreate: true,
       canRename: true,
       canWriteLocalized: true,
@@ -263,14 +265,17 @@ const contentRepository: ReturnType<typeof makeStudioContentRepository> = {
       page,
       finalBrowseOrder:
         input.search === null
-          ? { createdAt: SchemaStrict.decodeUnknownSync(IsoDateTime)(now), entryId: ids.entry }
+          ? {
+              createdAt: Schema.decodeUnknownSync(IsoDateTime, { onExcessProperty: "error" })(now),
+              entryId: ids.entry,
+            }
           : null,
       finalSearchOrder:
         input.search === null ? null : { foldedDisplayName: "article", entryId: ids.entry },
     }),
   resolveEntryLabels: () =>
     Effect.succeed([
-      SchemaStrict.decodeUnknownSync(StudioResolvedEntryLabel)({
+      Schema.decodeUnknownSync(StudioResolvedEntryLabel, { onExcessProperty: "error" })({
         id: ids.entry,
         displayName: "Article",
       }),
@@ -285,7 +290,7 @@ const entryRepository = {
   getDraft: () => Effect.succeed(draft),
   createEntryWithDraft: () =>
     Effect.succeed(
-      SchemaStrict.decodeUnknownSync(CreateEntryWithDraftResult)({
+      Schema.decodeUnknownSync(CreateEntryWithDraftResult, { onExcessProperty: "error" })({
         entry,
         commandId: ids.command,
         sharedVersion: 1,
@@ -298,7 +303,7 @@ const entryRepository = {
   renameEntry: () => Effect.succeed(entry),
   saveDraft: () =>
     Effect.succeed(
-      SchemaStrict.decodeUnknownSync(SaveEntryDraftResult)({
+      Schema.decodeUnknownSync(SaveEntryDraftResult, { onExcessProperty: "error" })({
         entryId: ids.entry,
         commandId: ids.command,
         sharedChanged: false,
@@ -314,7 +319,7 @@ const entryRepository = {
 const rateLimitManager: RateLimitManagerService = {
   evaluate: (input) =>
     Effect.succeed(
-      SchemaStrict.decodeUnknownSync(RateLimitDecision)({
+      Schema.decodeUnknownSync(RateLimitDecision, { onExcessProperty: "error" })({
         allowed: true,
         policy: input.policy,
         cost: input.cost,

@@ -1,8 +1,5 @@
-// Defines deterministic receiver responses for success, retry, redirect, timeout, and idempotency tests.
-
 import type { PlannedResponse, ScenarioKey, VerificationCategory } from "../types.js";
 
-/** Selects the deterministic response used to exercise one sender behavior. */
 export function planScenario(scenario: ScenarioKey, attemptNumber: number): PlannedResponse {
   switch (scenario) {
     case "success":
@@ -89,7 +86,6 @@ export function planScenario(scenario: ScenarioKey, attemptNumber: number): Plan
   }
 }
 
-/** Maps verification failures to bounded responses without revealing verification details. */
 export function planVerificationFailure(category: VerificationCategory): PlannedResponse {
   const status =
     category === "missing_secret"

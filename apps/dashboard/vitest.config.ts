@@ -1,5 +1,3 @@
-// Configures dashboard component/lib tests and measured coverage for authoring interaction boundaries.
-
 import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";

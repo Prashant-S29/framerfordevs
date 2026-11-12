@@ -1,10 +1,8 @@
-// Commits the owned generated directory and schema lock with same-filesystem rollback semantics.
-
 import { open, lstat, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 import { sha256 } from "../canonical";
 import {
@@ -16,7 +14,6 @@ import {
 import type { GenerationPlan } from "../generator";
 import { SchemaLock } from "../schema";
 
-import * as SchemaStrict from "../schema-strict";
 export type FileSystemEntryKind = "missing" | "file" | "directory" | "symbolic_link" | "other";
 
 export interface GeneratorFileSystemService {
@@ -200,7 +197,9 @@ export const commitGenerationPlan = Effect.fn("GeneratorFileSystem.commit")(func
       return yield* GeneratorOutputUnownedError.make();
     }
     if (previousLockBytes !== null) {
-      const previousLock = yield* SchemaStrict.decodeUnknownEffect(SchemaLock)(
+      const previousLock = yield* Schema.decodeUnknownEffect(SchemaLock, {
+        onExcessProperty: "error",
+      })(
         yield* Effect.try({
           try: (): unknown => JSON.parse(previousLockBytes),
           catch: () => GeneratorOutputUnownedError.make(),

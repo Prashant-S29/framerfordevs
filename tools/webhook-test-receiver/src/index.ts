@@ -1,5 +1,3 @@
-// Starts and gracefully stops the standalone real-network webhook receiver process.
-
 import { loadRuntimeConfig } from "./config.js";
 import { createReceiverServer } from "./server.js";
 
@@ -7,7 +5,6 @@ const config = loadRuntimeConfig();
 const server = createReceiverServer(config);
 let closing = false;
 
-/** Stops accepting requests and exits after active responses complete. */
 function shutdown(signal: NodeJS.Signals): void {
   if (closing) return;
   closing = true;

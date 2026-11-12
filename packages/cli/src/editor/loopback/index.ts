@@ -1,5 +1,3 @@
-// Owns the closed loopback-only HTTP/session boundary without hosted credential authority.
-
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 

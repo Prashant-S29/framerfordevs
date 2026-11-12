@@ -1,5 +1,3 @@
-// Defines tenant-scoped publication events, webhook configuration, delivery leases, and attempt history.
-
 import { relations, sql } from "drizzle-orm";
 import {
   bigint,

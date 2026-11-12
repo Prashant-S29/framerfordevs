@@ -1,5 +1,3 @@
-// Configures API tests and coverage for contracts, Effect boundaries, and explicitly owned pure kernels.
-
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({

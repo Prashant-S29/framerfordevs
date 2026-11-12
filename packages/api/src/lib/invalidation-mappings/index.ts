@@ -1,5 +1,3 @@
-// Matches bounded persisted route mappings into deterministic publication invalidation snapshots.
-
 export type PublicationInvalidationEventType =
   | "cms.schema.published"
   | "cms.entry.published"
@@ -39,7 +37,6 @@ function matches(mapping: InvalidationMappingRecord, scope: PublicationInvalidat
   );
 }
 
-/** Produces the exact immutable mapping contribution observed by a publication transaction. */
 export function matchInvalidationMappings(
   mappings: ReadonlyArray<InvalidationMappingRecord>,
   scope: PublicationInvalidationScope,

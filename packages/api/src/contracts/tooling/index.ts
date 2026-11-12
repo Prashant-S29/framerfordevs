@@ -1,5 +1,3 @@
-// Defines the closed Tooling v1 discovery, manifest, immutable-contract, and public-error surface.
-
 import { Schema } from "effect";
 
 import { ApiErrorDetail, ApiSuccessSchema, RequestIdSchema } from "../response/api";

@@ -1,13 +1,12 @@
 import { createHmac } from "node:crypto";
 
 import { assert, describe, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Option } from "effect";
+import { Cause, Effect, Exit, Option, Schema } from "effect";
 import { TestClock } from "effect/testing";
 
 import { StudioContentCursor } from "../../../contracts/studio-content";
 import { makeStudioContentCursorSigner } from ".";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const authority = {
   mode: "search" as const,
   projectId: "019fae8b-1234-7000-8000-000000000001",
@@ -82,7 +81,7 @@ describe("Studio Content cursor signer", () => {
           entryId: "019fae8b-1234-7000-8000-000000000005",
         },
       });
-      const tampered = SchemaStrict.decodeUnknownSync(StudioContentCursor)(
+      const tampered = Schema.decodeUnknownSync(StudioContentCursor, { onExcessProperty: "error" })(
         `${cursor.slice(0, -1)}${cursor.endsWith("a") ? "b" : "a"}`,
       );
 
@@ -182,7 +181,9 @@ describe("Studio Content cursor signer", () => {
       const secret = "studio-content-cursor-malformed-secret-at-least-32-bytes";
       const signer = makeStudioContentCursorSigner({ activeSecret: secret });
       for (const value of ["a".repeat(43), "a".repeat(44), "a".repeat(1_024)]) {
-        const cursor = SchemaStrict.decodeUnknownSync(StudioContentCursor)(value);
+        const cursor = Schema.decodeUnknownSync(StudioContentCursor, { onExcessProperty: "error" })(
+          value,
+        );
         assert.strictEqual(
           failureTag(yield* Effect.exit(signer.verify(cursor, authority))),
           "StudioContentCursorInvalidFailure",
@@ -208,7 +209,9 @@ describe("Studio Content cursor signer", () => {
       const signature = createHmac("sha256", secret)
         .update(`ffd:studio-content-cursor:v1:${payload}`, "utf8")
         .digest("base64url");
-      const excess = SchemaStrict.decodeUnknownSync(StudioContentCursor)(`${payload}${signature}`);
+      const excess = Schema.decodeUnknownSync(StudioContentCursor, { onExcessProperty: "error" })(
+        `${payload}${signature}`,
+      );
       assert.strictEqual(
         failureTag(yield* Effect.exit(signer.verify(excess, authority))),
         "StudioContentCursorInvalidFailure",

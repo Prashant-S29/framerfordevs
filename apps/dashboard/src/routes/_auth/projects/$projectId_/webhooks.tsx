@@ -1,10 +1,8 @@
-// Provides the protected non-nested M11 webhook operations workspace.
-
-import type { ControlPlaneWebhookDeliverySummary } from "@framerfordevs/api/contracts/control-plane/index";
+import type { ControlPlaneWebhookDeliverySummary } from "@framerfordevs/api/contracts/control-plane";
 import type {
   WebhookDeliveryStatus,
   WebhookPublicEventType,
-} from "@framerfordevs/api/contracts/webhook/index";
+} from "@framerfordevs/api/contracts/webhook";
 import {
   AlertDialog,
   AlertDialogAction,

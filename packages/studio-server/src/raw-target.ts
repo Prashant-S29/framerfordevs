@@ -1,5 +1,3 @@
-// Rejects ambiguous request targets before framework URL normalization can erase their spelling.
-
 const portableMount = /^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/u;
 const safeTarget = /^[\x21-\x7e]+$/u;
 const assetRoute = /^\/assets\/(?:chunk\/)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;

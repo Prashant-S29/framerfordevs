@@ -1,5 +1,3 @@
-// Explicit in-memory adapter for deterministic development and tests. Production configuration rejects it.
-
 import { Effect } from "effect";
 
 import type {

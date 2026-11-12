@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Schema } from "effect";
 
 import {
   ControlPlaneCredentialListQuery,
@@ -8,19 +8,22 @@ import {
   ControlPlaneWebhookDeliveryPage,
 } from "./index";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const cursor = null;
 
 describe("Control Plane operational contracts", () => {
   it.effect("keeps credential filters and one-time issue intent closed", () =>
     Effect.gen(function* () {
-      const query = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCredentialListQuery)({
+      const query = yield* Schema.decodeUnknownEffect(ControlPlaneCredentialListQuery, {
+        onExcessProperty: "error",
+      })({
         family: "management",
         status: "active",
         cursor,
         limit: 50,
       });
-      const issue = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneIssueCredentialRequest)({
+      const issue = yield* Schema.decodeUnknownEffect(ControlPlaneIssueCredentialRequest, {
+        onExcessProperty: "error",
+      })({
         family: "management",
         name: "CI",
         scopes: ["project.read"],
@@ -29,7 +32,9 @@ describe("Control Plane operational contracts", () => {
         previewAuthorityAcknowledged: false,
       });
       const excess = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneIssueCredentialRequest)({
+        Schema.decodeUnknownEffect(ControlPlaneIssueCredentialRequest, {
+          onExcessProperty: "error",
+        })({
           ...issue,
           rawKey: "forbidden",
         }),
@@ -55,19 +60,24 @@ describe("Control Plane operational contracts", () => {
         limit: 20,
       } as const;
       const valid = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)(base),
+        Schema.decodeUnknownEffect(ControlPlaneProjectAuditQuery, { onExcessProperty: "error" })(
+          base,
+        ),
       );
       const missingActor = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({ ...base, actorId: null }),
+        Schema.decodeUnknownEffect(ControlPlaneProjectAuditQuery, { onExcessProperty: "error" })({
+          ...base,
+          actorId: null,
+        }),
       );
       const excessiveWindow = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
+        Schema.decodeUnknownEffect(ControlPlaneProjectAuditQuery, { onExcessProperty: "error" })({
           ...base,
           to: "2026-11-01T00:00:00.000Z",
         }),
       );
       const reversed = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneProjectAuditQuery)({
+        Schema.decodeUnknownEffect(ControlPlaneProjectAuditQuery, { onExcessProperty: "error" })({
           ...base,
           from: "2026-10-02T00:00:00.000Z",
         }),
@@ -83,12 +93,14 @@ describe("Control Plane operational contracts", () => {
   it.effect("bounds delivery summaries without accepting embedded event bodies", () =>
     Effect.gen(function* () {
       const oversized = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneWebhookDeliveryPage)({
+        Schema.decodeUnknownEffect(ControlPlaneWebhookDeliveryPage, { onExcessProperty: "error" })({
           items: Array.from({ length: 51 }, (_, index) => ({ id: index })),
           nextCursor: null,
         }),
       );
-      const maximumPage = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneWebhookDeliveryPage)({
+      const maximumPage = yield* Schema.decodeUnknownEffect(ControlPlaneWebhookDeliveryPage, {
+        onExcessProperty: "error",
+      })({
         items: Array.from({ length: 50 }, () => ({
           id: "019fae8b-1234-7000-8000-000000000001",
           eventId: "019fae8b-1234-7000-8000-000000000002",

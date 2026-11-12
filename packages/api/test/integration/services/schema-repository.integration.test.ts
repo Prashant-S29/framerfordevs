@@ -86,16 +86,17 @@ import { makeToolingRepository } from "../../../src/services/tooling/repository"
 import { makeWebhookRepository } from "../../../src/services/webhook/repository";
 import { makeWebhookWorkerRepository } from "../../../src/services/webhook/worker-repository";
 
-import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ownerId = `m5-schema-owner-${suffix}`;
 const foreignId = `m5-schema-foreign-${suffix}`;
 const readerId = `m6-schema-reader-${suffix}`;
-const ownerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(ownerId);
-const foreignActor = SchemaStrict.decodeUnknownSync(AuthUserId)(foreignId);
-const readerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(readerId);
-const managementCredentialId = SchemaStrict.decodeUnknownSync(ApiCredentialId)(randomUUID());
-const managementActor = SchemaStrict.decodeUnknownSync(CmsActor)({
+const ownerActor = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(ownerId);
+const foreignActor = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(foreignId);
+const readerActor = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(readerId);
+const managementCredentialId = Schema.decodeUnknownSync(ApiCredentialId, {
+  onExcessProperty: "error",
+})(randomUUID());
+const managementActor = Schema.decodeUnknownSync(CmsActor, { onExcessProperty: "error" })({
   kind: "credential",
   id: managementCredentialId,
 });
@@ -162,14 +163,16 @@ beforeAll(async () => {
   workspaceModel = await Effect.runPromise(
     platform.createWorkspace(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M5 Schema Workspace" }),
+      Schema.decodeUnknownSync(CreateWorkspaceInput, { onExcessProperty: "error" })({
+        name: "M5 Schema Workspace",
+      }),
       "request-m5-schema-workspace",
     ),
   );
   projectModel = await Effect.runPromise(
     platform.createProject(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
+      Schema.decodeUnknownSync(CreateProjectInput, { onExcessProperty: "error" })({
         workspaceId: required(workspaceModel, "workspace").id,
         name: "M5 Schema Project",
         key: `schema-${suffix.slice(0, 8)}`,
@@ -193,7 +196,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     platform.enableCapability(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(EnableCapabilityInput)({
+      Schema.decodeUnknownSync(EnableCapabilityInput, { onExcessProperty: "error" })({
         projectId: required(projectModel, "project").id,
         capability: "cms",
       }),
@@ -226,7 +229,7 @@ beforeAll(async () => {
   disabledProject = await Effect.runPromise(
     platform.createProject(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
+      Schema.decodeUnknownSync(CreateProjectInput, { onExcessProperty: "error" })({
         workspaceId: required(workspaceModel, "workspace").id,
         name: "M5 Disabled Project",
         key: `disabled-${suffix.slice(0, 8)}`,
@@ -238,14 +241,16 @@ beforeAll(async () => {
   foreignWorkspace = await Effect.runPromise(
     platform.createWorkspace(
       foreignActor,
-      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M5 Foreign Workspace" }),
+      Schema.decodeUnknownSync(CreateWorkspaceInput, { onExcessProperty: "error" })({
+        name: "M5 Foreign Workspace",
+      }),
       "request-m5-foreign-workspace",
     ),
   );
   foreignProject = await Effect.runPromise(
     platform.createProject(
       foreignActor,
-      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
+      Schema.decodeUnknownSync(CreateProjectInput, { onExcessProperty: "error" })({
         workspaceId: required(foreignWorkspace, "foreign workspace").id,
         name: "M5 Foreign Project",
         key: `foreign-${suffix.slice(0, 8)}`,
@@ -257,7 +262,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     platform.enableCapability(
       foreignActor,
-      SchemaStrict.decodeUnknownSync(EnableCapabilityInput)({
+      Schema.decodeUnknownSync(EnableCapabilityInput, { onExcessProperty: "error" })({
         projectId: required(foreignProject, "foreign project").id,
         capability: "cms",
       }),
@@ -358,7 +363,7 @@ describe("schema repository PostgreSQL integration", () => {
       const currentProject = required(projectModel, "project");
       firstCollection = yield* schemas.createCollection(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
+        yield* Schema.decodeUnknownEffect(CreateCollectionInput, { onExcessProperty: "error" })({
           projectId: currentProject.id,
           environmentId: currentProject.environment.id,
           apiKey: "blog_posts",
@@ -415,7 +420,7 @@ describe("schema repository PostgreSQL integration", () => {
       const duplicate = yield* Effect.exit(
         schemas.createCollection(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
+          yield* Schema.decodeUnknownEffect(CreateCollectionInput, { onExcessProperty: "error" })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             apiKey: "blog_posts",
@@ -430,7 +435,7 @@ describe("schema repository PostgreSQL integration", () => {
       const capabilityRequired = yield* Effect.exit(
         schemas.createCollection(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
+          yield* Schema.decodeUnknownEffect(CreateCollectionInput, { onExcessProperty: "error" })({
             projectId: disabled.id,
             environmentId: disabled.environment.id,
             apiKey: "posts",
@@ -445,7 +450,7 @@ describe("schema repository PostgreSQL integration", () => {
       const foreign = required(foreignProject, "foreign project");
       const sameKeyInOtherEnvironment = yield* schemas.createCollection(
         foreignActor,
-        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
+        yield* Schema.decodeUnknownEffect(CreateCollectionInput, { onExcessProperty: "error" })({
           projectId: foreign.id,
           environmentId: foreign.environment.id,
           apiKey: "blog_posts",
@@ -467,7 +472,7 @@ describe("schema repository PostgreSQL integration", () => {
       const currentProject = required(projectModel, "project");
       yield* schemas.createCollection(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
+        yield* Schema.decodeUnknownEffect(CreateCollectionInput, { onExcessProperty: "error" })({
           projectId: currentProject.id,
           environmentId: currentProject.environment.id,
           apiKey: "authors",
@@ -479,7 +484,7 @@ describe("schema repository PostgreSQL integration", () => {
       );
       const firstPage = yield* schemas.listCollections(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(ListCollectionsInput)({
+        yield* Schema.decodeUnknownEffect(ListCollectionsInput, { onExcessProperty: "error" })({
           projectId: currentProject.id,
           environmentId: currentProject.environment.id,
           cursor: null,
@@ -488,7 +493,7 @@ describe("schema repository PostgreSQL integration", () => {
       );
       const secondPage = yield* schemas.listCollections(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(ListCollectionsInput)({
+        yield* Schema.decodeUnknownEffect(ListCollectionsInput, { onExcessProperty: "error" })({
           projectId: currentProject.id,
           environmentId: currentProject.environment.id,
           cursor: firstPage.nextCursor,
@@ -499,7 +504,7 @@ describe("schema repository PostgreSQL integration", () => {
       const crossTenant = yield* Effect.exit(
         schemas.getCollection(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetCollectionInput)({
+          yield* Schema.decodeUnknownEffect(GetCollectionInput, { onExcessProperty: "error" })({
             projectId: foreign.id,
             environmentId: foreign.environment.id,
             collectionId: required(firstCollection, "collection").id,
@@ -518,7 +523,7 @@ describe("schema repository PostgreSQL integration", () => {
       const collection = required(firstCollection, "collection");
       const noOp = yield* schemas.updateCollection(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionInput)({
+        yield* Schema.decodeUnknownEffect(UpdateCollectionInput, { onExcessProperty: "error" })({
           projectId: collection.projectId,
           environmentId: collection.environmentId,
           collectionId: collection.id,
@@ -532,7 +537,7 @@ describe("schema repository PostgreSQL integration", () => {
       );
       const updated = yield* schemas.updateCollection(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionInput)({
+        yield* Schema.decodeUnknownEffect(UpdateCollectionInput, { onExcessProperty: "error" })({
           projectId: collection.projectId,
           environmentId: collection.environmentId,
           collectionId: collection.id,
@@ -547,7 +552,7 @@ describe("schema repository PostgreSQL integration", () => {
       const stale = yield* Effect.exit(
         schemas.updateCollection(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionInput)({
+          yield* Schema.decodeUnknownEffect(UpdateCollectionInput, { onExcessProperty: "error" })({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -575,7 +580,7 @@ describe("schema repository PostgreSQL integration", () => {
         const collection = required(firstCollection, "collection");
         const current = yield* schemas.getCollection(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetCollectionInput)({
+          yield* Schema.decodeUnknownEffect(GetCollectionInput, { onExcessProperty: "error" })({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -583,7 +588,9 @@ describe("schema repository PostgreSQL integration", () => {
         );
         const titleDraft = yield* schemas.createField(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
+          yield* Schema.decodeUnknownEffect(CreateCollectionFieldInput, {
+            onExcessProperty: "error",
+          })({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -607,7 +614,9 @@ describe("schema repository PostgreSQL integration", () => {
         if (!title) throw new Error("Title field was not created.");
         const noOp = yield* schemas.updateField(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionFieldInput)({
+          yield* Schema.decodeUnknownEffect(UpdateCollectionFieldInput, {
+            onExcessProperty: "error",
+          })({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -629,7 +638,9 @@ describe("schema repository PostgreSQL integration", () => {
         );
         const summaryDraft = yield* schemas.createField(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
+          yield* Schema.decodeUnknownEffect(CreateCollectionFieldInput, {
+            onExcessProperty: "error",
+          })({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -653,7 +664,9 @@ describe("schema repository PostgreSQL integration", () => {
         if (!summary) throw new Error("Summary field was not created.");
         const reordered = yield* schemas.reorderFields(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(ReorderCollectionFieldsInput)({
+          yield* Schema.decodeUnknownEffect(ReorderCollectionFieldsInput, {
+            onExcessProperty: "error",
+          })({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -680,7 +693,7 @@ describe("schema repository PostgreSQL integration", () => {
       const project = required(projectModel, "project");
       const collection = yield* schemas.createCollection(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
+        yield* Schema.decodeUnknownEffect(CreateCollectionInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           apiKey: `bulk_${suffix.replaceAll("-", "").slice(0, 20)}`,
@@ -698,7 +711,9 @@ describe("schema repository PostgreSQL integration", () => {
       const duplicate = yield* Effect.exit(
         schemas.replaceFields(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(ReplaceCollectionDraftFieldsInput)({
+          yield* Schema.decodeUnknownEffect(ReplaceCollectionDraftFieldsInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             draftVersion: collection.draftVersion,
             authoringVersion: 1,
@@ -735,7 +750,9 @@ describe("schema repository PostgreSQL integration", () => {
       );
       const afterFailure = yield* schemas.getDraft(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)(scope),
+        yield* Schema.decodeUnknownEffect(GetCollectionDraftInput, { onExcessProperty: "error" })(
+          scope,
+        ),
       );
       assert.strictEqual(failureTag(duplicate), "SchemaInvalidFailure");
       assert.include(failureIssueCodes(duplicate), "field_api_key_duplicate");
@@ -743,7 +760,9 @@ describe("schema repository PostgreSQL integration", () => {
 
       const created = yield* schemas.replaceFields(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(ReplaceCollectionDraftFieldsInput)({
+        yield* Schema.decodeUnknownEffect(ReplaceCollectionDraftFieldsInput, {
+          onExcessProperty: "error",
+        })({
           ...scope,
           draftVersion: afterFailure.collection.draftVersion,
           authoringVersion: 1,
@@ -801,7 +820,9 @@ describe("schema repository PostgreSQL integration", () => {
       const title = required(created.fields[0], "bulk title");
       const updated = yield* schemas.replaceFields(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(ReplaceCollectionDraftFieldsInput)({
+        yield* Schema.decodeUnknownEffect(ReplaceCollectionDraftFieldsInput, {
+          onExcessProperty: "error",
+        })({
           ...scope,
           draftVersion: created.collection.draftVersion,
           authoringVersion: 1,
@@ -854,11 +875,15 @@ describe("schema repository PostgreSQL integration", () => {
       };
       let draft = yield* schemas.getDraft(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)(scope),
+        yield* Schema.decodeUnknownEffect(GetCollectionDraftInput, { onExcessProperty: "error" })(
+          scope,
+        ),
       );
       draft = yield* schemas.createField(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
+        yield* Schema.decodeUnknownEffect(CreateCollectionFieldInput, {
+          onExcessProperty: "error",
+        })({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           parentFieldId: null,
@@ -880,7 +905,9 @@ describe("schema repository PostgreSQL integration", () => {
       if (!product) throw new Error("Product object was not created.");
       draft = yield* schemas.createField(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
+        yield* Schema.decodeUnknownEffect(CreateCollectionFieldInput, {
+          onExcessProperty: "error",
+        })({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           parentFieldId: product.id,
@@ -900,7 +927,9 @@ describe("schema repository PostgreSQL integration", () => {
       );
       draft = yield* schemas.createField(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
+        yield* Schema.decodeUnknownEffect(CreateCollectionFieldInput, {
+          onExcessProperty: "error",
+        })({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           parentFieldId: null,
@@ -922,7 +951,9 @@ describe("schema repository PostgreSQL integration", () => {
       if (!prices) throw new Error("Prices list was not created.");
       draft = yield* schemas.createField(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
+        yield* Schema.decodeUnknownEffect(CreateCollectionFieldInput, {
+          onExcessProperty: "error",
+        })({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           parentFieldId: prices.id,
@@ -942,7 +973,9 @@ describe("schema repository PostgreSQL integration", () => {
       );
       draft = yield* schemas.createField(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
+        yield* Schema.decodeUnknownEffect(CreateCollectionFieldInput, {
+          onExcessProperty: "error",
+        })({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           parentFieldId: null,
@@ -962,7 +995,9 @@ describe("schema repository PostgreSQL integration", () => {
       );
       draft = yield* schemas.createField(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
+        yield* Schema.decodeUnknownEffect(CreateCollectionFieldInput, {
+          onExcessProperty: "error",
+        })({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           parentFieldId: null,
@@ -985,7 +1020,9 @@ describe("schema repository PostgreSQL integration", () => {
       const reloadedPrices = draft.fields.find((field) => field.id === prices.id);
       const form = yield* schemas.getDraftForm(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(GetDraftGeneratedFormInput)(scope),
+        yield* Schema.decodeUnknownEffect(GetDraftGeneratedFormInput, {
+          onExcessProperty: "error",
+        })(scope),
       );
       const firstTab = draft.editorLayout.tabs[0];
       const firstGroup = firstTab?.groups[0];
@@ -1001,7 +1038,7 @@ describe("schema repository PostgreSQL integration", () => {
       };
       draft = yield* schemas.updateEditorLayout(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(UpdateEditorLayoutInput)({
+        yield* Schema.decodeUnknownEffect(UpdateEditorLayoutInput, { onExcessProperty: "error" })({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           editorLayout: updatedLayout,
@@ -1031,7 +1068,9 @@ describe("schema repository PostgreSQL integration", () => {
       for (const fieldId of temporaryIds) {
         draft = yield* schemas.removeField(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(RemoveCollectionFieldInput)({
+          yield* Schema.decodeUnknownEffect(RemoveCollectionFieldInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             fieldId,
             draftVersion: draft.collection.draftVersion,
@@ -1052,7 +1091,7 @@ describe("schema repository PostgreSQL integration", () => {
         const currentProject = required(projectModel, "project");
         const collection = yield* schemas.createCollection(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(CreateCollectionInput)({
+          yield* Schema.decodeUnknownEffect(CreateCollectionInput, { onExcessProperty: "error" })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             apiKey: `aggregate_${suffix.slice(0, 8)}`,
@@ -1064,11 +1103,13 @@ describe("schema repository PostgreSQL integration", () => {
         );
         let draft = yield* schemas.getDraft(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)({
-            projectId: collection.projectId,
-            environmentId: collection.environmentId,
-            collectionId: collection.id,
-          }),
+          yield* Schema.decodeUnknownEffect(GetCollectionDraftInput, { onExcessProperty: "error" })(
+            {
+              projectId: collection.projectId,
+              environmentId: collection.environmentId,
+              collectionId: collection.id,
+            },
+          ),
         );
         let accepted = 0;
         let rejected = false;
@@ -1076,7 +1117,9 @@ describe("schema repository PostgreSQL integration", () => {
           const exit = yield* Effect.exit(
             schemas.createField(
               ownerActor,
-              yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
+              yield* Schema.decodeUnknownEffect(CreateCollectionFieldInput, {
+                onExcessProperty: "error",
+              })({
                 projectId: collection.projectId,
                 environmentId: collection.environmentId,
                 collectionId: collection.id,
@@ -1118,7 +1161,7 @@ describe("schema repository PostgreSQL integration", () => {
         );
         const current = yield* schemas.getCollection(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetCollectionInput)({
+          yield* Schema.decodeUnknownEffect(GetCollectionInput, { onExcessProperty: "error" })({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -1158,11 +1201,15 @@ describe("schema repository PostgreSQL integration", () => {
       };
       const draft = yield* schemas.getDraft(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)(scope),
+        yield* Schema.decodeUnknownEffect(GetCollectionDraftInput, { onExcessProperty: "error" })(
+          scope,
+        ),
       );
       const validation = yield* schemas.validateSchema(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(ValidateCollectionSchemaInput)(scope),
+        yield* Schema.decodeUnknownEffect(ValidateCollectionSchemaInput, {
+          onExcessProperty: "error",
+        })(scope),
       );
       const acknowledgedChangeIds = validation.changes.items
         .filter((change) => change.classification !== "non_breaking")
@@ -1186,7 +1233,9 @@ describe("schema repository PostgreSQL integration", () => {
             const exit = yield* Effect.exit(
               injected.publishSchema(
                 ownerActor,
-                yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)({
+                yield* Schema.decodeUnknownEffect(PublishCollectionSchemaInput, {
+                  onExcessProperty: "error",
+                })({
                   ...scope,
                   draftVersion: draft.collection.draftVersion,
                   expectedPublishedRevisionId: null,
@@ -1205,13 +1254,14 @@ describe("schema repository PostgreSQL integration", () => {
                 (select count(*)::int from outbox_event where subject_id = ${collection.id}) as events,
                 (select count(*)::int from audit_event where request_id = ${`request-m5-failure-${step}`}) as audits`),
             );
-            const counts = yield* SchemaStrict.decodeUnknownEffect(
+            const counts = yield* Schema.decodeUnknownEffect(
               Schema.Struct({
                 revisions: Schema.Number,
                 snapshots: Schema.Number,
                 events: Schema.Number,
                 audits: Schema.Number,
               }),
+              { onExcessProperty: "error" },
             )(countResult.rows[0]);
             assert.strictEqual(counts.revisions, 0);
             assert.strictEqual(counts.snapshots, 0);
@@ -1235,11 +1285,15 @@ describe("schema repository PostgreSQL integration", () => {
         };
         const draft = yield* schemas.getDraft(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)(scope),
+          yield* Schema.decodeUnknownEffect(GetCollectionDraftInput, { onExcessProperty: "error" })(
+            scope,
+          ),
         );
         const validation = yield* schemas.validateSchema(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(ValidateCollectionSchemaInput)(scope),
+          yield* Schema.decodeUnknownEffect(ValidateCollectionSchemaInput, {
+            onExcessProperty: "error",
+          })(scope),
         );
         assert.isTrue(validation.valid);
         assert.isTrue(validation.changes.requiresAcknowledgement);
@@ -1255,7 +1309,9 @@ describe("schema repository PostgreSQL integration", () => {
         const missingAcknowledgement = yield* Effect.exit(
           schemas.publishSchema(
             ownerActor,
-            yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)({
+            yield* Schema.decodeUnknownEffect(PublishCollectionSchemaInput, {
+              onExcessProperty: "error",
+            })({
               ...baseInput,
               acknowledgedChangeIds: [],
             }),
@@ -1268,9 +1324,9 @@ describe("schema repository PostgreSQL integration", () => {
           "SchemaChangeAcknowledgementRequiredFailure",
         );
 
-        const decodedInput = yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)(
-          baseInput,
-        );
+        const decodedInput = yield* Schema.decodeUnknownEffect(PublishCollectionSchemaInput, {
+          onExcessProperty: "error",
+        })(baseInput);
         const published = yield* schemas.publishSchema(
           ownerActor,
           decodedInput,
@@ -1285,18 +1341,24 @@ describe("schema repository PostgreSQL integration", () => {
         );
         const latest = yield* schemas.getLatestPublished(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetLatestPublishedSchemaInput)(scope),
+          yield* Schema.decodeUnknownEffect(GetLatestPublishedSchemaInput, {
+            onExcessProperty: "error",
+          })(scope),
         );
         const original = yield* schemas.getPublishedRevision(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetPublishedSchemaRevisionInput)({
+          yield* Schema.decodeUnknownEffect(GetPublishedSchemaRevisionInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             revisionId: published.id,
           }),
         );
         const readerForm = yield* schemas.getPublishedForm(
           readerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetPublishedGeneratedFormInput)({
+          yield* Schema.decodeUnknownEffect(GetPublishedGeneratedFormInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             revisionId: null,
           }),
@@ -1323,7 +1385,9 @@ describe("schema repository PostgreSQL integration", () => {
 
         const noOp = yield* schemas.publishSchema(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)({
+          yield* Schema.decodeUnknownEffect(PublishCollectionSchemaInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             draftVersion: draft.collection.draftVersion,
             expectedPublishedRevisionId: published.id,
@@ -1343,7 +1407,9 @@ describe("schema repository PostgreSQL integration", () => {
         if (!title) throw new Error("Published title field was not found.");
         const renamedDraft = yield* schemas.updateField(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionFieldInput)({
+          yield* Schema.decodeUnknownEffect(UpdateCollectionFieldInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             fieldId: title.id,
             draftVersion: draft.collection.draftVersion,
@@ -1363,14 +1429,18 @@ describe("schema repository PostgreSQL integration", () => {
         );
         const changed = yield* schemas.validateSchema(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(ValidateCollectionSchemaInput)(scope),
+          yield* Schema.decodeUnknownEffect(ValidateCollectionSchemaInput, {
+            onExcessProperty: "error",
+          })(scope),
         );
         assert.isTrue(
           changed.changes.items.some((change) => change.code === "field.api_key.updated"),
         );
         const second = yield* schemas.publishSchema(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)({
+          yield* Schema.decodeUnknownEffect(PublishCollectionSchemaInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             draftVersion: renamedDraft.collection.draftVersion,
             expectedPublishedRevisionId: published.id,
@@ -1384,7 +1454,9 @@ describe("schema repository PostgreSQL integration", () => {
         );
         const originalAfterLaterPublication = yield* schemas.getPublishedRevision(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetPublishedSchemaRevisionInput)({
+          yield* Schema.decodeUnknownEffect(GetPublishedSchemaRevisionInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             revisionId: published.id,
           }),
@@ -1402,7 +1474,9 @@ describe("schema repository PostgreSQL integration", () => {
         if (!summary) throw new Error("Summary field was not found.");
         const concurrencyDraft = yield* schemas.updateField(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionFieldInput)({
+          yield* Schema.decodeUnknownEffect(UpdateCollectionFieldInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             fieldId: summary.id,
             draftVersion: renamedDraft.collection.draftVersion,
@@ -1431,7 +1505,9 @@ describe("schema repository PostgreSQL integration", () => {
             schemas
               .publishSchema(
                 ownerActor,
-                yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)({
+                yield* Schema.decodeUnknownEffect(PublishCollectionSchemaInput, {
+                  onExcessProperty: "error",
+                })({
                   ...concurrentInput,
                   commandId: randomUUID(),
                 }),
@@ -1442,7 +1518,9 @@ describe("schema repository PostgreSQL integration", () => {
             schemas
               .publishSchema(
                 ownerActor,
-                yield* SchemaStrict.decodeUnknownEffect(PublishCollectionSchemaInput)({
+                yield* Schema.decodeUnknownEffect(PublishCollectionSchemaInput, {
+                  onExcessProperty: "error",
+                })({
                   ...concurrentInput,
                   commandId: randomUUID(),
                 }),
@@ -1554,7 +1632,9 @@ describe("schema repository PostgreSQL integration", () => {
       const collection = required(firstCollection, "collection");
       const published = yield* schemas.getLatestPublished(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(GetLatestPublishedSchemaInput)({
+        yield* Schema.decodeUnknownEffect(GetLatestPublishedSchemaInput, {
+          onExcessProperty: "error",
+        })({
           projectId: currentProject.id,
           environmentId: currentProject.environment.id,
           collectionId: collection.id,
@@ -1608,17 +1688,23 @@ describe("schema repository PostgreSQL integration", () => {
         };
         const initial = yield* delivery.getConfiguration(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetDeliveryConfigurationInput)(scope),
+          yield* Schema.decodeUnknownEffect(GetDeliveryConfigurationInput, {
+            onExcessProperty: "error",
+          })(scope),
         );
         const denied = yield* Effect.exit(
           delivery.getConfiguration(
             readerActor,
-            yield* SchemaStrict.decodeUnknownEffect(GetDeliveryConfigurationInput)(scope),
+            yield* Schema.decodeUnknownEffect(GetDeliveryConfigurationInput, {
+              onExcessProperty: "error",
+            })(scope),
           ),
         );
         const published = yield* schemas.getLatestPublished(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetLatestPublishedSchemaInput)(scope),
+          yield* Schema.decodeUnknownEffect(GetLatestPublishedSchemaInput, {
+            onExcessProperty: "error",
+          })(scope),
         );
         const field = published.fields.find(
           (candidate) => candidate.nodeRole === "root" && candidate.kind === "short_text",
@@ -1637,7 +1723,9 @@ describe("schema repository PostgreSQL integration", () => {
         const unacknowledged = yield* Effect.exit(
           delivery.updateConfiguration(
             ownerActor,
-            yield* SchemaStrict.decodeUnknownEffect(UpdateDeliveryConfigurationInput)({
+            yield* Schema.decodeUnknownEffect(UpdateDeliveryConfigurationInput, {
+              onExcessProperty: "error",
+            })({
               ...scope,
               expectedVersion: initial.version,
               access: "public",
@@ -1650,7 +1738,9 @@ describe("schema repository PostgreSQL integration", () => {
         );
         const configured = yield* delivery.updateConfiguration(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(UpdateDeliveryConfigurationInput)({
+          yield* Schema.decodeUnknownEffect(UpdateDeliveryConfigurationInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             expectedVersion: initial.version,
             access: "protected",
@@ -1662,7 +1752,9 @@ describe("schema repository PostgreSQL integration", () => {
         );
         const publicConfiguration = yield* delivery.updateConfiguration(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(UpdateDeliveryConfigurationInput)({
+          yield* Schema.decodeUnknownEffect(UpdateDeliveryConfigurationInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             expectedVersion: configured.version,
             access: "public",
@@ -1674,7 +1766,9 @@ describe("schema repository PostgreSQL integration", () => {
         );
         const noOp = yield* delivery.updateConfiguration(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(UpdateDeliveryConfigurationInput)({
+          yield* Schema.decodeUnknownEffect(UpdateDeliveryConfigurationInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             expectedVersion: publicConfiguration.version,
             access: "public",
@@ -1687,7 +1781,9 @@ describe("schema repository PostgreSQL integration", () => {
         const stale = yield* Effect.exit(
           delivery.updateConfiguration(
             ownerActor,
-            yield* SchemaStrict.decodeUnknownEffect(UpdateDeliveryConfigurationInput)({
+            yield* Schema.decodeUnknownEffect(UpdateDeliveryConfigurationInput, {
+              onExcessProperty: "error",
+            })({
               ...scope,
               expectedVersion: configured.version,
               access: "protected",
@@ -1733,7 +1829,7 @@ describe("schema repository PostgreSQL integration", () => {
       const project = required(projectModel, "project");
       const plan = yield* authoringSchemas.plan(
         managementActor,
-        yield* SchemaStrict.decodeUnknownEffect(AuthoringSchemaPlanInput)({
+        yield* Schema.decodeUnknownEffect(AuthoringSchemaPlanInput, { onExcessProperty: "error" })({
           scope: {
             projectId: project.id,
             environmentId: project.environment.id,
@@ -1771,7 +1867,7 @@ describe("schema repository PostgreSQL integration", () => {
       const collection = required(firstCollection, "collection");
       const current = yield* schemas.getCollection(
         managementActor,
-        yield* SchemaStrict.decodeUnknownEffect(GetCollectionInput)({
+        yield* Schema.decodeUnknownEffect(GetCollectionInput, { onExcessProperty: "error" })({
           projectId: collection.projectId,
           environmentId: collection.environmentId,
           collectionId: collection.id,
@@ -1780,7 +1876,7 @@ describe("schema repository PostgreSQL integration", () => {
       const requestId = `request-m13-credential-${suffix}`;
       const updated = yield* schemas.updateCollection(
         managementActor,
-        yield* SchemaStrict.decodeUnknownEffect(UpdateCollectionInput)({
+        yield* Schema.decodeUnknownEffect(UpdateCollectionInput, { onExcessProperty: "error" })({
           projectId: collection.projectId,
           environmentId: collection.environmentId,
           collectionId: collection.id,
@@ -1846,7 +1942,9 @@ describe("schema repository PostgreSQL integration", () => {
         const webhook = makeWebhookRepository();
         yield* webhook.createEndpoint(
           actor,
-          yield* SchemaStrict.decodeUnknownEffect(CreateWebhookEndpointInput)({
+          yield* Schema.decodeUnknownEffect(CreateWebhookEndpointInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             name: `Archive recovery ${endpointId.slice(0, 8)}`,
@@ -1880,7 +1978,9 @@ describe("schema repository PostgreSQL integration", () => {
         const successSecretId = randomUUID();
         yield* webhook.createEndpoint(
           actor,
-          yield* SchemaStrict.decodeUnknownEffect(CreateWebhookEndpointInput)({
+          yield* Schema.decodeUnknownEffect(CreateWebhookEndpointInput, {
+            onExcessProperty: "error",
+          })({
             projectId: currentProject.id,
             environmentId: currentProject.environment.id,
             name: `Archive success ${successEndpointId.slice(0, 8)}`,
@@ -2045,7 +2145,7 @@ describe("schema repository PostgreSQL integration", () => {
         );
         const archived = yield* platform.archiveProject(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(ArchiveProjectInput)({
+          yield* Schema.decodeUnknownEffect(ArchiveProjectInput, { onExcessProperty: "error" })({
             projectId: currentProject.id,
             version: required(currentProjectRow, "archive project").version,
           }),
@@ -2121,7 +2221,7 @@ describe("schema repository PostgreSQL integration", () => {
 
         yield* platform.restoreProject(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(RestoreProjectInput)({
+          yield* Schema.decodeUnknownEffect(RestoreProjectInput, { onExcessProperty: "error" })({
             projectId: currentProject.id,
             version: archived.version,
           }),
@@ -2228,15 +2328,19 @@ describe("schema repository PostgreSQL integration", () => {
 
         const beforeRemoval = yield* schemas.getDraft(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)({
-            projectId: collection.projectId,
-            environmentId: collection.environmentId,
-            collectionId: collection.id,
-          }),
+          yield* Schema.decodeUnknownEffect(GetCollectionDraftInput, { onExcessProperty: "error" })(
+            {
+              projectId: collection.projectId,
+              environmentId: collection.environmentId,
+              collectionId: collection.id,
+            },
+          ),
         );
         const removedDraft = yield* schemas.removeField(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(RemoveCollectionFieldInput)({
+          yield* Schema.decodeUnknownEffect(RemoveCollectionFieldInput, {
+            onExcessProperty: "error",
+          })({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -2251,7 +2355,9 @@ describe("schema repository PostgreSQL integration", () => {
         );
         const latestPublished = yield* schemas.getLatestPublished(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetLatestPublishedSchemaInput)({
+          yield* Schema.decodeUnknownEffect(GetLatestPublishedSchemaInput, {
+            onExcessProperty: "error",
+          })({
             projectId: collection.projectId,
             environmentId: collection.environmentId,
             collectionId: collection.id,
@@ -2274,16 +2380,20 @@ describe("schema repository PostgreSQL integration", () => {
         );
         const currentDraft = yield* schemas.getDraft(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetCollectionDraftInput)({
-            projectId: collection.projectId,
-            environmentId: collection.environmentId,
-            collectionId: collection.id,
-          }),
+          yield* Schema.decodeUnknownEffect(GetCollectionDraftInput, { onExcessProperty: "error" })(
+            {
+              projectId: collection.projectId,
+              environmentId: collection.environmentId,
+              collectionId: collection.id,
+            },
+          ),
         );
         const archivedMutation = yield* Effect.exit(
           schemas.createField(
             ownerActor,
-            yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
+            yield* Schema.decodeUnknownEffect(CreateCollectionFieldInput, {
+              onExcessProperty: "error",
+            })({
               projectId: collection.projectId,
               environmentId: collection.environmentId,
               collectionId: collection.id,

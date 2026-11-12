@@ -87,8 +87,12 @@ export function useContentRetryCountdown(error: Error | null): number {
       ? Math.max(1, error.retryAfterSeconds ?? 1)
       : 0;
   const [remaining, setRemaining] = useState(initial);
-  useEffect(() => {
+  const [countdownStart, setCountdownStart] = useState(initial);
+  if (countdownStart !== initial) {
+    setCountdownStart(initial);
     setRemaining(initial);
+  }
+  useEffect(() => {
     if (initial === 0) return;
     const interval = window.setInterval(
       () => setRemaining((current) => Math.max(0, current - 1)),

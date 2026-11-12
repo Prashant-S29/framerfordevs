@@ -1,5 +1,3 @@
-// Verifies DNS resolution remains replaceable and all-address failures are typed and closed.
-
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Exit, Fiber } from "effect";
 import { TestClock } from "effect/testing";

@@ -1,6 +1,4 @@
-// Exposes shared Control Plane domain operations independently of session or bearer transport.
-
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import {
   type ControlPlaneActor,
@@ -32,15 +30,14 @@ import {
 import { ControlPlaneCursorSigner } from "../../services/control-plane/cursor-signer";
 import { PlatformRepository } from "../../services/platform-repository";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const decodeSessionActor = (userId: string) =>
-  SchemaStrict.decodeUnknownEffect(AuthUserId)(userId).pipe(
+  Schema.decodeUnknownEffect(AuthUserId, { onExcessProperty: "error" })(userId).pipe(
     Effect.mapError(() => UnauthorizedFailure.make()),
     Effect.map((id): ControlPlaneActor => ({ kind: "user", id })),
   );
 
 function decodeSignedCursor(value: string) {
-  return SchemaStrict.decodeUnknownEffect(ControlPlaneCursor)(value).pipe(
+  return Schema.decodeUnknownEffect(ControlPlaneCursor, { onExcessProperty: "error" })(value).pipe(
     Effect.mapError((cause) =>
       SecurityServiceFailure.make({ operation: "control-plane.cursor.output", cause }),
     ),

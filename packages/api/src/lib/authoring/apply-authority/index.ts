@@ -1,8 +1,6 @@
-// Qualifies collection changes for project scope and fingerprints exact atomic apply authority.
-
 import { createHash } from "node:crypto";
 
-import { Result } from "effect";
+import { Result, Schema } from "effect";
 
 import {
   type AuthoringSchemaAuthority,
@@ -20,7 +18,6 @@ import { SchemaChangeId, type SchemaChangeSet } from "../../../contracts/schema"
 import type { AcknowledgedAuthoringSchemaChangeIds } from "../../../contracts/authoring/schema";
 import { canonicalizeSchemaDocument } from "../../field/document";
 
-import * as SchemaStrict from "../../schema-strict";
 export type QualifyProjectSchemaChangesResult =
   | { readonly valid: true; readonly changes: ReadonlyArray<AuthoringSchemaChange> }
   | {
@@ -31,7 +28,6 @@ export type QualifyProjectSchemaChangesResult =
       }>;
     };
 
-/** Ensures collection-level M5/M6 change IDs cannot collide in one complete-project plan. */
 export function qualifyProjectSchemaChanges(
   collectionSourceKey: string,
   changes: SchemaChangeSet,
@@ -39,8 +35,9 @@ export function qualifyProjectSchemaChanges(
 ): QualifyProjectSchemaChangesResult {
   const qualified: Array<AuthoringSchemaChange> = [];
   const issues: Array<{ readonly path: string; readonly code: "source_identity_missing" }> = [];
-  const decodedCollectionSourceKey =
-    SchemaStrict.decodeUnknownResult(CollectionSourceKey)(collectionSourceKey);
+  const decodedCollectionSourceKey = Schema.decodeUnknownResult(CollectionSourceKey, {
+    onExcessProperty: "error",
+  })(collectionSourceKey);
   if (Result.isFailure(decodedCollectionSourceKey)) {
     return {
       valid: false,
@@ -68,7 +65,7 @@ export function qualifyProjectSchemaChanges(
     const decodedFieldSourceKey =
       fieldSourceKey === null
         ? null
-        : SchemaStrict.decodeUnknownResult(FieldSourceKey)(fieldSourceKey);
+        : Schema.decodeUnknownResult(FieldSourceKey, { onExcessProperty: "error" })(fieldSourceKey);
     if (decodedFieldSourceKey !== null && Result.isFailure(decodedFieldSourceKey)) {
       issues.push({
         path: `changes.${change.changeId}.fieldId`,
@@ -115,7 +112,6 @@ export function hasExactProjectSchemaAcknowledgements(
   );
 }
 
-/** Fingerprints the actor, exact document, stale authority, plan, command, and acknowledgement set. */
 export function fingerprintAuthoringSchemaApply(options: {
   readonly actor: CmsActor;
   readonly projectId: ProjectId;

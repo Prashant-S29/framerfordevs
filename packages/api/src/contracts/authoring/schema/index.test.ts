@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Schema } from "effect";
 
 import {
   AcknowledgedAuthoringSchemaChangeIds,
@@ -9,7 +9,6 @@ import {
   AuthoringSchemaPlanRequest,
 } from "./index";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const collectionId = "019fae8b-1234-7000-8000-000000000301";
 const revisionId = "019fae8b-1234-7000-8000-000000000302";
 const structureHash = "a".repeat(64);
@@ -46,11 +45,11 @@ function project() {
 describe("Authoring schema plan/apply contracts", () => {
   it.effect("uses the complete shared project validator at the public contract boundary", () =>
     Effect.gen(function* () {
-      const accepted = yield* SchemaStrict.decodeUnknownEffect(AuthoringProjectSchemaDocument)(
-        project(),
-      );
+      const accepted = yield* Schema.decodeUnknownEffect(AuthoringProjectSchemaDocument, {
+        onExcessProperty: "error",
+      })(project());
       const excess = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(AuthoringProjectSchemaDocument)({
+        Schema.decodeUnknownEffect(AuthoringProjectSchemaDocument, { onExcessProperty: "error" })({
           collections: [{ ...project().collections[0], displayName: "Posts" }],
         }),
       );
@@ -62,11 +61,13 @@ describe("Authoring schema plan/apply contracts", () => {
 
   it.effect("rejects internal scope and excess properties in the public plan body", () =>
     Effect.gen(function* () {
-      const accepted = yield* SchemaStrict.decodeUnknownEffect(AuthoringSchemaPlanRequest)({
+      const accepted = yield* Schema.decodeUnknownEffect(AuthoringSchemaPlanRequest, {
+        onExcessProperty: "error",
+      })({
         project: project(),
       });
       const excess = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(AuthoringSchemaPlanRequest)({
+        Schema.decodeUnknownEffect(AuthoringSchemaPlanRequest, { onExcessProperty: "error" })({
           project: project(),
           workspaceId: "internal",
         }),
@@ -87,16 +88,18 @@ describe("Authoring schema plan/apply contracts", () => {
         candidateStructureHash: null,
         candidateContractHash: null,
       };
-      const accepted = yield* SchemaStrict.decodeUnknownEffect(AuthoringSchemaCandidate)(candidate);
+      const accepted = yield* Schema.decodeUnknownEffect(AuthoringSchemaCandidate, {
+        onExcessProperty: "error",
+      })(candidate);
       const omitted = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(AuthoringSchemaCandidate)(
+        Schema.decodeUnknownEffect(AuthoringSchemaCandidate, { onExcessProperty: "error" })(
           Object.fromEntries(
             Object.entries(candidate).filter(([key]) => key !== "candidateStructureHash"),
           ),
         ),
       );
       const falseHash = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(AuthoringSchemaCandidate)({
+        Schema.decodeUnknownEffect(AuthoringSchemaCandidate, { onExcessProperty: "error" })({
           ...candidate,
           candidateStructureHash: structureHash,
         }),
@@ -110,7 +113,9 @@ describe("Authoring schema plan/apply contracts", () => {
 
   it.effect("requires a real candidate hash when every identity is allocated", () =>
     Effect.gen(function* () {
-      const accepted = yield* SchemaStrict.decodeUnknownEffect(AuthoringSchemaCandidate)({
+      const accepted = yield* Schema.decodeUnknownEffect(AuthoringSchemaCandidate, {
+        onExcessProperty: "error",
+      })({
         collectionSourceKey: "posts",
         collectionId,
         currentRevisionId: revisionId,
@@ -119,7 +124,7 @@ describe("Authoring schema plan/apply contracts", () => {
         candidateContractHash: contractHash,
       });
       const missingHash = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(AuthoringSchemaCandidate)({
+        Schema.decodeUnknownEffect(AuthoringSchemaCandidate, { onExcessProperty: "error" })({
           ...accepted,
           candidateStructureHash: null,
         }),
@@ -132,7 +137,9 @@ describe("Authoring schema plan/apply contracts", () => {
 
   it.effect("correlates valid plans with a plan hash and invalid plans with explicit issues", () =>
     Effect.gen(function* () {
-      const valid = yield* SchemaStrict.decodeUnknownEffect(AuthoringSchemaPlan)({
+      const valid = yield* Schema.decodeUnknownEffect(AuthoringSchemaPlan, {
+        onExcessProperty: "error",
+      })({
         valid: true,
         current,
         planHash,
@@ -140,7 +147,9 @@ describe("Authoring schema plan/apply contracts", () => {
         changes: [],
         candidates: [],
       });
-      const invalid = yield* SchemaStrict.decodeUnknownEffect(AuthoringSchemaPlan)({
+      const invalid = yield* Schema.decodeUnknownEffect(AuthoringSchemaPlan, {
+        onExcessProperty: "error",
+      })({
         valid: false,
         current,
         planHash: null,
@@ -149,7 +158,7 @@ describe("Authoring schema plan/apply contracts", () => {
         candidates: [],
       });
       const ambiguous = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(AuthoringSchemaPlan)({
+        Schema.decodeUnknownEffect(AuthoringSchemaPlan, { onExcessProperty: "error" })({
           valid: true,
           current,
           planHash: null,
@@ -168,14 +177,13 @@ describe("Authoring schema plan/apply contracts", () => {
   it.effect("rejects duplicate risky-change acknowledgements", () =>
     Effect.gen(function* () {
       const changeId = "e".repeat(64);
-      const unique = yield* SchemaStrict.decodeUnknownEffect(AcknowledgedAuthoringSchemaChangeIds)([
-        changeId,
-      ]);
+      const unique = yield* Schema.decodeUnknownEffect(AcknowledgedAuthoringSchemaChangeIds, {
+        onExcessProperty: "error",
+      })([changeId]);
       const duplicate = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(AcknowledgedAuthoringSchemaChangeIds)([
-          changeId,
-          changeId,
-        ]),
+        Schema.decodeUnknownEffect(AcknowledgedAuthoringSchemaChangeIds, {
+          onExcessProperty: "error",
+        })([changeId, changeId]),
       );
 
       assert.strictEqual(unique[0], changeId);

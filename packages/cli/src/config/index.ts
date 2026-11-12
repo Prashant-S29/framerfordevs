@@ -1,9 +1,7 @@
-// Loads one bounded, non-executable config while preventing ambiguous ancestor authority.
-
 import { access, readFile } from "node:fs/promises";
 import { dirname, join, parse, resolve, sep } from "node:path";
 
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 import {
   CliConfigAmbiguousError,
@@ -13,7 +11,6 @@ import {
 } from "../errors";
 import { CliConfig } from "../schema";
 
-import * as SchemaStrict from "../schema-strict";
 export const cliConfigFileName = "framerfordevs.config.json";
 const maximumConfigBytes = 16 * 1_024;
 
@@ -97,9 +94,9 @@ export const loadCliConfig = Effect.fn("CliConfig.load")(function* (startDirecto
     try: (): unknown => JSON.parse(bytes),
     catch: () => CliConfigInvalidError.make(),
   });
-  const config = yield* SchemaStrict.decodeUnknownEffect(CliConfig)(unknownConfig).pipe(
-    Effect.mapError(() => CliConfigInvalidError.make()),
-  );
+  const config = yield* Schema.decodeUnknownEffect(CliConfig, { onExcessProperty: "error" })(
+    unknownConfig,
+  ).pipe(Effect.mapError(() => CliConfigInvalidError.make()));
   const directory = dirname(path);
   const resolveInsideProject = (relativePath: string) => {
     const absolutePath = resolve(directory, relativePath);

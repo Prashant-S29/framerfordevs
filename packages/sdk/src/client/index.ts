@@ -1,5 +1,3 @@
-// Provides framework-independent, bounded Delivery v1 and Preview v1 fetch clients.
-
 export type JsonValue = null | boolean | number | string | ReadonlyArray<JsonValue> | JsonObject;
 export interface JsonObject {
   readonly [key: string]: JsonValue;

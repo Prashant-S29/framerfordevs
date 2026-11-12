@@ -1,5 +1,3 @@
-// Validates complete code-owned project documents and binds deterministic plans to current authority.
-
 import { createHash } from "node:crypto";
 
 import type { ProjectSchema } from "@framerfordevs/schema";
@@ -27,10 +25,6 @@ export type ValidateCompleteProjectSchemaResult =
     }
   | { readonly valid: false; readonly issues: ReadonlyArray<AuthoringSchemaDocumentIssue> };
 
-/**
- * Validates the closed shared schema contract and proves that no currently active collection was
- * omitted. New collection source keys are allowed; omission never means deletion.
- */
 export function validateCompleteProjectSchema(
   value: unknown,
   activeCollectionSourceKeys: ReadonlyArray<CollectionSourceKey>,
@@ -72,7 +66,6 @@ export function validateCompleteProjectSchema(
   };
 }
 
-/** Binds the exact canonical code document to the current project structural authority. */
 export function computeSchemaPlanHash(
   canonicalProjectJson: string,
   currentManifestHash: ProjectStructureManifestHash,

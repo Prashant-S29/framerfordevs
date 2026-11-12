@@ -1,11 +1,8 @@
-// Reconciles GUI-owned editor layout around code-added and code-removed root fields.
-
-import { Result } from "effect";
+import { Result, Schema } from "effect";
 
 import { EditorLayout, type EditorLayoutNodeId } from "../../../contracts/field";
 import type { CollectionFieldDefinition } from "../../../contracts/schema";
 
-import * as SchemaStrict from "../../schema-strict";
 export interface CodeLayoutAllocations {
   readonly tabId: EditorLayoutNodeId | null;
   readonly groupId: EditorLayoutNodeId | null;
@@ -33,7 +30,7 @@ const allRoles = [
 ] as const;
 
 function decodeLayout(value: unknown): ReconcileCodeEditorLayoutResult {
-  const decoded = SchemaStrict.decodeUnknownResult(EditorLayout, {
+  const decoded = Schema.decodeUnknownResult(EditorLayout, {
     errors: "all",
     onExcessProperty: "error",
   })(value);
@@ -110,10 +107,6 @@ function createLayout(
   });
 }
 
-/**
- * Preserves all surviving GUI layout metadata, removes placements for omitted roots, and appends
- * newly allocated roots to the final main-area group. It never allocates IDs itself.
- */
 export function reconcileCodeEditorLayout(
   current: EditorLayout | null,
   candidateRoots: ReadonlyArray<CollectionFieldDefinition>,

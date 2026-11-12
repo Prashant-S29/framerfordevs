@@ -1,5 +1,3 @@
-// Verifies post-authentication redirects remain bounded to safe dashboard UI paths.
-
 import { isRedirect } from "@tanstack/react-router";
 import { describe, expect, it } from "vitest";
 

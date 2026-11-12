@@ -1,5 +1,3 @@
-// Reads tenant-scoped Tooling discovery and immutable published-contract projections.
-
 import { createHash } from "node:crypto";
 
 import { db } from "@framerfordevs/db";
@@ -19,7 +17,7 @@ import {
   projectCapability,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 import { AuthUserId } from "../../contracts/platform";
 import {
@@ -51,7 +49,6 @@ import {
   type ApplicationTransaction,
 } from "../project-access";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 interface PageInput {
   readonly afterId: string | null;
   readonly limit: number;
@@ -264,7 +261,7 @@ export function makeToolingRepository(options: ToolingRepositoryOptions = {}) {
       });
       const pageRows = rows.slice(0, input.limit);
       return {
-        items: pageRows.map((row) => SchemaStrict.decodeUnknownSync(ToolingProjectSummary)(row)),
+        items: pageRows.map((row) => Schema.decodeUnknownSync(ToolingProjectSummary)(row)),
         nextAfterId: rows.length > input.limit ? (pageRows.at(-1)?.id ?? null) : null,
       };
     }),
@@ -312,12 +309,10 @@ export function makeToolingRepository(options: ToolingRepositoryOptions = {}) {
       if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
       const pageRows = result.rows.slice(0, input.limit);
       return {
-        projectId: SchemaStrict.decodeUnknownSync(ToolingEnvironmentPage.fields.projectId)(
+        projectId: Schema.decodeUnknownSync(ToolingEnvironmentPage.fields.projectId)(
           input.projectId,
         ),
-        items: pageRows.map((row) =>
-          SchemaStrict.decodeUnknownSync(ToolingEnvironmentSummary)(row),
-        ),
+        items: pageRows.map((row) => Schema.decodeUnknownSync(ToolingEnvironmentSummary)(row)),
         nextAfterId: result.rows.length > input.limit ? (pageRows.at(-1)?.id ?? null) : null,
       };
     }),
@@ -392,7 +387,7 @@ export function makeToolingRepository(options: ToolingRepositoryOptions = {}) {
                 revision,
                 fields: groupedFields.get(revision.id) ?? [],
               });
-              return SchemaStrict.decodeUnknownSync(ToolingCollectionSummary)({
+              return Schema.decodeUnknownSync(ToolingCollectionSummary)({
                 id: published.collectionId,
                 key: published.collectionApiKey,
                 revisionId: published.id,
@@ -401,9 +396,9 @@ export function makeToolingRepository(options: ToolingRepositoryOptions = {}) {
               });
             });
             const localeItems = locales.map((locale) =>
-              SchemaStrict.decodeUnknownSync(ToolingLocaleSummary)(locale),
+              Schema.decodeUnknownSync(ToolingLocaleSummary)(locale),
             );
-            const page = SchemaStrict.decodeUnknownSync(ToolingSchemaManifestPage)({
+            const page = Schema.decodeUnknownSync(ToolingSchemaManifestPage)({
               projectId: scope.projectId,
               environmentId: scope.environmentId,
               environmentKey: scope.environmentKey,
@@ -482,7 +477,7 @@ export function makeToolingRepository(options: ToolingRepositoryOptions = {}) {
             if (!revision) return { kind: "not_found" as const };
             const fields = await loadRevisionFields(transaction, [revision.id]);
             const published = decodePublishedSchemaRevisionSync({ revision, fields });
-            const response = SchemaStrict.decodeUnknownSync(ToolingCollectionContractRevision)({
+            const response = Schema.decodeUnknownSync(ToolingCollectionContractRevision)({
               projectId: scope.projectId,
               environmentId: scope.environmentId,
               environmentKey: scope.environmentKey,

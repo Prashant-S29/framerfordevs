@@ -105,7 +105,6 @@ import {
 import { decideCredentialPolicy, decideUserPolicy } from "./policy";
 import { authorizeUserProject, type UserProjectAccess } from "./project-access";
 
-import * as SchemaStrict from "../lib/schema-strict";
 const STUDIO_OAUTH_RESOURCE_ROW_ID = "oauth-resource-studio-v1";
 const STUDIO_ACCESS_TOKEN_LIFETIME_SECONDS = 5 * 60;
 const STUDIO_REFRESH_TOKEN_LIFETIME_SECONDS = 8 * 60 * 60;
@@ -157,7 +156,7 @@ function decodeDatabaseValue<A, I>(
   schema: Schema.Codec<A, I, never>,
   value: unknown,
 ) {
-  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
+  return Schema.decodeUnknownEffect(schema)(value).pipe(
     Effect.mapError((cause) => databaseFailure(`${operation}.decode`, cause)),
   );
 }

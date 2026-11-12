@@ -1,5 +1,3 @@
-// Owns Better Auth session, dashboard cookie, and public OAuth issuer configuration.
-
 import { createHash, randomUUID } from "node:crypto";
 
 import { db } from "@framerfordevs/db";
@@ -25,6 +23,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { jwt } from "better-auth/plugins";
 import { decodeProtectedHeader } from "jose";
+import { allowsLocalLoopbackRedirect } from "./redirect-policy";
 
 export const OFFICIAL_CLI_OAUTH_CLIENT_ID = "framerfordevs-cli";
 export const STUDIO_SESSION_SCOPE = "studio:session";
@@ -140,19 +139,14 @@ interface CreateAuthOptions {
   readonly hostRoutingEnabled?: boolean;
   readonly nodeEnv?: "development" | "production" | "test";
   readonly oauthDeviceAuthorizationEnabled?: boolean;
-  /** Shared atomic storage for Better Auth's defense-in-depth request limiter. */
   readonly oauthRateLimitStorage?: OAuthRateLimitStorage;
-  /** Must finish current-policy and grant/audit persistence before returning claims. */
   readonly studioOAuthAccessTokenClaims?: (
     input: OAuthClaimExtensionInput,
   ) => Promise<Record<string, unknown>>;
-  /** Test clock for the immutable Studio grant deadline; production uses wall time. */
   readonly studioOAuthNow?: () => Date;
-  /** Exact shared OAuth quota adapter supplied by the server runtime. */
   readonly studioOAuthRateLimit?: (
     input: StudioOAuthRateLimitInput,
   ) => Promise<StudioOAuthRateLimitResult>;
-  /** Current user/project policy gate before acknowledgement and code issuance. */
   readonly studioOAuthConsentPolicy?: (input: {
     readonly clientId: string;
     readonly userId: string;
@@ -185,7 +179,6 @@ interface CookieAttributes {
   readonly path: "/";
 }
 
-/** Returns the dashboard-hosted, host-only session cookie attributes. */
 export function getDefaultCookieAttributes(
   nodeEnv: "development" | "production" | "test",
 ): CookieAttributes {
@@ -205,7 +198,6 @@ function studioOAuthProtocolError(
   return new APIError(status, { error, error_description: description });
 }
 
-/** Revalidates current registration, project, role, consent, and audit authority before token bytes exist. */
 function hashOAuthToken(token: string): string {
   return createHash("sha256").update(token).digest("base64url");
 }
@@ -596,7 +588,6 @@ async function enforceStudioOAuthProtocolPolicy(
   }
 }
 
-/** Builds the shared auth runtime with per-request dashboard/API base URL resolution when enforced. */
 export function createAuth(options: CreateAuthOptions = {}) {
   const apiOrigin = new URL(options.apiOrigin ?? env.BETTER_AUTH_URL).origin;
   const dashboardOrigin = new URL(options.dashboardOrigin ?? env.DASHBOARD_ORIGIN).origin;
@@ -756,12 +747,7 @@ export function createAuth(options: CreateAuthOptions = {}) {
             accessTokenExpiresIn: TOOLING_ACCESS_TOKEN_LIFETIME_SECONDS,
             refreshTokenExpiresIn: CLI_REFRESH_TOKEN_LIFETIME_SECONDS,
             refreshTokenReuseInterval: 0,
-            // M18 Studio web clients may use exact loopback HTTP for local development; every other HTTP redirect stays rejected.
-            allowInsecureRedirectUri: (url) =>
-              url.protocol === "http:" &&
-              (url.hostname === "localhost" ||
-                url.hostname === "127.0.0.1" ||
-                url.hostname === "[::1]"),
+            allowInsecureRedirectUri: (url) => allowsLocalLoopbackRedirect(nodeEnv, url),
             allowDynamicClientRegistration: false,
             allowUnauthenticatedClientRegistration: false,
             allowPublicClientPrelogin: true,
@@ -790,7 +776,6 @@ export function createAuth(options: CreateAuthOptions = {}) {
   });
 }
 
-/** Reconciles the fixed public CLI client and its sole Tooling resource before OAuth rollout. */
 export async function ensureOfficialCliOAuthAuthority(
   options: EnsureOfficialCliOAuthAuthorityOptions = {},
 ) {
@@ -892,7 +877,6 @@ export const auth = createAuth();
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
-/** Validates Studio access-token cryptography and narrows its versioned authority claims. */
 export function makeStudioOAuthAccessTokenVerifier(
   options: StudioOAuthAccessTokenVerifierOptions = {},
 ) {
@@ -983,7 +967,6 @@ export function makeStudioOAuthAccessTokenVerifier(
 
 export const verifyStudioOAuthAccessToken = makeStudioOAuthAccessTokenVerifier();
 
-/** Builds a verifier that validates protocol cryptography before narrowing official CLI claims. */
 export function makeToolingOAuthAccessTokenVerifier(
   options: ToolingOAuthAccessTokenVerifierOptions = {},
 ) {

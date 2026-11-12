@@ -1,12 +1,11 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit, Layer } from "effect";
+import { Effect, Exit, Layer, Schema } from "effect";
 
 import { canonicalizeJson, sha256 } from "../canonical";
 import { pullReconciledAuthority, readCompleteManifest } from "../pull";
 import { ToolingCollectionRevision, ToolingManifestPage, ToolingProjectPage } from "../schema";
 import { makeToolingHttpClient, ToolingHttpClient } from "./index";
 
-import * as SchemaStrict from "../schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const collectionId = "019fae8b-1234-7000-8000-000000000003";
@@ -22,7 +21,7 @@ const contractHash = sha256(canonicalizeJson(contract));
 const locale = { id: "019fae8b-1234-7000-8000-000000000005", tag: "en" };
 
 function manifest(revision: string = revisionId) {
-  return SchemaStrict.decodeUnknownSync(ToolingManifestPage)({
+  return Schema.decodeUnknownSync(ToolingManifestPage, { onExcessProperty: "error" })({
     projectId,
     environmentId,
     environmentKey: "main",
@@ -42,7 +41,7 @@ function manifest(revision: string = revisionId) {
 }
 
 function revision(revision: string = revisionId) {
-  return SchemaStrict.decodeUnknownSync(ToolingCollectionRevision)({
+  return Schema.decodeUnknownSync(ToolingCollectionRevision, { onExcessProperty: "error" })({
     projectId,
     environmentId,
     environmentKey: "main",
@@ -224,7 +223,7 @@ describe("reconciled Tooling pull", () => {
   );
 
   it.effect("rejects repeated pagination cursors", () => {
-    const repeating = SchemaStrict.decodeUnknownSync(ToolingManifestPage)({
+    const repeating = Schema.decodeUnknownSync(ToolingManifestPage, { onExcessProperty: "error" })({
       ...manifest(),
       nextCursor: "repeat",
     });

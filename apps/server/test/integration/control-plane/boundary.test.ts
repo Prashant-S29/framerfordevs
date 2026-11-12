@@ -2,13 +2,13 @@ import { randomUUID } from "node:crypto";
 import { request as requestHttp } from "node:http";
 
 import type { ApplicationEffectTransform } from "@framerfordevs/api/context";
-import { controlPlaneLimits } from "@framerfordevs/api/contracts/control-plane/index";
-import { RateLimitCost, RateLimitDecision } from "@framerfordevs/api/contracts/rate-limit/index";
-import { disposeApplicationRuntime } from "@framerfordevs/api/runtime/index";
+import { controlPlaneLimits } from "@framerfordevs/api/contracts/control-plane";
+import { RateLimitCost, RateLimitDecision } from "@framerfordevs/api/contracts/rate-limit";
+import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
 import {
   RateLimitManager,
   type RateLimitManagerService,
-} from "@framerfordevs/api/services/rate-limit/manager/index";
+} from "@framerfordevs/api/services/rate-limit/manager";
 import { db } from "@framerfordevs/db";
 import { user } from "@framerfordevs/db/schema/auth";
 import { generatePublicArtifacts } from "@framerfordevs/public-contracts";

@@ -1,8 +1,7 @@
-// Locks the approved pre-Drizzle realistic M8 snapshot fixture and its exact byte report.
-
 import { assert, describe, it } from "@effect/vitest";
 
 import { EntryValues } from "../../../contracts/entry";
+import { Schema } from "effect";
 import {
   CollectionFieldDefinition,
   type CollectionFieldDefinition as CollectionField,
@@ -13,7 +12,6 @@ import {
   type ResolvedPublicationReference,
 } from "./index";
 
-import * as SchemaStrict from "../../schema-strict";
 const editor = {
   helpText: null,
   placeholder: null,
@@ -26,7 +24,7 @@ function uuid(index: number): string {
 }
 
 function decodeField(value: unknown): CollectionField {
-  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)(value);
+  return Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })(value);
 }
 
 function textField(options: {
@@ -312,8 +310,10 @@ function realisticFixture() {
 
   return compilePublicationSnapshot({
     fields,
-    sharedValues: SchemaStrict.decodeUnknownSync(EntryValues)(shared),
-    localizedValues: SchemaStrict.decodeUnknownSync(EntryValues)(localized),
+    sharedValues: Schema.decodeUnknownSync(EntryValues, { onExcessProperty: "error" })(shared),
+    localizedValues: Schema.decodeUnknownSync(EntryValues, { onExcessProperty: "error" })(
+      localized,
+    ),
     resolvedReferences,
     authority: {
       sharedRevisionId: uuid(700),

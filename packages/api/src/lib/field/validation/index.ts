@@ -1,5 +1,3 @@
-// Provides dependency-light deterministic validation for M6 field values and recursive definitions.
-
 import { RE2JS } from "re2js";
 
 import type {
@@ -67,12 +65,10 @@ const portableTextKeyPattern = /^[A-Za-z0-9_-]{1,64}$/u;
 const dangerousKeys = new Set(["__proto__", "prototype", "constructor"]);
 const textEncoder = new TextEncoder();
 
-/** Creates a bounded mutable issue collector for one validation operation. */
 function makeCollector(): MutableIssueCollector {
   return { issues: [], capped: false };
 }
 
-/** Appends a safe issue while preserving the global issue-count bound. */
 function addIssue(
   collector: MutableIssueCollector,
   path: string,
@@ -86,14 +82,12 @@ function addIssue(
   collector.issues.push({ path, code, message });
 }
 
-/** Returns whether a value is a non-array object with a standard or null prototype. */
 function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 }
 
-/** Copies a known decoded Effect Schema class into inert JSON data for value validation. */
 function copyDecodedSchemaClass(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(copyDecodedSchemaClass);
   if (typeof value !== "object" || value === null) return value;
@@ -102,7 +96,6 @@ function copyDecodedSchemaClass(value: unknown): unknown {
   );
 }
 
-/** Returns whether an object contains only the exact approved own keys. */
 function hasOnlyKeys(
   value: Readonly<Record<string, unknown>>,
   allowed: ReadonlySet<string>,
@@ -110,12 +103,10 @@ function hasOnlyKeys(
   return Object.keys(value).every((key) => allowed.has(key));
 }
 
-/** Counts Unicode code points rather than UTF-16 code units. */
 function codePointLength(value: string): number {
   return [...value].length;
 }
 
-/** Detects C0/C1 controls, optionally preserving line feeds for long text. */
 function hasRejectedControl(value: string, allowLineFeed: boolean): boolean {
   for (const character of value) {
     const codePoint = character.codePointAt(0);
@@ -126,7 +117,6 @@ function hasRejectedControl(value: string, allowLineFeed: boolean): boolean {
   return false;
 }
 
-/** Parses a canonical exact decimal into bounded comparison components. */
 export function parseExactDecimal(value: string): ParsedDecimal | null {
   if (!decimalPattern.test(value)) return null;
   const negative = value.startsWith("-");
@@ -145,7 +135,6 @@ export function parseExactDecimal(value: string): ParsedDecimal | null {
   };
 }
 
-/** Compares two already parsed exact decimals without binary floating-point conversion. */
 export function compareExactDecimals(left: ParsedDecimal, right: ParsedDecimal): number {
   if (left.negative !== right.negative) return left.negative ? -1 : 1;
   const scale = Math.max(left.scale, right.scale);
@@ -166,12 +155,10 @@ export function compareExactDecimals(left: ParsedDecimal, right: ParsedDecimal):
   return left.negative ? -magnitude : magnitude;
 }
 
-/** Runs a user-authored RE2 pattern as an exact whole-value match. */
 function matchesSafePattern(pattern: string, value: string): boolean {
   return RE2JS.compile(pattern).testExact(value);
 }
 
-/** Checks configurable string constraints shared by text and slug fields. */
 function validateStringBounds(
   value: string,
   configuration: {
@@ -206,7 +193,6 @@ function validateStringBounds(
   }
 }
 
-/** Validates Gregorian calendar components without JavaScript date rollover. */
 function isValidDateParts(year: number, month: number, day: number): boolean {
   if (year < 0 || year > 9999 || month < 1 || month > 12 || day < 1) return false;
   const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
@@ -214,7 +200,6 @@ function isValidDateParts(year: number, month: number, day: number): boolean {
   return day <= (monthLengths[month - 1] ?? 0);
 }
 
-/** Validates and returns a canonical date string when possible. */
 export function validDate(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const match = datePattern.exec(value);
@@ -225,7 +210,6 @@ export function validDate(value: unknown): string | null {
   return isValidDateParts(year, month, day) ? value : null;
 }
 
-/** Validates an RFC 3339 instant and returns its canonical UTC millisecond representation. */
 export function canonicalDateTime(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const match = dateTimePattern.exec(value);
@@ -247,7 +231,6 @@ export function canonicalDateTime(value: unknown): string | null {
   return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
 }
 
-/** Validates safe absolute HTTP(S) URLs without performing any network request. */
 function validHttpUrl(value: unknown, httpsOnly: boolean): string | null {
   if (typeof value !== "string" || value.length > 2_048) return null;
   try {
@@ -262,7 +245,6 @@ function validHttpUrl(value: unknown, httpsOnly: boolean): string | null {
   }
 }
 
-/** Validates Portable Text link targets under the profile protocol allowlist. */
 function validRichTextLink(value: unknown): boolean {
   if (
     typeof value !== "string" ||
@@ -285,7 +267,6 @@ function validRichTextLink(value: unknown): boolean {
   }
 }
 
-/** Performs bounded JSON compatibility, depth, cycle, and dangerous-key preflight checks. */
 function preflightJson(
   value: unknown,
   maximumDepth: number,
@@ -424,7 +405,6 @@ function preflightJson(
   return true;
 }
 
-/** Produces deterministic JSON text for bounded uniqueness and hashing comparisons. */
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) {
     const items: Array<string> = [];
@@ -439,7 +419,6 @@ function canonicalJson(value: unknown): string {
   return `{${entries.join(",")}}`;
 }
 
-/** Validates a Portable Text profile document without trusting editor output. */
 function validateRichText(
   value: unknown,
   configuration: FieldConfigurationByKind["rich_text"],
@@ -669,7 +648,6 @@ function validateRichText(
   }
 }
 
-/** Validates one field value recursively and appends path-aware issues. */
 function validatePresentValue(
   definition: ValueFieldDefinition,
   value: unknown,
@@ -1098,7 +1076,6 @@ function validatePresentValue(
   }
 }
 
-/** Applies absence/default semantics before validating a present field value. */
 function validateValueInternal(
   definition: ValueFieldDefinition,
   value: unknown,
@@ -1124,7 +1101,6 @@ function validateValueInternal(
   return validatePresentValue(definition, value, collector, path);
 }
 
-/** Validates one field value, applies defaults, and returns bounded issues. */
 export function validateFieldValue(
   definition: ValueFieldDefinition,
   value: unknown,
@@ -1140,7 +1116,6 @@ export function validateFieldValue(
   };
 }
 
-/** Validates type-specific configuration relationships and configured defaults. */
 function validateConfigurationSemantics(
   definition: ValueFieldDefinition,
   collector: MutableIssueCollector,
@@ -1408,7 +1383,6 @@ function validateConfigurationSemantics(
   }
 }
 
-/** Validates recursive shape, localization, depth, and direct-list invariants. */
 export function validateDefinitionTree(
   roots: ReadonlyArray<ValueFieldDefinition>,
 ): DefinitionTreeValidationResult {

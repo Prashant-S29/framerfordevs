@@ -44,7 +44,6 @@ import { pullReconciledAuthority } from "./pull";
 import { CliConfig, PulledToolingAuthority, SchemaLock } from "./schema";
 import { ToolingHttpClient, makeToolingHttpClient } from "./tooling-http-client";
 
-import * as SchemaStrict from "./schema-strict";
 async function syncFile(path: string) {
   const handle = await open(path, "r");
   try {
@@ -100,7 +99,7 @@ function readBoundedJson<A, I>(path: string, schema: Schema.Codec<A, I, never>, 
       try: (): unknown => JSON.parse(bytes),
       catch: () => new Error("CLI_JSON_INVALID"),
     });
-    return yield* SchemaStrict.decodeUnknownEffect(schema)(value, {
+    return yield* Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(value, {
       onExcessProperty: "error",
     }).pipe(Effect.mapError(() => new Error("CLI_JSON_INVALID")));
   });
@@ -229,7 +228,7 @@ function commandEffect(
       return Effect.fail(new Error("CLI_LINK_FLAGS_REQUIRED"));
     }
     return Effect.gen(function* () {
-      const config = yield* SchemaStrict.decodeUnknownEffect(CliConfig)(
+      const config = yield* Schema.decodeUnknownEffect(CliConfig, { onExcessProperty: "error" })(
         {
           schemaVersion: 2,
           apiBaseUrl,

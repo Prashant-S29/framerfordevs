@@ -1,5 +1,3 @@
-// Exercises the production Lua token bucket against Redis for atomic weighted concurrency and reset behavior.
-
 import { randomUUID } from "node:crypto";
 
 import { assert, describe, layer } from "@effect/vitest";

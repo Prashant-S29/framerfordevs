@@ -1,5 +1,3 @@
-// Verifies successful current/revision Preview GET and HEAD transport semantics without persisting secrets.
-
 import { afterAll, assert, describe, it, vi } from "vitest";
 import request from "supertest";
 
@@ -8,7 +6,7 @@ vi.mock("@framerfordevs/api/operations/preview/public", async (importOriginal) =
     await importOriginal<typeof import("@framerfordevs/api/operations/preview/public")>();
   const { Effect } = await import("effect");
   const { PreviewResponseTooLargeFailure } =
-    await import("@framerfordevs/api/contracts/response/errors/index");
+    await import("@framerfordevs/api/contracts/response/errors");
   const ids = {
     workspace: "019fae8b-1234-7000-8000-000000000001",
     project: "019fae8b-1234-7000-8000-000000000002",
@@ -68,7 +66,7 @@ vi.mock("@framerfordevs/api/operations/preview/public", async (importOriginal) =
   };
 });
 
-const { applicationRuntime } = await import("@framerfordevs/api/runtime/index");
+const { applicationRuntime } = await import("@framerfordevs/api/runtime");
 const { createApp } = await import("../../src/app");
 
 const app = createApp({ previewApiEnabled: true });

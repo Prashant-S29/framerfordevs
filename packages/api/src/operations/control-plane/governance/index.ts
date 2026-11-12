@@ -1,5 +1,3 @@
-// Exposes M15 governance and locale operations through shared repository authorities.
-
 import { Clock, Effect, Schema } from "effect";
 
 import {
@@ -55,7 +53,6 @@ import {
   encodeProjectMemberCursor,
 } from "../../../contracts/access/page-cursor";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const currentDate = Effect.map(Clock.currentTimeMillis, (millis) => new Date(millis));
 
 function requireUser(actor: ControlPlaneActor) {
@@ -63,7 +60,7 @@ function requireUser(actor: ControlPlaneActor) {
 }
 
 function decodeSignedCursor(value: string) {
-  return SchemaStrict.decodeUnknownEffect(ControlPlaneCursor)(value).pipe(
+  return Schema.decodeUnknownEffect(ControlPlaneCursor, { onExcessProperty: "error" })(value).pipe(
     Effect.mapError((cause) =>
       SecurityServiceFailure.make({ operation: "control-plane.cursor.output", cause }),
     ),
@@ -71,7 +68,7 @@ function decodeSignedCursor(value: string) {
 }
 
 function decodeCursorId<A, I>(schema: Schema.Codec<A, I, never>, value: string) {
-  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
+  return Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(value).pipe(
     Effect.mapError((cause) =>
       SecurityServiceFailure.make({ operation: "control-plane.cursor.position", cause }),
     ),

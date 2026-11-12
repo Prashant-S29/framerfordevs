@@ -1,5 +1,3 @@
-// Proves the strictly decoded Authoring DTO is accepted by the private renderer adapter.
-
 import { adaptAuthoringGeneratedForm } from "@framerfordevs/content-form/authoring-adapter";
 import { describe, expect, it } from "vitest";
 

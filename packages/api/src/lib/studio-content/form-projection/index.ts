@@ -1,10 +1,7 @@
-// Redacts role and source-key schema authority from the browser-visible Studio form projection.
-
 import { EntryValues } from "../../../contracts/entry";
 import type { CollectionFieldDefinition, GeneratedFormDefinition } from "../../../contracts/schema";
 import { StudioFormField, StudioFormProjection } from "../../../contracts/studio-content";
-
-import * as SchemaStrict from "../../schema-strict";
+import { Schema } from "effect";
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -50,7 +47,7 @@ function projectFieldConfiguration(
   ) {
     return field.configuration;
   }
-  const projectedField = SchemaStrict.decodeUnknownSync(StudioFormField)({
+  const projectedField = Schema.decodeUnknownSync(StudioFormField, { onExcessProperty: "error" })({
     id: field.id,
     parentFieldId: field.parentFieldId,
     nodeRole: field.nodeRole,
@@ -85,7 +82,7 @@ function projectField(
     if (projected !== null) children.push(projected);
   }
   if ((field.kind === "object" || field.kind === "list") && children.length === 0) return null;
-  return SchemaStrict.decodeUnknownSync(StudioFormField)({
+  return Schema.decodeUnknownSync(StudioFormField, { onExcessProperty: "error" })({
     id: field.id,
     parentFieldId: field.parentFieldId,
     nodeRole: field.nodeRole,
@@ -137,7 +134,7 @@ export function projectStudioValues(
     const value = projectField(field, Reflect.get(values, field.id));
     if (value !== undefined) Reflect.set(projected, field.id, value);
   }
-  return SchemaStrict.decodeUnknownSync(EntryValues)(projected);
+  return Schema.decodeUnknownSync(EntryValues, { onExcessProperty: "error" })(projected);
 }
 
 export function projectStudioForm(form: GeneratedFormDefinition): StudioFormProjection {
@@ -228,7 +225,7 @@ export function projectStudioForm(form: GeneratedFormDefinition): StudioFormProj
     return projected === null ? [] : [projected];
   });
 
-  return SchemaStrict.decodeUnknownSync(StudioFormProjection)({
+  return Schema.decodeUnknownSync(StudioFormProjection, { onExcessProperty: "error" })({
     collectionId: form.collectionId,
     schemaRevisionId: form.revisionId,
     contractHash: form.contractHash,

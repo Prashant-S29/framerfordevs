@@ -1,5 +1,3 @@
-// Verifies Standard Webhooks-compatible signatures over exact raw bytes before bounded event decoding.
-
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type { JsonObject, JsonValue } from "../client";

@@ -1,5 +1,3 @@
-// Signs short-lived Control Plane pages bound to principal, route, tenant, status filter, and limit.
-
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 import { Clock, Context, Effect, Layer, Schema } from "effect";
@@ -10,7 +8,6 @@ import {
   SecurityServiceFailure,
 } from "../../../contracts/response/errors";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 import { Uuid } from "../../../contracts/uuid";
 const cursorLifetimeMs = 15 * 60 * 1_000;
 const cursorMaximumLength = 512;
@@ -210,9 +207,9 @@ export function makeControlPlaneCursorSigner(
           try: (): unknown => JSON.parse(Buffer.from(payloadText, "base64url").toString("utf8")),
           catch: () => invalidCursor(),
         });
-        const payload = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCursorPayload)(
-          unknownPayload,
-        ).pipe(Effect.mapError(() => invalidCursor()));
+        const payload = yield* Schema.decodeUnknownEffect(ControlPlaneCursorPayload, {
+          onExcessProperty: "error",
+        })(unknownPayload).pipe(Effect.mapError(() => invalidCursor()));
         const now = yield* Clock.currentTimeMillis;
         if (
           payload.authorityDigest !== authorityDigest(authority) ||

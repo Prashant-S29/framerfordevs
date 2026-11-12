@@ -86,7 +86,6 @@ if (total > 200_000)
 const allAssets = new Set(
   Object.values(manifest).flatMap((candidate) => [candidate.file, ...(candidate.css ?? [])]),
 );
-// Twelve reviewed M19B assets plus the bundler-owned rolldown runtime-helper chunk (Vite 8.3 / rolldown 1.3).
 if (allAssets.size > 13) throw new Error("Studio artifact contains too many finite assets.");
 process.stdout.write(
   `Studio initial transfer: ${total} gzip bytes across ${files.length} files (${scriptSize.raw}/${scriptSize.gzip} JS raw/gzip, ${styleSize.raw}/${styleSize.gzip} CSS raw/gzip). Content-form workspace: ${workspaceSize.raw}/${workspaceSize.gzip} raw/gzip. Portable Text: ${portableTextSize.raw}/${portableTextSize.gzip} raw/gzip.\n`,

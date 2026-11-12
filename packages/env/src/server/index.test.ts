@@ -1,5 +1,3 @@
-// Verifies complete, origin-safe server configuration and production routing gates.
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const environmentKeys = [

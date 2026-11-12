@@ -1,5 +1,3 @@
-// Defines the closed, tenant-safe Control Plane v1 request and response contracts.
-
 export * from "./operational";
 
 import { Schema } from "effect";
@@ -41,8 +39,7 @@ import {
 } from "../platform";
 import { ApiErrorDetail, ApiSuccessSchema, RequestIdSchema } from "../response/api";
 
-import * as SchemaStrict from "../../lib/schema-strict";
-import { UuidValue } from "../uuid";
+import { Uuid } from "../uuid";
 const textEncoder = new TextEncoder();
 
 function utf8Length(value: string): number {
@@ -129,7 +126,7 @@ export const controlPlaneLimits = {
   maximumStudioMountPathBytes: 240,
 } as const;
 
-export const ControlPlaneCommandId = UuidValue.pipe(Schema.brand("ControlPlaneCommandId"));
+export const ControlPlaneCommandId = Uuid.pipe(Schema.brand("ControlPlaneCommandId"));
 export type ControlPlaneCommandId = typeof ControlPlaneCommandId.Type;
 
 export const ControlPlaneCommandOperation = Schema.Literals([
@@ -143,7 +140,7 @@ export const ControlPlaneCommandOperation = Schema.Literals([
 ]);
 export type ControlPlaneCommandOperation = typeof ControlPlaneCommandOperation.Type;
 
-export const StudioRegistrationId = UuidValue.pipe(Schema.brand("StudioRegistrationId"));
+export const StudioRegistrationId = Uuid.pipe(Schema.brand("StudioRegistrationId"));
 export type StudioRegistrationId = typeof StudioRegistrationId.Type;
 
 export const StudioRuntimeStatus = Schema.Literals(["inactive", "active"]);
@@ -295,29 +292,20 @@ const ControlPlanePageLimit = Schema.Number.check(
 export const ControlPlaneListWorkspacesQuery = Schema.Struct({
   cursor: Schema.NullOr(ControlPlaneCursorInput),
   limit: ControlPlanePageLimit,
-}).annotate({
-  identifier: "ControlPlaneListWorkspacesQuery",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneListWorkspacesQuery" });
 export type ControlPlaneListWorkspacesQuery = typeof ControlPlaneListWorkspacesQuery.Type;
 
 export const ControlPlaneCreateWorkspaceRequest = Schema.Struct({
   commandId: ControlPlaneCommandId,
   name: WorkspaceName,
-}).annotate({
-  identifier: "ControlPlaneCreateWorkspaceRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneCreateWorkspaceRequest" });
 export type ControlPlaneCreateWorkspaceRequest = typeof ControlPlaneCreateWorkspaceRequest.Type;
 
 export const ControlPlaneListProjectsQuery = Schema.Struct({
   status: ControlPlaneProjectStatus,
   cursor: Schema.NullOr(ControlPlaneCursorInput),
   limit: ControlPlanePageLimit,
-}).annotate({
-  identifier: "ControlPlaneListProjectsQuery",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneListProjectsQuery" });
 export type ControlPlaneListProjectsQuery = typeof ControlPlaneListProjectsQuery.Type;
 
 export class ControlPlaneListProjectsInput extends Schema.Class<ControlPlaneListProjectsInput>(
@@ -343,10 +331,7 @@ export const ControlPlaneCreateProjectRequest = Schema.Struct({
   key: ProjectKey,
   description: Schema.NullOr(ProjectDescription),
   initialCapabilities: ControlPlaneInitialCapabilities,
-}).annotate({
-  identifier: "ControlPlaneCreateProjectRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneCreateProjectRequest" });
 export type ControlPlaneCreateProjectRequest = typeof ControlPlaneCreateProjectRequest.Type;
 
 export class ControlPlaneCreateProjectInput extends Schema.Class<ControlPlaneCreateProjectInput>(
@@ -376,10 +361,7 @@ export const ControlPlaneUpdateProjectRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
   name: ProjectName,
   description: Schema.NullOr(ProjectDescription),
-}).annotate({
-  identifier: "ControlPlaneUpdateProjectRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneUpdateProjectRequest" });
 export type ControlPlaneUpdateProjectRequest = typeof ControlPlaneUpdateProjectRequest.Type;
 
 export class ControlPlaneUpdateProjectInput extends Schema.Class<ControlPlaneUpdateProjectInput>(
@@ -393,10 +375,7 @@ export class ControlPlaneUpdateProjectInput extends Schema.Class<ControlPlaneUpd
 
 export const ControlPlaneProjectLifecycleRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
-}).annotate({
-  identifier: "ControlPlaneProjectLifecycleRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneProjectLifecycleRequest" });
 export type ControlPlaneProjectLifecycleRequest = typeof ControlPlaneProjectLifecycleRequest.Type;
 
 export class ControlPlaneProjectLifecycleInput extends Schema.Class<ControlPlaneProjectLifecycleInput>(
@@ -408,10 +387,7 @@ export class ControlPlaneProjectLifecycleInput extends Schema.Class<ControlPlane
 
 export const ControlPlaneEnableCapabilityRequest = Schema.Struct({
   commandId: ControlPlaneCommandId,
-}).annotate({
-  identifier: "ControlPlaneEnableCapabilityRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneEnableCapabilityRequest" });
 export type ControlPlaneEnableCapabilityRequest = typeof ControlPlaneEnableCapabilityRequest.Type;
 
 export class ControlPlaneEnableCapabilityInput extends Schema.Class<ControlPlaneEnableCapabilityInput>(
@@ -433,10 +409,7 @@ export const ControlPlanePutStudioRegistrationRequest = Schema.Struct({
   expectedVersion: Schema.NullOr(ResourceVersion),
   applicationOrigin: StudioApplicationOrigin,
   mountPath: StudioMountPath,
-}).annotate({
-  identifier: "ControlPlanePutStudioRegistrationRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlanePutStudioRegistrationRequest" });
 export type ControlPlanePutStudioRegistrationRequest =
   typeof ControlPlanePutStudioRegistrationRequest.Type;
 
@@ -455,10 +428,7 @@ export const ControlPlaneSetStudioRuntimeRequest = Schema.Struct({
   commandId: ControlPlaneCommandId,
   expectedVersion: ResourceVersion,
   enabled: Schema.Boolean,
-}).annotate({
-  identifier: "ControlPlaneSetStudioRuntimeRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneSetStudioRuntimeRequest" });
 export type ControlPlaneSetStudioRuntimeRequest = typeof ControlPlaneSetStudioRuntimeRequest.Type;
 
 export class ControlPlaneSetStudioRuntimeInput extends Schema.Class<ControlPlaneSetStudioRuntimeInput>(
@@ -480,10 +450,7 @@ export const ControlPlaneMemberListQuery = Schema.Struct({
   ),
   cursor: Schema.NullOr(ControlPlaneCursorInput),
   limit: ControlPlanePageLimit,
-}).annotate({
-  identifier: "ControlPlaneMemberListQuery",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneMemberListQuery" });
 export type ControlPlaneMemberListQuery = typeof ControlPlaneMemberListQuery.Type;
 
 export const ControlPlaneInvitationListQuery = Schema.Struct({
@@ -495,94 +462,64 @@ export const ControlPlaneInvitationListQuery = Schema.Struct({
   ),
   cursor: Schema.NullOr(ControlPlaneCursorInput),
   limit: ControlPlanePageLimit,
-}).annotate({
-  identifier: "ControlPlaneInvitationListQuery",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneInvitationListQuery" });
 export type ControlPlaneInvitationListQuery = typeof ControlPlaneInvitationListQuery.Type;
 
 export const ControlPlaneMemberPolicyRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
   role: ProjectRole,
   localeAccess: ProjectLocaleAccess,
-}).annotate({
-  identifier: "ControlPlaneMemberPolicyRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneMemberPolicyRequest" });
 export type ControlPlaneMemberPolicyRequest = typeof ControlPlaneMemberPolicyRequest.Type;
 
 export const ControlPlaneVersionRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
-}).annotate({
-  identifier: "ControlPlaneVersionRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneVersionRequest" });
 export type ControlPlaneVersionRequest = typeof ControlPlaneVersionRequest.Type;
 
 export const ControlPlaneCreateInvitationRequest = Schema.Struct({
   email: CanonicalEmail,
   role: ProjectRole,
   localeAccess: ProjectLocaleAccess,
-}).annotate({
-  identifier: "ControlPlaneCreateInvitationRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneCreateInvitationRequest" });
 export type ControlPlaneCreateInvitationRequest = typeof ControlPlaneCreateInvitationRequest.Type;
 
 export const ControlPlaneInvitationTokenRequest = Schema.Struct({
   token: InvitationToken,
-}).annotate({
-  identifier: "ControlPlaneInvitationTokenRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneInvitationTokenRequest" });
 export type ControlPlaneInvitationTokenRequest = typeof ControlPlaneInvitationTokenRequest.Type;
 
 export const ControlPlaneLocaleListQuery = Schema.Struct({
   view: Schema.Literals(["effective", "settings"]),
   includeRemoved: Schema.Boolean,
-}).annotate({
-  identifier: "ControlPlaneLocaleListQuery",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneLocaleListQuery" });
 export type ControlPlaneLocaleListQuery = typeof ControlPlaneLocaleListQuery.Type;
 
 export const ControlPlaneCreateLocaleRequest = Schema.Struct({
   commandId: ControlPlaneCommandId,
   tag: LocaleTag,
   displayName: LocaleDisplayName,
-}).annotate({
-  identifier: "ControlPlaneCreateLocaleRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneCreateLocaleRequest" });
 export type ControlPlaneCreateLocaleRequest = typeof ControlPlaneCreateLocaleRequest.Type;
 
 export const ControlPlaneUpdateLocaleRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
   displayName: LocaleDisplayName,
-}).annotate({
-  identifier: "ControlPlaneUpdateLocaleRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneUpdateLocaleRequest" });
 export type ControlPlaneUpdateLocaleRequest = typeof ControlPlaneUpdateLocaleRequest.Type;
 
 export const ControlPlaneLocaleStatusRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
   status: ProjectLocaleStatus,
   confirmDraftImpact: Schema.Boolean,
-}).annotate({
-  identifier: "ControlPlaneLocaleStatusRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneLocaleStatusRequest" });
 export type ControlPlaneLocaleStatusRequest = typeof ControlPlaneLocaleStatusRequest.Type;
 
 export const ControlPlaneLocaleOrderRequest = Schema.Struct({
   locales: Schema.Array(
     Schema.Struct({ localeId: ProjectLocaleId, expectedVersion: ResourceVersion }),
   ).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
-}).annotate({
-  identifier: "ControlPlaneLocaleOrderRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneLocaleOrderRequest" });
 export type ControlPlaneLocaleOrderRequest = typeof ControlPlaneLocaleOrderRequest.Type;
 
 export class ControlPlaneProjectRolePolicy extends Schema.Class<ControlPlaneProjectRolePolicy>(
@@ -755,50 +692,57 @@ export const ControlPlaneLocaleResponse = ApiSuccessSchema(ProjectLocale);
 export const ControlPlaneCreateLocaleResponse = ApiSuccessSchema(ProjectLocale);
 export const ControlPlaneLocaleListResponse = ApiSuccessSchema(ControlPlaneLocaleList);
 
-export const ControlPlaneWorkspaceScopeSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneWorkspaceScopeSchema = Schema.toStandardSchemaV1(
   ControlPlaneWorkspaceScope,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ControlPlaneProjectScopeSchema =
-  SchemaStrict.toStandardSchemaV1(ControlPlaneProjectScope);
-export const ControlPlaneProjectLifecycleInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneProjectScopeSchema = Schema.toStandardSchemaV1(ControlPlaneProjectScope, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const ControlPlaneProjectLifecycleInputSchema = Schema.toStandardSchemaV1(
   ControlPlaneProjectLifecycleInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ControlPlaneUpdateProjectInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneUpdateProjectInputSchema = Schema.toStandardSchemaV1(
   ControlPlaneUpdateProjectInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ControlPlaneWorkspaceOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneWorkspaceOutputSchema = Schema.toStandardSchemaV1(
   ControlPlaneWorkspaceResponse,
 );
-export const ControlPlaneProjectOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneProjectOutputSchema = Schema.toStandardSchemaV1(
   ControlPlaneProjectResponse,
 );
-export const ControlPlaneCapabilityListOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneCapabilityListOutputSchema = Schema.toStandardSchemaV1(
   ControlPlaneCapabilityListResponse,
 );
-export const ControlPlaneCreateProjectInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneCreateProjectInputSchema = Schema.toStandardSchemaV1(
   ControlPlaneCreateProjectInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ControlPlaneEnableCapabilityInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneEnableCapabilityInputSchema = Schema.toStandardSchemaV1(
   ControlPlaneEnableCapabilityInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ControlPlaneEnableCapabilityOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneEnableCapabilityOutputSchema = Schema.toStandardSchemaV1(
   ControlPlaneEnableCapabilityResponse,
 );
-export const ControlPlaneStudioRegistrationScopeSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneStudioRegistrationScopeSchema = Schema.toStandardSchemaV1(
   ControlPlaneStudioRegistrationScope,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ControlPlanePutStudioRegistrationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlanePutStudioRegistrationInputSchema = Schema.toStandardSchemaV1(
   ControlPlanePutStudioRegistrationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ControlPlaneSetStudioRuntimeInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneSetStudioRuntimeInputSchema = Schema.toStandardSchemaV1(
   ControlPlaneSetStudioRuntimeInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const StudioRegistrationOutputSchema = SchemaStrict.toStandardSchemaV1(
-  StudioRegistrationResponse,
-);
-export const ControlPlanePutStudioRegistrationOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const StudioRegistrationOutputSchema = Schema.toStandardSchemaV1(StudioRegistrationResponse);
+export const ControlPlanePutStudioRegistrationOutputSchema = Schema.toStandardSchemaV1(
   ControlPlanePutStudioRegistrationResponse,
 );
-export const ControlPlaneSetStudioRuntimeOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneSetStudioRuntimeOutputSchema = Schema.toStandardSchemaV1(
   ControlPlaneSetStudioRuntimeResponse,
 );

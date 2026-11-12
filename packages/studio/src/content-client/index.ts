@@ -1,5 +1,3 @@
-// Bounded same-origin Fetch client for the finite Studio Content BFF grammar.
-
 import {
   decodeStudioContentContextResponse,
   decodeStudioCreateEntryResponse,

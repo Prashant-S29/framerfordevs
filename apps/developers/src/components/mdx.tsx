@@ -1,5 +1,3 @@
-// Defines the allowlisted React components available to source-controlled public MDX pages.
-
 import { CodeBlock, Pre, type CodeBlockProps } from "fumadocs-ui/components/codeblock";
 import defaultMdxComponents from "fumadocs-ui/mdx";
 import type { MDXComponents } from "mdx/types";

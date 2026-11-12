@@ -1,5 +1,3 @@
-// Signs bounded Studio Content cursors with explicit mode, scope, locale, query, and schema authority.
-
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { Clock, Context, Effect, Layer, Schema } from "effect";
@@ -15,7 +13,6 @@ import {
   StudioContentCursorStaleFailure,
 } from "../../../contracts/studio-content";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const cursorLifetimeMs = 15 * 60 * 1_000;
 const cursorDomain = "ffd:studio-content-cursor:v1:";
 const Digest = Schema.String.check(
@@ -28,11 +25,11 @@ const SearchOrderName = Schema.String.check(Schema.isMinLength(1), Schema.isMaxL
 const BrowseOrder = Schema.Struct({
   createdAt: IsoDateTime,
   entryId: EntryId,
-}).annotate({ closedObject: true });
+});
 const SearchOrder = Schema.Struct({
   foldedDisplayName: SearchOrderName,
   entryId: EntryId,
-}).annotate({ closedObject: true });
+});
 
 class StudioContentCursorPayload extends Schema.Class<StudioContentCursorPayload>(
   "StudioContentCursorPayload",
@@ -51,7 +48,7 @@ class StudioContentCursorPayload extends Schema.Class<StudioContentCursorPayload
     searchOrder: Schema.NullOr(SearchOrder),
     issuedAtEpochMs: EpochMillis,
     expiresAtEpochMs: EpochMillis,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 class StudioContentCursorEnvelope extends Schema.Class<StudioContentCursorEnvelope>(
@@ -63,7 +60,7 @@ class StudioContentCursorEnvelope extends Schema.Class<StudioContentCursorEnvelo
       Schema.isBetweenLength(43, 43),
       Schema.isPattern(/^[A-Za-z0-9_-]+$/u),
     ),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export interface StudioContentCursorAuthority {
@@ -139,7 +136,9 @@ export function makeStudioContentCursorSigner(
   return {
     sign: Effect.fn("StudioContentCursorSigner.sign")(function* (input) {
       const now = yield* Clock.currentTimeMillis;
-      const payload = yield* SchemaStrict.decodeUnknownEffect(StudioContentCursorPayload)({
+      const payload = yield* Schema.decodeUnknownEffect(StudioContentCursorPayload, {
+        onExcessProperty: "error",
+      })({
         version: 1,
         kind: "studio_content_entries",
         ...input,
@@ -154,14 +153,16 @@ export function makeStudioContentCursorSigner(
       }
       const encodedPayload = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
       const encodedSignature = yield* signature(options.activeSecret, encodedPayload);
-      return yield* SchemaStrict.decodeUnknownEffect(StudioContentCursor)(
+      return yield* Schema.decodeUnknownEffect(StudioContentCursor, { onExcessProperty: "error" })(
         `${encodedPayload}${encodedSignature}`,
       ).pipe(Effect.mapError((cause) => securityFailure("studio_content.cursor.size", cause)));
     }),
     verify: Effect.fn("StudioContentCursorSigner.verify")(function* (cursor, authority) {
       if (cursor.length <= 43) return yield* invalidCursor();
       const signatureStart = cursor.length - 43;
-      const envelope = yield* SchemaStrict.decodeUnknownEffect(StudioContentCursorEnvelope)({
+      const envelope = yield* Schema.decodeUnknownEffect(StudioContentCursorEnvelope, {
+        onExcessProperty: "error",
+      })({
         payload: cursor.slice(0, signatureStart),
         signature: cursor.slice(signatureStart),
       }).pipe(Effect.mapError(() => invalidCursor()));
@@ -176,9 +177,9 @@ export function makeStudioContentCursorSigner(
         try: (): unknown => JSON.parse(Buffer.from(envelope.payload, "base64url").toString("utf8")),
         catch: () => invalidCursor(),
       });
-      const payload = yield* SchemaStrict.decodeUnknownEffect(StudioContentCursorPayload)(
-        unknownPayload,
-      ).pipe(Effect.mapError(() => invalidCursor()));
+      const payload = yield* Schema.decodeUnknownEffect(StudioContentCursorPayload, {
+        onExcessProperty: "error",
+      })(unknownPayload).pipe(Effect.mapError(() => invalidCursor()));
       const now = yield* Clock.currentTimeMillis;
       if (
         payload.expiresAtEpochMs <= now ||

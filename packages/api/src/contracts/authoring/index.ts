@@ -1,5 +1,3 @@
-// Defines M13 source identities, actors, hashes, public value mutations, and closed Authoring v1 errors.
-
 import { Schema } from "effect";
 
 import { ProjectActor } from "../access";
@@ -15,7 +13,7 @@ import {
   SchemaRevisionId,
 } from "../schema";
 
-import { UuidValue } from "../uuid";
+import { Uuid } from "../uuid";
 const digestPattern = /^[0-9a-f]{64}$/u;
 const sourceKeyPattern = /^[a-z][a-z0-9_-]{0,62}$/u;
 const reservedSourceKeys = new Set([
@@ -77,7 +75,7 @@ export const SchemaPlanHash = Schema.String.check(
 ).pipe(Schema.brand("SchemaPlanHash"));
 export type SchemaPlanHash = typeof SchemaPlanHash.Type;
 
-export const SchemaApplyCommandId = UuidValue.pipe(Schema.brand("SchemaApplyCommandId"));
+export const SchemaApplyCommandId = Uuid.pipe(Schema.brand("SchemaApplyCommandId"));
 export type SchemaApplyCommandId = typeof SchemaApplyCommandId.Type;
 
 export const SchemaApplyFingerprint = Schema.String.check(

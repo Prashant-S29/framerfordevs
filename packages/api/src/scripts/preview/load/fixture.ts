@@ -1,14 +1,11 @@
-// Prepares or restores bounded Preview-only load fixtures through normal audited repositories.
-
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 
 import { Effect, Schema } from "effect";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 import { Uuid } from "../../../contracts/uuid";
 const serverEnvironmentPath = "../../apps/server/.env";
-const loadEnvironmentPath = "../../preview-load.env";
+const loadEnvironmentPath = "../../apps/server/load/preview.env";
 process.loadEnvFile(serverEnvironmentPath);
 process.loadEnvFile(loadEnvironmentPath);
 
@@ -92,7 +89,9 @@ const [localeRow] = await db
   .limit(1);
 if (localeRow === undefined) throw new Error("The fixture requires enabled English.");
 
-const actorId = SchemaStrict.decodeUnknownSync(AuthUserId)(authority.actorId);
+const actorId = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(
+  authority.actorId,
+);
 const schemas = makeSchemaRepository();
 const entries = makeEntryRepository();
 const run = Effect.runPromise;
@@ -112,7 +111,9 @@ if (mode === "prepare" && collection === undefined) {
   const created = await run(
     schemas.createCollection(
       actorId,
-      SchemaStrict.decodeUnknownSync(schemaContracts.CreateCollectionInput)({
+      Schema.decodeUnknownSync(schemaContracts.CreateCollectionInput, {
+        onExcessProperty: "error",
+      })({
         projectId,
         environmentId: authority.environmentId,
         apiKey: collectionKey,
@@ -130,7 +131,9 @@ if (mode === "prepare" && collection !== undefined) {
   let draft = await run(
     schemas.getDraft(
       actorId,
-      SchemaStrict.decodeUnknownSync(schemaContracts.GetCollectionDraftInput)({
+      Schema.decodeUnknownSync(schemaContracts.GetCollectionDraftInput, {
+        onExcessProperty: "error",
+      })({
         projectId,
         environmentId: authority.environmentId,
         collectionId: collection.id,
@@ -146,7 +149,9 @@ if (mode === "prepare" && collection !== undefined) {
     draft = await run(
       schemas.createField(
         actorId,
-        SchemaStrict.decodeUnknownSync(schemaContracts.CreateCollectionFieldInput)({
+        Schema.decodeUnknownSync(schemaContracts.CreateCollectionFieldInput, {
+          onExcessProperty: "error",
+        })({
           projectId,
           environmentId: authority.environmentId,
           collectionId: collection.id,
@@ -176,20 +181,26 @@ if (mode === "prepare" && collection !== undefined) {
   draft = await run(
     schemas.getDraft(
       actorId,
-      SchemaStrict.decodeUnknownSync(schemaContracts.GetCollectionDraftInput)(scope),
+      Schema.decodeUnknownSync(schemaContracts.GetCollectionDraftInput, {
+        onExcessProperty: "error",
+      })(scope),
     ),
   );
   const validation = await run(
     schemas.validateSchema(
       actorId,
-      SchemaStrict.decodeUnknownSync(schemaContracts.ValidateCollectionSchemaInput)(scope),
+      Schema.decodeUnknownSync(schemaContracts.ValidateCollectionSchemaInput, {
+        onExcessProperty: "error",
+      })(scope),
     ),
   );
   if (!validation.valid) throw new Error("The Preview boundary schema did not validate.");
   await run(
     schemas.publishSchema(
       actorId,
-      SchemaStrict.decodeUnknownSync(schemaContracts.PublishCollectionSchemaInput)({
+      Schema.decodeUnknownSync(schemaContracts.PublishCollectionSchemaInput, {
+        onExcessProperty: "error",
+      })({
         ...scope,
         draftVersion: draft.collection.draftVersion,
         expectedPublishedRevisionId: draft.collection.currentPublishedRevisionId,
@@ -213,7 +224,9 @@ if (collection === undefined) {
 const draft = await run(
   schemas.getDraft(
     actorId,
-    SchemaStrict.decodeUnknownSync(schemaContracts.GetCollectionDraftInput)({
+    Schema.decodeUnknownSync(schemaContracts.GetCollectionDraftInput, {
+      onExcessProperty: "error",
+    })({
       projectId,
       environmentId: authority.environmentId,
       collectionId: collection.id,
@@ -234,7 +247,7 @@ if (mode === "prepare" && entry === undefined) {
   const created = await run(
     entries.createEntry(
       actorId,
-      SchemaStrict.decodeUnknownSync(entryContracts.CreateEntryInput)({
+      Schema.decodeUnknownSync(entryContracts.CreateEntryInput, { onExcessProperty: "error" })({
         projectId,
         environmentId: authority.environmentId,
         collectionId: collection.id,
@@ -256,7 +269,7 @@ if (mode === "prepare") {
   const entryDraft = await run(
     entries.getDraft(
       actorId,
-      SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
+      Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput, { onExcessProperty: "error" })({
         projectId,
         environmentId: authority.environmentId,
         collectionId: collection.id,
@@ -279,20 +292,22 @@ if (mode === "prepare") {
     await run(
       entries.saveDraft(
         actorId,
-        SchemaStrict.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
-          projectId,
-          environmentId: authority.environmentId,
-          collectionId: collection.id,
-          entryId: entry.id,
-          locale,
-          schemaRevisionId: entryDraft.schemaRevisionId,
-          contractHash: entryDraft.contractHash,
-          commandId: randomUUID(),
-          expectedSharedVersion: 0,
-          expectedLocalizedVersion: 0,
-          sharedMutations,
-          localizedMutations,
-        }),
+        Schema.decodeUnknownSync(entryContracts.SaveEntryDraftInput, { onExcessProperty: "error" })(
+          {
+            projectId,
+            environmentId: authority.environmentId,
+            collectionId: collection.id,
+            entryId: entry.id,
+            locale,
+            schemaRevisionId: entryDraft.schemaRevisionId,
+            contractHash: entryDraft.contractHash,
+            commandId: randomUUID(),
+            expectedSharedVersion: 0,
+            expectedLocalizedVersion: 0,
+            sharedMutations,
+            localizedMutations,
+          },
+        ),
         new Date(),
         "m10-preview-boundary-entry-save",
       ),

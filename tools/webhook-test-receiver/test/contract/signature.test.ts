@@ -1,5 +1,3 @@
-// Proves exact-byte signature verification, freshness, tamper rejection, and content-free parsing.
-
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -8,7 +6,6 @@ import { testBody, testEventId, testSecret, testSignature } from "../support/hel
 
 const now = 1_776_945_600;
 
-/** Builds the valid baseline verification input used by focused failure variants. */
 function validInput() {
   const body = testBody();
   return {

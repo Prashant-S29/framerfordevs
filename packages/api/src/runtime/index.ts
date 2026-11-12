@@ -1,5 +1,3 @@
-// Composes the shared application Layer/ManagedRuntime and maps Effect exits at framework boundaries.
-
 import { randomBytes } from "node:crypto";
 
 import * as OtelTracer from "@effect/opentelemetry/OtelTracer";
@@ -521,7 +519,6 @@ export function observeAuthoringRequest(event: AuthoringRequestMetric): Promise<
   );
 }
 
-/** Records a closed parser category without retaining the raw Preview query. */
 export function observePreviewQueryRejection(
   category: PreviewQueryRejectionCategory,
 ): Promise<void> {

@@ -1,5 +1,3 @@
-// Defines the exact origin-only configuration schema shared by browser and server environments.
-
 import { z } from "zod";
 
 export const exactOriginSchema = z.url().transform((value, context) => {

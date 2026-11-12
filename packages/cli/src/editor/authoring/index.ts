@@ -1,5 +1,3 @@
-// Owns the exact hosted Authoring operation gateway while keeping bearer authority in Node memory.
-
 import { authoringV1 } from "@framerfordevs/sdk/authoring";
 import { Cause, Effect, Exit, Option } from "effect";
 

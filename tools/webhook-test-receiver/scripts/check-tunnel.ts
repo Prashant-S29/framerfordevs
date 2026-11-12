@@ -1,9 +1,6 @@
-// Verifies a configured public tunnel hostname, bounded DNS answers, and receiver readiness without printing addresses.
-
 import { promises as dns } from "node:dns";
 import { isIP } from "node:net";
 
-/** Validates and checks the externally configured named or temporary HTTPS receiver origin. */
 async function main(): Promise<void> {
   const raw = process.env.PUBLIC_BASE_URL;
   if (raw === undefined) throw new Error("Set PUBLIC_BASE_URL to the tunnel's HTTPS origin.");

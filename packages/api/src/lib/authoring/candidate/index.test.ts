@@ -27,11 +27,11 @@ import { EditorLayout, EnumOptionId } from "../../../contracts/field";
 import { compileCodeCollectionFields } from "./index";
 import { validateDefinitionTree } from "../../field/validation";
 import type { StructureIdentityMap } from "../hash";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
-const decodeCollectionId = SchemaStrict.decodeUnknownSync(CollectionId);
-const decodeFieldId = SchemaStrict.decodeUnknownSync(CollectionFieldId);
-const decodeOptionId = SchemaStrict.decodeUnknownSync(EnumOptionId);
+const decodeCollectionId = Schema.decodeUnknownSync(CollectionId, { onExcessProperty: "error" });
+const decodeFieldId = Schema.decodeUnknownSync(CollectionFieldId, { onExcessProperty: "error" });
+const decodeOptionId = Schema.decodeUnknownSync(EnumOptionId, { onExcessProperty: "error" });
 const postsId = decodeCollectionId("019fae8b-1234-7000-8000-000000000401");
 const authorsId = decodeCollectionId("019fae8b-1234-7000-8000-000000000402");
 const authorId = decodeFieldId("019fae8b-1234-7000-8000-000000000403");
@@ -133,7 +133,7 @@ function requireCompiled(includeSummary = false, published: PublishedSchemaRevis
 }
 
 function publishedRevision(fields: ReadonlyArray<CollectionFieldDefinition>) {
-  const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
+  const layout = Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })({
     version: 1,
     tabs: [
       {
@@ -223,26 +223,33 @@ describe("code schema collection candidate", () => {
     const presented = initial
       .map((field) => {
         if (field.id === titleId)
-          return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
-            ...field,
-            displayLabel: CollectionFieldDisplayLabel.make("Headline"),
-            position: 0,
-          });
-        if (field.id === statusId && field.kind === "enum")
-          return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
-            ...field,
-            displayLabel: CollectionFieldDisplayLabel.make("Workflow"),
-            position: 1,
-            configuration: {
-              ...field.configuration,
-              options: [...field.configuration.options].reverse().map((option, position) => ({
-                ...option,
-                label: option.value === "draft" ? "Working" : "Live",
-                position,
-              })),
+          return Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })(
+            {
+              ...field,
+              displayLabel: CollectionFieldDisplayLabel.make("Headline"),
+              position: 0,
             },
-          });
-        return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({ ...field, position: 2 });
+          );
+        if (field.id === statusId && field.kind === "enum")
+          return Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })(
+            {
+              ...field,
+              displayLabel: CollectionFieldDisplayLabel.make("Workflow"),
+              position: 1,
+              configuration: {
+                ...field.configuration,
+                options: [...field.configuration.options].reverse().map((option, position) => ({
+                  ...option,
+                  label: option.value === "draft" ? "Working" : "Live",
+                  position,
+                })),
+              },
+            },
+          );
+        return Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })({
+          ...field,
+          position: 2,
+        });
       })
       .sort((left, right) => left.position - right.position);
     const candidate = requireCompiled(true, publishedRevision(presented));

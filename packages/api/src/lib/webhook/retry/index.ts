@@ -1,5 +1,3 @@
-// Classifies bounded webhook outcomes and calculates deterministic equal-jitter retry schedules.
-
 export const webhookMaximumAttempts = 12;
 const baseDelaySeconds = 30;
 const maximumBackoffSeconds = 6 * 60 * 60;
@@ -40,7 +38,6 @@ export function webhookBackoffCapSeconds(attemptNumber: number): number {
   return Math.min(maximumBackoffSeconds, baseDelaySeconds * 2 ** (attemptNumber - 1));
 }
 
-/** Uses injected entropy in [0,1) to produce equal jitter over the upper half of the cap. */
 export function webhookEqualJitterSeconds(attemptNumber: number, entropy: number): number {
   if (!Number.isFinite(entropy) || entropy < 0 || entropy >= 1) {
     throw new RangeError("Webhook retry entropy must be in the half-open interval [0, 1). ");

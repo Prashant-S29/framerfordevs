@@ -1,6 +1,4 @@
-// Defines named M7 entry workflows at the Effect/application boundary.
-
-import { Clock, Effect } from "effect";
+import { Clock, Effect, Schema } from "effect";
 
 import type {
   CreateEntryInput,
@@ -15,9 +13,8 @@ import { UnauthorizedFailure } from "../../contracts/response/errors";
 import { AuthUserId } from "../../contracts/platform";
 import { EntryRepository } from "../../services/entry/repository";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const decodeActorId = (actorId: string) =>
-  SchemaStrict.decodeUnknownEffect(AuthUserId)(actorId).pipe(
+  Schema.decodeUnknownEffect(AuthUserId, { onExcessProperty: "error" })(actorId).pipe(
     Effect.mapError(() => UnauthorizedFailure.make()),
   );
 
@@ -50,7 +47,6 @@ export const createEntry = Effect.fn("entry.create")(function* (
   return yield* (yield* EntryRepository).createEntry(actorId, input, yield* currentDate, requestId);
 });
 
-/** Renames one scoped CMS-only entry name through the repository boundary. */
 export const renameEntry = Effect.fn("entry.rename")(function* (
   actorUserId: string,
   input: RenameEntryInput,

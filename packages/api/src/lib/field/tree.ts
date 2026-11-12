@@ -1,5 +1,3 @@
-// Reconstructs and flattens bounded recursive field definitions without server or Effect dependencies.
-
 import type { FieldValidationIssue } from "../../contracts/field";
 import type { CollectionFieldDefinition } from "../../contracts/schema";
 import { fieldSystemLimits } from "./profile";
@@ -10,12 +8,10 @@ export interface FieldTreeResult {
   readonly issues: ReadonlyArray<FieldValidationIssue>;
 }
 
-/** Orders sibling definitions by stable schema position and identity. */
 function compareFields(left: CollectionFieldDefinition, right: CollectionFieldDefinition): number {
   return left.position - right.position || left.id.localeCompare(right.id);
 }
 
-/** Copies a discriminated field definition with its reconstructed children. */
 function withChildren(
   node: CollectionFieldDefinition,
   children: ReadonlyArray<CollectionFieldDefinition>,
@@ -23,7 +19,6 @@ function withChildren(
   return { ...node, children };
 }
 
-/** Reconstructs a checked recursive tree from decoded flat persistence nodes. */
 export function reconstructFieldTree(
   nodes: ReadonlyArray<CollectionFieldDefinition>,
 ): FieldTreeResult {
@@ -136,7 +131,6 @@ export function reconstructFieldTree(
   return { valid: issues.length === 0, roots, issues };
 }
 
-/** Flattens a validated recursive tree in deterministic parent-before-child order. */
 export function flattenFieldTree(
   roots: ReadonlyArray<CollectionFieldDefinition>,
 ): ReadonlyArray<CollectionFieldDefinition> {

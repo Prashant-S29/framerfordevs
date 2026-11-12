@@ -1,7 +1,5 @@
-// Verifies M6 schema contracts, strict structured values, and pinned field profiles.
-
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Schema } from "effect";
 
 import {
   CollectionFieldKind,
@@ -15,14 +13,15 @@ import {
   iso4217RegistryProfile,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 describe("M6 field contracts", () => {
   it.effect("exposes all eighteen approved field kinds", () =>
     Effect.gen(function* () {
       assert.strictEqual(collectionFieldKindValues.length, 18);
       for (const kind of collectionFieldKindValues) {
         assert.strictEqual(
-          yield* SchemaStrict.decodeUnknownEffect(CollectionFieldKind)(kind),
+          yield* Schema.decodeUnknownEffect(CollectionFieldKind, { onExcessProperty: "error" })(
+            kind,
+          ),
           kind,
         );
       }
@@ -32,14 +31,14 @@ describe("M6 field contracts", () => {
   it.effect("rejects unknown keys in money, assets, and Portable Text", () =>
     Effect.gen(function* () {
       const money = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(MoneyValue)({
+        Schema.decodeUnknownEffect(MoneyValue, { onExcessProperty: "error" })({
           amount: "19.99",
           currency: "USD",
           cents: 1999,
         }),
       );
       const asset = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ExternalAssetValue)({
+        Schema.decodeUnknownEffect(ExternalAssetValue, { onExcessProperty: "error" })({
           source: "external",
           url: "https://cdn.example.com/a.png",
           kind: "image",
@@ -51,7 +50,7 @@ describe("M6 field contracts", () => {
         }),
       );
       const richText = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(PortableTextDocument)({
+        Schema.decodeUnknownEffect(PortableTextDocument, { onExcessProperty: "error" })({
           version: 1,
           profile: "ffd-portable-text",
           blocks: [],

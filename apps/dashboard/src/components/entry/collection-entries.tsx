@@ -1,5 +1,3 @@
-// Renders a locale-neutral M7 stable-entry list with named creation and cursor pagination.
-
 import { Button } from "@framerfordevs/ui/components/button";
 import {
   Card,
@@ -35,7 +33,7 @@ import { Spinner } from "@framerfordevs/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon, PlusIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { entryNameSchema } from "@/lib/validation/cms";
@@ -97,10 +95,12 @@ export function CollectionEntries({
     retry: false,
   });
 
-  useEffect(() => {
+  const [paginationLocale, setPaginationLocale] = useState(locale);
+  if (paginationLocale !== locale) {
+    setPaginationLocale(locale);
     setAdditionalItems([]);
     setLoadedNextCursor(undefined);
-  }, [locale]);
+  }
 
   const loadMore = useMutation({
     mutationFn: (cursor: string) =>

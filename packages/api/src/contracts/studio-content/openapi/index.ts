@@ -1,5 +1,3 @@
-// Generates the tenant-neutral Studio Content v1 OpenAPI contract from strict Effect schemas.
-
 import { Schema } from "effect";
 
 import { make as makeJsonSchema } from "../../response/json-schema";

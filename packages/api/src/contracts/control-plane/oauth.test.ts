@@ -10,11 +10,10 @@ import {
   CONTROL_PLANE_SECURITY_READ_SCOPE,
   CONTROL_PLANE_WRITE_SCOPE,
 } from "@framerfordevs/auth";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Schema } from "effect";
 
 import { CredentialScope } from "../access";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 describe("Control Plane OAuth grants", () => {
   it("registers the eight narrow grants on the fixed CLI OAuth authority", () => {
     assert.includeMembers(
@@ -36,13 +35,19 @@ describe("Control Plane OAuth grants", () => {
   it.effect("keeps lifecycle authority out of management credential scopes", () =>
     Effect.gen(function* () {
       const archive = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(CredentialScope)("project.archive"),
+        Schema.decodeUnknownEffect(CredentialScope, { onExcessProperty: "error" })(
+          "project.archive",
+        ),
       );
       const restore = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(CredentialScope)("project.restore"),
+        Schema.decodeUnknownEffect(CredentialScope, { onExcessProperty: "error" })(
+          "project.restore",
+        ),
       );
       const audit = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(CredentialScope)("project.audit.read"),
+        Schema.decodeUnknownEffect(CredentialScope, { onExcessProperty: "error" })(
+          "project.audit.read",
+        ),
       );
 
       assert.isTrue(Exit.isFailure(archive));

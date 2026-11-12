@@ -1,5 +1,3 @@
-// Owns exported Tier 1 source and the v2 non-authoritative source/stable-ID lock.
-
 import type { ProjectSchema } from "@framerfordevs/schema";
 import type {
   AuthoringAppliedRevision,
@@ -11,7 +9,7 @@ import { open, lstat, mkdir, readFile, realpath, rename, rm, writeFile } from "n
 import { randomUUID } from "node:crypto";
 import { dirname, join, relative, sep } from "node:path";
 
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { canonicalJsonBytes, sha256, toJsonValue } from "../../../canonical";
 import {
@@ -21,7 +19,6 @@ import {
 } from "../../../errors";
 import { AuthoringSchemaLock } from "../../../schema";
 
-import * as SchemaStrict from "../../../schema-strict";
 export const authoringSchemaLockRelativePath = ".framerfordevs/schema.lock.json";
 
 export interface AuthoringSchemaLockInput {
@@ -82,7 +79,7 @@ async function optionalFile(path: string) {
 function decodeLock(bytes: string) {
   try {
     const value: unknown = JSON.parse(bytes);
-    return SchemaStrict.decodeUnknownSync(AuthoringSchemaLock)(value, {
+    return Schema.decodeUnknownSync(AuthoringSchemaLock, { onExcessProperty: "error" })(value, {
       onExcessProperty: "error",
     });
   } catch {
@@ -95,7 +92,7 @@ function compareText(left: string, right: string) {
 }
 
 function makeLock(input: AuthoringSchemaLockInput, schemaFileSha256: string) {
-  return SchemaStrict.decodeUnknownSync(AuthoringSchemaLock)({
+  return Schema.decodeUnknownSync(AuthoringSchemaLock, { onExcessProperty: "error" })({
     lockVersion: 2,
     authoringApi: "authoring/v1",
     projectId: input.projectId,

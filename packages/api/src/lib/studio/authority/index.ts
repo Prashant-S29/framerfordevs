@@ -1,5 +1,3 @@
-// Pure Studio client derivation, acknowledgement projection, action projection, and token binding.
-
 import type { ProjectRole } from "../../../contracts/access";
 import type {
   StudioApplicationOrigin,

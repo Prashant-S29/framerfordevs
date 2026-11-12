@@ -1,7 +1,5 @@
-// Verifies all M8 workflows forward through replaceable repository and telemetry services.
-
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 
 import {
   EntryPublicationPage,
@@ -29,7 +27,6 @@ import {
   validateEntryPublication,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const ids = {
   project: "019fae8b-1234-7000-8000-000000000001",
   environment: "019fae8b-1234-7000-8000-000000000002",
@@ -56,7 +53,7 @@ const size = {
   maximumBytes: 1_048_576,
   bucket: "small",
 };
-const summary = SchemaStrict.decodeUnknownSync(EntryPublicationSummary)({
+const summary = Schema.decodeUnknownSync(EntryPublicationSummary, { onExcessProperty: "error" })({
   id: ids.publication,
   snapshotId: ids.publication,
   entryId: ids.entry,
@@ -79,7 +76,7 @@ const summary = SchemaStrict.decodeUnknownSync(EntryPublicationSummary)({
   publishedAt: timestamp,
   current: true,
 });
-const status = SchemaStrict.decodeUnknownSync(EntryPublicationStatus)({
+const status = Schema.decodeUnknownSync(EntryPublicationStatus, { onExcessProperty: "error" })({
   entryId: ids.entry,
   localeId: ids.locale,
   locale: "en",
@@ -97,7 +94,7 @@ const status = SchemaStrict.decodeUnknownSync(EntryPublicationStatus)({
   schemaChanged: false,
   changedSincePublication: false,
 });
-const plan = SchemaStrict.decodeUnknownSync(EntryPublicationPlan)({
+const plan = Schema.decodeUnknownSync(EntryPublicationPlan, { onExcessProperty: "error" })({
   entryId: ids.entry,
   localeId: ids.locale,
   locale: "en",
@@ -119,7 +116,7 @@ const plan = SchemaStrict.decodeUnknownSync(EntryPublicationPlan)({
   referencesWouldRefresh: false,
   wouldCreatePublication: false,
 });
-const publishResult = SchemaStrict.decodeUnknownSync(PublishEntryResult)({
+const publishResult = Schema.decodeUnknownSync(PublishEntryResult, { onExcessProperty: "error" })({
   entryId: ids.entry,
   localeId: ids.locale,
   locale: "en",
@@ -128,7 +125,9 @@ const publishResult = SchemaStrict.decodeUnknownSync(PublishEntryResult)({
   resultKind: "no_op",
   publication: summary,
 });
-const unpublishResult = SchemaStrict.decodeUnknownSync(UnpublishEntryResult)({
+const unpublishResult = Schema.decodeUnknownSync(UnpublishEntryResult, {
+  onExcessProperty: "error",
+})({
   entryId: ids.entry,
   localeId: ids.locale,
   locale: "en",
@@ -186,15 +185,19 @@ describe("publication operations", () => {
         metrics.length = 0;
         yield* getEntryPublicationStatus(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(GetEntryPublicationStatusInput)(scope),
+          yield* Schema.decodeUnknownEffect(GetEntryPublicationStatusInput, {
+            onExcessProperty: "error",
+          })(scope),
         );
         yield* validateEntryPublication(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(ValidateEntryPublicationInput)(scope),
+          yield* Schema.decodeUnknownEffect(ValidateEntryPublicationInput, {
+            onExcessProperty: "error",
+          })(scope),
         );
         yield* publishEntryLocale(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(PublishEntryInput)({
+          yield* Schema.decodeUnknownEffect(PublishEntryInput, { onExcessProperty: "error" })({
             ...scope,
             commandId: ids.command,
             authorityHash: hash,
@@ -211,7 +214,7 @@ describe("publication operations", () => {
         );
         yield* unpublishEntryLocale(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(UnpublishEntryInput)({
+          yield* Schema.decodeUnknownEffect(UnpublishEntryInput, { onExcessProperty: "error" })({
             ...scope,
             commandId: ids.command,
             expectedStateVersion: 1,
@@ -221,7 +224,9 @@ describe("publication operations", () => {
         );
         yield* listEntryPublications(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(ListEntryPublicationsInput)({
+          yield* Schema.decodeUnknownEffect(ListEntryPublicationsInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             cursor: null,
             limit: 25,

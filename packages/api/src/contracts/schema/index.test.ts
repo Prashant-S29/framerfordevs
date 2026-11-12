@@ -19,7 +19,6 @@ import {
 } from "./index";
 import { EnvironmentId } from "../platform";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = EnvironmentId.make("019fae8b-1234-7000-8000-000000000002");
 const otherEnvironmentId = EnvironmentId.make("019fae8b-1234-7000-8000-000000000003");
@@ -31,9 +30,12 @@ const createdAt = "2026-08-01T12:00:00.000Z";
 describe("collection schema contracts", () => {
   it.effect("accepts trimmed lowercase snake-case keys and keeps collection and field brands", () =>
     Effect.gen(function* () {
-      const collectionKey =
-        yield* SchemaStrict.decodeUnknownEffect(CollectionApiKey)("  blog_posts  ");
-      const fieldKey = yield* SchemaStrict.decodeUnknownEffect(CollectionFieldApiKey)("hero_title");
+      const collectionKey = yield* Schema.decodeUnknownEffect(CollectionApiKey, {
+        onExcessProperty: "error",
+      })("  blog_posts  ");
+      const fieldKey = yield* Schema.decodeUnknownEffect(CollectionFieldApiKey, {
+        onExcessProperty: "error",
+      })("hero_title");
 
       assert.strictEqual(collectionKey, "blog_posts");
       assert.strictEqual(fieldKey, "hero_title");
@@ -53,7 +55,9 @@ describe("collection schema contracts", () => {
         "x".repeat(64),
       ];
       const exits = yield* Effect.forEach(invalid, (key) =>
-        Effect.exit(SchemaStrict.decodeUnknownEffect(CollectionApiKey)(key)),
+        Effect.exit(
+          Schema.decodeUnknownEffect(CollectionApiKey, { onExcessProperty: "error" })(key),
+        ),
       );
 
       assert.isTrue(exits.every(Exit.isFailure));
@@ -84,18 +88,22 @@ describe("collection schema contracts", () => {
       ] as const;
       for (const kind of kinds) {
         assert.strictEqual(
-          yield* SchemaStrict.decodeUnknownEffect(CollectionFieldKind)(kind),
+          yield* Schema.decodeUnknownEffect(CollectionFieldKind, { onExcessProperty: "error" })(
+            kind,
+          ),
           kind,
         );
       }
 
       const unsupportedKind = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(CollectionFieldKind)("markdown"),
+        Schema.decodeUnknownEffect(CollectionFieldKind, { onExcessProperty: "error" })("markdown"),
       );
-      const emptyConfiguration = yield* SchemaStrict.decodeUnknownEffect(
-        CollectionFieldConfiguration,
-      )({});
-      const configured = yield* SchemaStrict.decodeUnknownEffect(CollectionFieldConfiguration)({
+      const emptyConfiguration = yield* Schema.decodeUnknownEffect(CollectionFieldConfiguration, {
+        onExcessProperty: "error",
+      })({});
+      const configured = yield* Schema.decodeUnknownEffect(CollectionFieldConfiguration, {
+        onExcessProperty: "error",
+      })({
         minLength: 1,
       });
 
@@ -105,36 +113,41 @@ describe("collection schema contracts", () => {
     }),
   );
 
-  it.effect("keeps server-owned field identity out of create-field authority", () =>
+  it.effect("rejects server-owned field identity in create-field authority", () =>
     Effect.gen(function* () {
-      const decoded = yield* SchemaStrict.decodeUnknownEffect(CreateCollectionFieldInput)({
-        projectId,
-        environmentId,
-        collectionId,
-        draftVersion: 1,
-        parentFieldId: null,
-        field: {
-          apiKey: "title",
-          displayLabel: "Title",
-          kind: "short_text",
-          required: true,
-          localization: "localized",
-          deprecated: false,
-          editor: defaultFieldEditorMetadata,
-          configuration: {},
-        },
-        id: firstFieldId,
-        position: 99,
-      });
+      const decoded = yield* Effect.exit(
+        Schema.decodeUnknownEffect(CreateCollectionFieldInput, {
+          onExcessProperty: "error",
+        })({
+          projectId,
+          environmentId,
+          collectionId,
+          draftVersion: 1,
+          parentFieldId: null,
+          field: {
+            apiKey: "title",
+            displayLabel: "Title",
+            kind: "short_text",
+            required: true,
+            localization: "localized",
+            deprecated: false,
+            editor: defaultFieldEditorMetadata,
+            configuration: {},
+          },
+          id: firstFieldId,
+          position: 99,
+        }),
+      );
 
-      assert.isFalse("id" in decoded);
-      assert.isFalse("position" in decoded);
+      assert.isTrue(Exit.isFailure(decoded));
     }),
   );
 
   it.effect("accepts a recursive authoring tree with nullable identities", () =>
     Effect.gen(function* () {
-      const decoded = yield* SchemaStrict.decodeUnknownEffect(ReplaceCollectionDraftFieldsInput)({
+      const decoded = yield* Schema.decodeUnknownEffect(ReplaceCollectionDraftFieldsInput, {
+        onExcessProperty: "error",
+      })({
         projectId,
         environmentId,
         collectionId,
@@ -177,18 +190,20 @@ describe("collection schema contracts", () => {
 
   it.effect("requires unique bounded reorder and acknowledgement sets", () =>
     Effect.gen(function* () {
-      const order = yield* SchemaStrict.decodeUnknownEffect(CollectionFieldOrder)([
-        firstFieldId,
-        secondFieldId,
-      ]);
+      const order = yield* Schema.decodeUnknownEffect(CollectionFieldOrder, {
+        onExcessProperty: "error",
+      })([firstFieldId, secondFieldId]);
       const duplicateOrder = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(CollectionFieldOrder)([firstFieldId, firstFieldId]),
+        Schema.decodeUnknownEffect(CollectionFieldOrder, { onExcessProperty: "error" })([
+          firstFieldId,
+          firstFieldId,
+        ]),
       );
-      const acknowledgements = yield* SchemaStrict.decodeUnknownEffect(AcknowledgedSchemaChangeIds)(
-        ["a".repeat(64), "b".repeat(64)],
-      );
+      const acknowledgements = yield* Schema.decodeUnknownEffect(AcknowledgedSchemaChangeIds, {
+        onExcessProperty: "error",
+      })(["a".repeat(64), "b".repeat(64)]);
       const duplicateAcknowledgements = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(AcknowledgedSchemaChangeIds)([
+        Schema.decodeUnknownEffect(AcknowledgedSchemaChangeIds, { onExcessProperty: "error" })([
           "a".repeat(64),
           "a".repeat(64),
         ]),
@@ -205,13 +220,15 @@ describe("collection schema contracts", () => {
     Effect.gen(function* () {
       const validUuid = "019fae8b-1234-7000-8000-000000000099";
       const values = yield* Effect.all([
-        SchemaStrict.decodeUnknownEffect(CollectionId)(validUuid),
-        SchemaStrict.decodeUnknownEffect(SchemaRevisionId)(validUuid),
-        SchemaStrict.decodeUnknownEffect(SchemaPublicationCommandId)(validUuid),
-        SchemaStrict.decodeUnknownEffect(OutboxEventId)(validUuid),
+        Schema.decodeUnknownEffect(CollectionId, { onExcessProperty: "error" })(validUuid),
+        Schema.decodeUnknownEffect(SchemaRevisionId, { onExcessProperty: "error" })(validUuid),
+        Schema.decodeUnknownEffect(SchemaPublicationCommandId, { onExcessProperty: "error" })(
+          validUuid,
+        ),
+        Schema.decodeUnknownEffect(OutboxEventId, { onExcessProperty: "error" })(validUuid),
       ]);
       const malformed = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(CollectionId)("collection_1"),
+        Schema.decodeUnknownEffect(CollectionId, { onExcessProperty: "error" })("collection_1"),
       );
 
       assert.isTrue(values.every((value) => value === validUuid));
@@ -225,11 +242,13 @@ describe("collection schema contracts", () => {
     ([value]) =>
       Effect.gen(function* () {
         const first = yield* Effect.option(
-          SchemaStrict.decodeUnknownEffect(CollectionApiKey)(value),
+          Schema.decodeUnknownEffect(CollectionApiKey, { onExcessProperty: "error" })(value),
         );
         if (first._tag === "Some") {
           assert.strictEqual(
-            yield* SchemaStrict.decodeUnknownEffect(CollectionApiKey)(first.value),
+            yield* Schema.decodeUnknownEffect(CollectionApiKey, { onExcessProperty: "error" })(
+              first.value,
+            ),
             first.value,
           );
         }

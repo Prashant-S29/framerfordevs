@@ -1,5 +1,3 @@
-// Exercises the real Node HTTP boundary through signature verification, response completion, and capture persistence.
-
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -12,7 +10,6 @@ import { testBody, testEventId, testSecret, testSignature } from "../support/hel
 const deliveryId = "019fae8b-1234-7000-8000-000000000007";
 const attemptId = "019fae8b-1234-7000-8000-000000000008";
 
-/** Starts one isolated receiver and returns its assigned loopback port. */
 async function listen(server: ReturnType<typeof createReceiverServer>): Promise<number> {
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -24,7 +21,6 @@ async function listen(server: ReturnType<typeof createReceiverServer>): Promise<
   return address.port;
 }
 
-/** Closes one test server without leaking a listening socket. */
 async function close(server: ReturnType<typeof createReceiverServer>): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     server.close((cause) => (cause === undefined ? resolve() : reject(cause)));

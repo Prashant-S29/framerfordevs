@@ -1,5 +1,3 @@
-// Defines M9 Delivery response metadata, query capabilities, and management configuration contracts.
-
 import { Schema } from "effect";
 
 import { ApiErrorDetail, ApiSuccessSchema, RequestIdSchema } from "../response/api";
@@ -10,7 +8,6 @@ import { AuthUserId, EnvironmentId, IsoDateTime, ProjectId, ResourceVersion } fr
 import { EntryPublicationId, EntryPublicationSequence } from "../publication";
 import { CollectionApiKey, CollectionFieldId, CollectionId, SchemaRevisionId } from "../schema";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 export const DeliveryAccess = Schema.Literals(["protected", "public"]);
 export type DeliveryAccess = typeof DeliveryAccess.Type;
 
@@ -202,12 +199,14 @@ export class DeliveryResolvedScope extends Schema.Class<DeliveryResolvedScope>(
   locale: LocaleTag,
 }) {}
 
-export const GetDeliveryConfigurationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const GetDeliveryConfigurationInputSchema = Schema.toStandardSchemaV1(
   GetDeliveryConfigurationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const UpdateDeliveryConfigurationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const UpdateDeliveryConfigurationInputSchema = Schema.toStandardSchemaV1(
   UpdateDeliveryConfigurationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const DeliveryConfigurationOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const DeliveryConfigurationOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(DeliveryCollectionConfiguration),
 );

@@ -1,6 +1,4 @@
-// Exposes permissive bounded Preview compilation through a replaceable named Effect service.
-
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 import { PreviewItem, previewLimits } from "../../../contracts/preview";
 import {
@@ -13,8 +11,6 @@ import {
   type PreviewDocumentCompilationResult,
 } from "../../../lib/preview/document";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
-/** Creates the typed Preview compiler service without runtime-local provisioning. */
 export function makePreviewDocumentEngine(
   options: {
     readonly compile?: (input: CompilePreviewDocumentInput) => PreviewDocumentCompilationResult;
@@ -31,7 +27,7 @@ export function makePreviewDocumentEngine(
       if (result.responseBytes > previewLimits.responseBytes) {
         return yield* PreviewResponseTooLargeFailure.make();
       }
-      return yield* SchemaStrict.decodeUnknownEffect(PreviewItem)(result.item).pipe(
+      return yield* Schema.decodeUnknownEffect(PreviewItem)(result.item).pipe(
         Effect.mapError(() => PreviewDocumentCorruptFailure.make()),
       );
     }),

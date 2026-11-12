@@ -1,5 +1,3 @@
-// Provides the explicit dry-run/apply/reconcile gate for current-publication Delivery projections and generations.
-
 import { db } from "@framerfordevs/db";
 import { and, eq, inArray, sql } from "@framerfordevs/db/query";
 import {
@@ -11,7 +9,7 @@ import {
   cmsEntryLocalePublicationHead,
   cmsSchemaRevisionField,
 } from "@framerfordevs/db/schema/cms";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { DatabaseFailure } from "../../contracts/response/errors";
 import {
@@ -26,7 +24,6 @@ import {
 import { reconstructFieldTree } from "../../lib/field/tree";
 import type { ApplicationDb, ApplicationTransaction } from "../project-access";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 export interface DeliveryBackfillOptions {
   readonly mode: "dry_run" | "apply";
   readonly batchSize: number;
@@ -68,9 +65,8 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Reconstructs an immutable historical field row without consulting current draft state. */
 function fieldValue(row: typeof cmsSchemaRevisionField.$inferSelect): CollectionField {
-  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+  return Schema.decodeUnknownSync(CollectionFieldDefinition)({
     id: row.fieldId,
     parentFieldId: row.parentFieldId,
     nodeRole: row.nodeRole,
@@ -90,7 +86,6 @@ function fieldValue(row: typeof cmsSchemaRevisionField.$inferSelect): Collection
   });
 }
 
-/** Converts one pure row to exactly one typed database column. */
 function projectionValue(
   head: HeadArtifact,
   row: DeliveryProjectionRow,
@@ -123,7 +118,6 @@ function projectionValue(
   return { ...common, referenceValue: String(row.value) };
 }
 
-/** Loads one stable keyset batch of exact current heads and immutable artifacts. */
 async function loadBatch(
   database: ApplicationDb,
   batchSize: number,
@@ -163,7 +157,6 @@ async function loadBatch(
     .limit(batchSize);
 }
 
-/** Compiles a batch from historical schemas and current capability flags without writing. */
 async function planBatch(
   database: ApplicationDb,
   heads: ReadonlyArray<HeadArtifact>,
@@ -232,7 +225,6 @@ async function planBatch(
   return { plans, invalidCount };
 }
 
-/** Applies only still-current plans under current-head locks; any high-water drift aborts the batch. */
 async function applyBatch(
   transaction: ApplicationTransaction,
   plans: ReadonlyArray<HeadPlan>,
@@ -280,7 +272,6 @@ async function applyBatch(
   }
 }
 
-/** Runs the bounded operator-controlled backfill; apply is refused unless the complete dry run is clean. */
 export function runDeliveryBackfill(
   options: DeliveryBackfillOptions,
   database: ApplicationDb = db,

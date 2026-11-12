@@ -1,5 +1,3 @@
-// Persists verified captures and accepted-event reservations with atomic, traversal-safe filesystem writes.
-
 import { randomUUID } from "node:crypto";
 import { mkdir, open, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -12,12 +10,10 @@ export interface CaptureLocation {
   readonly absolutePath: string;
 }
 
-/** Converts an untrusted header identity into a traversal-safe path segment. */
 function safeIdentity(value: string | null, fallback: string): string {
   return value !== null && safeIdentityPattern.test(value) ? value : fallback;
 }
 
-/** Writes one JSON document through a same-directory atomic rename. */
 async function writeJsonAtomically(path: string, value: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const temporaryPath = `${path}.${randomUUID()}.tmp`;
@@ -29,7 +25,6 @@ async function writeJsonAtomically(path: string, value: unknown): Promise<void> 
   await rename(temporaryPath, path);
 }
 
-/** Allocates and writes one immutable-attempt capture in its date/scenario/event hierarchy. */
 export async function createCapture(
   dataDirectory: string,
   record: CaptureRecord,
@@ -54,7 +49,6 @@ export async function createCapture(
   return { absolutePath: path };
 }
 
-/** Replaces a received-phase capture with its terminal response/disconnect phase atomically. */
 export async function finalizeCapture(
   location: CaptureLocation,
   record: CaptureRecord,
@@ -62,7 +56,6 @@ export async function finalizeCapture(
   await writeJsonAtomically(location.absolutePath, record);
 }
 
-/** Atomically reserves one accepted event ID so replay/duplicates can be observed safely. */
 export async function reserveAcceptedEvent(
   dataDirectory: string,
   scenario: ScenarioKey,

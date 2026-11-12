@@ -1,5 +1,3 @@
-// Persists one response-gating projection-integrity audit per immutable schema revision.
-
 import { eq } from "@framerfordevs/db/query";
 import { auditEvent } from "@framerfordevs/db/schema/platform";
 
@@ -28,7 +26,6 @@ export interface EnsureProjectionInvalidAuditInput {
   readonly occurredAt: Date;
 }
 
-/** Uses the existing audit primary key as the concurrent idempotency constraint. */
 export async function ensureProjectionInvalidAudit(
   executor: ApplicationExecutor,
   input: EnsureProjectionInvalidAuditInput,

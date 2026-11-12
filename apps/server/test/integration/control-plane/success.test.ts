@@ -8,7 +8,7 @@ import {
   ProjectInvitationPage,
   ProjectMember,
   ProjectMemberPage,
-} from "@framerfordevs/api/contracts/access/index";
+} from "@framerfordevs/api/contracts/access";
 import {
   ControlPlaneCreateProjectResult,
   ControlPlaneCreateWorkspaceResult,
@@ -18,14 +18,11 @@ import {
   ControlPlaneSetStudioRuntimeResult,
   ControlPlaneWorkspace,
   StudioRegistration,
-} from "@framerfordevs/api/contracts/control-plane/index";
-import { ProjectLocale, ProjectLocaleList } from "@framerfordevs/api/contracts/locale/index";
-import { AuthUserId, Capability, Project } from "@framerfordevs/api/contracts/platform/index";
-import {
-  RateLimitDecision,
-  rateLimitPolicies,
-} from "@framerfordevs/api/contracts/rate-limit/index";
-import { disposeApplicationRuntime } from "@framerfordevs/api/runtime/index";
+} from "@framerfordevs/api/contracts/control-plane";
+import { ProjectLocale, ProjectLocaleList } from "@framerfordevs/api/contracts/locale";
+import { AuthUserId, Capability, Project } from "@framerfordevs/api/contracts/platform";
+import { RateLimitDecision, rateLimitPolicies } from "@framerfordevs/api/contracts/rate-limit";
+import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
 import {
   AccessRepository,
   makeAccessRepository,
@@ -33,7 +30,7 @@ import {
 import {
   ControlPlaneCursorSigner,
   makeControlPlaneCursorSigner,
-} from "@framerfordevs/api/services/control-plane/cursor-signer/index";
+} from "@framerfordevs/api/services/control-plane/cursor-signer";
 import {
   LocaleRepository,
   makeLocaleRepository,
@@ -45,21 +42,20 @@ import {
 import {
   RateLimitManager,
   type RateLimitManagerService,
-} from "@framerfordevs/api/services/rate-limit/manager/index";
+} from "@framerfordevs/api/services/rate-limit/manager";
 import { SecretGenerator } from "@framerfordevs/api/services/secret-generator";
 import {
   makeToolingPrincipalAuthenticator,
   ToolingPrincipalAuthenticator,
-} from "@framerfordevs/api/services/tooling/principal-authenticator/index";
-import { Effect } from "effect";
+} from "@framerfordevs/api/services/tooling/principal-authenticator";
+import { Effect, Schema } from "effect";
 import request from "supertest";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { createApp } from "../../../src/app";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const userId = AuthUserId.make("control-plane-http-user");
-const workspace = SchemaStrict.decodeUnknownSync(ControlPlaneWorkspace)({
+const workspace = Schema.decodeUnknownSync(ControlPlaneWorkspace, { onExcessProperty: "error" })({
   id: "019fae8b-1234-7000-8000-000000000001",
   name: "Workspace",
   version: 1,
@@ -67,7 +63,7 @@ const workspace = SchemaStrict.decodeUnknownSync(ControlPlaneWorkspace)({
   createdAt: "2026-08-14T00:00:00.000Z",
   updatedAt: "2026-08-14T00:00:00.000Z",
 });
-const capability = SchemaStrict.decodeUnknownSync(Capability)({
+const capability = Schema.decodeUnknownSync(Capability, { onExcessProperty: "error" })({
   id: "019fae8b-1234-7000-8000-000000000004",
   key: "cms",
   status: "enabled",
@@ -102,8 +98,12 @@ const projectValue = {
     "studio_registration.write",
   ],
 };
-let currentProject = SchemaStrict.decodeUnknownSync(ControlPlaneProject)(projectValue);
-const managementCredential = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
+let currentProject = Schema.decodeUnknownSync(ControlPlaneProject, { onExcessProperty: "error" })(
+  projectValue,
+);
+const managementCredential = Schema.decodeUnknownSync(CredentialPrincipal, {
+  onExcessProperty: "error",
+})({
   credentialId: "019fae8b-1234-7000-8000-000000000006",
   workspaceId: workspace.id,
   projectId: currentProject.id,
@@ -118,25 +118,25 @@ const managementCredential = SchemaStrict.decodeUnknownSync(CredentialPrincipal)
   ],
 });
 const observedActorKinds: Array<string> = [];
-const member = SchemaStrict.decodeUnknownSync(ProjectMember)({
+const member = Schema.decodeUnknownSync(ProjectMember, { onExcessProperty: "error" })({
   id: "019fae8b-1234-7000-8000-000000000020",
   projectId: currentProject.id,
   userId,
   name: "Control Plane User",
   email: "control-plane@example.test",
   role: "owner",
-  localeAccess: { mode: "all", localeIds: [] },
+  localeAccess: { mode: "all" },
   version: 1,
   removedAt: null,
   createdAt: "2026-08-14T00:00:00.000Z",
   updatedAt: "2026-08-14T00:00:00.000Z",
 });
-const invitation = SchemaStrict.decodeUnknownSync(ProjectInvitation)({
+const invitation = Schema.decodeUnknownSync(ProjectInvitation, { onExcessProperty: "error" })({
   id: "019fae8b-1234-7000-8000-000000000021",
   projectId: currentProject.id,
   email: "invited@example.test",
   role: "editor",
-  localeAccess: { mode: "all", localeIds: [] },
+  localeAccess: { mode: "all" },
   status: "pending",
   version: 1,
   expiresAt: "2026-08-21T00:00:00.000Z",
@@ -145,7 +145,9 @@ const invitation = SchemaStrict.decodeUnknownSync(ProjectInvitation)({
   createdAt: "2026-08-14T00:00:00.000Z",
   updatedAt: "2026-08-14T00:00:00.000Z",
 });
-const inspectedInvitation = SchemaStrict.decodeUnknownSync(InspectedProjectInvitation)({
+const inspectedInvitation = Schema.decodeUnknownSync(InspectedProjectInvitation, {
+  onExcessProperty: "error",
+})({
   projectId: currentProject.id,
   projectName: currentProject.name,
   role: invitation.role,
@@ -153,7 +155,7 @@ const inspectedInvitation = SchemaStrict.decodeUnknownSync(InspectedProjectInvit
   inviterName: "Control Plane User",
   expiresAt: invitation.expiresAt,
 });
-const englishLocale = SchemaStrict.decodeUnknownSync(ProjectLocale)({
+const englishLocale = Schema.decodeUnknownSync(ProjectLocale, { onExcessProperty: "error" })({
   id: "019fae8b-1234-7000-8000-000000000022",
   workspaceId: workspace.id,
   projectId: currentProject.id,
@@ -165,31 +167,35 @@ const englishLocale = SchemaStrict.decodeUnknownSync(ProjectLocale)({
   createdAt: "2026-08-14T00:00:00.000Z",
   updatedAt: "2026-08-14T00:00:00.000Z",
 });
-const currentAccess = SchemaStrict.decodeUnknownSync(CurrentProjectAccess)({
-  projectId: currentProject.id,
-  role: "owner",
-  localeAccess: { mode: "all", localeIds: [] },
-  baseRoleActions: [
-    "project.read",
-    "project.member.read",
-    "project.member.invite",
-    "project.member.role.update",
-    "project.member.locale.update",
-    "project.member.remove",
-  ],
-  effectiveProjectActions: [
-    "project.read",
-    "project.member.read",
-    "project.member.invite",
-    "project.member.role.update",
-    "project.member.locale.update",
-    "project.member.remove",
-  ],
-  effectiveLocaleIds: [englishLocale.id],
-  effectiveLocaleActions: ["content.read", "content.write", "content.review", "content.publish"],
-});
-const invitationToken = SchemaStrict.decodeUnknownSync(InvitationToken)("a".repeat(43));
-const registration = SchemaStrict.decodeUnknownSync(StudioRegistration)({
+const currentAccess = Schema.decodeUnknownSync(CurrentProjectAccess, { onExcessProperty: "error" })(
+  {
+    projectId: currentProject.id,
+    role: "owner",
+    localeAccess: { mode: "all" },
+    baseRoleActions: [
+      "project.read",
+      "project.member.read",
+      "project.member.invite",
+      "project.member.role.update",
+      "project.member.locale.update",
+      "project.member.remove",
+    ],
+    effectiveProjectActions: [
+      "project.read",
+      "project.member.read",
+      "project.member.invite",
+      "project.member.role.update",
+      "project.member.locale.update",
+      "project.member.remove",
+    ],
+    effectiveLocaleIds: [englishLocale.id],
+    effectiveLocaleActions: ["content.read", "content.write", "content.review", "content.publish"],
+  },
+);
+const invitationToken = Schema.decodeUnknownSync(InvitationToken, { onExcessProperty: "error" })(
+  "a".repeat(43),
+);
+const registration = Schema.decodeUnknownSync(StudioRegistration, { onExcessProperty: "error" })({
   id: "019fae8b-1234-7000-8000-000000000005",
   projectId: currentProject.id,
   environmentId: currentProject.primaryEnvironment.id,
@@ -204,7 +210,7 @@ const registration = SchemaStrict.decodeUnknownSync(StudioRegistration)({
 });
 
 function legacyProject(project: ControlPlaneProject) {
-  return SchemaStrict.decodeUnknownSync(Project)({
+  return Schema.decodeUnknownSync(Project, { onExcessProperty: "error" })({
     id: project.id,
     workspaceId: project.workspaceId,
     name: project.name,
@@ -242,31 +248,37 @@ const repository = {
   ) =>
     Effect.sync(() => {
       observedActorKinds.push(actor.kind);
-      currentProject = SchemaStrict.decodeUnknownSync(ControlPlaneProject)({
-        ...currentProject,
-        name: input.name,
-        version: currentProject.version + 1,
-      });
+      currentProject = Schema.decodeUnknownSync(ControlPlaneProject, { onExcessProperty: "error" })(
+        {
+          ...currentProject,
+          name: input.name,
+          version: currentProject.version + 1,
+        },
+      );
       return currentProject;
     }),
   archiveProject: () =>
     Effect.sync(() => {
-      currentProject = SchemaStrict.decodeUnknownSync(ControlPlaneProject)({
-        ...currentProject,
-        status: "archived",
-        archivedAt: "2026-08-15T00:00:00.000Z",
-        version: currentProject.version + 1,
-      });
+      currentProject = Schema.decodeUnknownSync(ControlPlaneProject, { onExcessProperty: "error" })(
+        {
+          ...currentProject,
+          status: "archived",
+          archivedAt: "2026-08-15T00:00:00.000Z",
+          version: currentProject.version + 1,
+        },
+      );
       return legacyProject(currentProject);
     }),
   restoreProject: () =>
     Effect.sync(() => {
-      currentProject = SchemaStrict.decodeUnknownSync(ControlPlaneProject)({
-        ...currentProject,
-        status: "active",
-        archivedAt: null,
-        version: currentProject.version + 1,
-      });
+      currentProject = Schema.decodeUnknownSync(ControlPlaneProject, { onExcessProperty: "error" })(
+        {
+          ...currentProject,
+          status: "active",
+          archivedAt: null,
+          version: currentProject.version + 1,
+        },
+      );
       return legacyProject(currentProject);
     }),
   enableControlPlaneCapability: () =>
@@ -354,7 +366,7 @@ const rateLimitManager: RateLimitManagerService = {
   evaluate: (input) =>
     Effect.sync(() => {
       evaluatedRates.push({ policy: input.policy, cost: input.cost });
-      return SchemaStrict.decodeUnknownSync(RateLimitDecision)({
+      return Schema.decodeUnknownSync(RateLimitDecision, { onExcessProperty: "error" })({
         allowed: rateLimitsAllow,
         policy: input.policy,
         cost: input.cost,

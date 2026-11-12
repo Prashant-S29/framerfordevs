@@ -1,16 +1,13 @@
 import { request as requestHttp } from "node:http";
 
 import type { ApplicationEffectTransform } from "@framerfordevs/api/context";
-import { StudioBootstrap, studioLimits } from "@framerfordevs/api/contracts/studio/index";
-import {
-  RateLimitDecision,
-  rateLimitPolicies,
-} from "@framerfordevs/api/contracts/rate-limit/index";
-import { disposeApplicationRuntime } from "@framerfordevs/api/runtime/index";
+import { StudioBootstrap, studioLimits } from "@framerfordevs/api/contracts/studio";
+import { RateLimitDecision, rateLimitPolicies } from "@framerfordevs/api/contracts/rate-limit";
+import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
 import {
   RateLimitManager,
   type RateLimitManagerService,
-} from "@framerfordevs/api/services/rate-limit/manager/index";
+} from "@framerfordevs/api/services/rate-limit/manager";
 import {
   makeStudioOAuthTokenVerifier,
   StudioOAuthTokenVerifier,
@@ -20,13 +17,12 @@ import {
   StudioRepository,
 } from "@framerfordevs/api/services/studio/repository";
 import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import request from "supertest";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { createApp } from "../../../src/app";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const projectId = "019fae8b-1234-7000-8000-000000000002";
 const environmentId = "019fae8b-1234-7000-8000-000000000003";
 const registrationId = "019fae8b-1234-7000-8000-000000000009";
@@ -44,7 +40,7 @@ const principal: StudioOAuthPrincipal = {
   scopes: ["studio:session", "offline_access"],
   expiresAtEpochSeconds: 1_800_000_000,
 };
-const bootstrap = SchemaStrict.decodeUnknownSync(StudioBootstrap)({
+const bootstrap = Schema.decodeUnknownSync(StudioBootstrap, { onExcessProperty: "error" })({
   formatVersion: 1,
   registration: {
     id: registrationId,
@@ -76,7 +72,7 @@ const rateLimitManager: RateLimitManagerService = {
   evaluate: (input) =>
     Effect.sync(() => {
       evaluatedPolicies.push(input.policy);
-      return SchemaStrict.decodeUnknownSync(RateLimitDecision)({
+      return Schema.decodeUnknownSync(RateLimitDecision, { onExcessProperty: "error" })({
         allowed: true,
         policy: input.policy,
         cost: input.cost,

@@ -1,5 +1,3 @@
-// Verifies dashboard control operations use canonical session paths while editorial calls stay on oRPC.
-
 import { describe, expect, it } from "vitest";
 
 import {

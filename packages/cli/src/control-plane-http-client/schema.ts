@@ -1,5 +1,3 @@
-// Mirrors the closed Control Plane v1 wire projections without widening the public application SDK.
-
 import { Schema } from "effect";
 
 const Uuid = Schema.String.check(Schema.isUUID());

@@ -1,5 +1,3 @@
-// Generates the tenant-neutral public Authoring schema and hosted-content OpenAPI contract.
-
 import { Schema } from "effect";
 
 import { make as makeJsonSchema } from "../../response/json-schema";

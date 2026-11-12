@@ -8,8 +8,8 @@ import ts from "typescript";
 import { canonicalizeJson, sha256 } from "../canonical";
 import { planGeneration } from "./index";
 import { type JsonValue, ToolingCollectionRevision, ToolingManifestPage } from "../schema";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const collectionId = "019fae8b-1234-7000-8000-000000000003";
@@ -80,7 +80,9 @@ function fixture() {
     fields,
   };
   const contractHash = sha256(canonicalizeJson(contract));
-  const revision = SchemaStrict.decodeUnknownSync(ToolingCollectionRevision)({
+  const revision = Schema.decodeUnknownSync(ToolingCollectionRevision, {
+    onExcessProperty: "error",
+  })({
     projectId,
     environmentId,
     environmentKey: "main",
@@ -93,7 +95,7 @@ function fixture() {
     contract,
   });
   const locales = [{ id: localeId, tag: "en" }];
-  const manifest = SchemaStrict.decodeUnknownSync(ToolingManifestPage)({
+  const manifest = Schema.decodeUnknownSync(ToolingManifestPage, { onExcessProperty: "error" })({
     projectId,
     environmentId,
     environmentKey: "main",
@@ -219,10 +221,12 @@ describe("deterministic project generator", () => {
 
   it("rejects incomplete and hash-mismatched authority", () => {
     const { manifest, revision } = fixture();
-    const incomplete = SchemaStrict.decodeUnknownSync(ToolingManifestPage)({
-      ...manifest,
-      nextCursor: "continuation",
-    });
+    const incomplete = Schema.decodeUnknownSync(ToolingManifestPage, { onExcessProperty: "error" })(
+      {
+        ...manifest,
+        nextCursor: "continuation",
+      },
+    );
     const mismatched = ToolingCollectionRevision.make({
       ...revision,
       contractHash: "0".repeat(64),

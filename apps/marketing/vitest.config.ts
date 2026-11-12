@@ -1,5 +1,3 @@
-// Configures focused marketing route and redirect-boundary tests.
-
 import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";

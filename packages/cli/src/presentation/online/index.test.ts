@@ -7,8 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PresentationEditDocument } from "../document";
 import { runPresentationGetOnline, runPresentationPublishOnline } from "./index";
 import type { CliConfigV2 } from "../../schema";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const revisionId = "019fae8b-1234-7000-8000-000000000003";
@@ -84,7 +84,9 @@ const revision = {
   contractHash: "c".repeat(64),
   publishedAt: "2026-08-29T00:00:00.000Z",
 };
-const editableDocument = SchemaStrict.decodeUnknownSync(PresentationEditDocument)({
+const editableDocument = Schema.decodeUnknownSync(PresentationEditDocument, {
+  onExcessProperty: "error",
+})({
   documentVersion: 1,
   projectId,
   environmentId,

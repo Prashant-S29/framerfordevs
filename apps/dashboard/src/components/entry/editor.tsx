@@ -1,6 +1,4 @@
-// Renders the generated multilingual M7 draft editor, conflict recovery, and immutable revision restore controls.
-
-import type { GeneratedFormDefinition } from "@framerfordevs/api/contracts/schema/index";
+import type { GeneratedFormDefinition } from "@framerfordevs/api/contracts/schema";
 import {
   adaptContentFormDefinition,
   partitionContentFormDefinition,
@@ -515,10 +513,13 @@ function EntryDraftWorkspace({
     },
   });
 
+  if (dirty && status !== "saving" && status !== "conflict" && status !== "unsaved") {
+    setStatus("unsaved");
+  }
+
   useEffect(() => {
     onDirtyChange(dirty);
-    if (dirty && status !== "saving" && status !== "conflict") setStatus("unsaved");
-  }, [dirty, onDirtyChange, status]);
+  }, [dirty, onDirtyChange]);
 
   const statusText = {
     saved: "All changes are saved.",

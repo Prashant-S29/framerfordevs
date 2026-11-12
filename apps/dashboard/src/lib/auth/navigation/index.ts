@@ -1,5 +1,3 @@
-// Validates dashboard-only post-authentication navigation without leaking credentials across hosts.
-
 import { redirect } from "@tanstack/react-router";
 
 const encodedUnsafeCharacterPattern = /%(?:0[0-9a-f]|1[0-9a-f]|2f|5c|7f)/iu;
@@ -12,7 +10,6 @@ function hasControlCharacter(value: string): boolean {
   return false;
 }
 
-/** Accepts only bounded same-origin application paths as post-authentication destinations. */
 export function getSafeAuthenticatedReturnTo(value: unknown): string | null {
   if (
     typeof value !== "string" ||

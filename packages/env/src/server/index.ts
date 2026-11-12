@@ -1,5 +1,3 @@
-// Validates server-only infrastructure, authentication, telemetry, and rate-limit configuration.
-
 import "dotenv/config";
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";

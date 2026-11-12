@@ -13,13 +13,13 @@ import {
   AuthoringSchemaPlan,
 } from "../../../contracts/authoring/schema";
 import { SchemaChangeId, SchemaRevisionId } from "../../../contracts/schema";
+import { Schema } from "effect";
 import {
   decideSchemaApplyReplay,
   hasExactAllocatedProjectChanges,
   verifyAuthoringSchemaApply,
 } from "./index";
 
-import * as SchemaStrict from "../../schema-strict";
 const posts = CollectionSourceKey.make("posts");
 const revisionId = SchemaRevisionId.make("019fae8b-1234-7000-8000-000000000901");
 const planHash = SchemaPlanHash.make("a".repeat(64));
@@ -28,7 +28,7 @@ const current = AuthoringSchemaAuthority.make({
   projectManifestHash: ProjectStructureManifestHash.make("c".repeat(64)),
   revisionIds: { [posts]: revisionId },
 });
-const plan = SchemaStrict.decodeUnknownSync(AuthoringSchemaPlan)({
+const plan = Schema.decodeUnknownSync(AuthoringSchemaPlan, { onExcessProperty: "error" })({
   valid: true,
   current,
   planHash,
@@ -47,7 +47,9 @@ const plan = SchemaStrict.decodeUnknownSync(AuthoringSchemaPlan)({
 });
 
 function acknowledgements(...ids: ReadonlyArray<SchemaChangeId>) {
-  return SchemaStrict.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds)(ids);
+  return Schema.decodeUnknownSync(AcknowledgedAuthoringSchemaChangeIds, {
+    onExcessProperty: "error",
+  })(ids);
 }
 
 describe("Authoring schema apply gate", () => {

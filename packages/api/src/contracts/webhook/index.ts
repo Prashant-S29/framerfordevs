@@ -1,5 +1,3 @@
-// Defines M11 publication-event, webhook-management, invalidation, delivery, and replay contracts.
-
 import { Schema, SchemaTransformation, Effect } from "effect";
 
 import { ProjectActor } from "../access";
@@ -23,8 +21,7 @@ import {
   SchemaRevisionId,
 } from "../schema";
 
-import * as SchemaStrict from "../../lib/schema-strict";
-import { UuidValue } from "../uuid";
+import { Uuid } from "../uuid";
 const semanticTagPattern = /^[a-z][a-z0-9_-]{0,31}:[a-z0-9][a-z0-9._/-]{0,31}$/u;
 const reservedTagNamespaces = new Set([
   "project",
@@ -100,27 +97,25 @@ export const webhookPublicEventTypeValues = [
 export const WebhookPublicEventType = Schema.Literals(webhookPublicEventTypeValues);
 export type WebhookPublicEventType = typeof WebhookPublicEventType.Type;
 
-export const WebhookEndpointId = UuidValue.pipe(Schema.brand("WebhookEndpointId"));
+export const WebhookEndpointId = Uuid.pipe(Schema.brand("WebhookEndpointId"));
 export type WebhookEndpointId = typeof WebhookEndpointId.Type;
 
-export const WebhookDestinationId = UuidValue.pipe(Schema.brand("WebhookDestinationId"));
+export const WebhookDestinationId = Uuid.pipe(Schema.brand("WebhookDestinationId"));
 export type WebhookDestinationId = typeof WebhookDestinationId.Type;
 
-export const WebhookSecretId = UuidValue.pipe(Schema.brand("WebhookSecretId"));
+export const WebhookSecretId = Uuid.pipe(Schema.brand("WebhookSecretId"));
 export type WebhookSecretId = typeof WebhookSecretId.Type;
 
-export const WebhookEventId = UuidValue.pipe(Schema.brand("WebhookEventId"));
+export const WebhookEventId = Uuid.pipe(Schema.brand("WebhookEventId"));
 export type WebhookEventId = typeof WebhookEventId.Type;
 
-export const WebhookDeliveryId = UuidValue.pipe(Schema.brand("WebhookDeliveryId"));
+export const WebhookDeliveryId = Uuid.pipe(Schema.brand("WebhookDeliveryId"));
 export type WebhookDeliveryId = typeof WebhookDeliveryId.Type;
 
-export const WebhookAttemptId = UuidValue.pipe(Schema.brand("WebhookAttemptId"));
+export const WebhookAttemptId = Uuid.pipe(Schema.brand("WebhookAttemptId"));
 export type WebhookAttemptId = typeof WebhookAttemptId.Type;
 
-export const InvalidationRouteMappingId = UuidValue.pipe(
-  Schema.brand("InvalidationRouteMappingId"),
-);
+export const InvalidationRouteMappingId = Uuid.pipe(Schema.brand("InvalidationRouteMappingId"));
 export type InvalidationRouteMappingId = typeof InvalidationRouteMappingId.Type;
 
 export const WebhookEndpointName = NormalizedString.check(
@@ -717,72 +712,88 @@ export class ReplayWebhookEventResult extends Schema.Class<ReplayWebhookEventRes
   replayedBy: ProjectActor,
 }) {}
 
-export const CreateWebhookEndpointInputSchema = SchemaStrict.toStandardSchemaV1(
+export const CreateWebhookEndpointInputSchema = Schema.toStandardSchemaV1(
   CreateWebhookEndpointInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ListWebhookEndpointsInputSchema =
-  SchemaStrict.toStandardSchemaV1(ListWebhookEndpointsInput);
-export const GetWebhookEndpointInputSchema =
-  SchemaStrict.toStandardSchemaV1(GetWebhookEndpointInput);
-export const UpdateWebhookEndpointInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ListWebhookEndpointsInputSchema = Schema.toStandardSchemaV1(
+  ListWebhookEndpointsInput,
+  { parseOptions: { onExcessProperty: "error" } },
+);
+export const GetWebhookEndpointInputSchema = Schema.toStandardSchemaV1(GetWebhookEndpointInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const UpdateWebhookEndpointInputSchema = Schema.toStandardSchemaV1(
   UpdateWebhookEndpointInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const SetWebhookEndpointStateInputSchema = SchemaStrict.toStandardSchemaV1(
+export const SetWebhookEndpointStateInputSchema = Schema.toStandardSchemaV1(
   SetWebhookEndpointStateInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ReplaceWebhookSubscriptionsInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ReplaceWebhookSubscriptionsInputSchema = Schema.toStandardSchemaV1(
   ReplaceWebhookSubscriptionsInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const StartWebhookSecretRotationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const StartWebhookSecretRotationInputSchema = Schema.toStandardSchemaV1(
   StartWebhookSecretRotationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ChangeWebhookSecretRotationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ChangeWebhookSecretRotationInputSchema = Schema.toStandardSchemaV1(
   ChangeWebhookSecretRotationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const CreateInvalidationRouteMappingInputSchema = SchemaStrict.toStandardSchemaV1(
+export const CreateInvalidationRouteMappingInputSchema = Schema.toStandardSchemaV1(
   CreateInvalidationRouteMappingInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const UpdateInvalidationRouteMappingInputSchema = SchemaStrict.toStandardSchemaV1(
+export const UpdateInvalidationRouteMappingInputSchema = Schema.toStandardSchemaV1(
   UpdateInvalidationRouteMappingInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const SetInvalidationRouteMappingStateInputSchema = SchemaStrict.toStandardSchemaV1(
+export const SetInvalidationRouteMappingStateInputSchema = Schema.toStandardSchemaV1(
   SetInvalidationRouteMappingStateInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ListInvalidationRouteMappingsInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ListInvalidationRouteMappingsInputSchema = Schema.toStandardSchemaV1(
   ListInvalidationRouteMappingsInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ListWebhookDeliveriesInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ListWebhookDeliveriesInputSchema = Schema.toStandardSchemaV1(
   ListWebhookDeliveriesInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ListWebhookAttemptsInputSchema =
-  SchemaStrict.toStandardSchemaV1(ListWebhookAttemptsInput);
-export const ReplayWebhookEventInputSchema =
-  SchemaStrict.toStandardSchemaV1(ReplayWebhookEventInput);
+export const ListWebhookAttemptsInputSchema = Schema.toStandardSchemaV1(ListWebhookAttemptsInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const ReplayWebhookEventInputSchema = Schema.toStandardSchemaV1(ReplayWebhookEventInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
 
-export const WebhookEndpointOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const WebhookEndpointOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(WebhookEndpoint),
 );
-export const IssuedWebhookEndpointOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const IssuedWebhookEndpointOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(IssuedWebhookEndpoint),
 );
-export const RotatedWebhookSecretOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const RotatedWebhookSecretOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(RotatedWebhookSecret),
 );
-export const WebhookEndpointPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const WebhookEndpointPageOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(WebhookEndpointPage),
 );
-export const InvalidationRouteMappingOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const InvalidationRouteMappingOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(InvalidationRouteMapping),
 );
-export const InvalidationRouteMappingPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const InvalidationRouteMappingPageOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(InvalidationRouteMappingPage),
 );
-export const WebhookDeliveryPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const WebhookDeliveryPageOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(WebhookDeliveryPage),
 );
-export const WebhookAttemptPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const WebhookAttemptPageOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(WebhookAttemptPage),
 );
-export const ReplayWebhookEventResultOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ReplayWebhookEventResultOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(ReplayWebhookEventResult),
 );

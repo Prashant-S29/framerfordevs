@@ -1,14 +1,11 @@
-// Creates the operator-approved deterministic M9 load fixture and writes one-time secrets only to ignored local environment files.
-
 import { createHash, randomBytes } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 
 import { Effect, Schema } from "effect";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 import { Uuid } from "../../../contracts/uuid";
 const serverEnvironmentPath = "../../apps/server/.env";
-const loadEnvironmentPath = "../../delivery-load.env";
+const loadEnvironmentPath = "../../apps/server/load/delivery.env";
 process.loadEnvFile(serverEnvironmentPath);
 process.loadEnvFile(loadEnvironmentPath);
 
@@ -174,7 +171,9 @@ try {
   if (authority?.revisionId === null || authority === undefined) {
     throw new Error("The configured collection must have a published schema.");
   }
-  const actorId = SchemaStrict.decodeUnknownSync(AuthUserId)(authority.actorId);
+  const actorId = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(
+    authority.actorId,
+  );
   const scope = {
     projectId,
     environmentId: authority.environmentId,
@@ -231,7 +230,7 @@ try {
   const targetDraft = await run(
     entries.getDraft(
       actorId,
-      SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
+      Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput, { onExcessProperty: "error" })({
         ...scope,
         entryId: targetEntryId,
       }),
@@ -247,7 +246,9 @@ try {
     await run(
       credentials.issueCredential(
         actorId,
-        SchemaStrict.decodeUnknownSync(accessContracts.IssueApiCredentialInput)({
+        Schema.decodeUnknownSync(accessContracts.IssueApiCredentialInput, {
+          onExcessProperty: "error",
+        })({
           projectId,
           environmentId: authority.environmentId,
           family: "delivery",
@@ -292,7 +293,7 @@ try {
       const created = await run(
         entries.createEntry(
           actorId,
-          SchemaStrict.decodeUnknownSync(entryContracts.CreateEntryInput)({
+          Schema.decodeUnknownSync(entryContracts.CreateEntryInput, { onExcessProperty: "error" })({
             ...scope,
             displayName: `M9 Load ${String(index).padStart(5, "0")}`,
             schemaRevisionId: targetDraft.schemaRevisionId,
@@ -306,7 +307,9 @@ try {
       let draft = await run(
         entries.getDraft(
           actorId,
-          SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
+          Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             entryId: created.id,
           }),
@@ -325,7 +328,9 @@ try {
         await run(
           entries.saveDraft(
             actorId,
-            SchemaStrict.decodeUnknownSync(entryContracts.SaveEntryDraftInput)({
+            Schema.decodeUnknownSync(entryContracts.SaveEntryDraftInput, {
+              onExcessProperty: "error",
+            })({
               ...scope,
               entryId: created.id,
               schemaRevisionId: draft.schemaRevisionId,
@@ -343,15 +348,18 @@ try {
         draft = await run(
           entries.getDraft(
             actorId,
-            SchemaStrict.decodeUnknownSync(entryContracts.GetEntryDraftInput)({
+            Schema.decodeUnknownSync(entryContracts.GetEntryDraftInput, {
+              onExcessProperty: "error",
+            })({
               ...scope,
               entryId: created.id,
             }),
           ),
         );
       }
-      const publicationScope = SchemaStrict.decodeUnknownSync(
+      const publicationScope = Schema.decodeUnknownSync(
         publicationContracts.ValidateEntryPublicationInput,
+        { onExcessProperty: "error" },
       )({ ...scope, entryId: created.id });
       const plan = await run(publications.validate(actorId, publicationScope, new Date()));
       if (!plan.valid || plan.authorityHash === null) {
@@ -362,7 +370,9 @@ try {
         await run(
           publications.publish(
             actorId,
-            SchemaStrict.decodeUnknownSync(publicationContracts.PublishEntryInput)({
+            Schema.decodeUnknownSync(publicationContracts.PublishEntryInput, {
+              onExcessProperty: "error",
+            })({
               ...scope,
               entryId: created.id,
               commandId: deterministicUuid(`entry:${index}:publish`),

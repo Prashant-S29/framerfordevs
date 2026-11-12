@@ -1,5 +1,3 @@
-// Adapts shared webhook administration to signed, principal-bound Control Plane resources.
-
 import { Clock, Effect, Schema } from "effect";
 
 import type { ProjectActor } from "../../../contracts/access";
@@ -70,9 +68,8 @@ import {
 } from "../../../services/control-plane/cursor-signer";
 import { WebhookRepository } from "../../../services/webhook/repository";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const decode = <A, I>(schema: Schema.Codec<A, I, never>, value: unknown) =>
-  SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
+  Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(value).pipe(
     Effect.mapError(() => UnauthorizedFailure.make()),
   );
 
@@ -110,7 +107,9 @@ function deliverySummary(delivery: {
   readonly createdAt: string;
   readonly updatedAt: string;
 }) {
-  return SchemaStrict.decodeUnknownSync(ControlPlaneWebhookDeliverySummary)({
+  return Schema.decodeUnknownSync(ControlPlaneWebhookDeliverySummary, {
+    onExcessProperty: "error",
+  })({
     id: delivery.id,
     eventId: delivery.eventId,
     endpointId: delivery.endpointId,

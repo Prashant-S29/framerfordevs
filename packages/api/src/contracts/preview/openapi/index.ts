@@ -1,5 +1,3 @@
-// Generates the tenant-neutral public Preview OpenAPI contract from Effect schemas and protocol metadata.
-
 import { Schema } from "effect";
 
 import { make as makeJsonSchema } from "../../response/json-schema";

@@ -41,7 +41,7 @@
       }
     },
     "schemas": {
-      "AllProjectLocaleAccess": {
+      "AllProjectLocaleAccessEncoded": {
         "additionalProperties": false,
         "properties": {
           "mode": {
@@ -56,13 +56,12 @@
         ],
         "type": "object"
       },
-      "ApiCredentialRotation": {
+      "ApiCredentialRotationEncoded": {
         "additionalProperties": false,
         "properties": {
           "activatedAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -74,7 +73,6 @@
           "canceledAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -86,7 +84,6 @@
           "completedAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -96,38 +93,32 @@
             ]
           },
           "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "environmentId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "predecessorCredentialId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "retireAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -146,20 +137,17 @@
             "type": "string"
           },
           "successorCredentialId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "updatedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "version": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -180,20 +168,20 @@
         ],
         "type": "object"
       },
-      "ApiErrorDetail": {
+      "ApiErrorDetailEncoded": {
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "a string at most 64 character(s) long",
             "maxLength": 64,
             "minLength": 1,
-            "title": "maxLength(64)",
             "type": "string"
           },
           "currentRevisionId": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UUID"
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
               },
               {
                 "type": "null"
@@ -201,28 +189,22 @@
             ]
           },
           "currentVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "expectedVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "path": {
-            "description": "a string at most 256 character(s) long",
             "maxLength": 256,
-            "title": "maxLength(256)",
             "type": "string"
           },
           "scope": {
@@ -239,13 +221,12 @@
         ],
         "type": "object"
       },
-      "Capability": {
+      "CapabilityEncoded": {
         "additionalProperties": false,
         "properties": {
           "changedAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -257,9 +238,8 @@
           "id": {
             "anyOf": [
               {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               {
@@ -283,9 +263,8 @@
           "version": {
             "anyOf": [
               {
-                "description": "a number greater than or equal to 1",
+                "maximum": 9007199254740991,
                 "minimum": 1,
-                "title": "greaterThanOrEqualTo(1)",
                 "type": "integer"
               },
               {
@@ -303,19 +282,17 @@
         ],
         "type": "object"
       },
-      "CollectionWebhookAggregateAuthority": {
+      "CollectionWebhookAggregateAuthorityEncoded": {
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "sequence": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "type": {
@@ -332,7 +309,7 @@
         ],
         "type": "object"
       },
-      "ControlPlaneApiError": {
+      "ControlPlaneApiErrorEncoded": {
         "additionalProperties": false,
         "properties": {
           "code": {
@@ -363,28 +340,21 @@
             "type": "string"
           },
           "details": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ApiErrorDetail"
+              "$ref": "#/components/schemas/ApiErrorDetailEncoded"
             },
             "maxItems": 50,
             "minItems": 1,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "requestId": {
-            "description": "a string matching the pattern ^[A-Za-z0-9._:-]+$",
             "maxLength": 128,
             "minLength": 1,
-            "pattern": "^[A-Za-z0-9._:-]+$",
-            "title": "maxLength(128)",
             "type": "string"
           },
           "retryable": {
@@ -400,19 +370,20 @@
         "type": "object"
       },
       "ControlPlaneApiFailure": {
+        "$ref": "#/components/schemas/ControlPlaneApiFailureEncoded"
+      },
+      "ControlPlaneApiFailureEncoded": {
         "additionalProperties": false,
         "properties": {
           "data": {
             "type": "null"
           },
           "error": {
-            "$ref": "#/components/schemas/ControlPlaneApiError"
+            "$ref": "#/components/schemas/ControlPlaneApiErrorEncoded"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -430,16 +401,14 @@
         ],
         "type": "object"
       },
-      "ControlPlaneCapabilityList": {
+      "ControlPlaneCapabilityListEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 8 item(s)",
             "items": {
-              "$ref": "#/components/schemas/Capability"
+              "$ref": "#/components/schemas/CapabilityEncoded"
             },
             "maxItems": 8,
-            "title": "maxItems(8)",
             "type": "array"
           }
         },
@@ -452,16 +421,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneCapabilityList"
+            "$ref": "#/components/schemas/ControlPlaneCapabilityListEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -483,18 +450,21 @@
         "additionalProperties": false,
         "properties": {
           "collectionId": {
-            "$ref": "#/components/schemas/UUID"
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
           },
           "commandId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "entryId": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UUID"
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
               },
               {
                 "type": "null"
@@ -502,7 +472,6 @@
             ]
           },
           "eventTypes": {
-            "description": "an array of at most 3 item(s)",
             "items": {
               "enum": [
                 "cms.schema.published",
@@ -513,13 +482,14 @@
             },
             "maxItems": 3,
             "minItems": 1,
-            "title": "maxItems(3)",
             "type": "array"
           },
           "localeId": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UUID"
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
               },
               {
                 "type": "null"
@@ -530,19 +500,15 @@
             "type": "string"
           },
           "route": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "semanticTags": {
-            "description": "an array of at most 10 item(s)",
             "items": {
               "type": "string"
             },
             "maxItems": 10,
-            "title": "maxItems(10)",
             "type": "array"
           }
         },
@@ -567,13 +533,13 @@
           "localeAccess": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllProjectLocaleAccess"
+                "$ref": "#/components/schemas/AllProjectLocaleAccessEncoded"
               },
               {
-                "$ref": "#/components/schemas/SelectedProjectLocaleAccess"
+                "$ref": "#/components/schemas/SelectedProjectLocaleAccessEncoded"
               },
               {
-                "$ref": "#/components/schemas/NoProjectLocaleAccess"
+                "$ref": "#/components/schemas/NoProjectLocaleAccessEncoded"
               }
             ]
           },
@@ -601,9 +567,8 @@
         "additionalProperties": false,
         "properties": {
           "commandId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "displayName": {
@@ -624,16 +589,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ProjectLocale"
+            "$ref": "#/components/schemas/ProjectLocaleEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -655,9 +618,8 @@
         "additionalProperties": false,
         "properties": {
           "commandId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "description": {
@@ -671,7 +633,6 @@
             ]
           },
           "initialCapabilities": {
-            "description": "an array of at most 8 item(s)",
             "items": {
               "enum": [
                 "cms"
@@ -679,7 +640,6 @@
               "type": "string"
             },
             "maxItems": 8,
-            "title": "maxItems(8)",
             "type": "array"
           },
           "key": {
@@ -702,16 +662,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneCreateProjectResult"
+            "$ref": "#/components/schemas/ControlPlaneCreateProjectResultEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -729,11 +687,11 @@
         ],
         "type": "object"
       },
-      "ControlPlaneCreateProjectResult": {
+      "ControlPlaneCreateProjectResultEncoded": {
         "additionalProperties": false,
         "properties": {
           "project": {
-            "$ref": "#/components/schemas/ControlPlaneProject"
+            "$ref": "#/components/schemas/ControlPlaneProjectEncoded"
           },
           "replayed": {
             "type": "boolean"
@@ -761,7 +719,6 @@
             "type": "string"
           },
           "subscriptions": {
-            "description": "an array of at most 3 item(s)",
             "items": {
               "enum": [
                 "cms.schema.published",
@@ -772,7 +729,6 @@
             },
             "maxItems": 3,
             "minItems": 1,
-            "title": "maxItems(3)",
             "type": "array"
           }
         },
@@ -788,9 +744,8 @@
         "additionalProperties": false,
         "properties": {
           "commandId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "name": {
@@ -807,16 +762,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneCreateWorkspaceResult"
+            "$ref": "#/components/schemas/ControlPlaneCreateWorkspaceResultEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -834,14 +787,14 @@
         ],
         "type": "object"
       },
-      "ControlPlaneCreateWorkspaceResult": {
+      "ControlPlaneCreateWorkspaceResultEncoded": {
         "additionalProperties": false,
         "properties": {
           "replayed": {
             "type": "boolean"
           },
           "workspace": {
-            "$ref": "#/components/schemas/ControlPlaneWorkspace"
+            "$ref": "#/components/schemas/ControlPlaneWorkspaceEncoded"
           }
         },
         "required": [
@@ -850,13 +803,12 @@
         ],
         "type": "object"
       },
-      "ControlPlaneCredential": {
+      "ControlPlaneCredentialEncoded": {
         "additionalProperties": false,
         "properties": {
           "activatedAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -866,20 +818,17 @@
             ]
           },
           "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "environmentId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "expiresAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -897,16 +846,13 @@
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "keyPrefix": {
-            "description": "a string at most 45 character(s) long",
             "maxLength": 45,
-            "minLength": 44,
-            "title": "maxLength(45)",
+            "minLength": 22,
             "type": "string"
           },
           "name": {
@@ -915,7 +861,7 @@
           "openRotation": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/ApiCredentialRotation"
+                "$ref": "#/components/schemas/ApiCredentialRotationEncoded"
               },
               {
                 "type": "null"
@@ -923,15 +869,13 @@
             ]
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "retireAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -943,7 +887,6 @@
           "revokedAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -953,7 +896,6 @@
             ]
           },
           "scopes": {
-            "description": "an array of at most 16 item(s)",
             "items": {
               "enum": [
                 "project.read",
@@ -977,7 +919,6 @@
             },
             "maxItems": 16,
             "minItems": 1,
-            "title": "maxItems(16)",
             "type": "array"
           },
           "status": {
@@ -992,14 +933,12 @@
             "type": "string"
           },
           "updatedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "version": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -1023,26 +962,22 @@
         ],
         "type": "object"
       },
-      "ControlPlaneCredentialPage": {
+      "ControlPlaneCredentialPageEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ControlPlaneCredential"
+              "$ref": "#/components/schemas/ControlPlaneCredentialEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "nextCursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 512,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(512)",
                 "type": "string"
               },
               {
@@ -1061,16 +996,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneCredentialPage"
+            "$ref": "#/components/schemas/ControlPlaneCredentialPageEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1092,16 +1025,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneCredential"
+            "$ref": "#/components/schemas/ControlPlaneCredentialEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1123,16 +1054,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ApiCredentialRotation"
+            "$ref": "#/components/schemas/ApiCredentialRotationEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1160,9 +1089,8 @@
             "type": "boolean"
           },
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -1176,9 +1104,8 @@
         "additionalProperties": false,
         "properties": {
           "commandId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           }
         },
@@ -1191,16 +1118,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneEnableCapabilityResult"
+            "$ref": "#/components/schemas/ControlPlaneEnableCapabilityResultEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1218,11 +1143,11 @@
         ],
         "type": "object"
       },
-      "ControlPlaneEnableCapabilityResult": {
+      "ControlPlaneEnableCapabilityResultEncoded": {
         "additionalProperties": false,
         "properties": {
           "capability": {
-            "$ref": "#/components/schemas/Capability"
+            "$ref": "#/components/schemas/CapabilityEncoded"
           },
           "replayed": {
             "type": "boolean"
@@ -1234,11 +1159,10 @@
         ],
         "type": "object"
       },
-      "ControlPlaneGovernance": {
+      "ControlPlaneGovernanceEncoded": {
         "additionalProperties": false,
         "properties": {
           "baseRoleActions": {
-            "description": "an array of at most 27 item(s)",
             "items": {
               "enum": [
                 "project.read",
@@ -1272,7 +1196,6 @@
               "type": "string"
             },
             "maxItems": 27,
-            "title": "maxItems(27)",
             "type": "array"
           },
           "canInviteMembers": {
@@ -1288,7 +1211,6 @@
             "type": "boolean"
           },
           "effectiveLocaleActions": {
-            "description": "an array of at most 27 item(s)",
             "items": {
               "enum": [
                 "project.read",
@@ -1322,23 +1244,18 @@
               "type": "string"
             },
             "maxItems": 27,
-            "title": "maxItems(27)",
             "type": "array"
           },
           "effectiveLocaleIds": {
-            "description": "an array of at most 100 item(s)",
             "items": {
-              "description": "a Universally Unique Identifier",
               "format": "uuid",
-              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
               "type": "string"
             },
             "maxItems": 100,
-            "title": "maxItems(100)",
             "type": "array"
           },
           "effectiveProjectActions": {
-            "description": "an array of at most 27 item(s)",
             "items": {
               "enum": [
                 "project.read",
@@ -1372,39 +1289,35 @@
               "type": "string"
             },
             "maxItems": 27,
-            "title": "maxItems(27)",
             "type": "array"
           },
           "fixedRolePolicies": {
-            "description": "an array of at most 7 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ControlPlaneProjectRolePolicy"
+              "$ref": "#/components/schemas/ControlPlaneProjectRolePolicyEncoded"
             },
             "maxItems": 7,
             "minItems": 7,
-            "title": "maxItems(7)",
             "type": "array"
           },
           "localeAccess": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllProjectLocaleAccess"
+                "$ref": "#/components/schemas/AllProjectLocaleAccessEncoded"
               },
               {
-                "$ref": "#/components/schemas/SelectedProjectLocaleAccess"
+                "$ref": "#/components/schemas/SelectedProjectLocaleAccessEncoded"
               },
               {
-                "$ref": "#/components/schemas/NoProjectLocaleAccess"
+                "$ref": "#/components/schemas/NoProjectLocaleAccessEncoded"
               }
             ]
           },
           "primaryEnvironment": {
-            "$ref": "#/components/schemas/ControlPlanePrimaryEnvironment"
+            "$ref": "#/components/schemas/ControlPlanePrimaryEnvironmentEncoded"
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "role": {
@@ -1441,16 +1354,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneGovernance"
+            "$ref": "#/components/schemas/ControlPlaneGovernanceEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1472,16 +1383,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/InspectedProjectInvitation"
+            "$ref": "#/components/schemas/InspectedProjectInvitationEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1499,26 +1408,22 @@
         ],
         "type": "object"
       },
-      "ControlPlaneInvalidationMappingPage": {
+      "ControlPlaneInvalidationMappingPageEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/InvalidationRouteMapping"
+              "$ref": "#/components/schemas/InvalidationRouteMappingEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "nextCursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 512,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(512)",
                 "type": "string"
               },
               {
@@ -1537,16 +1442,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneInvalidationMappingPage"
+            "$ref": "#/components/schemas/ControlPlaneInvalidationMappingPageEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1568,16 +1471,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/InvalidationRouteMapping"
+            "$ref": "#/components/schemas/InvalidationRouteMappingEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1599,9 +1500,8 @@
         "additionalProperties": false,
         "properties": {
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "state": {
@@ -1618,26 +1518,22 @@
         ],
         "type": "object"
       },
-      "ControlPlaneInvitationPage": {
+      "ControlPlaneInvitationPageEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ProjectInvitation"
+              "$ref": "#/components/schemas/ProjectInvitationEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "nextCursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 512,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(512)",
                 "type": "string"
               },
               {
@@ -1656,16 +1552,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneInvitationPage"
+            "$ref": "#/components/schemas/ControlPlaneInvitationPageEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1687,16 +1581,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ProjectInvitation"
+            "$ref": "#/components/schemas/ProjectInvitationEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1718,11 +1610,9 @@
         "additionalProperties": false,
         "properties": {
           "token": {
-            "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
             "maxLength": 43,
-            "minLength": 43,
+            "minLength": 22,
             "pattern": "^[A-Za-z0-9_-]+$",
-            "title": "length(43)",
             "type": "string"
           }
         },
@@ -1737,7 +1627,6 @@
           "expiresAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -1764,7 +1653,6 @@
             "type": "boolean"
           },
           "scopes": {
-            "description": "an array of at most 16 item(s)",
             "items": {
               "enum": [
                 "project.read",
@@ -1788,7 +1676,6 @@
             },
             "maxItems": 16,
             "minItems": 1,
-            "title": "maxItems(16)",
             "type": "array"
           }
         },
@@ -1802,18 +1689,16 @@
         ],
         "type": "object"
       },
-      "ControlPlaneIssuedCredential": {
+      "ControlPlaneIssuedCredentialEncoded": {
         "additionalProperties": false,
         "properties": {
           "credential": {
-            "$ref": "#/components/schemas/ControlPlaneCredential"
+            "$ref": "#/components/schemas/ControlPlaneCredentialEncoded"
           },
           "key": {
-            "description": "a string matching the pattern ^ffd_(?:mgmt|del|prev)_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{43}$",
             "maxLength": 89,
-            "minLength": 88,
+            "minLength": 44,
             "pattern": "^ffd_(?:mgmt|del|prev)_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{43}$",
-            "title": "maxLength(89)",
             "type": "string"
           }
         },
@@ -1827,16 +1712,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneIssuedCredential"
+            "$ref": "#/components/schemas/ControlPlaneIssuedCredentialEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1858,16 +1741,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/IssuedProjectInvitation"
+            "$ref": "#/components/schemas/IssuedProjectInvitationEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1889,16 +1770,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/IssuedWebhookEndpoint"
+            "$ref": "#/components/schemas/IssuedWebhookEndpointEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1916,16 +1795,14 @@
         ],
         "type": "object"
       },
-      "ControlPlaneLocaleList": {
+      "ControlPlaneLocaleListEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 100 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ProjectLocale"
+              "$ref": "#/components/schemas/ProjectLocaleEncoded"
             },
             "maxItems": 100,
-            "title": "maxItems(100)",
             "type": "array"
           }
         },
@@ -1938,16 +1815,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneLocaleList"
+            "$ref": "#/components/schemas/ControlPlaneLocaleListEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1969,20 +1844,17 @@
         "additionalProperties": false,
         "properties": {
           "locales": {
-            "description": "an array of at most 100 item(s)",
             "items": {
               "additionalProperties": false,
               "properties": {
                 "expectedVersion": {
-                  "description": "a number greater than or equal to 1",
+                  "maximum": 9007199254740991,
                   "minimum": 1,
-                  "title": "greaterThanOrEqualTo(1)",
                   "type": "integer"
                 },
                 "localeId": {
-                  "description": "a Universally Unique Identifier",
                   "format": "uuid",
-                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                   "type": "string"
                 }
               },
@@ -1994,7 +1866,6 @@
             },
             "maxItems": 100,
             "minItems": 1,
-            "title": "maxItems(100)",
             "type": "array"
           }
         },
@@ -2007,16 +1878,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ProjectLocale"
+            "$ref": "#/components/schemas/ProjectLocaleEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -2041,9 +1910,8 @@
             "type": "boolean"
           },
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "status": {
@@ -2062,26 +1930,22 @@
         ],
         "type": "object"
       },
-      "ControlPlaneMemberPage": {
+      "ControlPlaneMemberPageEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ProjectMember"
+              "$ref": "#/components/schemas/ProjectMemberEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "nextCursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 512,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(512)",
                 "type": "string"
               },
               {
@@ -2100,16 +1964,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneMemberPage"
+            "$ref": "#/components/schemas/ControlPlaneMemberPageEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -2131,21 +1993,20 @@
         "additionalProperties": false,
         "properties": {
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "localeAccess": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllProjectLocaleAccess"
+                "$ref": "#/components/schemas/AllProjectLocaleAccessEncoded"
               },
               {
-                "$ref": "#/components/schemas/SelectedProjectLocaleAccess"
+                "$ref": "#/components/schemas/SelectedProjectLocaleAccessEncoded"
               },
               {
-                "$ref": "#/components/schemas/NoProjectLocaleAccess"
+                "$ref": "#/components/schemas/NoProjectLocaleAccessEncoded"
               }
             ]
           },
@@ -2173,16 +2034,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ProjectMember"
+            "$ref": "#/components/schemas/ProjectMemberEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -2200,18 +2059,16 @@
         ],
         "type": "object"
       },
-      "ControlPlanePrimaryEnvironment": {
+      "ControlPlanePrimaryEnvironmentEncoded": {
         "additionalProperties": false,
         "properties": {
           "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "isPrimary": {
@@ -2242,13 +2099,139 @@
         ],
         "type": "object"
       },
-      "ControlPlaneProject": {
+      "ControlPlaneProjectAuditEventEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_.-]{0,127}$",
+            "type": "string"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/ProjectActor"
+          },
+          "environmentId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "occurredAt": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+            "type": "string"
+          },
+          "projectId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "requestId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "resourceId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "resourceType": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_.-]{0,63}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "environmentId",
+          "actor",
+          "action",
+          "resourceType",
+          "resourceId",
+          "requestId",
+          "occurredAt"
+        ],
+        "type": "object"
+      },
+      "ControlPlaneProjectAuditPageEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ControlPlaneProjectAuditEventEncoded"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "ControlPlaneProjectAuditPageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ControlPlaneProjectAuditPageEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "ControlPlaneProjectEncoded": {
         "additionalProperties": false,
         "properties": {
           "archivedAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -2258,16 +2241,13 @@
             ]
           },
           "capabilities": {
-            "description": "an array of at most 8 item(s)",
             "items": {
-              "$ref": "#/components/schemas/Capability"
+              "$ref": "#/components/schemas/CapabilityEncoded"
             },
             "maxItems": 8,
-            "title": "maxItems(8)",
             "type": "array"
           },
           "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
@@ -2282,7 +2262,6 @@
             ]
           },
           "effectiveActions": {
-            "description": "an array of at most 7 item(s)",
             "items": {
               "enum": [
                 "project.read",
@@ -2296,13 +2275,11 @@
               "type": "string"
             },
             "maxItems": 7,
-            "title": "maxItems(7)",
             "type": "array"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "key": {
@@ -2312,7 +2289,7 @@
             "type": "string"
           },
           "primaryEnvironment": {
-            "$ref": "#/components/schemas/ControlPlanePrimaryEnvironment"
+            "$ref": "#/components/schemas/ControlPlanePrimaryEnvironmentEncoded"
           },
           "status": {
             "enum": [
@@ -2322,20 +2299,17 @@
             "type": "string"
           },
           "updatedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "version": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "workspaceId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           }
         },
@@ -2356,154 +2330,12 @@
         ],
         "type": "object"
       },
-      "ControlPlaneProjectAuditEvent": {
-        "additionalProperties": false,
-        "properties": {
-          "action": {
-            "description": "a string matching the pattern ^[a-z][a-z0-9_.-]{0,127}$",
-            "maxLength": 128,
-            "minLength": 1,
-            "pattern": "^[a-z][a-z0-9_.-]{0,127}$",
-            "title": "maxLength(128)",
-            "type": "string"
-          },
-          "actor": {
-            "$ref": "#/components/schemas/ProjectActor"
-          },
-          "environmentId": {
-            "anyOf": [
-              {
-                "description": "a Universally Unique Identifier",
-                "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "id": {
-            "description": "a Universally Unique Identifier",
-            "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-            "type": "string"
-          },
-          "occurredAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
-            "type": "string"
-          },
-          "projectId": {
-            "description": "a Universally Unique Identifier",
-            "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-            "type": "string"
-          },
-          "requestId": {
-            "description": "a string at most 128 character(s) long",
-            "maxLength": 128,
-            "minLength": 1,
-            "title": "maxLength(128)",
-            "type": "string"
-          },
-          "resourceId": {
-            "$ref": "#/components/schemas/UUID"
-          },
-          "resourceType": {
-            "description": "a string matching the pattern ^[a-z][a-z0-9_.-]{0,63}$",
-            "maxLength": 64,
-            "minLength": 1,
-            "pattern": "^[a-z][a-z0-9_.-]{0,63}$",
-            "title": "maxLength(64)",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "projectId",
-          "environmentId",
-          "actor",
-          "action",
-          "resourceType",
-          "resourceId",
-          "requestId",
-          "occurredAt"
-        ],
-        "type": "object"
-      },
-      "ControlPlaneProjectAuditPage": {
-        "additionalProperties": false,
-        "properties": {
-          "items": {
-            "description": "an array of at most 50 item(s)",
-            "items": {
-              "$ref": "#/components/schemas/ControlPlaneProjectAuditEvent"
-            },
-            "maxItems": 50,
-            "title": "maxItems(50)",
-            "type": "array"
-          },
-          "nextCursor": {
-            "anyOf": [
-              {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
-                "maxLength": 512,
-                "minLength": 1,
-                "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(512)",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "items",
-          "nextCursor"
-        ],
-        "type": "object"
-      },
-      "ControlPlaneProjectAuditPageResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/ControlPlaneProjectAuditPage"
-          },
-          "error": {
-            "type": "null"
-          },
-          "message": {
-            "description": "a string at most 512 character(s) long",
-            "maxLength": 512,
-            "minLength": 1,
-            "title": "maxLength(512)",
-            "type": "string"
-          },
-          "ok": {
-            "enum": [
-              true
-            ],
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ok",
-          "data",
-          "error",
-          "message"
-        ],
-        "type": "object"
-      },
       "ControlPlaneProjectLifecycleRequest": {
         "additionalProperties": false,
         "properties": {
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -2512,26 +2344,22 @@
         ],
         "type": "object"
       },
-      "ControlPlaneProjectPage": {
+      "ControlPlaneProjectPageEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ControlPlaneProject"
+              "$ref": "#/components/schemas/ControlPlaneProjectEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "nextCursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 512,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(512)",
                 "type": "string"
               },
               {
@@ -2550,16 +2378,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneProjectPage"
+            "$ref": "#/components/schemas/ControlPlaneProjectPageEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -2581,16 +2407,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneProject"
+            "$ref": "#/components/schemas/ControlPlaneProjectEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -2608,11 +2432,10 @@
         ],
         "type": "object"
       },
-      "ControlPlaneProjectRolePolicy": {
+      "ControlPlaneProjectRolePolicyEncoded": {
         "additionalProperties": false,
         "properties": {
           "baseRoleActions": {
-            "description": "an array of at most 27 item(s)",
             "items": {
               "enum": [
                 "project.read",
@@ -2646,7 +2469,6 @@
               "type": "string"
             },
             "maxItems": 27,
-            "title": "maxItems(27)",
             "type": "array"
           },
           "requiresAllLocales": {
@@ -2676,24 +2498,20 @@
         "additionalProperties": false,
         "properties": {
           "applicationOrigin": {
-            "description": "a string at most 2048 character(s) long",
             "maxLength": 2048,
             "minLength": 1,
-            "title": "maxLength(2048)",
             "type": "string"
           },
           "commandId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "expectedVersion": {
             "anyOf": [
               {
-                "description": "a number greater than or equal to 1",
+                "maximum": 9007199254740991,
                 "minimum": 1,
-                "title": "greaterThanOrEqualTo(1)",
                 "type": "integer"
               },
               {
@@ -2702,10 +2520,8 @@
             ]
           },
           "mountPath": {
-            "description": "a string at most 240 character(s) long",
             "maxLength": 240,
             "minLength": 1,
-            "title": "maxLength(240)",
             "type": "string"
           }
         },
@@ -2721,16 +2537,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlanePutStudioRegistrationResult"
+            "$ref": "#/components/schemas/ControlPlanePutStudioRegistrationResultEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -2748,7 +2562,7 @@
         ],
         "type": "object"
       },
-      "ControlPlanePutStudioRegistrationResult": {
+      "ControlPlanePutStudioRegistrationResultEncoded": {
         "additionalProperties": false,
         "properties": {
           "created": {
@@ -2758,7 +2572,7 @@
             "type": "boolean"
           },
           "registration": {
-            "$ref": "#/components/schemas/StudioRegistration"
+            "$ref": "#/components/schemas/StudioRegistrationEncoded"
           },
           "replayed": {
             "type": "boolean"
@@ -2776,13 +2590,11 @@
         "additionalProperties": false,
         "properties": {
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "subscriptions": {
-            "description": "an array of at most 3 item(s)",
             "items": {
               "enum": [
                 "cms.schema.published",
@@ -2793,7 +2605,6 @@
             },
             "maxItems": 3,
             "minItems": 1,
-            "title": "maxItems(3)",
             "type": "array"
           }
         },
@@ -2813,29 +2624,25 @@
             "type": "boolean"
           },
           "commandId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "endpointId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "eventId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "sourceDeliveryId": {
             "anyOf": [
               {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               {
@@ -2863,9 +2670,8 @@
             "type": "boolean"
           },
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -2879,16 +2685,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/RotatedWebhookSecret"
+            "$ref": "#/components/schemas/RotatedWebhookSecretEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -2910,18 +2714,16 @@
         "additionalProperties": false,
         "properties": {
           "commandId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "enabled": {
             "type": "boolean"
           },
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -2936,16 +2738,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneSetStudioRuntimeResult"
+            "$ref": "#/components/schemas/ControlPlaneSetStudioRuntimeResultEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -2963,14 +2763,14 @@
         ],
         "type": "object"
       },
-      "ControlPlaneSetStudioRuntimeResult": {
+      "ControlPlaneSetStudioRuntimeResultEncoded": {
         "additionalProperties": false,
         "properties": {
           "noOp": {
             "type": "boolean"
           },
           "registration": {
-            "$ref": "#/components/schemas/StudioRegistration"
+            "$ref": "#/components/schemas/StudioRegistrationEncoded"
           },
           "replayed": {
             "type": "boolean"
@@ -2995,15 +2795,13 @@
         "additionalProperties": false,
         "properties": {
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "expiresAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -3023,22 +2821,20 @@
         ],
         "type": "object"
       },
-      "ControlPlaneStartedCredentialRotation": {
+      "ControlPlaneStartedCredentialRotationEncoded": {
         "additionalProperties": false,
         "properties": {
           "key": {
-            "description": "a string matching the pattern ^ffd_(?:mgmt|del|prev)_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{43}$",
             "maxLength": 89,
-            "minLength": 88,
+            "minLength": 44,
             "pattern": "^ffd_(?:mgmt|del|prev)_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{43}$",
-            "title": "maxLength(89)",
             "type": "string"
           },
           "rotation": {
-            "$ref": "#/components/schemas/ApiCredentialRotation"
+            "$ref": "#/components/schemas/ApiCredentialRotationEncoded"
           },
           "successor": {
-            "$ref": "#/components/schemas/ControlPlaneCredential"
+            "$ref": "#/components/schemas/ControlPlaneCredentialEncoded"
           }
         },
         "required": [
@@ -3052,16 +2848,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneStartedCredentialRotation"
+            "$ref": "#/components/schemas/ControlPlaneStartedCredentialRotationEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -3089,9 +2883,8 @@
             "type": "boolean"
           },
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -3105,12 +2898,16 @@
         "additionalProperties": false,
         "properties": {
           "collectionId": {
-            "$ref": "#/components/schemas/UUID"
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
           },
           "entryId": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UUID"
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
               },
               {
                 "type": "null"
@@ -3118,7 +2915,6 @@
             ]
           },
           "eventTypes": {
-            "description": "an array of at most 3 item(s)",
             "items": {
               "enum": [
                 "cms.schema.published",
@@ -3129,19 +2925,19 @@
             },
             "maxItems": 3,
             "minItems": 1,
-            "title": "maxItems(3)",
             "type": "array"
           },
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "localeId": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UUID"
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
               },
               {
                 "type": "null"
@@ -3152,19 +2948,15 @@
             "type": "string"
           },
           "route": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "semanticTags": {
-            "description": "an array of at most 10 item(s)",
             "items": {
               "type": "string"
             },
             "maxItems": 10,
-            "title": "maxItems(10)",
             "type": "array"
           }
         },
@@ -3187,9 +2979,8 @@
             "type": "string"
           },
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -3213,9 +3004,8 @@
             ]
           },
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "name": {
@@ -3246,9 +3036,8 @@
             "type": "boolean"
           },
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "name": {
@@ -3267,9 +3056,8 @@
         "additionalProperties": false,
         "properties": {
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -3278,16 +3066,14 @@
         ],
         "type": "object"
       },
-      "ControlPlaneWebhookAttemptList": {
+      "ControlPlaneWebhookAttemptListEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 12 item(s)",
             "items": {
-              "$ref": "#/components/schemas/WebhookDeliveryAttempt"
+              "$ref": "#/components/schemas/WebhookDeliveryAttemptEncoded"
             },
             "maxItems": 12,
-            "title": "maxItems(12)",
             "type": "array"
           }
         },
@@ -3300,16 +3086,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneWebhookAttemptList"
+            "$ref": "#/components/schemas/ControlPlaneWebhookAttemptListEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -3327,22 +3111,22 @@
         ],
         "type": "object"
       },
-      "ControlPlaneWebhookDeliveryDetail": {
+      "ControlPlaneWebhookDeliveryDetailEncoded": {
         "additionalProperties": false,
         "properties": {
           "delivery": {
-            "$ref": "#/components/schemas/ControlPlaneWebhookDeliverySummary"
+            "$ref": "#/components/schemas/ControlPlaneWebhookDeliverySummaryEncoded"
           },
           "event": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SchemaPublishedWebhookEvent"
+                "$ref": "#/components/schemas/SchemaPublishedWebhookEventEncoded"
               },
               {
-                "$ref": "#/components/schemas/EntryPublishedWebhookEvent"
+                "$ref": "#/components/schemas/EntryPublishedWebhookEventEncoded"
               },
               {
-                "$ref": "#/components/schemas/EntryUnpublishedWebhookEvent"
+                "$ref": "#/components/schemas/EntryUnpublishedWebhookEventEncoded"
               }
             ]
           }
@@ -3357,16 +3141,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneWebhookDeliveryDetail"
+            "$ref": "#/components/schemas/ControlPlaneWebhookDeliveryDetailEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -3384,26 +3166,22 @@
         ],
         "type": "object"
       },
-      "ControlPlaneWebhookDeliveryPage": {
+      "ControlPlaneWebhookDeliveryPageEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ControlPlaneWebhookDeliverySummary"
+              "$ref": "#/components/schemas/ControlPlaneWebhookDeliverySummaryEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "nextCursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 512,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(512)",
                 "type": "string"
               },
               {
@@ -3422,16 +3200,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneWebhookDeliveryPage"
+            "$ref": "#/components/schemas/ControlPlaneWebhookDeliveryPageEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -3449,20 +3225,17 @@
         ],
         "type": "object"
       },
-      "ControlPlaneWebhookDeliverySummary": {
+      "ControlPlaneWebhookDeliverySummaryEncoded": {
         "additionalProperties": false,
         "properties": {
           "attemptCount": {
-            "description": "a number between 0 and 12",
             "maximum": 12,
             "minimum": 0,
-            "title": "between(0, 12)",
             "type": "integer"
           },
           "completedAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -3472,24 +3245,20 @@
             ]
           },
           "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "endpointId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "eventId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "eventTime": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
@@ -3502,9 +3271,8 @@
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "kind": {
@@ -3517,11 +3285,9 @@
           "lastOutcome": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[a-z][a-z0-9_]{0,63}$",
                 "maxLength": 64,
                 "minLength": 1,
                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
-                "title": "maxLength(64)",
                 "type": "string"
               },
               {
@@ -3532,7 +3298,6 @@
           "nextAttemptAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -3553,15 +3318,12 @@
             "type": "string"
           },
           "subject": {
-            "description": "a string matching the pattern ^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
             "maxLength": 64,
-            "minLength": 46,
+            "minLength": 23,
             "pattern": "^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
-            "title": "maxLength(64)",
             "type": "string"
           },
           "updatedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           }
@@ -3584,26 +3346,22 @@
         ],
         "type": "object"
       },
-      "ControlPlaneWebhookEndpointPage": {
+      "ControlPlaneWebhookEndpointPageEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/WebhookEndpoint"
+              "$ref": "#/components/schemas/WebhookEndpointEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "nextCursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 512,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(512)",
                 "type": "string"
               },
               {
@@ -3622,16 +3380,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneWebhookEndpointPage"
+            "$ref": "#/components/schemas/ControlPlaneWebhookEndpointPageEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -3653,16 +3409,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/WebhookEndpoint"
+            "$ref": "#/components/schemas/WebhookEndpointEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -3687,9 +3441,8 @@
             "type": "boolean"
           },
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "state": {
@@ -3711,16 +3464,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ReplayWebhookEventResult"
+            "$ref": "#/components/schemas/ReplayWebhookEventResultEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -3748,9 +3499,8 @@
             "type": "boolean"
           },
           "expectedVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -3760,18 +3510,16 @@
         ],
         "type": "object"
       },
-      "ControlPlaneWorkspace": {
+      "ControlPlaneWorkspaceEncoded": {
         "additionalProperties": false,
         "properties": {
           "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "name": {
@@ -3785,14 +3533,12 @@
             "type": "string"
           },
           "updatedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "version": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -3806,26 +3552,22 @@
         ],
         "type": "object"
       },
-      "ControlPlaneWorkspacePage": {
+      "ControlPlaneWorkspacePageEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ControlPlaneWorkspace"
+              "$ref": "#/components/schemas/ControlPlaneWorkspaceEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "nextCursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 512,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(512)",
                 "type": "string"
               },
               {
@@ -3844,16 +3586,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneWorkspacePage"
+            "$ref": "#/components/schemas/ControlPlaneWorkspacePageEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -3875,16 +3615,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/ControlPlaneWorkspace"
+            "$ref": "#/components/schemas/ControlPlaneWorkspaceEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -3902,50 +3640,46 @@
         ],
         "type": "object"
       },
-      "EntryPublishedWebhookData": {
+      "EntryPublishedWebhookDataEncoded": {
         "additionalProperties": false,
         "properties": {
           "aggregate": {
-            "$ref": "#/components/schemas/EntryWebhookAggregateAuthority"
+            "$ref": "#/components/schemas/EntryWebhookAggregateAuthorityEncoded"
           },
           "changes": {
-            "$ref": "#/components/schemas/WebhookChangeAuthority"
+            "$ref": "#/components/schemas/WebhookChangeAuthorityEncoded"
           },
           "collectionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "entryId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "environmentId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "invalidation": {
-            "$ref": "#/components/schemas/WebhookInvalidationAuthority"
+            "$ref": "#/components/schemas/WebhookInvalidationAuthorityEncoded"
           },
           "locale": {
-            "$ref": "#/components/schemas/WebhookLocaleAuthority"
+            "$ref": "#/components/schemas/WebhookLocaleAuthorityEncoded"
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "publication": {
-            "$ref": "#/components/schemas/WebhookPublicationAuthority"
+            "$ref": "#/components/schemas/WebhookPublicationAuthorityEncoded"
           },
           "schema": {
-            "$ref": "#/components/schemas/EntryWebhookSchemaAuthority"
+            "$ref": "#/components/schemas/EntryWebhookSchemaAuthorityEncoded"
           },
           "version": {
             "enum": [
@@ -3969,11 +3703,11 @@
         ],
         "type": "object"
       },
-      "EntryPublishedWebhookEvent": {
+      "EntryPublishedWebhookEventEncoded": {
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/EntryPublishedWebhookData"
+            "$ref": "#/components/schemas/EntryPublishedWebhookDataEncoded"
           },
           "datacontenttype": {
             "enum": [
@@ -3982,17 +3716,14 @@
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "source": {
-            "description": "a string matching the pattern ^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
             "maxLength": 160,
             "minLength": 1,
             "pattern": "^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
-            "title": "maxLength(160)",
             "type": "string"
           },
           "specversion": {
@@ -4002,15 +3733,12 @@
             "type": "string"
           },
           "subject": {
-            "description": "a string matching the pattern ^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
             "maxLength": 64,
-            "minLength": 46,
+            "minLength": 23,
             "pattern": "^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
-            "title": "maxLength(64)",
             "type": "string"
           },
           "time": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
@@ -4033,50 +3761,46 @@
         ],
         "type": "object"
       },
-      "EntryUnpublishedWebhookData": {
+      "EntryUnpublishedWebhookDataEncoded": {
         "additionalProperties": false,
         "properties": {
           "aggregate": {
-            "$ref": "#/components/schemas/EntryWebhookAggregateAuthority"
+            "$ref": "#/components/schemas/EntryWebhookAggregateAuthorityEncoded"
           },
           "changes": {
-            "$ref": "#/components/schemas/WebhookChangeAuthority"
+            "$ref": "#/components/schemas/WebhookChangeAuthorityEncoded"
           },
           "collectionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "entryId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "environmentId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "invalidation": {
-            "$ref": "#/components/schemas/WebhookInvalidationAuthority"
+            "$ref": "#/components/schemas/WebhookInvalidationAuthorityEncoded"
           },
           "locale": {
-            "$ref": "#/components/schemas/WebhookLocaleAuthority"
+            "$ref": "#/components/schemas/WebhookLocaleAuthorityEncoded"
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "publication": {
-            "$ref": "#/components/schemas/WebhookPublicationAuthority"
+            "$ref": "#/components/schemas/WebhookPublicationAuthorityEncoded"
           },
           "schema": {
-            "$ref": "#/components/schemas/EntryWebhookSchemaAuthority"
+            "$ref": "#/components/schemas/EntryWebhookSchemaAuthorityEncoded"
           },
           "version": {
             "enum": [
@@ -4100,11 +3824,11 @@
         ],
         "type": "object"
       },
-      "EntryUnpublishedWebhookEvent": {
+      "EntryUnpublishedWebhookEventEncoded": {
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/EntryUnpublishedWebhookData"
+            "$ref": "#/components/schemas/EntryUnpublishedWebhookDataEncoded"
           },
           "datacontenttype": {
             "enum": [
@@ -4113,17 +3837,14 @@
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "source": {
-            "description": "a string matching the pattern ^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
             "maxLength": 160,
             "minLength": 1,
             "pattern": "^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
-            "title": "maxLength(160)",
             "type": "string"
           },
           "specversion": {
@@ -4133,15 +3854,12 @@
             "type": "string"
           },
           "subject": {
-            "description": "a string matching the pattern ^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
             "maxLength": 64,
-            "minLength": 46,
+            "minLength": 23,
             "pattern": "^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
-            "title": "maxLength(64)",
             "type": "string"
           },
           "time": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
@@ -4164,19 +3882,17 @@
         ],
         "type": "object"
       },
-      "EntryWebhookAggregateAuthority": {
+      "EntryWebhookAggregateAuthorityEncoded": {
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "sequence": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "type": {
@@ -4193,21 +3909,18 @@
         ],
         "type": "object"
       },
-      "EntryWebhookSchemaAuthority": {
+      "EntryWebhookSchemaAuthorityEncoded": {
         "additionalProperties": false,
         "properties": {
           "contractHash": {
-            "description": "a string matching the pattern ^[0-9a-f]{64}$",
             "maxLength": 64,
-            "minLength": 64,
+            "minLength": 32,
             "pattern": "^[0-9a-f]{64}$",
-            "title": "length(64)",
             "type": "string"
           },
           "revisionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           }
         },
@@ -4217,45 +3930,39 @@
         ],
         "type": "object"
       },
-      "InspectedProjectInvitation": {
+      "InspectedProjectInvitationEncoded": {
         "additionalProperties": false,
         "properties": {
           "expiresAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "inviterName": {
-            "description": "a string at most 255 character(s) long",
             "maxLength": 255,
             "minLength": 1,
-            "title": "maxLength(255)",
             "type": "string"
           },
           "localeAccess": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllProjectLocaleAccess"
+                "$ref": "#/components/schemas/AllProjectLocaleAccessEncoded"
               },
               {
-                "$ref": "#/components/schemas/SelectedProjectLocaleAccess"
+                "$ref": "#/components/schemas/SelectedProjectLocaleAccessEncoded"
               },
               {
-                "$ref": "#/components/schemas/NoProjectLocaleAccess"
+                "$ref": "#/components/schemas/NoProjectLocaleAccessEncoded"
               }
             ]
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "projectName": {
-            "description": "a string at most 100 character(s) long",
             "maxLength": 100,
             "minLength": 1,
-            "title": "maxLength(100)",
             "type": "string"
           },
           "role": {
@@ -4281,26 +3988,23 @@
         ],
         "type": "object"
       },
-      "InvalidationRouteMapping": {
+      "InvalidationRouteMappingEncoded": {
         "additionalProperties": false,
         "properties": {
           "collectionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "entryId": {
             "anyOf": [
               {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               {
@@ -4309,13 +4013,11 @@
             ]
           },
           "environmentId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "eventTypes": {
-            "description": "an array of at most 3 item(s)",
             "items": {
               "enum": [
                 "cms.schema.published",
@@ -4326,21 +4028,18 @@
             },
             "maxItems": 3,
             "minItems": 1,
-            "title": "maxItems(3)",
             "type": "array"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "localeId": {
             "anyOf": [
               {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               {
@@ -4352,25 +4051,20 @@
             "type": "string"
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "route": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "semanticTags": {
-            "description": "an array of at most 10 item(s)",
             "items": {
               "type": "string"
             },
             "maxItems": 10,
-            "title": "maxItems(10)",
             "type": "array"
           },
           "state": {
@@ -4381,14 +4075,12 @@
             "type": "string"
           },
           "updatedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "version": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -4410,18 +4102,16 @@
         ],
         "type": "object"
       },
-      "IssuedProjectInvitation": {
+      "IssuedProjectInvitationEncoded": {
         "additionalProperties": false,
         "properties": {
           "invitation": {
-            "$ref": "#/components/schemas/ProjectInvitation"
+            "$ref": "#/components/schemas/ProjectInvitationEncoded"
           },
           "token": {
-            "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
             "maxLength": 43,
-            "minLength": 43,
+            "minLength": 22,
             "pattern": "^[A-Za-z0-9_-]+$",
-            "title": "length(43)",
             "type": "string"
           }
         },
@@ -4431,18 +4121,16 @@
         ],
         "type": "object"
       },
-      "IssuedWebhookEndpoint": {
+      "IssuedWebhookEndpointEncoded": {
         "additionalProperties": false,
         "properties": {
           "endpoint": {
-            "$ref": "#/components/schemas/WebhookEndpoint"
+            "$ref": "#/components/schemas/WebhookEndpointEncoded"
           },
           "secret": {
-            "description": "a string matching the pattern ^whsec_[A-Za-z0-9_-]{43}$",
             "maxLength": 49,
-            "minLength": 49,
+            "minLength": 25,
             "pattern": "^whsec_[A-Za-z0-9_-]{43}$",
-            "title": "length(49)",
             "type": "string"
           }
         },
@@ -4452,7 +4140,7 @@
         ],
         "type": "object"
       },
-      "NoProjectLocaleAccess": {
+      "NoProjectLocaleAccessEncoded": {
         "additionalProperties": false,
         "properties": {
           "mode": {
@@ -4473,10 +4161,8 @@
             "additionalProperties": false,
             "properties": {
               "id": {
-                "description": "a string at most 255 character(s) long",
                 "maxLength": 255,
                 "minLength": 1,
-                "title": "maxLength(255)",
                 "type": "string"
               },
               "kind": {
@@ -4496,9 +4182,8 @@
             "additionalProperties": false,
             "properties": {
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -4516,13 +4201,12 @@
           }
         ]
       },
-      "ProjectInvitation": {
+      "ProjectInvitationEncoded": {
         "additionalProperties": false,
         "properties": {
           "acceptedAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -4532,7 +4216,6 @@
             ]
           },
           "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
@@ -4540,39 +4223,35 @@
             "type": "string"
           },
           "expiresAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "localeAccess": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllProjectLocaleAccess"
+                "$ref": "#/components/schemas/AllProjectLocaleAccessEncoded"
               },
               {
-                "$ref": "#/components/schemas/SelectedProjectLocaleAccess"
+                "$ref": "#/components/schemas/SelectedProjectLocaleAccessEncoded"
               },
               {
-                "$ref": "#/components/schemas/NoProjectLocaleAccess"
+                "$ref": "#/components/schemas/NoProjectLocaleAccessEncoded"
               }
             ]
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "revokedAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -4603,14 +4282,12 @@
             "type": "string"
           },
           "updatedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "version": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -4630,11 +4307,10 @@
         ],
         "type": "object"
       },
-      "ProjectLocale": {
+      "ProjectLocaleEncoded": {
         "additionalProperties": false,
         "properties": {
           "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
@@ -4642,17 +4318,15 @@
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "position": {
             "anyOf": [
               {
-                "description": "a non-negative number",
+                "maximum": 9007199254740991,
                 "minimum": 0,
-                "title": "greaterThanOrEqualTo(0)",
                 "type": "integer"
               },
               {
@@ -4661,9 +4335,8 @@
             ]
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "status": {
@@ -4678,20 +4351,17 @@
             "type": "string"
           },
           "updatedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "version": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "workspaceId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           }
         },
@@ -4709,11 +4379,10 @@
         ],
         "type": "object"
       },
-      "ProjectMember": {
+      "ProjectMemberEncoded": {
         "additionalProperties": false,
         "properties": {
           "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
@@ -4721,41 +4390,36 @@
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "localeAccess": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AllProjectLocaleAccess"
+                "$ref": "#/components/schemas/AllProjectLocaleAccessEncoded"
               },
               {
-                "$ref": "#/components/schemas/SelectedProjectLocaleAccess"
+                "$ref": "#/components/schemas/SelectedProjectLocaleAccessEncoded"
               },
               {
-                "$ref": "#/components/schemas/NoProjectLocaleAccess"
+                "$ref": "#/components/schemas/NoProjectLocaleAccessEncoded"
               }
             ]
           },
           "name": {
-            "description": "a string at most 255 character(s) long",
             "maxLength": 255,
             "minLength": 1,
-            "title": "maxLength(255)",
             "type": "string"
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "removedAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -4777,21 +4441,17 @@
             "type": "string"
           },
           "updatedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "userId": {
-            "description": "a string at most 255 character(s) long",
             "maxLength": 255,
             "minLength": 1,
-            "title": "maxLength(255)",
             "type": "string"
           },
           "version": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -4810,29 +4470,24 @@
         ],
         "type": "object"
       },
-      "PublishedWebhookSchemaAuthority": {
+      "PublishedWebhookSchemaAuthorityEncoded": {
         "additionalProperties": false,
         "properties": {
           "contractHash": {
-            "description": "a string matching the pattern ^[0-9a-f]{64}$",
             "maxLength": 64,
-            "minLength": 64,
+            "minLength": 32,
             "pattern": "^[0-9a-f]{64}$",
-            "title": "length(64)",
             "type": "string"
           },
           "revisionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "schemaHash": {
-            "description": "a string matching the pattern ^[0-9a-f]{64}$",
             "maxLength": 64,
-            "minLength": 64,
+            "minLength": 32,
             "pattern": "^[0-9a-f]{64}$",
-            "title": "length(64)",
             "type": "string"
           }
         },
@@ -4843,11 +4498,11 @@
         ],
         "type": "object"
       },
-      "ReplayWebhookEventResult": {
+      "ReplayWebhookEventResultEncoded": {
         "additionalProperties": false,
         "properties": {
           "delivery": {
-            "$ref": "#/components/schemas/WebhookDelivery"
+            "$ref": "#/components/schemas/WebhookDeliveryEncoded"
           },
           "replayedBy": {
             "$ref": "#/components/schemas/ProjectActor"
@@ -4859,27 +4514,23 @@
         ],
         "type": "object"
       },
-      "RotatedWebhookSecret": {
+      "RotatedWebhookSecretEncoded": {
         "additionalProperties": false,
         "properties": {
           "endpointId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "secret": {
-            "description": "a string matching the pattern ^whsec_[A-Za-z0-9_-]{43}$",
             "maxLength": 49,
-            "minLength": 49,
+            "minLength": 25,
             "pattern": "^whsec_[A-Za-z0-9_-]{43}$",
-            "title": "length(49)",
             "type": "string"
           },
           "secretId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "state": {
@@ -4897,38 +4548,35 @@
         ],
         "type": "object"
       },
-      "SchemaPublishedWebhookData": {
+      "SchemaPublishedWebhookDataEncoded": {
         "additionalProperties": false,
         "properties": {
           "aggregate": {
-            "$ref": "#/components/schemas/CollectionWebhookAggregateAuthority"
+            "$ref": "#/components/schemas/CollectionWebhookAggregateAuthorityEncoded"
           },
           "changes": {
-            "$ref": "#/components/schemas/WebhookChangeAuthority"
+            "$ref": "#/components/schemas/WebhookChangeAuthorityEncoded"
           },
           "collectionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "environmentId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "invalidation": {
-            "$ref": "#/components/schemas/WebhookInvalidationAuthority"
+            "$ref": "#/components/schemas/WebhookInvalidationAuthorityEncoded"
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "schema": {
-            "$ref": "#/components/schemas/PublishedWebhookSchemaAuthority"
+            "$ref": "#/components/schemas/PublishedWebhookSchemaAuthorityEncoded"
           },
           "version": {
             "enum": [
@@ -4949,11 +4597,11 @@
         ],
         "type": "object"
       },
-      "SchemaPublishedWebhookEvent": {
+      "SchemaPublishedWebhookEventEncoded": {
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/SchemaPublishedWebhookData"
+            "$ref": "#/components/schemas/SchemaPublishedWebhookDataEncoded"
           },
           "datacontenttype": {
             "enum": [
@@ -4962,17 +4610,14 @@
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "source": {
-            "description": "a string matching the pattern ^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
             "maxLength": 160,
             "minLength": 1,
             "pattern": "^urn:framerfordevs:project:[0-9a-f-]{36}:environment:[0-9a-f-]{36}$",
-            "title": "maxLength(160)",
             "type": "string"
           },
           "specversion": {
@@ -4982,15 +4627,12 @@
             "type": "string"
           },
           "subject": {
-            "description": "a string matching the pattern ^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
             "maxLength": 64,
-            "minLength": 46,
+            "minLength": 23,
             "pattern": "^cms\\.(?:collection|entry)\\/[0-9a-f-]{36}$",
-            "title": "maxLength(64)",
             "type": "string"
           },
           "time": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
@@ -5013,20 +4655,17 @@
         ],
         "type": "object"
       },
-      "SelectedProjectLocaleAccess": {
+      "SelectedProjectLocaleAccessEncoded": {
         "additionalProperties": false,
         "properties": {
           "localeIds": {
-            "description": "an array of at most 100 item(s)",
             "items": {
-              "description": "a Universally Unique Identifier",
               "format": "uuid",
-              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
               "type": "string"
             },
             "maxItems": 100,
             "minItems": 1,
-            "title": "maxItems(100)",
             "type": "array"
           },
           "mode": {
@@ -5042,50 +4681,41 @@
         ],
         "type": "object"
       },
-      "StudioRegistration": {
+      "StudioRegistrationEncoded": {
         "additionalProperties": false,
         "properties": {
           "applicationOrigin": {
-            "description": "a string at most 2048 character(s) long",
             "maxLength": 2048,
             "minLength": 1,
-            "title": "maxLength(2048)",
             "type": "string"
           },
           "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "environmentId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "mountPath": {
-            "description": "a string at most 240 character(s) long",
             "maxLength": 240,
             "minLength": 1,
-            "title": "maxLength(240)",
             "type": "string"
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "runtimeChangedAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -5097,10 +4727,8 @@
           "runtimeChangedByUserId": {
             "anyOf": [
               {
-                "description": "a string at most 255 character(s) long",
                 "maxLength": 255,
                 "minLength": 1,
-                "title": "maxLength(255)",
                 "type": "string"
               },
               {
@@ -5116,14 +4744,12 @@
             "type": "string"
           },
           "updatedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "version": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -5146,16 +4772,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/StudioRegistration"
+            "$ref": "#/components/schemas/StudioRegistrationEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -5173,25 +4797,16 @@
         ],
         "type": "object"
       },
-      "UUID": {
-        "description": "a Universally Unique Identifier",
-        "format": "uuid",
-        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-        "type": "string"
-      },
-      "WebhookChangeAuthority": {
+      "WebhookChangeAuthorityEncoded": {
         "additionalProperties": false,
         "properties": {
           "fieldIds": {
-            "description": "an array of at most 1000 item(s)",
             "items": {
-              "description": "a Universally Unique Identifier",
               "format": "uuid",
-              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
               "type": "string"
             },
             "maxItems": 1000,
-            "title": "maxItems(1000)",
             "type": "array"
           }
         },
@@ -5200,145 +4815,17 @@
         ],
         "type": "object"
       },
-      "WebhookDelivery": {
-        "additionalProperties": false,
-        "properties": {
-          "attemptCount": {
-            "description": "a number between 0 and 12",
-            "maximum": 12,
-            "minimum": 0,
-            "title": "between(0, 12)",
-            "type": "integer"
-          },
-          "completedAt": {
-            "anyOf": [
-              {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
-                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
-            "type": "string"
-          },
-          "endpointId": {
-            "description": "a Universally Unique Identifier",
-            "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-            "type": "string"
-          },
-          "event": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SchemaPublishedWebhookEvent"
-              },
-              {
-                "$ref": "#/components/schemas/EntryPublishedWebhookEvent"
-              },
-              {
-                "$ref": "#/components/schemas/EntryUnpublishedWebhookEvent"
-              }
-            ]
-          },
-          "eventId": {
-            "description": "a Universally Unique Identifier",
-            "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-            "type": "string"
-          },
-          "id": {
-            "description": "a Universally Unique Identifier",
-            "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-            "type": "string"
-          },
-          "kind": {
-            "enum": [
-              "initial",
-              "replay"
-            ],
-            "type": "string"
-          },
-          "lastOutcome": {
-            "anyOf": [
-              {
-                "description": "a string matching the pattern ^[a-z][a-z0-9_]{0,63}$",
-                "maxLength": 64,
-                "minLength": 1,
-                "pattern": "^[a-z][a-z0-9_]{0,63}$",
-                "title": "maxLength(64)",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "nextAttemptAt": {
-            "anyOf": [
-              {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
-                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "status": {
-            "enum": [
-              "queued",
-              "delivering",
-              "retry_scheduled",
-              "succeeded",
-              "dead_letter",
-              "canceled"
-            ],
-            "type": "string"
-          },
-          "updatedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "eventId",
-          "endpointId",
-          "event",
-          "kind",
-          "status",
-          "attemptCount",
-          "nextAttemptAt",
-          "completedAt",
-          "lastOutcome",
-          "createdAt",
-          "updatedAt"
-        ],
-        "type": "object"
-      },
-      "WebhookDeliveryAttempt": {
+      "WebhookDeliveryAttemptEncoded": {
         "additionalProperties": false,
         "properties": {
           "attemptNumber": {
-            "description": "a number between 1 and 12",
             "maximum": 12,
             "minimum": 1,
-            "title": "between(1, 12)",
             "type": "integer"
           },
           "completedAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -5348,17 +4835,15 @@
             ]
           },
           "deliveryId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "durationMs": {
             "anyOf": [
               {
-                "description": "a non-negative number",
+                "maximum": 9007199254740991,
                 "minimum": 0,
-                "title": "greaterThanOrEqualTo(0)",
                 "type": "integer"
               },
               {
@@ -5367,24 +4852,20 @@
             ]
           },
           "endpointId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "eventId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "httpStatus": {
             "anyOf": [
               {
-                "description": "a number between 100 and 599",
                 "maximum": 599,
                 "minimum": 100,
-                "title": "between(100, 599)",
                 "type": "integer"
               },
               {
@@ -5393,15 +4874,13 @@
             ]
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "nextAttemptAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -5413,11 +4892,9 @@
           "outcome": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[a-z][a-z0-9_]{0,63}$",
                 "maxLength": 64,
                 "minLength": 1,
                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
-                "title": "maxLength(64)",
                 "type": "string"
               },
               {
@@ -5426,7 +4903,6 @@
             ]
           },
           "startedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
@@ -5476,32 +4952,141 @@
         ],
         "type": "object"
       },
-      "WebhookEndpoint": {
+      "WebhookDeliveryEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "attemptCount": {
+            "maximum": 12,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+            "type": "string"
+          },
+          "endpointId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "event": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SchemaPublishedWebhookEventEncoded"
+              },
+              {
+                "$ref": "#/components/schemas/EntryPublishedWebhookEventEncoded"
+              },
+              {
+                "$ref": "#/components/schemas/EntryUnpublishedWebhookEventEncoded"
+              }
+            ]
+          },
+          "eventId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "initial",
+              "replay"
+            ],
+            "type": "string"
+          },
+          "lastOutcome": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nextAttemptAt": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "delivering",
+              "retry_scheduled",
+              "succeeded",
+              "dead_letter",
+              "canceled"
+            ],
+            "type": "string"
+          },
+          "updatedAt": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "endpointId",
+          "event",
+          "kind",
+          "status",
+          "attemptCount",
+          "nextAttemptAt",
+          "completedAt",
+          "lastOutcome",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "WebhookEndpointEncoded": {
         "additionalProperties": false,
         "properties": {
           "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "deadLetterCount": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "destinationOrigin": {
-            "description": "a string matching the pattern ^https:\\/\\/[^/?#\\s]+$",
             "maxLength": 255,
-            "minLength": 9,
+            "minLength": 5,
             "pattern": "^https:\\/\\/[^/?#\\s]+$",
-            "title": "maxLength(255)",
             "type": "string"
           },
           "disabledAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -5513,7 +5098,6 @@
           "enabledAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -5523,25 +5107,21 @@
             ]
           },
           "environmentId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "lastOutcome": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[a-z][a-z0-9_]{0,63}$",
                 "maxLength": 64,
                 "minLength": 1,
                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
-                "title": "maxLength(64)",
                 "type": "string"
               },
               {
@@ -5553,15 +5133,13 @@
             "type": "string"
           },
           "projectId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "rotationEndsAt": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
                 "type": "string"
               },
@@ -5595,7 +5173,6 @@
             "type": "string"
           },
           "subscriptions": {
-            "description": "an array of at most 3 item(s)",
             "items": {
               "enum": [
                 "cms.schema.published",
@@ -5606,18 +5183,15 @@
             },
             "maxItems": 3,
             "minItems": 1,
-            "title": "maxItems(3)",
             "type": "array"
           },
           "updatedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "version": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -5641,43 +5215,33 @@
         ],
         "type": "object"
       },
-      "WebhookInvalidationAuthority": {
+      "WebhookInvalidationAuthorityEncoded": {
         "additionalProperties": false,
         "properties": {
           "routes": {
-            "description": "an array of at most 100 item(s)",
             "items": {
-              "description": "a string at most 512 character(s) long",
               "maxLength": 512,
               "minLength": 1,
-              "title": "maxLength(512)",
               "type": "string"
             },
             "maxItems": 100,
-            "title": "maxItems(100)",
             "type": "array"
           },
           "semanticTags": {
-            "description": "an array of at most 100 item(s)",
             "items": {
               "type": "string"
             },
             "maxItems": 100,
-            "title": "maxItems(100)",
             "type": "array"
           },
           "systemTags": {
-            "description": "an array of at most 1005 item(s)",
             "items": {
-              "description": "a string matching the pattern ^(?:project|environment|collection|entry|locale|field):[0-9a-f-]{36}$",
               "maxLength": 64,
-              "minLength": 38,
+              "minLength": 19,
               "pattern": "^(?:project|environment|collection|entry|locale|field):[0-9a-f-]{36}$",
-              "title": "maxLength(64)",
               "type": "string"
             },
             "maxItems": 1005,
-            "title": "maxItems(1005)",
             "type": "array"
           }
         },
@@ -5688,13 +5252,12 @@
         ],
         "type": "object"
       },
-      "WebhookLocaleAuthority": {
+      "WebhookLocaleAuthorityEncoded": {
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "tag": {
@@ -5707,19 +5270,17 @@
         ],
         "type": "object"
       },
-      "WebhookPublicationAuthority": {
+      "WebhookPublicationAuthorityEncoded": {
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "sequence": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },

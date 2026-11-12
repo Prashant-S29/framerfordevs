@@ -3,8 +3,8 @@ import { performance } from "node:perf_hooks";
 
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const priorOAuthRollout = process.env.OAUTH_DEVICE_AUTHORIZATION_ENABLED;
 process.env.OAUTH_DEVICE_AUTHORIZATION_ENABLED = "true";
 
@@ -63,7 +63,7 @@ beforeAll(async () => {
     effectModule,
   ] = await Promise.all([
     import("../../src/app"),
-    import("@framerfordevs/api/runtime/index"),
+    import("@framerfordevs/api/runtime"),
     import("@framerfordevs/db"),
     import("@framerfordevs/db/query"),
     import("@framerfordevs/db/schema/access"),
@@ -73,8 +73,8 @@ beforeAll(async () => {
     import("@framerfordevs/db/schema/platform"),
     import("@framerfordevs/api/services/platform-repository"),
     import("@framerfordevs/api/services/schema/repository"),
-    import("@framerfordevs/api/contracts/platform/index"),
-    import("@framerfordevs/api/contracts/schema/index"),
+    import("@framerfordevs/api/contracts/platform"),
+    import("@framerfordevs/api/contracts/schema"),
     import("effect"),
   ]);
 
@@ -92,13 +92,17 @@ beforeAll(async () => {
   ownerId = signUp.body.user.id;
 
   const { Effect } = effectModule;
-  const owner = SchemaStrict.decodeUnknownSync(platformContracts.AuthUserId)(ownerId);
+  const owner = Schema.decodeUnknownSync(platformContracts.AuthUserId, {
+    onExcessProperty: "error",
+  })(ownerId);
   const platform = platformServices.makePlatformRepository();
   const schemas = schemaServices.makeSchemaRepository();
   const workspace = await Effect.runPromise(
     platform.createWorkspace(
       owner,
-      SchemaStrict.decodeUnknownSync(platformContracts.CreateWorkspaceInput)({
+      Schema.decodeUnknownSync(platformContracts.CreateWorkspaceInput, {
+        onExcessProperty: "error",
+      })({
         name: "M12 Tooling Readiness Workspace",
       }),
       `m12-tooling-workspace-${suffix}`,
@@ -110,7 +114,9 @@ beforeAll(async () => {
     Effect.runPromise(
       platform.createProject(
         owner,
-        SchemaStrict.decodeUnknownSync(platformContracts.CreateProjectInput)({
+        Schema.decodeUnknownSync(platformContracts.CreateProjectInput, {
+          onExcessProperty: "error",
+        })({
           workspaceId,
           name,
           key,
@@ -137,7 +143,9 @@ beforeAll(async () => {
   await Effect.runPromise(
     platform.enableCapability(
       owner,
-      SchemaStrict.decodeUnknownSync(platformContracts.EnableCapabilityInput)({
+      Schema.decodeUnknownSync(platformContracts.EnableCapabilityInput, {
+        onExcessProperty: "error",
+      })({
         projectId,
         capability: "cms",
       }),
@@ -149,7 +157,9 @@ beforeAll(async () => {
     const created = await Effect.runPromise(
       schemas.createCollection(
         owner,
-        SchemaStrict.decodeUnknownSync(schemaContracts.CreateCollectionInput)({
+        Schema.decodeUnknownSync(schemaContracts.CreateCollectionInput, {
+          onExcessProperty: "error",
+        })({
           projectId,
           environmentId,
           apiKey: key,
@@ -163,7 +173,9 @@ beforeAll(async () => {
     const draft = await Effect.runPromise(
       schemas.createField(
         owner,
-        SchemaStrict.decodeUnknownSync(schemaContracts.CreateCollectionFieldInput)({
+        Schema.decodeUnknownSync(schemaContracts.CreateCollectionFieldInput, {
+          onExcessProperty: "error",
+        })({
           projectId,
           environmentId,
           collectionId: created.id,
@@ -188,13 +200,17 @@ beforeAll(async () => {
     const validation = await Effect.runPromise(
       schemas.validateSchema(
         owner,
-        SchemaStrict.decodeUnknownSync(schemaContracts.ValidateCollectionSchemaInput)(scope),
+        Schema.decodeUnknownSync(schemaContracts.ValidateCollectionSchemaInput, {
+          onExcessProperty: "error",
+        })(scope),
       ),
     );
     const published = await Effect.runPromise(
       schemas.publishSchema(
         owner,
-        SchemaStrict.decodeUnknownSync(schemaContracts.PublishCollectionSchemaInput)({
+        Schema.decodeUnknownSync(schemaContracts.PublishCollectionSchemaInput, {
+          onExcessProperty: "error",
+        })({
           ...scope,
           draftVersion: draft.collection.draftVersion,
           expectedPublishedRevisionId: null,

@@ -1,6 +1,4 @@
-// Verifies credential secrets and lifecycle before applying optional tenant/resource scope policy.
-
-import { Clock, Context, Effect, Result, Layer } from "effect";
+import { Clock, Context, Effect, Result, Layer, Schema } from "effect";
 
 import {
   CredentialPrincipal,
@@ -16,7 +14,6 @@ import { CredentialRepository } from "./repository";
 import { PolicyService } from "../policy";
 import { SecretGenerator, parseCredentialKey } from "../secret-generator";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 export interface VerifyCredentialInput {
   readonly key: string;
   readonly expectedFamily: CredentialFamily;
@@ -30,7 +27,6 @@ export interface AuthenticateCredentialInput extends VerifyCredentialInput {
   readonly environmentId: string;
 }
 
-/** Creates base verification and scope-bound authentication over shared security services. */
 export function makeCredentialAuthenticator() {
   const verifyBase = Effect.fn("CredentialAuthenticator.verifyBase")(function* (
     input: VerifyCredentialInput,
@@ -94,7 +90,7 @@ export function makeCredentialAuthenticator() {
     });
     if (!decision.allowed) return yield* reject();
 
-    const principal = yield* SchemaStrict.decodeUnknownEffect(CredentialPrincipal)({
+    const principal = yield* Schema.decodeUnknownEffect(CredentialPrincipal)({
       credentialId: record.credential.id,
       workspaceId: record.credential.workspaceId,
       projectId: record.credential.projectId,

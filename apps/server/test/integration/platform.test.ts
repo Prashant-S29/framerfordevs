@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { disposeApplicationRuntime } from "@framerfordevs/api/runtime/index";
+import { disposeApplicationRuntime } from "@framerfordevs/api/runtime";
 import { db } from "@framerfordevs/db";
 import { and, eq, or } from "@framerfordevs/db/query";
 import {
@@ -841,13 +841,19 @@ describe("platform API contracts", () => {
   });
 
   it("updates with optimistic concurrency and rejects a stale version", async () => {
-    const updated = await rpc(firstAgent, "platform/projects/update", {
+    const immutableChange = await rpc(firstAgent, "platform/projects/update", {
       projectId,
       version: projectVersion,
       name: "Updated API Project",
       description: null,
       key: "attempted-key-change",
       workspaceId: secondWorkspaceId,
+    });
+    const updated = await rpc(firstAgent, "platform/projects/update", {
+      projectId,
+      version: projectVersion,
+      name: "Updated API Project",
+      description: null,
     });
     projectVersion = updated.body.json.data.version;
     const stale = await rpc(firstAgent, "platform/projects/update", {
@@ -857,6 +863,8 @@ describe("platform API contracts", () => {
       description: null,
     });
 
+    expect(immutableChange.status).toBe(400);
+    expect(immutableChange.body.json.data.error.code).toBe("VALIDATION_ERROR");
     expect(updated.status).toBe(200);
     expect(updated.body.json.data.name).toBe("Updated API Project");
     expect(updated.body.json.data.key).toBe("api-project");

@@ -1,5 +1,3 @@
-// Records only closed, low-cardinality M11 worker metrics; resource identities never become labels.
-
 import { Context, Effect, Layer, Metric } from "effect";
 
 import type { WebhookPublicEventType } from "../../contracts/webhook";

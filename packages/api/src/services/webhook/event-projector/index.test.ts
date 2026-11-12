@@ -1,5 +1,3 @@
-// Verifies the replaceable projector preserves typed invalid-event failures.
-
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Exit } from "effect";
 

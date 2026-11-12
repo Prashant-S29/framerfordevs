@@ -1,5 +1,3 @@
-// Builds the bounded current-user Studio bootstrap projection from authorized current state.
-
 import type { CanonicalEmail, ProjectRole } from "../../../contracts/access";
 import type {
   StudioApplicationOrigin,

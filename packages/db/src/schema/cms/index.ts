@@ -1,5 +1,3 @@
-// Defines tenant-scoped CMS schemas, immutable schema/content history, draft heads, and outbox persistence.
-
 import { relations, sql } from "drizzle-orm";
 import {
   bigint,

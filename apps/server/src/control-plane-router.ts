@@ -1,19 +1,17 @@
-// Owns the bearer-only, originless Control Plane v1 Express transport boundary.
-
-import { listProjectAuditEvents } from "@framerfordevs/api/operations/audit/index";
+import { listProjectAuditEvents } from "@framerfordevs/api/operations/audit";
 import {
   type ApplicationEffectTransform,
   createContext,
   type Context,
 } from "@framerfordevs/api/context";
-import { controlPlaneLimits } from "@framerfordevs/api/contracts/control-plane/index";
+import { controlPlaneLimits } from "@framerfordevs/api/contracts/control-plane";
 import {
   apiFailure,
   type ApiData,
   type ApiResponse,
-} from "@framerfordevs/api/contracts/response/api/index";
-import type { RateLimitDecision } from "@framerfordevs/api/contracts/rate-limit/index";
-import { selectCanonicalNetworkSource } from "@framerfordevs/api/lib/network-source/index";
+} from "@framerfordevs/api/contracts/response/api";
+import type { RateLimitDecision } from "@framerfordevs/api/contracts/rate-limit";
+import { selectCanonicalNetworkSource } from "@framerfordevs/api/lib/network-source";
 import {
   acceptInvitation as acceptControlPlaneInvitation,
   createInvitation as createControlPlaneInvitation,
@@ -29,7 +27,7 @@ import {
   updateLocale as updateControlPlaneLocale,
   updateLocaleStatus as updateControlPlaneLocaleStatus,
   updateMemberPolicy as updateControlPlaneMemberPolicy,
-} from "@framerfordevs/api/operations/control-plane/governance/index";
+} from "@framerfordevs/api/operations/control-plane/governance";
 import {
   archiveProject as archiveControlPlaneProject,
   createProject as createControlPlaneProject,
@@ -45,14 +43,14 @@ import {
   setStudioRuntime as setControlPlaneStudioRuntime,
   restoreProject as restoreControlPlaneProject,
   updateProject as updateControlPlaneProject,
-} from "@framerfordevs/api/operations/control-plane/index";
+} from "@framerfordevs/api/operations/control-plane";
 import {
   changeControlPlaneCredentialRotation,
   issueControlPlaneCredential,
   listControlPlaneCredentials,
   revokeControlPlaneCredential,
   startControlPlaneCredentialRotation,
-} from "@framerfordevs/api/operations/control-plane/operational/index";
+} from "@framerfordevs/api/operations/control-plane/operational";
 import {
   changeControlPlaneWebhookSecretRotation,
   createControlPlaneInvalidationMapping,
@@ -129,16 +127,16 @@ import {
   evaluateControlPlanePrincipalRateLimit,
   type ControlPlaneBearerRequirement,
   type ControlPlanePrincipal,
-} from "@framerfordevs/api/operations/control-plane/public/index";
-import { makeRequestContext } from "@framerfordevs/api/observability/request-context/index";
+} from "@framerfordevs/api/operations/control-plane/public";
+import { makeRequestContext } from "@framerfordevs/api/observability/request-context";
 import {
   type ControlPlaneCostBucket,
   type ControlPlaneOperation,
   type ControlPlaneSubject,
   toStatusFamily,
-} from "@framerfordevs/api/observability/telemetry/index";
-import { observeControlPlaneRequest, reportBoundaryDefect } from "@framerfordevs/api/runtime/index";
-import { requireSession } from "@framerfordevs/api/operations/system/index";
+} from "@framerfordevs/api/observability/telemetry";
+import { observeControlPlaneRequest, reportBoundaryDefect } from "@framerfordevs/api/runtime";
+import { requireSession } from "@framerfordevs/api/operations/system";
 import { apiReference } from "@scalar/express-api-reference";
 import { fromNodeHeaders } from "better-auth/node";
 import express, { type NextFunction, type Request, type Response, type Router } from "express";

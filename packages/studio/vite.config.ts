@@ -15,7 +15,6 @@ export default defineConfig({
         entryFileNames: "assets/studio-[hash].js",
         chunkFileNames: "assets/chunk/[name]-[hash].js",
         assetFileNames: "assets/studio-[hash][extname]",
-        // Keeps React and its CommonJS helpers in one vendor chunk, matching the reviewed M19B chunk graph.
         codeSplitting: {
           groups: [
             {

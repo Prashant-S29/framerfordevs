@@ -2,8 +2,8 @@ import { assert, describe, it } from "@effect/vitest";
 
 import { CollectionSourceKey, ProjectStructureManifestHash } from "../../../contracts/authoring";
 import { computeSchemaPlanHash, validateCompleteProjectSchema } from "./index";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 function project() {
   return {
     collections: [
@@ -25,12 +25,18 @@ function project() {
   };
 }
 
-const postsSourceKey = SchemaStrict.decodeUnknownSync(CollectionSourceKey)("posts");
-const pagesSourceKey = SchemaStrict.decodeUnknownSync(CollectionSourceKey)("pages");
-const manifestHash = SchemaStrict.decodeUnknownSync(ProjectStructureManifestHash)("a".repeat(64));
-const otherManifestHash = SchemaStrict.decodeUnknownSync(ProjectStructureManifestHash)(
-  "b".repeat(64),
+const postsSourceKey = Schema.decodeUnknownSync(CollectionSourceKey, { onExcessProperty: "error" })(
+  "posts",
 );
+const pagesSourceKey = Schema.decodeUnknownSync(CollectionSourceKey, { onExcessProperty: "error" })(
+  "pages",
+);
+const manifestHash = Schema.decodeUnknownSync(ProjectStructureManifestHash, {
+  onExcessProperty: "error",
+})("a".repeat(64));
+const otherManifestHash = Schema.decodeUnknownSync(ProjectStructureManifestHash, {
+  onExcessProperty: "error",
+})("b".repeat(64));
 
 describe("complete Authoring project schema documents", () => {
   it("returns a typed canonical document when every active collection is present", () => {

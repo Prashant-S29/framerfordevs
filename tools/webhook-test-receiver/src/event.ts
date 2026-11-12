@@ -1,5 +1,3 @@
-// Validates the exact content-free Framer for Devs CloudEvent before any body is persisted.
-
 import type { VerifiedEvent } from "./types.js";
 
 const eventTypes = new Set([
@@ -13,12 +11,10 @@ const systemTagPattern = /^(?:project|environment|collection|entry|locale|field)
 const semanticTagPattern = /^[a-z][a-z0-9_-]{0,31}:[a-z0-9][a-z0-9._/-]{0,31}$/u;
 const localeTagPattern = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/u;
 
-/** Narrows unknown JSON objects without trusting arrays or null. */
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Rejects additive or missing keys so captures cannot retain unreviewed public data. */
 function hasExactKeys(
   value: Readonly<Record<string, unknown>>,
   keys: ReadonlyArray<string>,
@@ -27,19 +23,16 @@ function hasExactKeys(
   return actual.length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 }
 
-/** Recognizes one bounded positive event sequence. */
 function isPositiveSequence(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 1;
 }
 
-/** Requires canonical ISO instants rather than implementation-dependent date strings. */
 function isIsoDateTime(value: unknown): value is string {
   if (typeof value !== "string") return false;
   const parsed = new Date(value);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
 }
 
-/** Validates one bounded, sorted, duplicate-free string array. */
 function isSortedStringArray(
   value: unknown,
   maximumItems: number,
@@ -60,7 +53,6 @@ function isSortedStringArray(
   return true;
 }
 
-/** Validates one bounded duplicate-free array whose canonical order is sender-owned. */
 function isUniqueStringArray(
   value: unknown,
   maximumItems: number,
@@ -74,7 +66,6 @@ function isUniqueStringArray(
   );
 }
 
-/** Detects control characters forbidden by the sender's route contract. */
 function hasControlCharacter(value: string): boolean {
   for (const character of value) {
     const codePoint = character.codePointAt(0);
@@ -85,7 +76,6 @@ function hasControlCharacter(value: string): boolean {
   return false;
 }
 
-/** Mirrors the sender's exact origin-relative route safety boundary. */
 function isSafeRoute(value: string): boolean {
   if (
     !value.startsWith("/") ||
@@ -104,7 +94,6 @@ function isSafeRoute(value: string): boolean {
   return !value.split("/").some((segment) => segment === "." || segment === "..");
 }
 
-/** Validates the exact invalidation projection shared by every public event. */
 function isInvalidation(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -119,7 +108,6 @@ function isInvalidation(value: unknown): boolean {
   );
 }
 
-/** Validates the bounded changed-field identity projection. */
 function isChanges(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -128,7 +116,6 @@ function isChanges(value: unknown): boolean {
   );
 }
 
-/** Validates stable locale identity plus its ergonomic canonical tag. */
 function isLocale(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -141,7 +128,6 @@ function isLocale(value: unknown): boolean {
   );
 }
 
-/** Validates the immutable publication identity used by entry events. */
 function isPublication(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -152,7 +138,6 @@ function isPublication(value: unknown): boolean {
   );
 }
 
-/** Validates generic aggregate identity and binds it to the concrete event resource. */
 function isAggregate(value: unknown, type: "cms.collection" | "cms.entry", id: string): boolean {
   return (
     isRecord(value) &&
@@ -163,7 +148,6 @@ function isAggregate(value: unknown, type: "cms.collection" | "cms.entry", id: s
   );
 }
 
-/** Validates exact schema authority for collection and entry publication variants. */
 function isSchema(value: unknown, includeSchemaHash: boolean): boolean {
   const keys = includeSchemaHash
     ? ["revisionId", "schemaHash", "contractHash"]
@@ -186,7 +170,6 @@ interface EventScope {
   readonly collectionId: string;
 }
 
-/** Reads the direct scope repeated intentionally in every data variant. */
 function eventScope(value: Readonly<Record<string, unknown>>): EventScope | null {
   if (
     value.version !== 1 ||
@@ -206,7 +189,6 @@ function eventScope(value: Readonly<Record<string, unknown>>): EventScope | null
   };
 }
 
-/** Validates one schema-publication data variant and its repeated identity bindings. */
 function isSchemaData(value: unknown): value is Readonly<Record<string, unknown>> {
   if (
     !isRecord(value) ||
@@ -233,7 +215,6 @@ function isSchemaData(value: unknown): value is Readonly<Record<string, unknown>
   );
 }
 
-/** Validates one entry publish/unpublish data variant and its repeated identity bindings. */
 function isEntryData(value: unknown): value is Readonly<Record<string, unknown>> {
   if (
     !isRecord(value) ||
@@ -267,7 +248,6 @@ function isEntryData(value: unknown): value is Readonly<Record<string, unknown>>
   );
 }
 
-/** Parses the exact approved CloudEvent shape and binds every repeated scope to its envelope. */
 export function parseWebhookEvent(body: Uint8Array, expectedEventId: string): VerifiedEvent | null {
   let input: unknown;
   try {

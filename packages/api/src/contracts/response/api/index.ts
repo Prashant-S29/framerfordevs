@@ -1,5 +1,3 @@
-// Defines the standard application response envelope, public error details, and transport-safe helpers.
-
 import { Schema } from "effect";
 
 import { Uuid } from "../../uuid";

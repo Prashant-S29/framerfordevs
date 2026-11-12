@@ -1,6 +1,4 @@
-// Wraps the pure M6 field kernel in named replaceable Effect service operations.
-
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 import {
   type CollectionFieldKind,
@@ -26,7 +24,6 @@ import {
   validateFieldValue,
 } from "../../../lib/field/validation";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 export interface FieldConfigurationValidationResult {
   readonly valid: boolean;
   readonly configuration: FieldConfiguration | null;
@@ -38,103 +35,101 @@ const configurationParseOptions = {
   onExcessProperty: "error",
 } as const;
 
-/** Decodes one kind-correlated configuration with strict excess-property handling. */
 function decodeConfiguration(kind: CollectionFieldKind, input: unknown) {
   switch (kind) {
     case "short_text":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.short_text,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.short_text, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "long_text":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.long_text,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.long_text, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "rich_text":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.rich_text,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.rich_text, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "number":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.number,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.number, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "decimal":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.decimal,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.decimal, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "money":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.money,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.money, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "boolean":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.boolean,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.boolean, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "date":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.date,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.date, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "date_time":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.date_time,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.date_time, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "enum":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.enum,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.enum, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "url":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.url,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.url, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "email":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.email,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.email, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "slug":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.slug,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.slug, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "json":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.json,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.json, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "object":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.object,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.object, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "list":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.list,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.list, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "reference":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.reference,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.reference, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
     case "external_asset":
-      return SchemaStrict.decodeUnknownResult(
-        fieldConfigurationSchemas.external_asset,
-        configurationParseOptions,
-      )(input);
+      return Schema.decodeUnknownResult(fieldConfigurationSchemas.external_asset, {
+        ...configurationParseOptions,
+        onExcessProperty: "error",
+      })(input);
   }
 }
 
-/** Validates one configuration and converts parser details into bounded safe feedback. */
 function validateConfigurationOperation(
   kind: CollectionFieldKind,
   input: unknown,
@@ -151,7 +146,6 @@ function validateConfigurationOperation(
   });
 }
 
-/** Validates and normalizes one field value through the pure deterministic kernel. */
 function validateValueOperation(
   definition: ValueFieldDefinition,
   value: unknown,
@@ -160,21 +154,18 @@ function validateValueOperation(
   return Effect.succeed(validateFieldValue(definition, value, path));
 }
 
-/** Validates recursive structure, depth, and localization through the pure kernel. */
 function validateDefinitionsOperation(
   roots: ReadonlyArray<ValueFieldDefinition>,
 ): Effect.Effect<DefinitionTreeValidationResult> {
   return Effect.succeed(validateDefinitionTree(roots));
 }
 
-/** Validates and canonicalizes the complete management schema under the aggregate byte ceiling. */
 function validateAggregateDocumentOperation(
   document: unknown,
 ): Effect.Effect<AggregateSchemaValidationResult> {
   return Effect.succeed(validateAggregateSchemaDocument(document));
 }
 
-/** Validates editor layout independently from API/value contract compilation. */
 function validateLayoutOperation(
   layout: EditorLayout,
   fields: ReadonlyArray<LayoutFieldDefinition>,
@@ -182,7 +173,6 @@ function validateLayoutOperation(
   return Effect.succeed(validateEditorLayout(layout, fields));
 }
 
-/** Constructs the production service without creating a local runtime or Layer. */
 export function makeFieldEngine() {
   return {
     validateConfiguration: Effect.fn("FieldEngine.validateConfiguration")(

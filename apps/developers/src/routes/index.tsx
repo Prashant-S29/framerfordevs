@@ -1,5 +1,3 @@
-// Presents the developer-first landing page and directs newcomers into task-oriented documentation.
-
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { HomeLayout } from "fumadocs-ui/layouts/home";
 import { ArrowRight, BookOpen, Braces, TerminalSquare, Webhook } from "lucide-react";

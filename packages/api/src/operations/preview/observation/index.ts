@@ -1,5 +1,3 @@
-// Records bounded Preview outcome metrics without content or tenant identity labels.
-
 import { Cause, Clock, Effect, Exit, Option } from "effect";
 
 import type { PreviewItem } from "../../../contracts/preview";
@@ -28,7 +26,6 @@ function sizeBucket(bytes: number): PreviewReadMetric["sizeBucket"] {
   return "near_limit";
 }
 
-/** Observes one repository read while making telemetry failure non-authoritative. */
 export function observePreviewRead<E, R>(
   effect: Effect.Effect<PreviewItem, E, R>,
   source: "current" | "revision",

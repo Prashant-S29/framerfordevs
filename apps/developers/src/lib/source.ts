@@ -1,5 +1,3 @@
-// Defines the source-controlled MDX collection and public documentation page tree.
-
 import { loader } from "fumadocs-core/source";
 import { defineDocs } from "fumadocs-mdx/macro";
 

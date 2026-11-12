@@ -1,4 +1,4 @@
-import { Clock, Effect } from "effect";
+import { Clock, Effect, Schema } from "effect";
 
 import {
   type AcceptProjectInvitationInput,
@@ -18,16 +18,15 @@ import { AuthUserId } from "../../contracts/platform";
 import { AccessRepository } from "../../services/access-repository";
 import { SecretGenerator } from "../../services/secret-generator";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const invitationLifetimeMs = 7 * 24 * 60 * 60 * 1_000;
 
 const decodeActorId = (actorId: string) =>
-  SchemaStrict.decodeUnknownEffect(AuthUserId)(actorId).pipe(
+  Schema.decodeUnknownEffect(AuthUserId, { onExcessProperty: "error" })(actorId).pipe(
     Effect.mapError(() => UnauthorizedFailure.make()),
   );
 
 const decodeActorEmail = (email: string) =>
-  SchemaStrict.decodeUnknownEffect(CanonicalEmail)(email).pipe(
+  Schema.decodeUnknownEffect(CanonicalEmail, { onExcessProperty: "error" })(email).pipe(
     Effect.mapError(() => UnauthorizedFailure.make()),
   );
 

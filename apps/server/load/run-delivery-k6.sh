@@ -6,7 +6,7 @@ repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 requested_scenario="${DELIVERY_SCENARIO:-}"
 set -a
 # shellcheck disable=SC1091
-source "$repository_root/delivery-load.env"
+source "$repository_root/apps/server/load/delivery.env"
 set +a
 if [[ -n "$requested_scenario" ]]; then
   DELIVERY_SCENARIO="$requested_scenario"

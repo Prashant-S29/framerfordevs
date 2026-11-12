@@ -1,5 +1,3 @@
-// Canonicalizes Control Plane command intent into receipt-safe, actor- and scope-bound fingerprints.
-
 import { createHash } from "node:crypto";
 
 import type {
@@ -51,7 +49,6 @@ function canonicalJson(value: ControlPlaneFingerprintValue): string {
   return `{${entries.join(",")}}`;
 }
 
-/** Binds one decoded command to its operation, actual actor, exact tenant scope, and input. */
 export function controlPlaneCommandFingerprint(
   command: ControlPlaneCommandFingerprintInput,
 ): string {

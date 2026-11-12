@@ -1,11 +1,9 @@
-// Projects strict versioned outbox authority into one immutable, content-free CloudEvents body.
-
 import { createHash } from "node:crypto";
 
 import { PublicationWebhookEvent, type WebhookPublicEventType } from "../../../contracts/webhook";
 import { canonicalizeEntryValue } from "../../entry/values";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 const maximumEventBytes = 128 * 1_024;
 const digestPattern = /^[0-9a-f]{64}$/u;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -193,8 +191,10 @@ function invalidation(payload: OutboxPayloadBase) {
 
 function decodeAndCanonicalize(value: unknown): PublicationEventProjectionResult {
   try {
-    const event = SchemaStrict.decodeUnknownSync(PublicationWebhookEvent)(value);
-    const transport = SchemaStrict.encodeSync(PublicationWebhookEvent)(event);
+    const event = Schema.decodeUnknownSync(PublicationWebhookEvent, { onExcessProperty: "error" })(
+      value,
+    );
+    const transport = Schema.encodeSync(PublicationWebhookEvent)(event);
     const canonicalBody = canonicalizeEntryValue(transport);
     const bodyBytes = Buffer.byteLength(canonicalBody, "utf8");
     if (bodyBytes > maximumEventBytes) return { ok: false, category: "event_too_large" };
@@ -212,7 +212,6 @@ function decodeAndCanonicalize(value: unknown): PublicationEventProjectionResult
   }
 }
 
-/** Projects one supported outbox row without database, network, or mutable configuration access. */
 export function projectPublicationEvent(
   record: PublicationOutboxRecord,
 ): PublicationEventProjectionResult {

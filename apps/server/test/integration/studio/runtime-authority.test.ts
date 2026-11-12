@@ -1,5 +1,3 @@
-// Proves real registration-derived OAuth claims, audit gating, refresh continuity, and bootstrap authority.
-
 import { createHash, randomUUID } from "node:crypto";
 
 import {
@@ -12,7 +10,7 @@ import {
 import {
   ControlPlanePutStudioRegistrationRequest,
   ControlPlaneSetStudioRuntimeRequest,
-} from "@framerfordevs/api/contracts/control-plane/index";
+} from "@framerfordevs/api/contracts/control-plane";
 import {
   AuthUserId,
   CreateProjectInput,
@@ -20,7 +18,7 @@ import {
   EnableCapabilityInput,
   EnvironmentId,
   ProjectId,
-} from "@framerfordevs/api/contracts/platform/index";
+} from "@framerfordevs/api/contracts/platform";
 import { makePlatformRepository } from "@framerfordevs/api/services/platform-repository";
 import { makeStudioRepository } from "@framerfordevs/api/services/studio/repository";
 import { db } from "@framerfordevs/db";
@@ -50,14 +48,13 @@ import {
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
 import { createStudioOAuthHarness } from "@framerfordevs/studio-oauth-harness";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Schema } from "effect";
 import { like } from "drizzle-orm";
 import express from "express";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { toNodeHandler } from "better-auth/node";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const apiOrigin = "https://runtime-api.example.test";
 const dashboardOrigin = "https://runtime-dashboard.example.test";
 const applicationOrigin = "http://127.0.0.1:43218";
@@ -73,7 +70,7 @@ const runtimeAuth = createAuth({
   apiOrigin,
   dashboardOrigin,
   hostRoutingEnabled: true,
-  nodeEnv: "production",
+  nodeEnv: "test",
   oauthDeviceAuthorizationEnabled: true,
   studioOAuthNow: () => studioAuthorityNow ?? new Date(),
   oauthRateLimitStorage: {
@@ -118,7 +115,9 @@ beforeAll(async () => {
   const createdWorkspace = await Effect.runPromise(
     platform.createWorkspace(
       actorId,
-      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: `Studio Runtime ${suffix}` }),
+      Schema.decodeUnknownSync(CreateWorkspaceInput, { onExcessProperty: "error" })({
+        name: `Studio Runtime ${suffix}`,
+      }),
       `m18-runtime-workspace-${suffix}`,
     ),
   );
@@ -126,7 +125,7 @@ beforeAll(async () => {
   const createdProject = await Effect.runPromise(
     platform.createProject(
       actorId,
-      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
+      Schema.decodeUnknownSync(CreateProjectInput, { onExcessProperty: "error" })({
         workspaceId: createdWorkspace.id,
         name: "Runtime Project",
         key: `runtime-${suffix}`,
@@ -140,7 +139,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     platform.enableCapability(
       actorId,
-      SchemaStrict.decodeUnknownSync(EnableCapabilityInput)({
+      Schema.decodeUnknownSync(EnableCapabilityInput, { onExcessProperty: "error" })({
         projectId: createdProject.id,
         capability: "cms",
       }),
@@ -152,7 +151,9 @@ beforeAll(async () => {
       { kind: "user", id: actorId },
       createdProject.id,
       createdProject.environment.id,
-      SchemaStrict.decodeUnknownSync(ControlPlanePutStudioRegistrationRequest)({
+      Schema.decodeUnknownSync(ControlPlanePutStudioRegistrationRequest, {
+        onExcessProperty: "error",
+      })({
         commandId: randomUUID(),
         expectedVersion: null,
         applicationOrigin,
@@ -166,7 +167,7 @@ beforeAll(async () => {
       { kind: "user", id: actorId },
       createdProject.id,
       createdProject.environment.id,
-      SchemaStrict.decodeUnknownSync(ControlPlaneSetStudioRuntimeRequest)({
+      Schema.decodeUnknownSync(ControlPlaneSetStudioRuntimeRequest, { onExcessProperty: "error" })({
         commandId: randomUUID(),
         expectedVersion: registered.registration.version,
         enabled: true,
@@ -287,7 +288,9 @@ describe("M18A Studio runtime authority", () => {
           { kind: "user", id: AuthUserId.make(userId) },
           ProjectId.make(projectId),
           EnvironmentId.make(environmentId),
-          SchemaStrict.decodeUnknownSync(ControlPlaneSetStudioRuntimeRequest)({
+          Schema.decodeUnknownSync(ControlPlaneSetStudioRuntimeRequest, {
+            onExcessProperty: "error",
+          })({
             commandId: randomUUID(),
             expectedVersion: registrationVersion,
             enabled: true,
@@ -576,7 +579,9 @@ describe("M18A Studio runtime authority", () => {
         { kind: "user", id: actorId },
         ProjectId.make(projectId),
         EnvironmentId.make(environmentId),
-        SchemaStrict.decodeUnknownSync(ControlPlaneSetStudioRuntimeRequest)({
+        Schema.decodeUnknownSync(ControlPlaneSetStudioRuntimeRequest, {
+          onExcessProperty: "error",
+        })({
           commandId: randomUUID(),
           expectedVersion: registrationVersion,
           enabled: false,

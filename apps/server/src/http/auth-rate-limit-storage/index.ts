@@ -1,5 +1,3 @@
-// Preserves Better Auth's per-key defense limits while routing OAuth overload to shared storage.
-
 interface BetterAuthRateLimitRule {
   readonly window: number;
   readonly max: number;
@@ -39,7 +37,6 @@ function validRule(rule: BetterAuthRateLimitRule) {
   );
 }
 
-/** Creates Better Auth storage with shared OAuth overload and bounded local defense buckets. */
 export function makeAuthRateLimitStorage(options: AuthRateLimitStorageOptions) {
   const entries = new Map<string, LocalEntry>();
   const maxLocalEntries = options.maxLocalEntries ?? 10_000;

@@ -1,5 +1,3 @@
-// Defines bounded dispatcher polling through the worker-owned Effect runtime.
-
 import { Clock, Effect } from "effect";
 
 import { SecurityServiceFailure } from "../../../contracts/response/errors";
@@ -32,7 +30,6 @@ export const dispatchWebhookOutboxBatch = Effect.fn("webhook.worker.dispatch_bat
   return result;
 });
 
-/** Polls until interruption while backing off when no due outbox work exists. */
 export const runWebhookDispatcher = Effect.fn("webhook.worker.dispatcher")(function* () {
   while (true) {
     const result = yield* dispatchWebhookOutboxBatch();

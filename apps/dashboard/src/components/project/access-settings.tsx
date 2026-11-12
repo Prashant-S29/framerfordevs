@@ -1,5 +1,3 @@
-// Renders permission-aware project membership, invitation, locale-access, and credential controls.
-
 import type {
   ApiCredential,
   ApiCredentialRotation,
@@ -12,8 +10,8 @@ import type {
   ProjectMember,
   ProjectPermissionAction,
   ProjectRole,
-} from "@framerfordevs/api/contracts/access/index";
-import type { ProjectLocale } from "@framerfordevs/api/contracts/locale/index";
+} from "@framerfordevs/api/contracts/access";
+import type { ProjectLocale } from "@framerfordevs/api/contracts/locale";
 import { Alert, AlertDescription, AlertTitle } from "@framerfordevs/ui/components/alert";
 import {
   AlertDialog,
@@ -1719,6 +1717,7 @@ export function IssueCredentialDialog({
   const [family, setFamily] = useState<CredentialFamily>("delivery");
   const [scopes, setScopes] = useState<ReadonlyArray<CredentialScope>>(["delivery.read"]);
   const [expiry, setExpiry] = useState(defaultExpiryLocal);
+  const [expiryChosenAt, setExpiryChosenAt] = useState(Date.now);
   const [nonExpiring, setNonExpiring] = useState(false);
   const [nonExpiringAcknowledged, setNonExpiringAcknowledged] = useState(false);
   const [previewAuthorityAcknowledged, setPreviewAuthorityAcknowledged] = useState(false);
@@ -1736,6 +1735,11 @@ export function IssueCredentialDialog({
     }),
   );
 
+  function chooseExpiry(value: string) {
+    setExpiry(value);
+    setExpiryChosenAt(Date.now());
+  }
+
   function selectFamily(nextFamily: CredentialFamily) {
     setFamily(nextFamily);
     setScopes(
@@ -1745,7 +1749,7 @@ export function IssueCredentialDialog({
           ? ["preview.read"]
           : ["project.read"],
     );
-    setExpiry(defaultExpiryLocal(nextFamily === "preview" ? 30 : 90));
+    chooseExpiry(defaultExpiryLocal(nextFamily === "preview" ? 30 : 90));
     setNonExpiring(false);
     setNonExpiringAcknowledged(false);
     setPreviewAuthorityAcknowledged(false);
@@ -1755,7 +1759,7 @@ export function IssueCredentialDialog({
     setName("");
     setFamily("delivery");
     setScopes(["delivery.read"]);
-    setExpiry(defaultExpiryLocal());
+    chooseExpiry(defaultExpiryLocal());
     setNonExpiring(false);
     setNonExpiringAcknowledged(false);
     setPreviewAuthorityAcknowledged(false);
@@ -1779,7 +1783,8 @@ export function IssueCredentialDialog({
   const expiresAt = nonExpiring ? null : futureExpiryIso(expiry);
   const previewExpiryAllowed =
     family !== "preview" ||
-    (expiresAt !== null && new Date(expiresAt).getTime() - Date.now() <= 30 * 24 * 60 * 60 * 1_000);
+    (expiresAt !== null &&
+      new Date(expiresAt).getTime() - expiryChosenAt <= 30 * 24 * 60 * 60 * 1_000);
   const canSubmit =
     name.trim() !== "" &&
     scopes.length > 0 &&
@@ -1923,7 +1928,7 @@ export function IssueCredentialDialog({
                   disabled={nonExpiring}
                   required={!nonExpiring}
                   aria-invalid={!nonExpiring && (!expiresAt || !previewExpiryAllowed)}
-                  onChange={(event) => setExpiry(event.target.value)}
+                  onChange={(event) => chooseExpiry(event.target.value)}
                 />
                 <FieldDescription>
                   {family === "preview" ? "Required; maximum 30 days." : "Defaults to 90 days."}

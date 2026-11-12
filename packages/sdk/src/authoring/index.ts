@@ -1,5 +1,3 @@
-// Provides bounded Promise and Effect clients for the originless Authoring v1 protocol.
-
 import { Effect, Schema, Stream, SchemaTransformation } from "effect";
 
 import { AuthoringEditorLayout, AuthoringFieldEditor, AuthoringGeneratedForm } from "./form.js";
@@ -21,7 +19,6 @@ import type {
   SdkResponse,
 } from "../client/index.js";
 
-import * as SchemaStrict from "../schema-strict";
 export type AuthoringMutation = typeof AuthoringMutationSchema.Type;
 
 export interface AuthoringClientOptions {
@@ -113,12 +110,12 @@ const SetMutation = Schema.Struct({
   scope: Schema.Literals(["shared", "localized"]),
   path: MutationPath,
   value: JsonValueSchema,
-}).annotate({ closedObject: true });
+});
 const UnsetMutation = Schema.Struct({
   operation: Schema.Literal("unset"),
   scope: Schema.Literals(["shared", "localized"]),
   path: MutationPath,
-}).annotate({ closedObject: true });
+});
 export const AuthoringMutationSchema = Schema.Union([SetMutation, UnsetMutation]).annotate({
   identifier: "SdkAuthoringMutation",
 });
@@ -130,7 +127,7 @@ export class AuthoringEnumOptionPresentation extends Schema.Class<AuthoringEnumO
     optionId: Uuid,
     label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
     position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 99 })),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class AuthoringFieldPresentation extends Schema.Class<AuthoringFieldPresentation>(
@@ -149,7 +146,7 @@ export class AuthoringFieldPresentation extends Schema.Class<AuthoringFieldPrese
         (options) => new Set(options.map((option) => option.optionId)).size === options.length,
       ),
     ),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class AuthoringCollectionPresentation extends Schema.Class<AuthoringCollectionPresentation>(
@@ -166,7 +163,7 @@ export class AuthoringCollectionPresentation extends Schema.Class<AuthoringColle
       ),
     ),
     editorLayout: AuthoringEditorLayout,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class AuthoringPresentationRevision extends Schema.Class<AuthoringPresentationRevision>(
@@ -437,7 +434,7 @@ const AuthoringErrorDetail = Schema.Struct({
   expectedVersion: Schema.optionalKey(Version),
   currentVersion: Schema.optionalKey(Version),
   currentRevisionId: Schema.optionalKey(Schema.NullOr(Uuid)),
-}).annotate({ closedObject: true });
+});
 const AuthoringErrorCode = Schema.Literals([
   "VALIDATION_ERROR",
   "UNAUTHORIZED",
@@ -471,7 +468,7 @@ const AuthoringPublicErrorSchema = Schema.Struct({
     Schema.isMaxLength(128),
     Schema.isPattern(/^[A-Za-z0-9._:-]+$/u),
   ),
-}).annotate({ closedObject: true });
+});
 
 const maximumRequestBytes = 1_048_576;
 const maximumResponseBytes = 4_194_304;
@@ -511,7 +508,7 @@ function jsonObject(value: unknown): JsonObject {
 
 function requestBody<A, I>(schema: Schema.Codec<A, I, never>, value: unknown): JsonObject {
   return jsonObject(
-    SchemaStrict.decodeUnknownSync(schema)(value, {
+    Schema.decodeUnknownSync(schema, { onExcessProperty: "error" })(value, {
       onExcessProperty: "error",
     }),
   );
@@ -539,9 +536,12 @@ function decodeEnvelope<A>(value: unknown, decodeData: (value: unknown) => A): A
     } satisfies ApiSuccess<A>;
   }
   if (value.data !== null) throw new Error("Authoring failure envelope is invalid.");
-  const error = SchemaStrict.decodeUnknownSync(AuthoringPublicErrorSchema)(value.error, {
-    onExcessProperty: "error",
-  });
+  const error = Schema.decodeUnknownSync(AuthoringPublicErrorSchema, { onExcessProperty: "error" })(
+    value.error,
+    {
+      onExcessProperty: "error",
+    },
+  );
   const publicError: PublicApiError = {
     code: error.code,
     message: error.message,
@@ -577,7 +577,7 @@ function segment(value: string): string {
 }
 
 function pathValue<I>(schema: Schema.Codec<string, I, never>, value: unknown): string {
-  const decoded = SchemaStrict.decodeUnknownSync(schema)(value);
+  const decoded = Schema.decodeUnknownSync(schema, { onExcessProperty: "error" })(value);
   return segment(decoded);
 }
 
@@ -666,7 +666,9 @@ export function authoringV1(options: AuthoringClientOptions) {
       text === ""
         ? null
         : decodeEnvelope(JSON.parse(text), (value) =>
-            SchemaStrict.decodeUnknownSync(dataSchema)(value, { onExcessProperty: "error" }),
+            Schema.decodeUnknownSync(dataSchema, { onExcessProperty: "error" })(value, {
+              onExcessProperty: "error",
+            }),
           );
     return {
       status: response.status,
@@ -713,13 +715,14 @@ export function authoringV1(options: AuthoringClientOptions) {
     },
     entries: {
       list: (collectionKey: string, locale: string, input: AuthoringListOptions = {}) => {
-        const queryInput = SchemaStrict.decodeUnknownSync(
+        const queryInput = Schema.decodeUnknownSync(
           Schema.Struct({
             limit: Schema.optionalKey(
               Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 50 })),
             ),
             cursor: Schema.optionalKey(Cursor),
           }),
+          { onExcessProperty: "error" },
         )({
           ...(input.limit === undefined ? {} : { limit: input.limit }),
           ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
@@ -812,7 +815,7 @@ export function authoringV1(options: AuthoringClientOptions) {
         request(
           `${entryPath(collectionKey, locale, entryId)}/publication/validate`,
           "POST",
-          requestBody(Schema.Struct({}).annotate({ closedObject: true }), {}),
+          requestBody(Schema.Struct({}), {}),
           AuthoringPublicationPlan,
           input,
         ),

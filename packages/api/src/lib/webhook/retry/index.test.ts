@@ -1,5 +1,3 @@
-// Locks HTTP classification, bounded exponential equal jitter, Retry-After, and exhaustion behavior.
-
 import { assert, describe, it } from "@effect/vitest";
 
 import {

@@ -1,11 +1,8 @@
-// Thin TanStack Start/Nitro bridge. The host must supply the raw request-target before URL normalization.
-
 import type { StudioFetchHandler } from "@framerfordevs/studio-server";
 import { parseStudioRawTarget } from "@framerfordevs/studio-server/raw-target";
 
 export interface TanStackStudioRequest {
   readonly request: Request;
-  /** Read from the runtime event's original request URL, never reconstructed from URL.pathname. */
   readonly rawTarget: string;
 }
 

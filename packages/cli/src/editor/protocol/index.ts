@@ -1,9 +1,6 @@
-// Defines the exact browser-to-loopback operation allowlist; it contains no hosted authority.
-
 import { AuthoringMutationSchema } from "@framerfordevs/sdk/authoring";
 import { Schema, SchemaTransformation } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 const Uuid = Schema.String.check(
   Schema.isPattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu),
 );
@@ -42,8 +39,7 @@ const NonEmptyMutations = Mutations.check(Schema.isMinLength(1));
 
 const scoped = { collectionKey: ApiKey, locale: Locale };
 const identified = { ...scoped, entryId: Uuid };
-const exact = <Fields extends Schema.Struct.Fields>(fields: Fields) =>
-  Schema.Struct(fields).annotate({ closedObject: true });
+const exact = <Fields extends Schema.Struct.Fields>(fields: Fields) => Schema.Struct(fields);
 
 const SchemaLocal = exact({ operation: Schema.Literal("schema.local") });
 const FormGet = exact({
@@ -127,7 +123,7 @@ export const EditorOperationRequest = Schema.Union([
 export type EditorOperationRequest = typeof EditorOperationRequest.Type;
 
 export function decodeEditorOperationRequest(value: unknown): EditorOperationRequest {
-  return SchemaStrict.decodeUnknownSync(EditorOperationRequest)(value, {
+  return Schema.decodeUnknownSync(EditorOperationRequest, { onExcessProperty: "error" })(value, {
     onExcessProperty: "error",
   });
 }

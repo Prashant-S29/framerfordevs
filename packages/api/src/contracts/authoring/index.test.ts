@@ -1,4 +1,4 @@
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Schema } from "effect";
 import { assert, describe, it } from "@effect/vitest";
 
 import {
@@ -11,7 +11,6 @@ import {
   StructureHash,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const userId = "019fae8b-1234-7000-8000-000000000001";
 const credentialId = "019fae8b-1234-7000-8000-000000000002";
 
@@ -21,13 +20,19 @@ describe("authoring contracts", () => {
     () =>
       Effect.gen(function* () {
         const accepted = yield* Effect.all([
-          SchemaStrict.decodeUnknownEffect(CollectionSourceKey)("blog-posts"),
-          SchemaStrict.decodeUnknownEffect(FieldSourceKey)("seo_title"),
-          SchemaStrict.decodeUnknownEffect(EnumOptionSourceKey)("in-review"),
+          Schema.decodeUnknownEffect(CollectionSourceKey, { onExcessProperty: "error" })(
+            "blog-posts",
+          ),
+          Schema.decodeUnknownEffect(FieldSourceKey, { onExcessProperty: "error" })("seo_title"),
+          Schema.decodeUnknownEffect(EnumOptionSourceKey, { onExcessProperty: "error" })(
+            "in-review",
+          ),
         ]);
         const rejected = yield* Effect.all(
           ["id", "BadKey", "double--dash", "double__underscore", "trailing-"].map((value) =>
-            Effect.exit(SchemaStrict.decodeUnknownEffect(CollectionSourceKey)(value)),
+            Effect.exit(
+              Schema.decodeUnknownEffect(CollectionSourceKey, { onExcessProperty: "error" })(value),
+            ),
           ),
         );
 
@@ -38,13 +43,18 @@ describe("authoring contracts", () => {
 
   it.effect("keeps user and credential actor attribution explicit", () =>
     Effect.gen(function* () {
-      const user = yield* SchemaStrict.decodeUnknownEffect(CmsActor)({ kind: "user", id: userId });
-      const credential = yield* SchemaStrict.decodeUnknownEffect(CmsActor)({
-        kind: "credential",
-        id: credentialId,
+      const user = yield* Schema.decodeUnknownEffect(CmsActor, { onExcessProperty: "error" })({
+        kind: "user",
+        id: userId,
       });
+      const credential = yield* Schema.decodeUnknownEffect(CmsActor, { onExcessProperty: "error" })(
+        {
+          kind: "credential",
+          id: credentialId,
+        },
+      );
       const impersonation = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(CmsActor)({
+        Schema.decodeUnknownEffect(CmsActor, { onExcessProperty: "error" })({
           kind: "credential",
           id: credentialId,
           userId,
@@ -59,7 +69,9 @@ describe("authoring contracts", () => {
 
   it.effect("accepts only finite JSON mutations and canonical digest authorities", () =>
     Effect.gen(function* () {
-      const mutations = yield* SchemaStrict.decodeUnknownEffect(AuthoringValueMutations)([
+      const mutations = yield* Schema.decodeUnknownEffect(AuthoringValueMutations, {
+        onExcessProperty: "error",
+      })([
         {
           operation: "set",
           scope: "localized",
@@ -68,11 +80,13 @@ describe("authoring contracts", () => {
         },
       ]);
       const invalidNumber = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(AuthoringValueMutations)([
+        Schema.decodeUnknownEffect(AuthoringValueMutations, { onExcessProperty: "error" })([
           { operation: "set", scope: "localized", path: ["title"], value: Infinity },
         ]),
       );
-      const hash = yield* SchemaStrict.decodeUnknownEffect(StructureHash)("a".repeat(64));
+      const hash = yield* Schema.decodeUnknownEffect(StructureHash, { onExcessProperty: "error" })(
+        "a".repeat(64),
+      );
 
       assert.strictEqual(mutations.length, 1);
       assert.isTrue(Exit.isFailure(invalidNumber));
@@ -82,11 +96,13 @@ describe("authoring contracts", () => {
 
   it.effect("defines a closed content-safe Authoring error vocabulary", () =>
     Effect.gen(function* () {
-      const known = yield* SchemaStrict.decodeUnknownEffect(AuthoringApiErrorCode)(
-        "SOURCE_IDENTITY_CONFLICT",
-      );
+      const known = yield* Schema.decodeUnknownEffect(AuthoringApiErrorCode, {
+        onExcessProperty: "error",
+      })("SOURCE_IDENTITY_CONFLICT");
       const unknown = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(AuthoringApiErrorCode)("DATABASE_CONSTRAINT_FAILED"),
+        Schema.decodeUnknownEffect(AuthoringApiErrorCode, { onExcessProperty: "error" })(
+          "DATABASE_CONSTRAINT_FAILED",
+        ),
       );
 
       assert.strictEqual(known, "SOURCE_IDENTITY_CONFLICT");

@@ -1,5 +1,3 @@
-// Framework-neutral Studio BFF: exact mount routing, OAuth lifecycle, encrypted sessions, and Fetch responses.
-
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 import {
@@ -70,7 +68,6 @@ export interface StudioServerConfig {
 }
 
 export interface StudioRequestContext {
-  /** The untouched HTTP request-target from the framework adapter. */
   readonly rawTarget: string;
 }
 
@@ -3629,7 +3626,6 @@ function routeRequest(
   });
 }
 
-/** Creates one process-lifetime ManagedRuntime and one Fetch-standard Studio handler. */
 export function createStudioFetchHandler(input: StudioServerConfig): StudioFetchHandler {
   const config = validateConfig(input);
   const runtime = ManagedRuntime.make(Layer.empty);

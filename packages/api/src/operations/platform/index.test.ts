@@ -1,5 +1,5 @@
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 
 import {
   ControlPlaneCreateProjectResult,
@@ -37,8 +37,7 @@ import {
   updateProject,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
-const workspace = SchemaStrict.decodeUnknownSync(Workspace)({
+const workspace = Schema.decodeUnknownSync(Workspace, { onExcessProperty: "error" })({
   id: "019fae8b-1234-7000-8000-000000000001",
   name: "Test Workspace",
   version: 1,
@@ -46,7 +45,7 @@ const workspace = SchemaStrict.decodeUnknownSync(Workspace)({
   createdAt: "2026-07-29T12:00:00.000Z",
   updatedAt: "2026-07-29T12:00:00.000Z",
 });
-const project = SchemaStrict.decodeUnknownSync(Project)({
+const project = Schema.decodeUnknownSync(Project, { onExcessProperty: "error" })({
   id: "019fae8b-1234-7000-8000-000000000002",
   workspaceId: workspace.id,
   name: "Test Project",
@@ -73,7 +72,7 @@ const project = SchemaStrict.decodeUnknownSync(Project)({
     },
   ],
 });
-const projectSummary = SchemaStrict.decodeUnknownSync(ProjectSummary)({
+const projectSummary = Schema.decodeUnknownSync(ProjectSummary, { onExcessProperty: "error" })({
   id: project.id,
   workspaceId: project.workspaceId,
   name: project.name,
@@ -84,11 +83,16 @@ const projectSummary = SchemaStrict.decodeUnknownSync(ProjectSummary)({
   createdAt: project.createdAt,
   updatedAt: project.updatedAt,
 });
-const controlPlaneWorkspace = SchemaStrict.decodeUnknownSync(ControlPlaneWorkspace)(workspace);
-const controlPlaneProject = SchemaStrict.decodeUnknownSync(ControlPlaneProject)({
-  ...project,
+const controlPlaneWorkspace = Schema.decodeUnknownSync(ControlPlaneWorkspace, {
+  onExcessProperty: "error",
+})(workspace);
+const controlPlaneProject = Schema.decodeUnknownSync(ControlPlaneProject, {
+  onExcessProperty: "error",
+})({
+  ...projectSummary,
   status: "active",
   primaryEnvironment: project.environment,
+  capabilities: project.capabilities,
   effectiveActions: [
     "project.read",
     "project.update",
@@ -98,7 +102,7 @@ const controlPlaneProject = SchemaStrict.decodeUnknownSync(ControlPlaneProject)(
     "studio_registration.write",
   ],
 });
-const capability = SchemaStrict.decodeUnknownSync(Capability)({
+const capability = Schema.decodeUnknownSync(Capability, { onExcessProperty: "error" })({
   id: "019fae8b-1234-7000-8000-000000000004",
   key: "cms",
   status: "enabled",
@@ -172,7 +176,9 @@ describe("platform operations", () => {
     it.effect("uses the replaceable repository service", () =>
       Effect.gen(function* () {
         createCalls = 0;
-        const input = yield* SchemaStrict.decodeUnknownEffect(CreateWorkspaceInput)({
+        const input = yield* Schema.decodeUnknownEffect(CreateWorkspaceInput, {
+          onExcessProperty: "error",
+        })({
           name: "Test Workspace",
         });
         const result = yield* createWorkspace("user-1", input, "request-platform-operation");
@@ -190,11 +196,14 @@ describe("platform operations", () => {
 
         yield* listWorkspaces(
           actor,
-          yield* SchemaStrict.decodeUnknownEffect(ListWorkspacesInput)({ cursor: null, limit: 20 }),
+          yield* Schema.decodeUnknownEffect(ListWorkspacesInput, { onExcessProperty: "error" })({
+            cursor: null,
+            limit: 20,
+          }),
         );
         yield* createProject(
           actor,
-          yield* SchemaStrict.decodeUnknownEffect(CreateProjectInput)({
+          yield* Schema.decodeUnknownEffect(CreateProjectInput, { onExcessProperty: "error" })({
             workspaceId: workspace.id,
             name: project.name,
             key: project.key,
@@ -204,7 +213,7 @@ describe("platform operations", () => {
         );
         yield* listProjects(
           actor,
-          yield* SchemaStrict.decodeUnknownEffect(ListProjectsInput)({
+          yield* Schema.decodeUnknownEffect(ListProjectsInput, { onExcessProperty: "error" })({
             workspaceId: workspace.id,
             status: "active",
             cursor: null,
@@ -213,11 +222,13 @@ describe("platform operations", () => {
         );
         yield* getProject(
           actor,
-          yield* SchemaStrict.decodeUnknownEffect(GetProjectInput)({ projectId: project.id }),
+          yield* Schema.decodeUnknownEffect(GetProjectInput, { onExcessProperty: "error" })({
+            projectId: project.id,
+          }),
         );
         yield* updateProject(
           actor,
-          yield* SchemaStrict.decodeUnknownEffect(UpdateProjectInput)({
+          yield* Schema.decodeUnknownEffect(UpdateProjectInput, { onExcessProperty: "error" })({
             projectId: project.id,
             version: project.version,
             name: project.name,
@@ -227,7 +238,7 @@ describe("platform operations", () => {
         );
         yield* archiveProject(
           actor,
-          yield* SchemaStrict.decodeUnknownEffect(ArchiveProjectInput)({
+          yield* Schema.decodeUnknownEffect(ArchiveProjectInput, { onExcessProperty: "error" })({
             projectId: project.id,
             version: project.version,
           }),
@@ -235,7 +246,7 @@ describe("platform operations", () => {
         );
         yield* restoreProject(
           actor,
-          yield* SchemaStrict.decodeUnknownEffect(RestoreProjectInput)({
+          yield* Schema.decodeUnknownEffect(RestoreProjectInput, { onExcessProperty: "error" })({
             projectId: project.id,
             version: project.version,
           }),
@@ -243,7 +254,7 @@ describe("platform operations", () => {
         );
         yield* enableCapability(
           actor,
-          yield* SchemaStrict.decodeUnknownEffect(EnableCapabilityInput)({
+          yield* Schema.decodeUnknownEffect(EnableCapabilityInput, { onExcessProperty: "error" })({
             projectId: project.id,
             capability: "cms",
           }),
@@ -266,7 +277,9 @@ describe("platform operations", () => {
     it.effect("rejects malformed actors before invoking persistence", () =>
       Effect.gen(function* () {
         createCalls = 0;
-        const input = yield* SchemaStrict.decodeUnknownEffect(CreateWorkspaceInput)({
+        const input = yield* Schema.decodeUnknownEffect(CreateWorkspaceInput, {
+          onExcessProperty: "error",
+        })({
           name: "Test Workspace",
         });
         const exit = yield* Effect.exit(createWorkspace("", input, "request-invalid-actor"));

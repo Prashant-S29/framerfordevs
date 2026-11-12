@@ -1,5 +1,3 @@
-// Builds the independent marketing and authentication-entry application.
-
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";

@@ -1,14 +1,11 @@
-// Reconstructs the complete code-owned project schema from published stable-ID authority.
-
 import type { ProjectSchema } from "@framerfordevs/schema";
-import { Result } from "effect";
+import { Result, Schema } from "effect";
 
 import { AuthoringProjectSchemaDocument } from "../../../contracts/authoring/schema";
 import type { PublishedSchemaRevision, CollectionFieldDefinition } from "../../../contracts/schema";
 import { compareCanonicalText } from "../../field/document";
 import type { PersistedProjectSourceIdentities } from "../sources";
 
-import * as SchemaStrict from "../../schema-strict";
 export interface AuthoringSchemaExportCollection {
   readonly sourceKey: string;
   readonly collectionId: string;
@@ -154,7 +151,6 @@ function exportNode(
   return named;
 }
 
-/** Excludes all hosted presentation while preserving authoritative immutable source mappings. */
 export function buildAuthoringSchemaExport(options: {
   readonly collections: ReadonlyArray<AuthoringSchemaExportCollection>;
   readonly persistedIdentities: PersistedProjectSourceIdentities;
@@ -199,7 +195,9 @@ export function buildAuthoringSchemaExport(options: {
     return { sourceKey: collection.sourceKey, apiKey: collection.apiKey, fields };
   });
   collections.sort((left, right) => compareCanonicalText(left.sourceKey, right.sourceKey));
-  const decoded = SchemaStrict.decodeUnknownResult(AuthoringProjectSchemaDocument)({ collections });
+  const decoded = Schema.decodeUnknownResult(AuthoringProjectSchemaDocument, {
+    onExcessProperty: "error",
+  })({ collections });
   if (Result.isFailure(decoded)) {
     context.issues.push({ path: "$", code: "export_document_invalid" });
   }

@@ -1,5 +1,3 @@
-// Builds secondary API-reference pages exclusively from canonical public contract artifacts.
-
 import authoringDocument from "@framerfordevs/public-contracts/artifacts/authoring/v1/openapi.json?raw";
 import controlPlaneDocument from "@framerfordevs/public-contracts/artifacts/control-plane/v1/openapi.json?raw";
 import deliveryDocument from "@framerfordevs/public-contracts/artifacts/delivery/v1/openapi.json?raw";
@@ -16,7 +14,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Validates the minimal document boundary required by Fumadocs' internal 3.1-to-3.2 upgrader. */
 function isFumadocsDocument(value: unknown): value is OpenAPIV3_2.Document {
   return (
     isRecord(value) &&
@@ -28,7 +25,6 @@ function isFumadocsDocument(value: unknown): value is OpenAPIV3_2.Document {
   );
 }
 
-/** Decodes verified canonical JSON and adapts the version marker Fumadocs upgrades internally. */
 function decodeDocument(rawDocument: string): OpenAPIV3_2.Document {
   const parsed: unknown = JSON.parse(rawDocument);
   if (!isRecord(parsed) || parsed.openapi !== "3.1.0") {
@@ -57,7 +53,6 @@ const studioContentV2 = createOpenAPI({
 });
 const tooling = createOpenAPI({ input: { tooling: decodeDocument(toolingDocument) } });
 
-/** Gives each family one stable version-root contract page. */
 function indexPageName() {
   return "index";
 }

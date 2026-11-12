@@ -1,5 +1,3 @@
-// Performs bounded, redirect-free Tooling reads with exact public-envelope decoding.
-
 import { Context, Effect, Schema } from "effect";
 
 import { ToolingHttpError, ToolingResponseTooLargeError, ToolingTransportError } from "../errors";
@@ -12,7 +10,6 @@ import {
   ToolingSuccessResponse,
 } from "../schema";
 
-import * as SchemaStrict from "../schema-strict";
 const maximumResponseBytes = 1_572_864;
 const maximumTokenBytes = 16_384;
 const defaultTimeoutMs = 15_000;
@@ -119,15 +116,16 @@ export function makeToolingHttpClient(options: ToolingHttpClientOptions) {
         catch: (cause) => transportError("tooling.response.json", cause),
       });
       if (response.ok) {
-        const success = yield* SchemaStrict.decodeUnknownEffect(ToolingSuccessResponse(dataSchema))(
-          unknownBody,
-          { onExcessProperty: "error" },
-        ).pipe(
+        const success = yield* Schema.decodeUnknownEffect(ToolingSuccessResponse(dataSchema), {
+          onExcessProperty: "error",
+        })(unknownBody, { onExcessProperty: "error" }).pipe(
           Effect.mapError((cause) => transportError("tooling.response.decode_success", cause)),
         );
         return success.data;
       }
-      const failure = yield* SchemaStrict.decodeUnknownEffect(ToolingFailureResponse)(unknownBody, {
+      const failure = yield* Schema.decodeUnknownEffect(ToolingFailureResponse, {
+        onExcessProperty: "error",
+      })(unknownBody, {
         onExcessProperty: "error",
       }).pipe(Effect.mapError((cause) => transportError("tooling.response.decode_failure", cause)));
       return yield* ToolingHttpError.make({

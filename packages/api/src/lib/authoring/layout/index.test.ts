@@ -9,8 +9,8 @@ import {
   defaultFieldEditorMetadata,
 } from "../../../contracts/schema";
 import { reconcileCodeEditorLayout } from "./index";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 const titleId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000501");
 const obsoleteId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000502");
 const summaryId = CollectionFieldId.make("019fae8b-1234-7000-8000-000000000503");
@@ -21,7 +21,7 @@ const obsoletePlacementId = EditorLayoutNodeId.make("019fae8b-1234-7000-8000-000
 const summaryPlacementId = EditorLayoutNodeId.make("019fae8b-1234-7000-8000-000000000508");
 
 function field(id: CollectionFieldId, apiKey: string, position: number) {
-  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+  return Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })({
     id,
     parentFieldId: null,
     nodeRole: "root",
@@ -42,7 +42,7 @@ const title = field(titleId, "title", 0);
 const summary = field(summaryId, "summary", 1);
 
 function currentLayout() {
-  return SchemaStrict.decodeUnknownSync(EditorLayout)({
+  return Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })({
     version: 1,
     tabs: [
       {

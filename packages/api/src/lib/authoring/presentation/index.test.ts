@@ -12,13 +12,13 @@ import {
   SchemaPublicationCommandId,
 } from "../../../contracts/schema";
 import { hashCollectionContract, hashCollectionDraft } from "../../../services/schema/engine";
+import { Schema } from "effect";
 import {
   buildAuthoringPresentationCandidate,
   hasEqualPublishedStructure,
   publishedPresentation,
 } from "./index";
 
-import * as SchemaStrict from "../../schema-strict";
 const collectionId = "019fae8b-1234-7000-8000-000000000101";
 const revisionId = "019fae8b-1234-7000-8000-000000000102";
 const titleId = "019fae8b-1234-7000-8000-000000000103";
@@ -28,7 +28,7 @@ const liveId = "019fae8b-1234-7000-8000-000000000106";
 const roles = ["owner", "developer"] as const;
 
 function field(value: unknown) {
-  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)(value);
+  return Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })(value);
 }
 
 const fields = [
@@ -79,7 +79,7 @@ const fields = [
   }),
 ];
 
-const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
+const layout = Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })({
   version: 1,
   tabs: [
     {
@@ -124,7 +124,7 @@ function currentRevision() {
     formatVersion: 2 as const,
     validationProfile: "ffd-fields@1" as const,
     currencyRegistryProfile: null,
-    collection: SchemaStrict.decodeUnknownSync(CmsCollection)({
+    collection: Schema.decodeUnknownSync(CmsCollection, { onExcessProperty: "error" })({
       id: collectionId,
       workspaceId: "019fae8b-1234-7000-8000-000000000120",
       projectId: "019fae8b-1234-7000-8000-000000000121",
@@ -143,7 +143,7 @@ function currentRevision() {
     fields,
     editorLayout: layout,
   };
-  return SchemaStrict.decodeUnknownSync(PublishedSchemaRevision)({
+  return Schema.decodeUnknownSync(PublishedSchemaRevision, { onExcessProperty: "error" })({
     id: revisionId,
     workspaceId: draft.collection.workspaceId,
     projectId: draft.collection.projectId,
@@ -173,7 +173,7 @@ function currentRevision() {
 
 function changedPresentation() {
   const current = publishedPresentation(currentRevision());
-  return SchemaStrict.decodeUnknownSync(AuthoringCollectionPresentation)({
+  return Schema.decodeUnknownSync(AuthoringCollectionPresentation, { onExcessProperty: "error" })({
     ...current,
     displayName: "Stories",
     description: "Editorial stories",
@@ -201,16 +201,18 @@ describe("Authoring presentation publication", () => {
       presentation: changedPresentation(),
     };
     assert.doesNotThrow(() =>
-      SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)(request),
+      Schema.decodeUnknownSync(AuthoringPublishPresentationRequest, { onExcessProperty: "error" })(
+        request,
+      ),
     );
     assert.throws(() =>
-      SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+      Schema.decodeUnknownSync(AuthoringPublishPresentationRequest, { onExcessProperty: "error" })({
         ...request,
         presentation: { ...request.presentation, apiKey: "forbidden" },
       }),
     );
     assert.throws(() =>
-      SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+      Schema.decodeUnknownSync(AuthoringPublishPresentationRequest, { onExcessProperty: "error" })({
         ...request,
         presentation: {
           ...request.presentation,

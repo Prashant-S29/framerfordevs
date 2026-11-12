@@ -1,5 +1,3 @@
-// Verifies M7 entry identity, partition concurrency, idempotency, history, restore, authorization, and audit persistence.
-
 import { createHash, randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, it } from "@effect/vitest";
@@ -35,7 +33,7 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Cause, Effect, Exit, Option } from "effect";
+import { Cause, Effect, Exit, Option, Schema } from "effect";
 
 import { ApiCredentialId } from "../../../src/contracts/access";
 import { AuthoringValueMutations, CmsActor } from "../../../src/contracts/authoring";
@@ -84,15 +82,19 @@ import { makePlatformRepository } from "../../../src/services/platform-repositor
 import { makeSchemaRepository } from "../../../src/services/schema/repository";
 import { makeStudioContentRepository } from "../../../src/services/studio-content/repository";
 
-import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ownerId = `m7-entry-owner-${suffix}`;
 const editorId = `m7-entry-editor-${suffix}`;
-const ownerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(ownerId);
-const ownerCmsActor = SchemaStrict.decodeUnknownSync(CmsActor)({ kind: "user", id: ownerActor });
-const editorActor = SchemaStrict.decodeUnknownSync(AuthUserId)(editorId);
-const managementCredentialId = SchemaStrict.decodeUnknownSync(ApiCredentialId)(randomUUID());
-const managementActor = SchemaStrict.decodeUnknownSync(CmsActor)({
+const ownerActor = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(ownerId);
+const ownerCmsActor = Schema.decodeUnknownSync(CmsActor, { onExcessProperty: "error" })({
+  kind: "user",
+  id: ownerActor,
+});
+const editorActor = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(editorId);
+const managementCredentialId = Schema.decodeUnknownSync(ApiCredentialId, {
+  onExcessProperty: "error",
+})(randomUUID());
+const managementActor = Schema.decodeUnknownSync(CmsActor, { onExcessProperty: "error" })({
   kind: "credential",
   id: managementCredentialId,
 });
@@ -148,14 +150,16 @@ beforeAll(async () => {
   workspaceModel = await Effect.runPromise(
     platform.createWorkspace(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M7 Entry Workspace" }),
+      Schema.decodeUnknownSync(CreateWorkspaceInput, { onExcessProperty: "error" })({
+        name: "M7 Entry Workspace",
+      }),
       `m7-workspace-${suffix}`,
     ),
   );
   projectModel = await Effect.runPromise(
     platform.createProject(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
+      Schema.decodeUnknownSync(CreateProjectInput, { onExcessProperty: "error" })({
         workspaceId: required(workspaceModel, "workspace").id,
         name: "M7 Entry Project",
         key: `entry-${suffix.slice(0, 8)}`,
@@ -167,7 +171,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     platform.enableCapability(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(EnableCapabilityInput)({
+      Schema.decodeUnknownSync(EnableCapabilityInput, { onExcessProperty: "error" })({
         projectId: required(projectModel, "project").id,
         capability: "cms",
       }),
@@ -215,7 +219,7 @@ beforeAll(async () => {
   collectionModel = await Effect.runPromise(
     schemas.createCollection(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateCollectionInput)({
+      Schema.decodeUnknownSync(CreateCollectionInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         apiKey: "articles",
@@ -229,7 +233,7 @@ beforeAll(async () => {
   const sharedDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
+      Schema.decodeUnknownSync(CreateCollectionFieldInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -254,7 +258,7 @@ beforeAll(async () => {
   const localizedDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
+      Schema.decodeUnknownSync(CreateCollectionFieldInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -279,7 +283,7 @@ beforeAll(async () => {
   const referenceDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
+      Schema.decodeUnknownSync(CreateCollectionFieldInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -304,7 +308,7 @@ beforeAll(async () => {
   const mixedDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
+      Schema.decodeUnknownSync(CreateCollectionFieldInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -329,7 +333,7 @@ beforeAll(async () => {
   const mixedSharedDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
+      Schema.decodeUnknownSync(CreateCollectionFieldInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -354,7 +358,7 @@ beforeAll(async () => {
   const mixedLocalizedDraft = await Effect.runPromise(
     schemas.createField(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateCollectionFieldInput)({
+      Schema.decodeUnknownSync(CreateCollectionFieldInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -379,7 +383,7 @@ beforeAll(async () => {
   const validation = await Effect.runPromise(
     schemas.validateSchema(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(ValidateCollectionSchemaInput)({
+      Schema.decodeUnknownSync(ValidateCollectionSchemaInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -389,7 +393,7 @@ beforeAll(async () => {
   publishedModel = await Effect.runPromise(
     schemas.publishSchema(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(PublishCollectionSchemaInput)({
+      Schema.decodeUnknownSync(PublishCollectionSchemaInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         environmentId: currentProject.environment.id,
         collectionId: required(collectionModel, "collection").id,
@@ -407,7 +411,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     localeRepository.createLocale(
       ownerActor,
-      SchemaStrict.decodeUnknownSync(CreateProjectLocaleInput)({
+      Schema.decodeUnknownSync(CreateProjectLocaleInput, { onExcessProperty: "error" })({
         projectId: currentProject.id,
         tag: "hi",
         displayName: "Hindi",
@@ -510,7 +514,7 @@ describe("entry repository PostgreSQL integration", () => {
       const page = yield* Effect.acquireUseRelease(
         schemas.createCollection(
           ownerActor,
-          SchemaStrict.decodeUnknownSync(CreateCollectionInput)({
+          Schema.decodeUnknownSync(CreateCollectionInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             apiKey: "unpublished_entries",
@@ -524,7 +528,7 @@ describe("entry repository PostgreSQL integration", () => {
           Effect.all({
             page: entries.listEntries(
               ownerActor,
-              SchemaStrict.decodeUnknownSync(ListEntriesInput)({
+              Schema.decodeUnknownSync(ListEntriesInput, { onExcessProperty: "error" })({
                 projectId: project.id,
                 environmentId: project.environment.id,
                 collectionId: collection.id,
@@ -535,7 +539,7 @@ describe("entry repository PostgreSQL integration", () => {
             ),
             context: studioContent.getContext(
               ownerActor,
-              SchemaStrict.decodeUnknownSync(StudioContentScope)({
+              Schema.decodeUnknownSync(StudioContentScope, { onExcessProperty: "error" })({
                 projectId: project.id,
                 environmentId: project.environment.id,
               }),
@@ -571,16 +575,22 @@ describe("entry repository PostgreSQL integration", () => {
       const project = required(projectModel, "project");
       const collection = required(collectionModel, "collection");
       const published = required(publishedModel, "published schema");
-      const contextScope = SchemaStrict.decodeUnknownSync(StudioContentScope)({
+      const contextScope = Schema.decodeUnknownSync(StudioContentScope, {
+        onExcessProperty: "error",
+      })({
         projectId: project.id,
         environmentId: project.environment.id,
       });
-      const englishScope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
+      const englishScope = Schema.decodeUnknownSync(StudioCollectionLocaleScope, {
+        onExcessProperty: "error",
+      })({
         ...contextScope,
         collectionId: collection.id,
         locale: "en",
       });
-      const hindiScope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
+      const hindiScope = Schema.decodeUnknownSync(StudioCollectionLocaleScope, {
+        onExcessProperty: "error",
+      })({
         ...contextScope,
         collectionId: collection.id,
         locale: "hi",
@@ -604,7 +614,7 @@ describe("entry repository PostgreSQL integration", () => {
       const foreignEnvironment = yield* Effect.exit(
         studioContent.authorizeCollection(
           ownerActor,
-          SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
+          Schema.decodeUnknownSync(StudioCollectionLocaleScope, { onExcessProperty: "error" })({
             ...englishScope,
             environmentId: randomUUID(),
           }),
@@ -614,7 +624,7 @@ describe("entry repository PostgreSQL integration", () => {
       const foreignCollection = yield* Effect.exit(
         studioContent.authorizeCollection(
           ownerActor,
-          SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
+          Schema.decodeUnknownSync(StudioCollectionLocaleScope, { onExcessProperty: "error" })({
             ...englishScope,
             collectionId: randomUUID(),
           }),
@@ -624,7 +634,7 @@ describe("entry repository PostgreSQL integration", () => {
       const foreignProject = yield* Effect.exit(
         studioContent.authorizeCollection(
           ownerActor,
-          SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
+          Schema.decodeUnknownSync(StudioCollectionLocaleScope, { onExcessProperty: "error" })({
             ...englishScope,
             projectId: randomUUID(),
             environmentId: randomUUID(),
@@ -637,9 +647,12 @@ describe("entry repository PostgreSQL integration", () => {
           ownerActor,
           {
             scope: englishScope,
-            expectedSchemaRevisionId:
-              SchemaStrict.decodeUnknownSync(SchemaRevisionId)(randomUUID()),
-            limit: SchemaStrict.decodeUnknownSync(StudioContentPageLimit)(25),
+            expectedSchemaRevisionId: Schema.decodeUnknownSync(SchemaRevisionId, {
+              onExcessProperty: "error",
+            })(randomUUID()),
+            limit: Schema.decodeUnknownSync(StudioContentPageLimit, { onExcessProperty: "error" })(
+              25,
+            ),
             search: null,
             browseOrder: null,
             searchOrder: null,
@@ -673,11 +686,13 @@ describe("entry repository PostgreSQL integration", () => {
   it("enforces the Studio fixed-role and locale-access capability matrix", async () => {
     const currentProject = required(projectModel, "project");
     const currentCollection = required(collectionModel, "collection");
-    const scope = SchemaStrict.decodeUnknownSync(StudioContentScope)({
+    const scope = Schema.decodeUnknownSync(StudioContentScope, { onExcessProperty: "error" })({
       projectId: currentProject.id,
       environmentId: currentProject.environment.id,
     });
-    const localeScope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
+    const localeScope = Schema.decodeUnknownSync(StudioCollectionLocaleScope, {
+      onExcessProperty: "error",
+    })({
       ...scope,
       collectionId: currentCollection.id,
       locale: "en",
@@ -774,11 +789,13 @@ describe("entry repository PostgreSQL integration", () => {
     const currentProject = required(projectModel, "project");
     const currentCollection = required(collectionModel, "collection");
     const published = required(publishedModel, "published schema");
-    const scope = SchemaStrict.decodeUnknownSync(StudioContentScope)({
+    const scope = Schema.decodeUnknownSync(StudioContentScope, { onExcessProperty: "error" })({
       projectId: currentProject.id,
       environmentId: currentProject.environment.id,
     });
-    const localeScope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
+    const localeScope = Schema.decodeUnknownSync(StudioCollectionLocaleScope, {
+      onExcessProperty: "error",
+    })({
       ...scope,
       collectionId: currentCollection.id,
       locale: "en",
@@ -1097,7 +1114,9 @@ describe("entry repository PostgreSQL integration", () => {
       const collection = required(collectionModel, "collection");
       const published = required(publishedModel, "published schema");
       const commandId = randomUUID();
-      const input = yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
+      const input = yield* Schema.decodeUnknownEffect(CreateEntryInput, {
+        onExcessProperty: "error",
+      })({
         projectId: project.id,
         environmentId: project.environment.id,
         collectionId: collection.id,
@@ -1126,7 +1145,7 @@ describe("entry repository PostgreSQL integration", () => {
       );
       const page = yield* entries.listEntries(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(ListEntriesInput)({
+        yield* Schema.decodeUnknownEffect(ListEntriesInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1140,7 +1159,10 @@ describe("entry repository PostgreSQL integration", () => {
       const commandConflict = yield* Effect.exit(
         entries.createEntry(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({ ...input, locale: "hi" }),
+          yield* Schema.decodeUnknownEffect(CreateEntryInput, { onExcessProperty: "error" })({
+            ...input,
+            locale: "hi",
+          }),
           new Date("2026-08-08T11:01:30.000Z"),
           `m7-create-conflict-${suffix}`,
         ),
@@ -1149,7 +1171,7 @@ describe("entry repository PostgreSQL integration", () => {
       const nameCommandConflict = yield* Effect.exit(
         entries.createEntry(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
+          yield* Schema.decodeUnknownEffect(CreateEntryInput, { onExcessProperty: "error" })({
             ...input,
             displayName: "Different command name",
           }),
@@ -1162,7 +1184,7 @@ describe("entry repository PostgreSQL integration", () => {
       assert.strictEqual(page.items[0]?.displayName, "Primary entry");
       const renamed = yield* entries.renameEntry(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
+        yield* Schema.decodeUnknownEffect(RenameEntryInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1178,7 +1200,7 @@ describe("entry repository PostgreSQL integration", () => {
       assert.strictEqual(renamed.nameVersion, 2);
       const noOpRename = yield* entries.renameEntry(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
+        yield* Schema.decodeUnknownEffect(RenameEntryInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1194,7 +1216,7 @@ describe("entry repository PostgreSQL integration", () => {
       const rollbackRename = yield* Effect.exit(
         makeEntryRepository({ failAfter: "audit" }).renameEntry(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
+          yield* Schema.decodeUnknownEffect(RenameEntryInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1210,7 +1232,7 @@ describe("entry repository PostgreSQL integration", () => {
       assert.strictEqual(failureTag(rollbackRename), "DatabaseFailure");
       const afterRenameRollback = yield* entries.getDraft(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
+        yield* Schema.decodeUnknownEffect(GetEntryDraftInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1223,7 +1245,7 @@ describe("entry repository PostgreSQL integration", () => {
       const staleRename = yield* Effect.exit(
         entries.renameEntry(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
+          yield* Schema.decodeUnknownEffect(RenameEntryInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1239,7 +1261,7 @@ describe("entry repository PostgreSQL integration", () => {
       assert.strictEqual(failureTag(staleRename), "VersionConflictFailure");
       const renamedPage = yield* entries.listEntries(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(ListEntriesInput)({
+        yield* Schema.decodeUnknownEffect(ListEntriesInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1271,7 +1293,9 @@ describe("entry repository PostgreSQL integration", () => {
       const published = required(publishedModel, "published schema");
       const entryId = required(primaryEntryId, "primary entry");
       const unavailableId = randomUUID();
-      const scope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
+      const scope = Schema.decodeUnknownSync(StudioCollectionLocaleScope, {
+        onExcessProperty: "error",
+      })({
         projectId: project.id,
         environmentId: project.environment.id,
         collectionId: collection.id,
@@ -1282,7 +1306,10 @@ describe("entry repository PostgreSQL integration", () => {
         {
           scope,
           expectedSchemaRevisionId: published.id,
-          entryIds: SchemaStrict.decodeUnknownSync(StudioResolveEntryIds)([unavailableId, entryId]),
+          entryIds: Schema.decodeUnknownSync(StudioResolveEntryIds, { onExcessProperty: "error" })([
+            unavailableId,
+            entryId,
+          ]),
         },
         new Date("2026-08-08T11:04:30.000Z"),
       );
@@ -1291,9 +1318,12 @@ describe("entry repository PostgreSQL integration", () => {
           ownerActor,
           {
             scope,
-            expectedSchemaRevisionId:
-              SchemaStrict.decodeUnknownSync(SchemaRevisionId)(randomUUID()),
-            entryIds: SchemaStrict.decodeUnknownSync(StudioResolveEntryIds)([entryId]),
+            expectedSchemaRevisionId: Schema.decodeUnknownSync(SchemaRevisionId, {
+              onExcessProperty: "error",
+            })(randomUUID()),
+            entryIds: Schema.decodeUnknownSync(StudioResolveEntryIds, {
+              onExcessProperty: "error",
+            })([entryId]),
           },
           new Date("2026-08-08T11:04:30.000Z"),
         ),
@@ -1329,7 +1359,9 @@ describe("entry repository PostgreSQL integration", () => {
           action: "content.read",
         },
       );
-      const mutations = yield* SchemaStrict.decodeUnknownEffect(AuthoringValueMutations)([
+      const mutations = yield* Schema.decodeUnknownEffect(AuthoringValueMutations, {
+        onExcessProperty: "error",
+      })([
         { operation: "set", scope: "shared", path: ["internal_name"], value: "Internal" },
         { operation: "set", scope: "localized", path: ["hero", "heading"], value: "Hello" },
       ]);
@@ -1344,15 +1376,15 @@ describe("entry repository PostgreSQL integration", () => {
       );
       assert.isTrue(resolved.valid);
       if (resolved.valid) {
-        const sharedId = SchemaStrict.decodeUnknownSync(CollectionFieldId)(
+        const sharedId = Schema.decodeUnknownSync(CollectionFieldId, { onExcessProperty: "error" })(
           required(sharedFieldId, "shared field"),
         );
-        const mixedObjectId = SchemaStrict.decodeUnknownSync(CollectionFieldId)(
-          required(mixedObjectFieldId, "mixed object field"),
-        );
-        const mixedLocalizedId = SchemaStrict.decodeUnknownSync(CollectionFieldId)(
-          required(mixedLocalizedFieldId, "mixed localized field"),
-        );
+        const mixedObjectId = Schema.decodeUnknownSync(CollectionFieldId, {
+          onExcessProperty: "error",
+        })(required(mixedObjectFieldId, "mixed object field"));
+        const mixedLocalizedId = Schema.decodeUnknownSync(CollectionFieldId, {
+          onExcessProperty: "error",
+        })(required(mixedLocalizedFieldId, "mixed localized field"));
         assert.deepStrictEqual(resolved.mutations, [
           { operation: "set", path: [sharedId], value: "Internal" },
           {
@@ -1371,7 +1403,9 @@ describe("entry repository PostgreSQL integration", () => {
       const collection = required(collectionModel, "collection");
       const published = required(publishedModel, "published schema");
       const commandId = randomUUID();
-      const input = yield* SchemaStrict.decodeUnknownEffect(CreateEntryWithDraftInput)({
+      const input = yield* Schema.decodeUnknownEffect(CreateEntryWithDraftInput, {
+        onExcessProperty: "error",
+      })({
         projectId: project.id,
         environmentId: project.environment.id,
         collectionId: collection.id,
@@ -1414,7 +1448,7 @@ describe("entry repository PostgreSQL integration", () => {
       );
       const draft = yield* entries.getDraft(
         managementActor,
-        yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
+        yield* Schema.decodeUnknownEffect(GetEntryDraftInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1424,16 +1458,20 @@ describe("entry repository PostgreSQL integration", () => {
       );
       const conflictingCommandId = randomUUID();
       const conflictingInputs = [
-        yield* SchemaStrict.decodeUnknownEffect(CreateEntryWithDraftInput)({
-          ...input,
-          commandId: conflictingCommandId,
-          displayName: "Concurrent conflict A",
-        }),
-        yield* SchemaStrict.decodeUnknownEffect(CreateEntryWithDraftInput)({
-          ...input,
-          commandId: conflictingCommandId,
-          displayName: "Concurrent conflict B",
-        }),
+        yield* Schema.decodeUnknownEffect(CreateEntryWithDraftInput, { onExcessProperty: "error" })(
+          {
+            ...input,
+            commandId: conflictingCommandId,
+            displayName: "Concurrent conflict A",
+          },
+        ),
+        yield* Schema.decodeUnknownEffect(CreateEntryWithDraftInput, { onExcessProperty: "error" })(
+          {
+            ...input,
+            commandId: conflictingCommandId,
+            displayName: "Concurrent conflict B",
+          },
+        ),
       ] as const;
       const conflictingResults = yield* Effect.all(
         conflictingInputs.map((conflictingInput, index) =>
@@ -1458,7 +1496,9 @@ describe("entry repository PostgreSQL integration", () => {
       const failed = yield* Effect.exit(
         entries.createEntryWithDraft(
           managementActor,
-          yield* SchemaStrict.decodeUnknownEffect(CreateEntryWithDraftInput)({
+          yield* Schema.decodeUnknownEffect(CreateEntryWithDraftInput, {
+            onExcessProperty: "error",
+          })({
             ...input,
             commandId: failedCommandId,
             displayName: "Must roll back",
@@ -1495,7 +1535,9 @@ describe("entry repository PostgreSQL integration", () => {
         const rolledBack = yield* Effect.exit(
           makeEntryRepository({ failAfter: stage }).createEntryWithDraft(
             managementActor,
-            yield* SchemaStrict.decodeUnknownEffect(CreateEntryWithDraftInput)({
+            yield* Schema.decodeUnknownEffect(CreateEntryWithDraftInput, {
+              onExcessProperty: "error",
+            })({
               ...input,
               commandId: rollbackCommandId,
               displayName: `Injected ${stage} rollback`,
@@ -1562,7 +1604,7 @@ describe("entry repository PostgreSQL integration", () => {
         const published = required(publishedModel, "published schema");
         const page = yield* entries.listEntries(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(ListEntriesInput)({
+          yield* Schema.decodeUnknownEffect(ListEntriesInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1579,7 +1621,7 @@ describe("entry repository PostgreSQL integration", () => {
         const mixedLocalizedId = required(mixedLocalizedFieldId, "mixed localized field");
         const first = yield* entries.saveDraft(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
+          yield* Schema.decodeUnknownEffect(SaveEntryDraftInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1604,7 +1646,7 @@ describe("entry repository PostgreSQL integration", () => {
         assert.strictEqual(first.validation.issues[0]?.code, "required");
         const localized = yield* entries.saveDraft(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
+          yield* Schema.decodeUnknownEffect(SaveEntryDraftInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1633,7 +1675,7 @@ describe("entry repository PostgreSQL integration", () => {
         const malformed = yield* Effect.exit(
           entries.saveDraft(
             ownerActor,
-            yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
+            yield* Schema.decodeUnknownEffect(SaveEntryDraftInput, { onExcessProperty: "error" })({
               projectId: project.id,
               environmentId: project.environment.id,
               collectionId: collection.id,
@@ -1658,22 +1700,24 @@ describe("entry repository PostgreSQL integration", () => {
           const rollback = yield* Effect.exit(
             makeEntryRepository({ failAfter: stage }).saveDraft(
               ownerActor,
-              yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
-                projectId: project.id,
-                environmentId: project.environment.id,
-                collectionId: collection.id,
-                entryId: entry.id,
-                locale: "en",
-                schemaRevisionId: published.id,
-                contractHash: published.contractHash,
-                commandId: rollbackCommandId,
-                expectedSharedVersion: 1,
-                expectedLocalizedVersion: 1,
-                sharedMutations: [],
-                localizedMutations: [
-                  { operation: "set", path: [localizedId], value: `Rolled back ${stage}` },
-                ],
-              }),
+              yield* Schema.decodeUnknownEffect(SaveEntryDraftInput, { onExcessProperty: "error" })(
+                {
+                  projectId: project.id,
+                  environmentId: project.environment.id,
+                  collectionId: collection.id,
+                  entryId: entry.id,
+                  locale: "en",
+                  schemaRevisionId: published.id,
+                  contractHash: published.contractHash,
+                  commandId: rollbackCommandId,
+                  expectedSharedVersion: 1,
+                  expectedLocalizedVersion: 1,
+                  sharedMutations: [],
+                  localizedMutations: [
+                    { operation: "set", path: [localizedId], value: `Rolled back ${stage}` },
+                  ],
+                },
+              ),
               new Date("2026-08-08T11:03:45.000Z"),
               rollbackRequestId,
             ),
@@ -1693,7 +1737,7 @@ describe("entry repository PostgreSQL integration", () => {
         }
         const afterRollback = yield* entries.getDraft(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
+          yield* Schema.decodeUnknownEffect(GetEntryDraftInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1721,7 +1765,9 @@ describe("entry repository PostgreSQL integration", () => {
           "English heading",
         );
         const replayCommand = randomUUID();
-        const replayInput = yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
+        const replayInput = yield* Schema.decodeUnknownEffect(SaveEntryDraftInput, {
+          onExcessProperty: "error",
+        })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1758,7 +1804,7 @@ describe("entry repository PostgreSQL integration", () => {
         assert.strictEqual(replay.sharedRevisionId, saved.sharedRevisionId);
         const noOp = yield* entries.saveDraft(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
+          yield* Schema.decodeUnknownEffect(SaveEntryDraftInput, { onExcessProperty: "error" })({
             ...replayInput,
             commandId: randomUUID(),
             expectedSharedVersion: 2,
@@ -1771,7 +1817,7 @@ describe("entry repository PostgreSQL integration", () => {
         const commandConflict = yield* Effect.exit(
           entries.saveDraft(
             ownerActor,
-            yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
+            yield* Schema.decodeUnknownEffect(SaveEntryDraftInput, { onExcessProperty: "error" })({
               ...replayInput,
               sharedMutations: [{ operation: "set", path: [sharedId], value: "Different" }],
             }),
@@ -1783,7 +1829,7 @@ describe("entry repository PostgreSQL integration", () => {
         const stale = yield* Effect.exit(
           entries.saveDraft(
             ownerActor,
-            yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
+            yield* Schema.decodeUnknownEffect(SaveEntryDraftInput, { onExcessProperty: "error" })({
               ...replayInput,
               commandId: randomUUID(),
               expectedSharedVersion: 0,
@@ -1807,7 +1853,7 @@ describe("entry repository PostgreSQL integration", () => {
       const missingReferenceId = randomUUID();
       const entry = yield* entries.createEntry(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
+        yield* Schema.decodeUnknownEffect(CreateEntryInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -1823,7 +1869,7 @@ describe("entry repository PostgreSQL integration", () => {
       const malformedReference = yield* Effect.exit(
         entries.saveDraft(
           ownerActor,
-          SchemaStrict.decodeUnknownSync(SaveEntryDraftInput)({
+          Schema.decodeUnknownSync(SaveEntryDraftInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1848,7 +1894,7 @@ describe("entry repository PostgreSQL integration", () => {
       const save = (locale: "en" | "hi", value: string) =>
         entries.saveDraft(
           ownerActor,
-          SchemaStrict.decodeUnknownSync(SaveEntryDraftInput)({
+          Schema.decodeUnknownSync(SaveEntryDraftInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1883,7 +1929,7 @@ describe("entry repository PostgreSQL integration", () => {
       const [englishDraft, hindiDraft] = yield* Effect.all([
         entries.getDraft(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
+          yield* Schema.decodeUnknownEffect(GetEntryDraftInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1893,7 +1939,7 @@ describe("entry repository PostgreSQL integration", () => {
         ),
         entries.getDraft(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
+          yield* Schema.decodeUnknownEffect(GetEntryDraftInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1919,7 +1965,7 @@ describe("entry repository PostgreSQL integration", () => {
         const published = required(publishedModel, "published schema");
         const page = yield* entries.listEntries(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(ListEntriesInput)({
+          yield* Schema.decodeUnknownEffect(ListEntriesInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1934,7 +1980,7 @@ describe("entry repository PostgreSQL integration", () => {
         ).entry;
         const draft = yield* entries.getDraft(
           editorActor,
-          yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
+          yield* Schema.decodeUnknownEffect(GetEntryDraftInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -1950,7 +1996,7 @@ describe("entry repository PostgreSQL integration", () => {
         const unauthorizedLocale = yield* Effect.exit(
           entries.getDraft(
             editorActor,
-            yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
+            yield* Schema.decodeUnknownEffect(GetEntryDraftInput, { onExcessProperty: "error" })({
               projectId: project.id,
               environmentId: project.environment.id,
               collectionId: collection.id,
@@ -1963,7 +2009,7 @@ describe("entry repository PostgreSQL integration", () => {
         const denied = yield* Effect.exit(
           entries.saveDraft(
             editorActor,
-            yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
+            yield* Schema.decodeUnknownEffect(SaveEntryDraftInput, { onExcessProperty: "error" })({
               projectId: project.id,
               environmentId: project.environment.id,
               collectionId: collection.id,
@@ -1990,21 +2036,23 @@ describe("entry repository PostgreSQL integration", () => {
         assert.strictEqual(failureTag(denied), "ForbiddenFailure");
         const localizedHistory = yield* entries.listRevisions(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(ListEntryRevisionsInput)({
-            projectId: project.id,
-            environmentId: project.environment.id,
-            collectionId: collection.id,
-            entryId: entry.id,
-            locale: "en",
-            scope: "localized",
-            cursor: null,
-            limit: 25,
-          }),
+          yield* Schema.decodeUnknownEffect(ListEntryRevisionsInput, { onExcessProperty: "error" })(
+            {
+              projectId: project.id,
+              environmentId: project.environment.id,
+              collectionId: collection.id,
+              entryId: entry.id,
+              locale: "en",
+              scope: "localized",
+              cursor: null,
+              limit: 25,
+            },
+          ),
         );
         const target = required(localizedHistory.items[0], "localized revision");
         const changed = yield* entries.saveDraft(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
+          yield* Schema.decodeUnknownEffect(SaveEntryDraftInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -2029,7 +2077,9 @@ describe("entry repository PostgreSQL integration", () => {
         );
         const restored = yield* entries.restoreRevision(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(RestoreEntryRevisionInput)({
+          yield* Schema.decodeUnknownEffect(RestoreEntryRevisionInput, {
+            onExcessProperty: "error",
+          })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -2046,21 +2096,21 @@ describe("entry repository PostgreSQL integration", () => {
           `m7-restore-${suffix}`,
         );
         assert.strictEqual(restored.localizedVersion, 3);
-        const restoreNoOpInput = yield* SchemaStrict.decodeUnknownEffect(RestoreEntryRevisionInput)(
-          {
-            projectId: project.id,
-            environmentId: project.environment.id,
-            collectionId: collection.id,
-            entryId: entry.id,
-            locale: "en",
-            scope: "localized",
-            revisionId: target.id,
-            schemaRevisionId: published.id,
-            contractHash: published.contractHash,
-            expectedVersion: 3,
-            commandId: randomUUID(),
-          },
-        );
+        const restoreNoOpInput = yield* Schema.decodeUnknownEffect(RestoreEntryRevisionInput, {
+          onExcessProperty: "error",
+        })({
+          projectId: project.id,
+          environmentId: project.environment.id,
+          collectionId: collection.id,
+          entryId: entry.id,
+          locale: "en",
+          scope: "localized",
+          revisionId: target.id,
+          schemaRevisionId: published.id,
+          contractHash: published.contractHash,
+          expectedVersion: 3,
+          commandId: randomUUID(),
+        });
         const restoreNoOp = yield* entries.restoreRevision(
           ownerActor,
           restoreNoOpInput,
@@ -2077,16 +2127,18 @@ describe("entry repository PostgreSQL integration", () => {
         assert.strictEqual(restoreReplay.localizedVersion, 3);
         const revisions = yield* entries.listRevisions(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(ListEntryRevisionsInput)({
-            projectId: project.id,
-            environmentId: project.environment.id,
-            collectionId: collection.id,
-            entryId: entry.id,
-            locale: "en",
-            scope: "localized",
-            cursor: null,
-            limit: 25,
-          }),
+          yield* Schema.decodeUnknownEffect(ListEntryRevisionsInput, { onExcessProperty: "error" })(
+            {
+              projectId: project.id,
+              environmentId: project.environment.id,
+              collectionId: collection.id,
+              entryId: entry.id,
+              locale: "en",
+              scope: "localized",
+              cursor: null,
+              limit: 25,
+            },
+          ),
         );
         assert.strictEqual(revisions.items[0]?.restoredFromRevisionId, target.id);
         assert.strictEqual(revisions.items.length, 3);
@@ -2115,7 +2167,7 @@ describe("entry repository PostgreSQL integration", () => {
       const entryId = required(primaryEntryId, "primary entry");
       const current = yield* entries.getDraft(
         managementActor,
-        yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({
+        yield* Schema.decodeUnknownEffect(GetEntryDraftInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -2126,7 +2178,7 @@ describe("entry repository PostgreSQL integration", () => {
       const requestId = `m13-entry-credential-${suffix}`;
       const renamed = yield* entries.renameEntry(
         managementActor,
-        yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
+        yield* Schema.decodeUnknownEffect(RenameEntryInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -2183,7 +2235,7 @@ describe("entry repository PostgreSQL integration", () => {
       ]) {
         const created = yield* entries.createEntry(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
+          yield* Schema.decodeUnknownEffect(CreateEntryInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -2198,13 +2250,17 @@ describe("entry repository PostgreSQL integration", () => {
         );
         entryIdsByName.set(displayName, created.id);
       }
-      const scope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
+      const scope = Schema.decodeUnknownSync(StudioCollectionLocaleScope, {
+        onExcessProperty: "error",
+      })({
         projectId: project.id,
         environmentId: project.environment.id,
         collectionId: collection.id,
         locale: "en",
       });
-      const limit = SchemaStrict.decodeUnknownSync(StudioContentPageLimit)(10);
+      const limit = Schema.decodeUnknownSync(StudioContentPageLimit, { onExcessProperty: "error" })(
+        10,
+      );
       const firstBrowse = yield* studioContent.listEntries(
         ownerActor,
         {
@@ -2219,7 +2275,7 @@ describe("entry repository PostgreSQL integration", () => {
       );
       yield* entries.createEntry(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
+        yield* Schema.decodeUnknownEffect(CreateEntryInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -2259,7 +2315,7 @@ describe("entry repository PostgreSQL integration", () => {
       );
       yield* entries.createEntry(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
+        yield* Schema.decodeUnknownEffect(CreateEntryInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -2274,7 +2330,7 @@ describe("entry repository PostgreSQL integration", () => {
       );
       yield* entries.renameEntry(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
+        yield* Schema.decodeUnknownEffect(RenameEntryInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -2288,7 +2344,7 @@ describe("entry repository PostgreSQL integration", () => {
       );
       yield* entries.renameEntry(
         ownerActor,
-        yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
+        yield* Schema.decodeUnknownEffect(RenameEntryInput, { onExcessProperty: "error" })({
           projectId: project.id,
           environmentId: project.environment.id,
           collectionId: collection.id,
@@ -2365,7 +2421,9 @@ describe("entry repository PostgreSQL integration", () => {
         {
           scope,
           expectedSchemaRevisionId: published.id,
-          limit: SchemaStrict.decodeUnknownSync(StudioContentPageLimit)(13),
+          limit: Schema.decodeUnknownSync(StudioContentPageLimit, { onExcessProperty: "error" })(
+            13,
+          ),
           search: alpha,
           browseOrder: null,
           searchOrder: null,
@@ -2377,7 +2435,9 @@ describe("entry repository PostgreSQL integration", () => {
         {
           scope,
           expectedSchemaRevisionId: published.id,
-          limit: SchemaStrict.decodeUnknownSync(StudioContentPageLimit)(50),
+          limit: Schema.decodeUnknownSync(StudioContentPageLimit, { onExcessProperty: "error" })(
+            50,
+          ),
           search: null,
           browseOrder: null,
           searchOrder: null,
@@ -2467,7 +2527,7 @@ describe("entry repository PostgreSQL integration", () => {
       for (let index = 0; index < 12; index += 1) {
         const created = yield* entries.createEntry(
           ownerActor,
-          yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
+          yield* Schema.decodeUnknownEffect(CreateEntryInput, { onExcessProperty: "error" })({
             projectId: project.id,
             environmentId: project.environment.id,
             collectionId: collection.id,
@@ -2482,7 +2542,9 @@ describe("entry repository PostgreSQL integration", () => {
         );
         createdIds.push(created.id);
       }
-      const scope = SchemaStrict.decodeUnknownSync(StudioCollectionLocaleScope)({
+      const scope = Schema.decodeUnknownSync(StudioCollectionLocaleScope, {
+        onExcessProperty: "error",
+      })({
         projectId: project.id,
         environmentId: project.environment.id,
         collectionId: collection.id,
@@ -2494,7 +2556,9 @@ describe("entry repository PostgreSQL integration", () => {
         {
           scope,
           expectedSchemaRevisionId: published.id,
-          limit: SchemaStrict.decodeUnknownSync(StudioContentPageLimit)(10),
+          limit: Schema.decodeUnknownSync(StudioContentPageLimit, { onExcessProperty: "error" })(
+            10,
+          ),
           search,
           browseOrder: null,
           searchOrder: null,
@@ -2506,7 +2570,9 @@ describe("entry repository PostgreSQL integration", () => {
         {
           scope,
           expectedSchemaRevisionId: published.id,
-          limit: SchemaStrict.decodeUnknownSync(StudioContentPageLimit)(10),
+          limit: Schema.decodeUnknownSync(StudioContentPageLimit, { onExcessProperty: "error" })(
+            10,
+          ),
           search,
           browseOrder: null,
           searchOrder: first.finalSearchOrder,

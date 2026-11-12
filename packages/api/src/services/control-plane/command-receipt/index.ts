@@ -1,5 +1,3 @@
-// Owns serialized inspection and persistence of bounded Control Plane command receipts.
-
 import { eq, sql } from "@framerfordevs/db/query";
 import { controlPlaneCommandReceipt } from "@framerfordevs/db/schema/control-plane";
 
@@ -111,7 +109,6 @@ function actorMatches(
   return receipt.actorType === actor.kind && receipt.actorId === actor.id;
 }
 
-/** Prevents same-command races from mutating before the committed receipt can be replayed. */
 export async function lockControlPlaneCommand(
   transaction: ApplicationTransaction,
   commandId: ControlPlaneCommandId,

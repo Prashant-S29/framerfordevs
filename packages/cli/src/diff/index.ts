@@ -1,5 +1,3 @@
-// Classifies lock, immutable authority, locale, field, and generated-file drift by stable identity.
-
 import { canonicalizeJson } from "../canonical";
 import type {
   JsonValue,

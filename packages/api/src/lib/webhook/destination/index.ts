@@ -1,5 +1,3 @@
-// Applies pure webhook URL, hostname, and all-answer IP policy before any outbound connection.
-
 import { domainToASCII } from "node:url";
 
 import ipaddr from "ipaddr.js";
@@ -59,7 +57,6 @@ function isBlockedHostname(hostname: string): boolean {
   );
 }
 
-/** Normalizes a destination without DNS or HTTP and rejects authority-smuggling syntax. */
 export function normalizeWebhookDestination(
   input: string,
 ): WebhookDestinationPolicyResult<NormalizedWebhookDestination> {
@@ -98,7 +95,6 @@ function isPublicAddress(input: string): boolean {
   }
 }
 
-/** Requires every bounded DNS answer to be a globally routable unicast address. */
 export function validateWebhookDnsAnswers(
   answers: ReadonlyArray<string>,
 ): WebhookDestinationPolicyResult<ReadonlyArray<string>> {

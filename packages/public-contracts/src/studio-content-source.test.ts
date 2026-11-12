@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { studioContentOpenApiDocument } from "@framerfordevs/api/contracts/studio-content/openapi/index";
+import { studioContentOpenApiDocument } from "@framerfordevs/api/contracts/studio-content/openapi";
 import { studioContentV2OpenApiDocument } from "@framerfordevs/api/contracts/studio-content/openapi/v2";
 import { describe, expect, it } from "vitest";
 
@@ -55,16 +55,16 @@ describe("Studio Content v1 contract source", () => {
       generatePublicArtifacts().map((artifact) => [artifact.key, artifact.digest]),
     );
     expect(artifacts.get("authoring/v1")).toBe(
-      "d9500549cd95067857b87f494b77375e3d575c4832589478858e125ab3f31205",
+      "fe9876d93d76f893bf40a0f4f7d5e7dee9725ccb4481bdaef1ceca8f5a8c6610",
     );
     expect(artifacts.get("control-plane/v1")).toBe(
-      "3dd7c890b7a0448bfb497db663fadfee7f3eeaf614a026e405da3638a595d59b",
+      "d151581190e0532300c9dd05787ea054227e9c24a46eaaefb91a11151ef0e3d5",
     );
     expect(artifacts.get("studio/v1")).toBe(
-      "f3a70dee4d72057a3df982a6b4a4ff5192daea850b57810cfeb7caa498ef5b03",
+      "35913414f519316097cea6e73dfb1cb3a8e9097bb9083a76543adff25c6eed8f",
     );
     expect(artifacts.get("studio-content/v1")).toBe(
-      "c9226fdcc767d704a41e100a5440560afbb7f64977209f82d42dad20bc48a9fc",
+      "f0166c8346c4e0771ed5f97570c08302dd3bd94e0b0ff566cfd41a6654f6afe0",
     );
   });
 });

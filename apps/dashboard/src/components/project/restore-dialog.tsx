@@ -1,4 +1,4 @@
-import type { Project } from "@framerfordevs/api/contracts/platform/index";
+import type { Project } from "@framerfordevs/api/contracts/platform";
 import {
   AlertDialog,
   AlertDialogAction,

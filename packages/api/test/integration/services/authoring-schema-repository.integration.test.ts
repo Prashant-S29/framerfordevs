@@ -30,7 +30,7 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { ApiCredentialId } from "../../../src/contracts/access";
 import { CmsActor } from "../../../src/contracts/authoring";
@@ -55,13 +55,17 @@ import { makeAuthoringPresentationRepository } from "../../../src/services/autho
 import { makeAuthoringSchemaRepository } from "../../../src/services/authoring/schema/repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 
-import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ownerId = `m13-apply-owner-${suffix}`;
-const ownerUserId = SchemaStrict.decodeUnknownSync(AuthUserId)(ownerId);
-const ownerActor = SchemaStrict.decodeUnknownSync(CmsActor)({ kind: "user", id: ownerUserId });
-const managementCredentialId = SchemaStrict.decodeUnknownSync(ApiCredentialId)(randomUUID());
-const managementActor = SchemaStrict.decodeUnknownSync(CmsActor)({
+const ownerUserId = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(ownerId);
+const ownerActor = Schema.decodeUnknownSync(CmsActor, { onExcessProperty: "error" })({
+  kind: "user",
+  id: ownerUserId,
+});
+const managementCredentialId = Schema.decodeUnknownSync(ApiCredentialId, {
+  onExcessProperty: "error",
+})(randomUUID());
+const managementActor = Schema.decodeUnknownSync(CmsActor, { onExcessProperty: "error" })({
   kind: "credential",
   id: managementCredentialId,
 });
@@ -150,14 +154,16 @@ beforeAll(async () => {
   workspaceModel = await Effect.runPromise(
     platform.createWorkspace(
       ownerUserId,
-      SchemaStrict.decodeUnknownSync(CreateWorkspaceInput)({ name: "M13 Apply Workspace" }),
+      Schema.decodeUnknownSync(CreateWorkspaceInput, { onExcessProperty: "error" })({
+        name: "M13 Apply Workspace",
+      }),
       `m13-apply-workspace-${suffix}`,
     ),
   );
   projectModel = await Effect.runPromise(
     platform.createProject(
       ownerUserId,
-      SchemaStrict.decodeUnknownSync(CreateProjectInput)({
+      Schema.decodeUnknownSync(CreateProjectInput, { onExcessProperty: "error" })({
         workspaceId: required(workspaceModel, "workspace").id,
         name: "M13 Apply Project",
         key: `m13-apply-${suffix.slice(0, 8)}`,
@@ -169,7 +175,7 @@ beforeAll(async () => {
   await Effect.runPromise(
     platform.enableCapability(
       ownerUserId,
-      SchemaStrict.decodeUnknownSync(EnableCapabilityInput)({
+      Schema.decodeUnknownSync(EnableCapabilityInput, { onExcessProperty: "error" })({
         projectId: required(projectModel, "project").id,
         capability: "cms",
       }),
@@ -261,7 +267,7 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     const plan = await Effect.runPromise(
       authoring.plan(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(AuthoringSchemaPlanInput)({
+        Schema.decodeUnknownSync(AuthoringSchemaPlanInput, { onExcessProperty: "error" })({
           scope,
           project: projectDocument,
         }),
@@ -272,7 +278,9 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     assert.isTrue(plan.candidates.every((candidate) => candidate.containsUnallocatedIdentities));
 
     const commandId = randomUUID();
-    const input = SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
+    const input = Schema.decodeUnknownSync(AuthoringSchemaApplyInput, {
+      onExcessProperty: "error",
+    })({
       scope,
       project: projectDocument,
       commandId,
@@ -319,7 +327,9 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     const exported = await Effect.runPromise(
       authoring.exportSchema(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(AuthoringSchemaExportInput)({ scope }),
+        Schema.decodeUnknownSync(AuthoringSchemaExportInput, { onExcessProperty: "error" })({
+          scope,
+        }),
       ),
     );
     assert.deepStrictEqual(
@@ -376,7 +386,7 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     const commandConflict = await Effect.runPromise(
       authoring.apply(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
+        Schema.decodeUnknownSync(AuthoringSchemaApplyInput, { onExcessProperty: "error" })({
           ...input,
           project: {
             ...projectDocument,
@@ -394,7 +404,7 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     const stale = await Effect.runPromise(
       authoring.apply(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
+        Schema.decodeUnknownSync(AuthoringSchemaApplyInput, { onExcessProperty: "error" })({
           ...input,
           commandId: randomUUID(),
         }),
@@ -407,7 +417,7 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     const currentPlan = await Effect.runPromise(
       authoring.plan(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(AuthoringSchemaPlanInput)({
+        Schema.decodeUnknownSync(AuthoringSchemaPlanInput, { onExcessProperty: "error" })({
           scope,
           project: projectDocument,
         }),
@@ -418,7 +428,7 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     const noOp = await Effect.runPromise(
       authoring.apply(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
+        Schema.decodeUnknownSync(AuthoringSchemaApplyInput, { onExcessProperty: "error" })({
           scope,
           project: projectDocument,
           commandId: randomUUID(),
@@ -469,7 +479,7 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     const stalePlan = await Effect.runPromise(
       authoring.plan(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(AuthoringSchemaPlanInput)({
+        Schema.decodeUnknownSync(AuthoringSchemaPlanInput, { onExcessProperty: "error" })({
           scope,
           project: projectDocument,
         }),
@@ -481,7 +491,9 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     const title = current.presentation.fields[0];
     const status = current.presentation.fields[2];
     if (!title || !status) throw new Error("Expected complete posts presentation fields.");
-    const changed = SchemaStrict.decodeUnknownSync(AuthoringCollectionPresentation)({
+    const changed = Schema.decodeUnknownSync(AuthoringCollectionPresentation, {
+      onExcessProperty: "error",
+    })({
       ...current.presentation,
       displayName: "Editorial Posts",
       description: "Presentation-only metadata",
@@ -499,7 +511,9 @@ describe("Authoring schema repository PostgreSQL integration", () => {
       })),
     });
     const commandId = randomUUID();
-    const request = SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+    const request = Schema.decodeUnknownSync(AuthoringPublishPresentationRequest, {
+      onExcessProperty: "error",
+    })({
       commandId,
       expectedRevisionId: current.revision.revisionId,
       expectedSequence: current.revision.sequence,
@@ -542,7 +556,7 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     const staleApply = await Effect.runPromise(
       authoring.apply(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
+        Schema.decodeUnknownSync(AuthoringSchemaApplyInput, { onExcessProperty: "error" })({
           scope,
           project: projectDocument,
           commandId: randomUUID(),
@@ -556,7 +570,9 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     );
     assert.strictEqual(staleApply.kind, "stale_schema_authority");
 
-    const noOpRequest = SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+    const noOpRequest = Schema.decodeUnknownSync(AuthoringPublishPresentationRequest, {
+      onExcessProperty: "error",
+    })({
       commandId: randomUUID(),
       expectedRevisionId: published.revision.revisionId,
       expectedSequence: published.revision.sequence,
@@ -580,7 +596,9 @@ describe("Authoring schema repository PostgreSQL integration", () => {
         managementActor,
         scope,
         "posts",
-        SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+        Schema.decodeUnknownSync(AuthoringPublishPresentationRequest, {
+          onExcessProperty: "error",
+        })({
           ...noOpRequest,
           commandId: randomUUID(),
           expectedRevisionId: current.revision.revisionId,
@@ -597,7 +615,9 @@ describe("Authoring schema repository PostgreSQL integration", () => {
         managementActor,
         scope,
         "posts",
-        SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+        Schema.decodeUnknownSync(AuthoringPublishPresentationRequest, {
+          onExcessProperty: "error",
+        })({
           ...request,
           presentation: { ...request.presentation, displayName: "Conflicting reuse" },
         }),
@@ -732,7 +752,9 @@ describe("Authoring schema repository PostgreSQL integration", () => {
           managementActor,
           scope,
           "posts",
-          SchemaStrict.decodeUnknownSync(AuthoringPublishPresentationRequest)({
+          Schema.decodeUnknownSync(AuthoringPublishPresentationRequest, {
+            onExcessProperty: "error",
+          })({
             commandId,
             expectedRevisionId: baseline.revision.revisionId,
             expectedSequence: baseline.revision.sequence,
@@ -811,7 +833,7 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     const plan = await Effect.runPromise(
       authoring.plan(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(AuthoringSchemaPlanInput)({
+        Schema.decodeUnknownSync(AuthoringSchemaPlanInput, { onExcessProperty: "error" })({
           scope,
           project: renamedProject,
         }),
@@ -841,7 +863,7 @@ describe("Authoring schema repository PostgreSQL integration", () => {
       const failed = await Effect.runPromiseExit(
         makeAuthoringSchemaRepository({ testFailApplyAfter: stage }).apply(
           ownerActor,
-          SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
+          Schema.decodeUnknownSync(AuthoringSchemaApplyInput, { onExcessProperty: "error" })({
             scope,
             project: renamedProject,
             commandId,
@@ -901,7 +923,7 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     const unchanged = await Effect.runPromise(
       authoring.plan(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(AuthoringSchemaPlanInput)({
+        Schema.decodeUnknownSync(AuthoringSchemaPlanInput, { onExcessProperty: "error" })({
           scope,
           project: projectDocument,
         }),
@@ -931,7 +953,7 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     const plan = await Effect.runPromise(
       authoring.plan(
         ownerActor,
-        SchemaStrict.decodeUnknownSync(AuthoringSchemaPlanInput)({
+        Schema.decodeUnknownSync(AuthoringSchemaPlanInput, { onExcessProperty: "error" })({
           scope,
           project: swappedProject,
         }),
@@ -944,7 +966,7 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     const decision = await Effect.runPromise(
       authoring.apply(
         managementActor,
-        SchemaStrict.decodeUnknownSync(AuthoringSchemaApplyInput)({
+        Schema.decodeUnknownSync(AuthoringSchemaApplyInput, { onExcessProperty: "error" })({
           scope,
           project: swappedProject,
           commandId,

@@ -1,5 +1,3 @@
-// Canonicalizes and bounds complete M6 management schema documents before hashing or persistence.
-
 import type { FieldValidationIssue } from "../../../contracts/field";
 import { fieldSystemLimits } from "../profile";
 
@@ -12,14 +10,12 @@ export interface AggregateSchemaValidationResult {
 
 const textEncoder = new TextEncoder();
 
-/** Returns whether a value is a plain JSON object. */
 function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 }
 
-/** Rejects non-JSON, cyclic, dangerous-key, or excessively deep aggregate documents iteratively. */
 function preflightAggregate(value: unknown): FieldValidationIssue | null {
   const stack: Array<{
     readonly value: unknown;
@@ -133,12 +129,10 @@ function preflightAggregate(value: unknown): FieldValidationIssue | null {
   return null;
 }
 
-/** Compares canonical text by code units without process-locale collation. */
 export function compareCanonicalText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-/** Converts preflighted JSON-compatible values into deterministic key-ordered text. */
 export function canonicalizeSchemaDocument(value: unknown): string {
   if (Array.isArray(value)) {
     const items: Array<string> = [];
@@ -153,7 +147,6 @@ export function canonicalizeSchemaDocument(value: unknown): string {
   return `{${entries.join(",")}}`;
 }
 
-/** Validates and measures the exact canonical management document against the 1 MiB ceiling. */
 export function validateAggregateSchemaDocument(value: unknown): AggregateSchemaValidationResult {
   const preflightIssue = preflightAggregate(value);
   if (preflightIssue) {

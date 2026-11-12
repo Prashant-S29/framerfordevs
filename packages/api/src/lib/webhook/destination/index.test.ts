@@ -1,5 +1,3 @@
-// Exercises webhook URL normalization and all-address SSRF rejection without network access.
-
 import { assert, describe, it } from "@effect/vitest";
 
 import { normalizeWebhookDestination, validateWebhookDnsAnswers } from "./index";

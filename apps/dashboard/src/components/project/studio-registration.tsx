@@ -1,8 +1,8 @@
 import {
   ControlPlanePutStudioRegistrationRequest,
   ControlPlaneSetStudioRuntimeRequest,
-} from "@framerfordevs/api/contracts/control-plane/index";
-import type { Project } from "@framerfordevs/api/contracts/platform/index";
+} from "@framerfordevs/api/contracts/control-plane";
+import type { Project } from "@framerfordevs/api/contracts/platform";
 import { Alert, AlertDescription, AlertTitle } from "@framerfordevs/ui/components/alert";
 import { Button } from "@framerfordevs/ui/components/button";
 import {
@@ -16,14 +16,13 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@framerfordevs/ui/com
 import { Input } from "@framerfordevs/ui/components/input";
 import { Spinner } from "@framerfordevs/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Option } from "effect";
+import { Option, Schema } from "effect";
 import { ExternalLinkIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 function applicationErrorCode(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null) return undefined;
   if ("code" in error && typeof error.code === "string") return error.code;
@@ -59,16 +58,18 @@ export function StudioRegistrationSettings({
   const registration = registrationQuery.data?.data ?? null;
   const isMissing = applicationErrorCode(registrationQuery.error) === "NOT_FOUND";
 
-  useEffect(() => {
-    if (!registration) return;
-    setApplicationOrigin(registration.applicationOrigin);
-    setMountPath(registration.mountPath);
-  }, [registration]);
+  const [formRegistration, setFormRegistration] = useState<typeof registration>(null);
+  if (registration !== formRegistration) {
+    setFormRegistration(registration);
+    if (registration) {
+      setApplicationOrigin(registration.applicationOrigin);
+      setMountPath(registration.mountPath);
+    }
+  }
 
   const putRegistration = useMutation(
     orpc.platform.projects.studioRegistration.put.mutationOptions({
       onSuccess: async (response) => {
-        pendingCommand.current = null;
         setValidationMessage(null);
         await queryClient.invalidateQueries({
           queryKey: orpc.platform.projects.key(),
@@ -82,7 +83,6 @@ export function StudioRegistrationSettings({
   const setRuntime = useMutation(
     orpc.platform.projects.studioRegistration.setRuntime.mutationOptions({
       onSuccess: async (response) => {
-        pendingRuntimeCommand.current = null;
         await queryClient.invalidateQueries({ queryKey: orpc.platform.projects.key() });
         toast.success(response.message);
       },
@@ -97,14 +97,23 @@ export function StudioRegistrationSettings({
       pendingRuntimeCommand.current = { intent, commandId: crypto.randomUUID() };
     }
     const decoded = Option.getOrUndefined(
-      SchemaStrict.decodeUnknownOption(ControlPlaneSetStudioRuntimeRequest)({
+      Schema.decodeUnknownOption(ControlPlaneSetStudioRuntimeRequest, {
+        onExcessProperty: "error",
+      })({
         commandId: pendingRuntimeCommand.current.commandId,
         expectedVersion: registration.version,
         enabled,
       }),
     );
     if (!decoded) return;
-    setRuntime.mutate({ ...scope, ...decoded });
+    setRuntime.mutate(
+      { ...scope, ...decoded },
+      {
+        onSuccess: () => {
+          pendingRuntimeCommand.current = null;
+        },
+      },
+    );
   };
 
   const save = () => {
@@ -113,7 +122,9 @@ export function StudioRegistrationSettings({
       pendingCommand.current = { intent, commandId: crypto.randomUUID() };
     }
     const decoded = Option.getOrUndefined(
-      SchemaStrict.decodeUnknownOption(ControlPlanePutStudioRegistrationRequest)({
+      Schema.decodeUnknownOption(ControlPlanePutStudioRegistrationRequest, {
+        onExcessProperty: "error",
+      })({
         commandId: pendingCommand.current.commandId,
         expectedVersion: registration?.version ?? null,
         applicationOrigin,
@@ -127,7 +138,14 @@ export function StudioRegistrationSettings({
       return;
     }
     setValidationMessage(null);
-    putRegistration.mutate({ ...scope, ...decoded });
+    putRegistration.mutate(
+      { ...scope, ...decoded },
+      {
+        onSuccess: () => {
+          pendingCommand.current = null;
+        },
+      },
+    );
   };
 
   const unavailableError = registrationQuery.error && !isMissing;

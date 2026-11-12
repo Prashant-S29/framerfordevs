@@ -1,10 +1,8 @@
-// Canonicalizes bounded Studio display-name prefix searches without retaining raw query text.
-
 import { createHash } from "node:crypto";
 
 import { StudioContentSearchText } from "../../../contracts/studio-content";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 const likeEscapePattern = /[\\%_]/gu;
 
 export interface StudioSearchAuthority {
@@ -15,9 +13,10 @@ export interface StudioSearchAuthority {
   readonly queryDigest: string;
 }
 
-/** Produces canonical case-insensitive prefix authority and a log-safe cursor digest. */
 export function studioSearchAuthority(input: unknown): StudioSearchAuthority {
-  const normalized = SchemaStrict.decodeUnknownSync(StudioContentSearchText)(input);
+  const normalized = Schema.decodeUnknownSync(StudioContentSearchText, {
+    onExcessProperty: "error",
+  })(input);
   const folded = normalized.toLocaleLowerCase("en-US");
   const escaped = folded.replace(likeEscapePattern, (value) => `\\${value}`);
   const databaseEscaped = normalized.replace(likeEscapePattern, (value) => `\\${value}`);
@@ -32,7 +31,6 @@ export function studioSearchAuthority(input: unknown): StudioSearchAuthority {
   };
 }
 
-/** Converts a bounded count probe (which reads at most 1,001 rows) to the public contract. */
 export function boundedStudioMatchCount(probedRows: number) {
   if (!Number.isInteger(probedRows) || probedRows < 0 || probedRows > 1_001) {
     throw new RangeError("Studio match-count probes must be integers between 0 and 1,001.");

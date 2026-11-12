@@ -1,4 +1,4 @@
-import type { AppRouter } from "@framerfordevs/api/routers/index";
+import type { AppRouter } from "@framerfordevs/api/routers";
 import { env } from "@framerfordevs/env/dashboard";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";

@@ -1,5 +1,3 @@
-// Compiles immutable exact-locale delivery snapshots without database, HTTP, or Effect runtime dependencies.
-
 import { createHash } from "node:crypto";
 
 import type { EntryValues } from "../../../contracts/entry";
@@ -106,12 +104,10 @@ export interface CompilePublicationSnapshotInput {
 
 const textEncoder = new TextEncoder();
 
-/** Produces canonical SHA-256 hashes for immutable publication authority. */
 function digest(value: unknown): string {
   return createHash("sha256").update(canonicalizeEntryValue(value)).digest("hex");
 }
 
-/** Collects bounded reference occurrences from an already projected API-key document. */
 function collectReferenceUses(
   field: CollectionFieldDefinition,
   value: unknown,
@@ -152,7 +148,6 @@ function collectReferenceUses(
   }
 }
 
-/** Orders pinned reference authority deterministically for hashes and immutable storage. */
 function compareManifestItems(
   left: PublicationReferenceManifestItem,
   right: PublicationReferenceManifestItem,
@@ -166,7 +161,6 @@ function compareManifestItems(
   );
 }
 
-/** Maps canonical aggregate bytes to the bounded publication telemetry bucket. */
 function sizeBucket(combinedBytes: number): PublicationSizeBucket {
   if (combinedBytes <= 262_144) return "small";
   if (combinedBytes <= 524_288) return "medium";
@@ -175,7 +169,6 @@ function sizeBucket(combinedBytes: number): PublicationSizeBucket {
   return "over_limit";
 }
 
-/** Compares delivery roots and reports stable field IDs without exposing content. */
 export function changedPublicationFieldIds(
   fields: ReadonlyArray<CollectionFieldDefinition>,
   previousData: Readonly<Record<string, unknown>> | null,
@@ -197,7 +190,6 @@ export function changedPublicationFieldIds(
     .sort();
 }
 
-/** Strictly validates, defaults, projects, pins references, hashes, and bounds one snapshot. */
 export function compilePublicationSnapshot(
   input: CompilePublicationSnapshotInput,
 ): PublicationCompilationResult {

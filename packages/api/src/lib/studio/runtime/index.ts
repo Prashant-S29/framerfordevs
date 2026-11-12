@@ -1,5 +1,3 @@
-// Pure registration-runtime transitions before transactional persistence and OAuth side effects.
-
 import { ResourceVersion, type AuthUserId, type IsoDateTime } from "../../../contracts/platform";
 import type { StudioRuntimeStatus } from "../../../contracts/studio";
 

@@ -1,5 +1,3 @@
-// Proves central policy enforcement, opaque identities, refill, bounded storage, and degraded recovery.
-
 import { assert, describe, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { TestClock } from "effect/testing";
@@ -24,7 +22,6 @@ interface TelemetryCapture {
   readonly service: TelemetryService;
 }
 
-/** Creates a no-content telemetry fake that records only bounded rate-limit events. */
 function makeTelemetryCapture(): TelemetryCapture {
   const decisions: Array<RateLimitDecisionMetric> = [];
   const stores: Array<RateLimitStoreMetric> = [];
@@ -59,7 +56,6 @@ function makeTelemetryCapture(): TelemetryCapture {
   };
 }
 
-/** Creates an isolated manager with independent primary and fallback memory state. */
 function makeTestManager(capture = makeTelemetryCapture()) {
   return {
     capture,

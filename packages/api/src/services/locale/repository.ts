@@ -45,7 +45,6 @@ import {
 } from "../project-access";
 import { isRoleAllowed } from "../policy";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
 }
@@ -79,7 +78,7 @@ function decodeDatabaseValue<A, I>(
   schema: Schema.Codec<A, I, never>,
   value: unknown,
 ) {
-  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
+  return Schema.decodeUnknownEffect(schema)(value).pipe(
     Effect.mapError((cause) => databaseFailure(`${operation}.decode`, cause)),
   );
 }
@@ -200,7 +199,6 @@ async function selectLocaleById(executor: ApplicationExecutor, localeId: string)
   return row;
 }
 
-/** Counts exact-locale draft heads under the project lock without scanning unbounded history. */
 async function selectLocaleDependencies(
   executor: ApplicationExecutor,
   locale: typeof projectLocale.$inferSelect,

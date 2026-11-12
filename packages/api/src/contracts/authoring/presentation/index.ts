@@ -1,5 +1,3 @@
-// Defines the strict presentation-only projection and immutable publication result for Authoring v1.
-
 import { Schema } from "effect";
 
 import { ApiSuccessSchema } from "../../response/api";
@@ -26,7 +24,7 @@ export class AuthoringEnumOptionPresentation extends Schema.Class<AuthoringEnumO
     optionId: EnumOptionId,
     label: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
     position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 99 })),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 const AuthoringEnumOptionPresentations = Schema.Array(AuthoringEnumOptionPresentation).check(
@@ -48,7 +46,7 @@ export class AuthoringFieldPresentation extends Schema.Class<AuthoringFieldPrese
     position: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum: 99 })),
     editor: FieldEditorMetadata,
     enumOptions: AuthoringEnumOptionPresentations,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const AuthoringFieldPresentations = Schema.Array(AuthoringFieldPresentation).check(
@@ -71,7 +69,7 @@ export class AuthoringCollectionPresentation extends Schema.Class<AuthoringColle
     description: Schema.NullOr(CollectionDescription),
     fields: AuthoringFieldPresentations,
     editorLayout: EditorLayout,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const AuthoringPublishPresentationRequest = Schema.Struct({
@@ -79,10 +77,7 @@ export const AuthoringPublishPresentationRequest = Schema.Struct({
   expectedRevisionId: SchemaRevisionId,
   expectedSequence: SchemaRevisionSequence,
   presentation: AuthoringCollectionPresentation,
-}).annotate({
-  identifier: "AuthoringPublishPresentationRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "AuthoringPublishPresentationRequest" });
 export type AuthoringPublishPresentationRequest = typeof AuthoringPublishPresentationRequest.Type;
 
 export class AuthoringPresentationRevision extends Schema.Class<AuthoringPresentationRevision>(

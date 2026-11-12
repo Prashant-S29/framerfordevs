@@ -1,5 +1,5 @@
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 
 import {
   AcceptProjectInvitationInput,
@@ -33,13 +33,12 @@ import {
   updateProjectMemberPolicy,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const membershipId = "019fae8b-1234-7000-8000-000000000002";
 const invitationId = "019fae8b-1234-7000-8000-000000000003";
 const token = "A".repeat(43);
 const timestamp = "2026-07-30T12:00:00.000Z";
-const member = SchemaStrict.decodeUnknownSync(ProjectMember)({
+const member = Schema.decodeUnknownSync(ProjectMember, { onExcessProperty: "error" })({
   id: membershipId,
   projectId,
   userId: "user-1",
@@ -52,7 +51,7 @@ const member = SchemaStrict.decodeUnknownSync(ProjectMember)({
   createdAt: timestamp,
   updatedAt: timestamp,
 });
-const invitation = SchemaStrict.decodeUnknownSync(ProjectInvitation)({
+const invitation = Schema.decodeUnknownSync(ProjectInvitation, { onExcessProperty: "error" })({
   id: invitationId,
   projectId,
   email: "member@example.test",
@@ -66,7 +65,9 @@ const invitation = SchemaStrict.decodeUnknownSync(ProjectInvitation)({
   createdAt: timestamp,
   updatedAt: timestamp,
 });
-const inspected = SchemaStrict.decodeUnknownSync(InspectedProjectInvitation)({
+const inspected = Schema.decodeUnknownSync(InspectedProjectInvitation, {
+  onExcessProperty: "error",
+})({
   projectId,
   projectName: "Test Project",
   role: "editor",
@@ -74,15 +75,17 @@ const inspected = SchemaStrict.decodeUnknownSync(InspectedProjectInvitation)({
   inviterName: "Test Owner",
   expiresAt: invitation.expiresAt,
 });
-const currentAccess = SchemaStrict.decodeUnknownSync(CurrentProjectAccess)({
-  projectId,
-  role: "owner",
-  localeAccess: { mode: "all" },
-  baseRoleActions: ["project.read", "project.member.invite"],
-  effectiveProjectActions: ["project.read", "project.member.invite"],
-  effectiveLocaleIds: [],
-  effectiveLocaleActions: [],
-});
+const currentAccess = Schema.decodeUnknownSync(CurrentProjectAccess, { onExcessProperty: "error" })(
+  {
+    projectId,
+    role: "owner",
+    localeAccess: { mode: "all" },
+    baseRoleActions: ["project.read", "project.member.invite"],
+    effectiveProjectActions: ["project.read", "project.member.invite"],
+    effectiveLocaleIds: [],
+    effectiveLocaleActions: [],
+  },
+);
 const memberPage = ProjectMemberPage.make({ items: [member], nextCursor: null });
 const invitationPage = ProjectInvitationPage.make({ items: [invitation], nextCursor: null });
 const calls: Array<string> = [];
@@ -103,7 +106,11 @@ const AccessRepositoryTest = Layer.succeed(AccessRepository, {
 const SecretGeneratorTest = Layer.succeed(SecretGenerator, {
   ...makeSecretGenerator(),
   generateInvitationToken: () =>
-    Effect.succeed(SchemaStrict.decodeUnknownSync(InspectProjectInvitationInput)({ token }).token),
+    Effect.succeed(
+      Schema.decodeUnknownSync(InspectProjectInvitationInput, { onExcessProperty: "error" })({
+        token,
+      }).token,
+    ),
   digest: () => Effect.succeed("a".repeat(64)),
 });
 
@@ -122,7 +129,9 @@ describe("access operations", () => {
 
           const issued = yield* createProjectInvitation(
             actor,
-            yield* SchemaStrict.decodeUnknownEffect(CreateProjectInvitationInput)({
+            yield* Schema.decodeUnknownEffect(CreateProjectInvitationInput, {
+              onExcessProperty: "error",
+            })({
               projectId,
               email,
               role: "editor",
@@ -133,11 +142,15 @@ describe("access operations", () => {
           assert.isTrue(issued instanceof IssuedProjectInvitation);
           yield* getCurrentProjectAccess(
             actor,
-            yield* SchemaStrict.decodeUnknownEffect(GetCurrentProjectAccessInput)({ projectId }),
+            yield* Schema.decodeUnknownEffect(GetCurrentProjectAccessInput, {
+              onExcessProperty: "error",
+            })({ projectId }),
           );
           yield* listProjectInvitations(
             actor,
-            yield* SchemaStrict.decodeUnknownEffect(ListProjectInvitationsInput)({
+            yield* Schema.decodeUnknownEffect(ListProjectInvitationsInput, {
+              onExcessProperty: "error",
+            })({
               projectId,
               cursor: null,
               limit: 20,
@@ -145,17 +158,23 @@ describe("access operations", () => {
           );
           yield* inspectProjectInvitation(
             email,
-            yield* SchemaStrict.decodeUnknownEffect(InspectProjectInvitationInput)({ token }),
+            yield* Schema.decodeUnknownEffect(InspectProjectInvitationInput, {
+              onExcessProperty: "error",
+            })({ token }),
           );
           yield* acceptProjectInvitation(
             actor,
             email,
-            yield* SchemaStrict.decodeUnknownEffect(AcceptProjectInvitationInput)({ token }),
+            yield* Schema.decodeUnknownEffect(AcceptProjectInvitationInput, {
+              onExcessProperty: "error",
+            })({ token }),
             requestId,
           );
           yield* revokeProjectInvitation(
             actor,
-            yield* SchemaStrict.decodeUnknownEffect(RevokeProjectInvitationInput)({
+            yield* Schema.decodeUnknownEffect(RevokeProjectInvitationInput, {
+              onExcessProperty: "error",
+            })({
               projectId,
               invitationId,
               version: 1,
@@ -164,7 +183,9 @@ describe("access operations", () => {
           );
           yield* listProjectMembers(
             actor,
-            yield* SchemaStrict.decodeUnknownEffect(ListProjectMembersInput)({
+            yield* Schema.decodeUnknownEffect(ListProjectMembersInput, {
+              onExcessProperty: "error",
+            })({
               projectId,
               cursor: null,
               limit: 20,
@@ -172,7 +193,9 @@ describe("access operations", () => {
           );
           yield* updateProjectMemberPolicy(
             actor,
-            yield* SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
+            yield* Schema.decodeUnknownEffect(UpdateProjectMemberPolicyInput, {
+              onExcessProperty: "error",
+            })({
               projectId,
               membershipId,
               version: 1,
@@ -183,7 +206,9 @@ describe("access operations", () => {
           );
           yield* removeProjectMember(
             actor,
-            yield* SchemaStrict.decodeUnknownEffect(RemoveProjectMemberInput)({
+            yield* Schema.decodeUnknownEffect(RemoveProjectMemberInput, {
+              onExcessProperty: "error",
+            })({
               projectId,
               membershipId,
               version: 1,
@@ -211,13 +236,17 @@ describe("access operations", () => {
         const invalidActor = yield* Effect.exit(
           getCurrentProjectAccess(
             "",
-            yield* SchemaStrict.decodeUnknownEffect(GetCurrentProjectAccessInput)({ projectId }),
+            yield* Schema.decodeUnknownEffect(GetCurrentProjectAccessInput, {
+              onExcessProperty: "error",
+            })({ projectId }),
           ),
         );
         const invalidEmail = yield* Effect.exit(
           inspectProjectInvitation(
             "not-an-email",
-            yield* SchemaStrict.decodeUnknownEffect(InspectProjectInvitationInput)({ token }),
+            yield* Schema.decodeUnknownEffect(InspectProjectInvitationInput, {
+              onExcessProperty: "error",
+            })({ token }),
           ),
         );
 

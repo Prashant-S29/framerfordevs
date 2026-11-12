@@ -1,5 +1,3 @@
-// Exercises representative compiled MDX with axe while keeping the test independent of hosted services.
-
 // @vitest-environment jsdom
 
 import axe from "axe-core";

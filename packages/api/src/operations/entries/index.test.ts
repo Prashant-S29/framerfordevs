@@ -1,7 +1,5 @@
-// Verifies named M7 Effect operations remain replaceable and forward every repository workflow.
-
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 
 import {
   CmsEntry,
@@ -29,7 +27,6 @@ import {
   saveEntryDraft,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const collectionId = "019fae8b-1234-7000-8000-000000000003";
@@ -42,7 +39,7 @@ const workspaceId = "019fae8b-1234-7000-8000-000000000009";
 const timestamp = "2026-08-08T12:00:00.000Z";
 const contractHash = "a".repeat(64);
 const validation = EntryValidation.make({ valid: true, issues: [], capped: false });
-const entry = SchemaStrict.decodeUnknownSync(CmsEntry)({
+const entry = Schema.decodeUnknownSync(CmsEntry, { onExcessProperty: "error" })({
   id: entryId,
   workspaceId,
   projectId,
@@ -58,7 +55,7 @@ const entry = SchemaStrict.decodeUnknownSync(CmsEntry)({
   updatedAt: timestamp,
 });
 const page = CmsEntryPage.make({ items: [], nextCursor: null });
-const draft = SchemaStrict.decodeUnknownSync(CmsEntryDraft)({
+const draft = Schema.decodeUnknownSync(CmsEntryDraft, { onExcessProperty: "error" })({
   entry,
   localeId,
   locale: "en",
@@ -73,7 +70,7 @@ const draft = SchemaStrict.decodeUnknownSync(CmsEntryDraft)({
   canEditShared: true,
   validation,
 });
-const saveResult = SchemaStrict.decodeUnknownSync(SaveEntryDraftResult)({
+const saveResult = Schema.decodeUnknownSync(SaveEntryDraftResult, { onExcessProperty: "error" })({
   entryId,
   commandId,
   sharedChanged: false,
@@ -105,7 +102,7 @@ describe("entry operations", () => {
         const scope = { projectId, environmentId, collectionId, locale: "en" };
         yield* listEntries(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(ListEntriesInput)({
+          yield* Schema.decodeUnknownEffect(ListEntriesInput, { onExcessProperty: "error" })({
             ...scope,
             cursor: null,
             limit: 25,
@@ -113,7 +110,7 @@ describe("entry operations", () => {
         );
         yield* createEntry(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(CreateEntryInput)({
+          yield* Schema.decodeUnknownEffect(CreateEntryInput, { onExcessProperty: "error" })({
             ...scope,
             displayName: "Test entry",
             schemaRevisionId,
@@ -124,7 +121,7 @@ describe("entry operations", () => {
         );
         yield* renameEntry(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(RenameEntryInput)({
+          yield* Schema.decodeUnknownEffect(RenameEntryInput, { onExcessProperty: "error" })({
             ...scope,
             entryId,
             displayName: "Renamed entry",
@@ -134,11 +131,14 @@ describe("entry operations", () => {
         );
         yield* getEntryDraft(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(GetEntryDraftInput)({ ...scope, entryId }),
+          yield* Schema.decodeUnknownEffect(GetEntryDraftInput, { onExcessProperty: "error" })({
+            ...scope,
+            entryId,
+          }),
         );
         yield* saveEntryDraft(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(SaveEntryDraftInput)({
+          yield* Schema.decodeUnknownEffect(SaveEntryDraftInput, { onExcessProperty: "error" })({
             ...scope,
             entryId,
             schemaRevisionId,
@@ -153,17 +153,21 @@ describe("entry operations", () => {
         );
         yield* listEntryRevisions(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(ListEntryRevisionsInput)({
-            ...scope,
-            entryId,
-            scope: "localized",
-            cursor: null,
-            limit: 25,
-          }),
+          yield* Schema.decodeUnknownEffect(ListEntryRevisionsInput, { onExcessProperty: "error" })(
+            {
+              ...scope,
+              entryId,
+              scope: "localized",
+              cursor: null,
+              limit: 25,
+            },
+          ),
         );
         yield* restoreEntryRevision(
           "user-1",
-          yield* SchemaStrict.decodeUnknownEffect(RestoreEntryRevisionInput)({
+          yield* Schema.decodeUnknownEffect(RestoreEntryRevisionInput, {
+            onExcessProperty: "error",
+          })({
             ...scope,
             entryId,
             scope: "localized",

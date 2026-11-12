@@ -1,5 +1,3 @@
-// Records closed local-editor proxy metrics without retaining request bodies or hosted authority.
-
 import { Effect, Metric } from "effect";
 
 import type { EditorOperationRequest } from "../protocol";

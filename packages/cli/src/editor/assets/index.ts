@@ -1,5 +1,3 @@
-// Loads the finite packaged browser build into an exact in-memory route allowlist.
-
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";

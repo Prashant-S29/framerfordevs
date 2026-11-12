@@ -1,5 +1,3 @@
-// Verifies exact Preview scope/source authority, role projection, coherent transactions, retries, and audits in PostgreSQL.
-
 import { randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, it } from "@effect/vitest";
@@ -51,7 +49,6 @@ import {
   PreviewRepositoryLive,
 } from "../../../src/services/preview/repository";
 
-import * as SchemaStrict from "../../../src/lib/schema-strict";
 const suffix = randomUUID();
 const ids = {
   workspace: randomUUID(),
@@ -73,7 +70,7 @@ const ids = {
 };
 const ownerId = `m10-preview-owner-${suffix}`;
 const viewerId = `m10-preview-viewer-${suffix}`;
-const viewerActor = SchemaStrict.decodeUnknownSync(AuthUserId)(viewerId);
+const viewerActor = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(viewerId);
 const hiddenEditor = {
   helpText: null,
   placeholder: null,
@@ -81,26 +78,32 @@ const hiddenEditor = {
   editableByRoles: ["owner"],
 } as const;
 
-const sharedV1 = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
-  id: ids.sharedField,
-  parentFieldId: null,
-  nodeRole: "root",
-  apiKey: "secret_note",
-  displayLabel: "Secret note",
-  kind: "short_text",
-  required: false,
-  localization: "shared",
-  deprecated: false,
-  position: 0,
-  editor: hiddenEditor,
-  configuration: {},
-  children: [],
-});
-const sharedV2 = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
-  ...sharedV1,
-  apiKey: "internal_note",
-});
-const localizedField = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+const sharedV1 = Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })(
+  {
+    id: ids.sharedField,
+    parentFieldId: null,
+    nodeRole: "root",
+    apiKey: "secret_note",
+    displayLabel: "Secret note",
+    kind: "short_text",
+    required: false,
+    localization: "shared",
+    deprecated: false,
+    position: 0,
+    editor: hiddenEditor,
+    configuration: {},
+    children: [],
+  },
+);
+const sharedV2 = Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })(
+  {
+    ...sharedV1,
+    apiKey: "internal_note",
+  },
+);
+const localizedField = Schema.decodeUnknownSync(CollectionFieldDefinition, {
+  onExcessProperty: "error",
+})({
   id: ids.localizedField,
   parentFieldId: null,
   nodeRole: "root",
@@ -129,7 +132,7 @@ const contractTwo = hashSchemaContract({
   collectionApiKey: "articles",
   fields: [sharedV2, localizedField],
 });
-const principal = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
+const principal = Schema.decodeUnknownSync(CredentialPrincipal, { onExcessProperty: "error" })({
   credentialId: ids.credential,
   workspaceId: ids.workspace,
   projectId: ids.project,
@@ -137,27 +140,35 @@ const principal = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
   family: "preview",
   scopes: ["preview.read"],
 });
-const currentCredentialInput = SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
+const currentCredentialInput = Schema.decodeUnknownSync(PreviewRouteScope, {
+  onExcessProperty: "error",
+})({
   projectId: ids.project,
   environmentKey: "main",
   collectionKey: "articles",
   entryId: ids.entry,
   locale: "en",
 });
-const revisionCredentialInput = SchemaStrict.decodeUnknownSync(GetRevisionCredentialPreviewInput)({
+const revisionCredentialInput = Schema.decodeUnknownSync(GetRevisionCredentialPreviewInput, {
+  onExcessProperty: "error",
+})({
   ...currentCredentialInput,
   schemaRevisionId: ids.schemaOne,
   sharedRevisionId: ids.sharedRevision,
   localizedRevisionId: ids.localizedRevisionOne,
 });
-const currentUserInput = SchemaStrict.decodeUnknownSync(GetCurrentUserPreviewInput)({
+const currentUserInput = Schema.decodeUnknownSync(GetCurrentUserPreviewInput, {
+  onExcessProperty: "error",
+})({
   projectId: ids.project,
   environmentId: ids.environment,
   collectionId: ids.collection,
   entryId: ids.entry,
   locale: "en",
 });
-const revisionUserInput = SchemaStrict.decodeUnknownSync(GetRevisionUserPreviewInput)({
+const revisionUserInput = Schema.decodeUnknownSync(GetRevisionUserPreviewInput, {
+  onExcessProperty: "error",
+})({
   ...currentUserInput,
   schemaRevisionId: ids.schemaOne,
   sharedRevisionId: ids.sharedRevision,
@@ -734,7 +745,7 @@ describe("Preview repository PostgreSQL integration", () => {
       const disabledLocale = await Effect.runPromiseExit(
         repository.getCredentialCurrent(
           principal,
-          SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
+          Schema.decodeUnknownSync(PreviewRouteScope, { onExcessProperty: "error" })({
             ...currentCredentialInput,
             locale: "hi",
           }),
@@ -868,7 +879,7 @@ describe("Preview repository PostgreSQL integration", () => {
         );
         const none = yield* repository.getUserRevision(
           viewerActor,
-          SchemaStrict.decodeUnknownSync(GetRevisionUserPreviewInput)({
+          Schema.decodeUnknownSync(GetRevisionUserPreviewInput, { onExcessProperty: "error" })({
             ...revisionUserInput,
             sharedRevisionId: null,
             localizedRevisionId: null,
@@ -879,7 +890,9 @@ describe("Preview repository PostgreSQL integration", () => {
         const incompatible = yield* Effect.exit(
           repository.getCredentialRevision(
             principal,
-            SchemaStrict.decodeUnknownSync(GetRevisionCredentialPreviewInput)({
+            Schema.decodeUnknownSync(GetRevisionCredentialPreviewInput, {
+              onExcessProperty: "error",
+            })({
               ...revisionCredentialInput,
               localizedRevisionId: ids.localizedRevisionTwo,
             }),
@@ -910,7 +923,7 @@ describe("Preview repository PostgreSQL integration", () => {
     Effect.gen(function* () {
       const item = yield* makePreviewRepository().getCredentialCurrent(
         principal,
-        SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
+        Schema.decodeUnknownSync(PreviewRouteScope, { onExcessProperty: "error" })({
           ...currentCredentialInput,
           entryId: ids.emptyEntry,
         }),
@@ -932,7 +945,7 @@ describe("Preview repository PostgreSQL integration", () => {
       Effect.gen(function* () {
         const wrongFamily = yield* Effect.exit(
           makePreviewRepository().getCredentialCurrent(
-            SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
+            Schema.decodeUnknownSync(CredentialPrincipal, { onExcessProperty: "error" })({
               ...principal,
               family: "delivery",
               scopes: ["delivery.read"],
@@ -944,7 +957,7 @@ describe("Preview repository PostgreSQL integration", () => {
         );
         const missingScope = yield* Effect.exit(
           makePreviewRepository().getCredentialCurrent(
-            SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
+            Schema.decodeUnknownSync(CredentialPrincipal, { onExcessProperty: "error" })({
               ...principal,
               scopes: ["content.read"],
             }),
@@ -956,7 +969,7 @@ describe("Preview repository PostgreSQL integration", () => {
         const wrongProject = yield* Effect.exit(
           makePreviewRepository().getCredentialCurrent(
             principal,
-            SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
+            Schema.decodeUnknownSync(PreviewRouteScope, { onExcessProperty: "error" })({
               ...currentCredentialInput,
               projectId: randomUUID(),
             }),
@@ -964,7 +977,9 @@ describe("Preview repository PostgreSQL integration", () => {
             "preview.failed.project",
           ),
         );
-        const wrongPrincipal = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
+        const wrongPrincipal = Schema.decodeUnknownSync(CredentialPrincipal, {
+          onExcessProperty: "error",
+        })({
           ...principal,
           environmentId: randomUUID(),
         });
@@ -979,7 +994,7 @@ describe("Preview repository PostgreSQL integration", () => {
         const missingCollection = yield* Effect.exit(
           makePreviewRepository().getCredentialCurrent(
             principal,
-            SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
+            Schema.decodeUnknownSync(PreviewRouteScope, { onExcessProperty: "error" })({
               ...currentCredentialInput,
               collectionKey: "missing",
             }),
@@ -990,7 +1005,7 @@ describe("Preview repository PostgreSQL integration", () => {
         const missingEntry = yield* Effect.exit(
           makePreviewRepository().getCredentialCurrent(
             principal,
-            SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
+            Schema.decodeUnknownSync(PreviewRouteScope, { onExcessProperty: "error" })({
               ...currentCredentialInput,
               entryId: randomUUID(),
             }),
@@ -1001,7 +1016,7 @@ describe("Preview repository PostgreSQL integration", () => {
         const missingLocale = yield* Effect.exit(
           makePreviewRepository().getCredentialCurrent(
             principal,
-            SchemaStrict.decodeUnknownSync(PreviewRouteScope)({
+            Schema.decodeUnknownSync(PreviewRouteScope, { onExcessProperty: "error" })({
               ...currentCredentialInput,
               locale: "fr",
             }),
@@ -1012,7 +1027,9 @@ describe("Preview repository PostgreSQL integration", () => {
         const missingRevision = yield* Effect.exit(
           makePreviewRepository().getCredentialRevision(
             principal,
-            SchemaStrict.decodeUnknownSync(GetRevisionCredentialPreviewInput)({
+            Schema.decodeUnknownSync(GetRevisionCredentialPreviewInput, {
+              onExcessProperty: "error",
+            })({
               ...revisionCredentialInput,
               localizedRevisionId: randomUUID(),
             }),
@@ -1186,7 +1203,7 @@ describe("Preview repository PostgreSQL integration", () => {
                   current_setting('statement_timeout') as statement_timeout,
                   current_setting('idle_in_transaction_session_timeout') as idle_timeout
               `);
-              const decoded = SchemaStrict.decodeUnknownSync(
+              const decoded = Schema.decodeUnknownSync(
                 Schema.Struct({
                   rows: Schema.Array(
                     Schema.Struct({

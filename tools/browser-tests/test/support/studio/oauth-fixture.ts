@@ -2,11 +2,10 @@ import { randomUUID } from "node:crypto";
 
 import { createStudioOAuthHarness } from "@framerfordevs/studio-oauth-harness";
 import { config as loadEnv } from "dotenv";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { browserTestOrigins } from "../preflight";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const apiOrigin = "http://localhost:3000";
 const applicationOrigin = "http://127.0.0.1:43219";
 const password = "M18-Studio-Browser-Authority-123!";
@@ -42,7 +41,7 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
     platform,
   ] = await Promise.all([
     import("@framerfordevs/api/services/platform-repository"),
-    import("@framerfordevs/api/contracts/platform/index"),
+    import("@framerfordevs/api/contracts/platform"),
     import("@framerfordevs/db"),
     import("@framerfordevs/db/query"),
     import("@framerfordevs/db/schema/access"),
@@ -51,7 +50,7 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
     import("@framerfordevs/db/schema/locale"),
     import("@framerfordevs/db/schema/platform"),
   ]);
-  const controlPlaneContracts = await import("@framerfordevs/api/contracts/control-plane/index");
+  const controlPlaneContracts = await import("@framerfordevs/api/contracts/control-plane");
   const suffix = randomUUID();
   const email = `m18-studio-browser-${suffix}@example.test`;
   const dashboardOrigin = browserTestOrigins().dashboard.origin;
@@ -78,7 +77,7 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
   const createdWorkspace = await Effect.runPromise(
     repository.createWorkspace(
       actorId,
-      SchemaStrict.decodeUnknownSync(contracts.CreateWorkspaceInput)({
+      Schema.decodeUnknownSync(contracts.CreateWorkspaceInput, { onExcessProperty: "error" })({
         name: `Studio Browser ${suffix}`,
       }),
       `m18-browser-workspace-${suffix}`,
@@ -87,7 +86,7 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
   const createdProject = await Effect.runPromise(
     repository.createProject(
       actorId,
-      SchemaStrict.decodeUnknownSync(contracts.CreateProjectInput)({
+      Schema.decodeUnknownSync(contracts.CreateProjectInput, { onExcessProperty: "error" })({
         workspaceId: createdWorkspace.id,
         name: "Browser Customer Site",
         key: `studio-browser-${suffix}`,
@@ -99,7 +98,7 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
   await Effect.runPromise(
     repository.enableCapability(
       actorId,
-      SchemaStrict.decodeUnknownSync(contracts.EnableCapabilityInput)({
+      Schema.decodeUnknownSync(contracts.EnableCapabilityInput, { onExcessProperty: "error" })({
         projectId: createdProject.id,
         capability: "cms",
       }),
@@ -111,9 +110,9 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
       { kind: "user", id: actorId },
       createdProject.id,
       createdProject.environment.id,
-      SchemaStrict.decodeUnknownSync(
-        controlPlaneContracts.ControlPlanePutStudioRegistrationRequest,
-      )({
+      Schema.decodeUnknownSync(controlPlaneContracts.ControlPlanePutStudioRegistrationRequest, {
+        onExcessProperty: "error",
+      })({
         commandId: randomUUID(),
         expectedVersion: null,
         applicationOrigin,
@@ -127,7 +126,9 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
       { kind: "user", id: actorId },
       createdProject.id,
       createdProject.environment.id,
-      SchemaStrict.decodeUnknownSync(controlPlaneContracts.ControlPlaneSetStudioRuntimeRequest)({
+      Schema.decodeUnknownSync(controlPlaneContracts.ControlPlaneSetStudioRuntimeRequest, {
+        onExcessProperty: "error",
+      })({
         commandId: randomUUID(),
         expectedVersion: registered.registration.version,
         enabled: true,
@@ -216,9 +217,9 @@ export async function createStudioBrowserFixture(): Promise<StudioBrowserFixture
           { kind: "user", id: actorId },
           createdProject.id,
           createdProject.environment.id,
-          SchemaStrict.decodeUnknownSync(
-            controlPlaneContracts.ControlPlanePutStudioRegistrationRequest,
-          )({
+          Schema.decodeUnknownSync(controlPlaneContracts.ControlPlanePutStudioRegistrationRequest, {
+            onExcessProperty: "error",
+          })({
             commandId: randomUUID(),
             expectedVersion: registrationVersion,
             applicationOrigin: "http://127.0.0.1:43220",

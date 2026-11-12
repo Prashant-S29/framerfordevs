@@ -1,5 +1,3 @@
-// Generates the canonical bearer-only Control Plane v1 OpenAPI contract.
-
 import { Schema } from "effect";
 
 import { make as makeJsonSchema } from "../../response/json-schema";

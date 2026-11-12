@@ -263,10 +263,6 @@ export function validateStudioValues(
   return issues;
 }
 
-/**
- * Conservatively carries uncontested stable-ID edits onto separately fetched authority.
- * It is pure and never fetches, persists, logs, or mutates an input.
- */
 export function rebaseStudioValues(input: {
   readonly oldDefinition: ContentFormDefinition;
   readonly oldBaseline: Readonly<Record<string, unknown>>;

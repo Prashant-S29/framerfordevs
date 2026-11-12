@@ -1,5 +1,3 @@
-// Composes Express transport middleware, protocol routes, CORS boundaries, and the shared Effect runtime.
-
 import { createHash } from "node:crypto";
 
 import {
@@ -7,41 +5,41 @@ import {
   createContext,
   type Context,
 } from "@framerfordevs/api/context";
-import { EffectSchemaToJsonSchemaConverter } from "@framerfordevs/api/contracts/response/effect-schema-converter/index";
+import { EffectSchemaToJsonSchemaConverter } from "@framerfordevs/api/contracts/response/effect-schema-converter";
 import {
   apiFailure,
   type ApiData,
   type ApiResponse,
-} from "@framerfordevs/api/contracts/response/api/index";
-import { DatabaseFailure } from "@framerfordevs/api/contracts/response/errors/index";
-import { authoringLimits } from "@framerfordevs/api/contracts/authoring/index";
+} from "@framerfordevs/api/contracts/response/api";
+import { DatabaseFailure } from "@framerfordevs/api/contracts/response/errors";
+import { authoringLimits } from "@framerfordevs/api/contracts/authoring";
 import type {
   AuthoringCreateEntryRequest,
   AuthoringRenameEntryRequest,
   AuthoringSaveEntryDraftRequest,
-} from "@framerfordevs/api/contracts/authoring/content/index";
+} from "@framerfordevs/api/contracts/authoring/content";
 import type {
   AuthoringPublishEntryRequest,
   AuthoringUnpublishEntryRequest,
-} from "@framerfordevs/api/contracts/authoring/publication/index";
-import type { AuthoringPublishPresentationRequest } from "@framerfordevs/api/contracts/authoring/presentation/index";
+} from "@framerfordevs/api/contracts/authoring/publication";
+import type { AuthoringPublishPresentationRequest } from "@framerfordevs/api/contracts/authoring/presentation";
 import type {
   AuthoringSchemaApplyRequest,
   AuthoringSchemaPlanRequest,
-} from "@framerfordevs/api/contracts/authoring/schema/index";
-import type { DeliveryAccessPrincipal } from "@framerfordevs/api/contracts/delivery/index";
-import { toolingLimits } from "@framerfordevs/api/contracts/tooling/index";
-import { studioLimits } from "@framerfordevs/api/contracts/studio/index";
-import { studioContentLimits } from "@framerfordevs/api/contracts/studio-content/index";
-import { studioContentOpenApiJson } from "@framerfordevs/api/contracts/studio-content/openapi/index";
+} from "@framerfordevs/api/contracts/authoring/schema";
+import type { DeliveryAccessPrincipal } from "@framerfordevs/api/contracts/delivery";
+import { toolingLimits } from "@framerfordevs/api/contracts/tooling";
+import { studioLimits } from "@framerfordevs/api/contracts/studio";
+import { studioContentLimits } from "@framerfordevs/api/contracts/studio-content";
+import { studioContentOpenApiJson } from "@framerfordevs/api/contracts/studio-content/openapi";
 import { studioContentV2OpenApiJson } from "@framerfordevs/api/contracts/studio-content/openapi/v2";
-import { studioOpenApiJson } from "@framerfordevs/api/contracts/studio/openapi/index";
+import { studioOpenApiJson } from "@framerfordevs/api/contracts/studio/openapi";
 import {
   generatePublicArtifacts,
   type PublicContractRegistryKey,
 } from "@framerfordevs/public-contracts";
-import type { RateLimitDecision } from "@framerfordevs/api/contracts/rate-limit/index";
-import { selectCanonicalNetworkSource } from "@framerfordevs/api/lib/network-source/index";
+import type { RateLimitDecision } from "@framerfordevs/api/contracts/rate-limit";
+import { selectCanonicalNetworkSource } from "@framerfordevs/api/lib/network-source";
 import {
   applyAuthoringProjectSchema,
   authenticateAuthoringRequest,
@@ -81,7 +79,7 @@ import {
   saveAuthoringEntryDraft,
   unpublishAuthoringEntry,
   validateAuthoringPublication,
-} from "@framerfordevs/api/operations/authoring/public/index";
+} from "@framerfordevs/api/operations/authoring/public";
 import {
   browseStudioEntries,
   createStudioEntry,
@@ -101,7 +99,7 @@ import {
   resolveStudioEntryLabels,
   saveStudioEntryDraft,
   searchStudioEntries,
-} from "@framerfordevs/api/operations/studio-content-public/index";
+} from "@framerfordevs/api/operations/studio-content-public";
 import {
   authenticateStudioRequest,
   decodeStudioBootstrapScope,
@@ -109,7 +107,7 @@ import {
   evaluateStudioUserRateLimit,
   getStudioBootstrap,
   validateStudioEmptyQuery,
-} from "@framerfordevs/api/operations/studio-public/index";
+} from "@framerfordevs/api/operations/studio-public";
 import {
   authenticateToolingRequest,
   decodeToolingCollectionRevisionScope,
@@ -125,8 +123,8 @@ import {
   toolingManifestCost,
   toolingRevisionCost,
   validateToolingEmptyQuery,
-} from "@framerfordevs/api/operations/tooling-public/index";
-import type { ToolingPrincipal } from "@framerfordevs/api/services/tooling/principal-authenticator/index";
+} from "@framerfordevs/api/operations/tooling-public";
+import type { ToolingPrincipal } from "@framerfordevs/api/services/tooling/principal-authenticator";
 import {
   authenticatePreviewRequest,
   evaluatePreviewCredentialRateLimit,
@@ -151,8 +149,8 @@ import type {
   DeliveryRouteScopeInput,
   ResolvedDeliveryScope,
 } from "@framerfordevs/api/services/delivery/read-repository";
-import { readinessCheck, healthCheck } from "@framerfordevs/api/operations/system/index";
-import { makeRequestContext } from "@framerfordevs/api/observability/request-context/index";
+import { readinessCheck, healthCheck } from "@framerfordevs/api/operations/system";
+import { makeRequestContext } from "@framerfordevs/api/observability/request-context";
 import {
   authoringCostBucket,
   authoringSizeBucket,
@@ -164,7 +162,7 @@ import {
   type PreviewQueryRejectionCategory,
   type ToolingEndpoint,
   type ToolingSubject,
-} from "@framerfordevs/api/observability/telemetry/index";
+} from "@framerfordevs/api/observability/telemetry";
 import {
   observeAuthoringAuthentication,
   observeAuthoringRequest,
@@ -172,8 +170,8 @@ import {
   observePreviewQueryRejection,
   observeToolingRequest,
   reportBoundaryDefect,
-} from "@framerfordevs/api/runtime/index";
-import { appRouter } from "@framerfordevs/api/routers/index";
+} from "@framerfordevs/api/runtime";
+import { appRouter } from "@framerfordevs/api/routers";
 import { auth, type StudioOAuthPrincipal } from "@framerfordevs/auth";
 import { env } from "@framerfordevs/env/server";
 import { OpenAPIHandler } from "@orpc/openapi/node";
@@ -198,7 +196,6 @@ export { classifyControlPlaneRequest } from "./control-plane-router";
 
 const generatedPublicArtifacts = generatePublicArtifacts();
 
-/** Selects the externally effective host only from the configured trusted proxy boundary. */
 function effectiveRequestHost(req: Request): string | undefined {
   const forwardedHost = env.TRUST_PROXY_HOPS > 0 ? req.headers["x-forwarded-host"] : undefined;
   return typeof forwardedHost === "string" ? forwardedHost : req.headers.host;
@@ -258,7 +255,6 @@ const deliveryExposedHeaders = [
 ].join(", ");
 const maximumDeliveryResponseBytes = 4 * 1_024 * 1_024;
 
-/** Applies wildcard, non-credentialed CORS exclusively to the Delivery protocol boundary. */
 function setDeliveryCorsHeaders(res: Response): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
@@ -270,7 +266,6 @@ function setDeliveryCorsHeaders(res: Response): void {
   res.setHeader("X-Content-Type-Options", "nosniff");
 }
 
-/** Sends the existing application envelope while preserving HEAD's bodyless protocol semantics. */
 function sendApplicationResponse(
   req: Request,
   res: Response,
@@ -285,7 +280,6 @@ function sendApplicationResponse(
   res.status(status).json(response);
 }
 
-/** Unwraps an internal shared-runtime step or forwards its centralized failure once. */
 function stepData<A extends ApiData>(
   req: Request,
   res: Response,
@@ -298,7 +292,6 @@ function stepData<A extends ApiData>(
   return result.response.data;
 }
 
-/** Writes standard bounded quota metadata from the policy that governs this response. */
 function setRateLimitHeaders(res: Response, decision: RateLimitDecision): void {
   res.setHeader("RateLimit-Limit", String(decision.limit));
   res.setHeader("RateLimit-Remaining", String(decision.remaining));
@@ -308,7 +301,6 @@ function setRateLimitHeaders(res: Response, decision: RateLimitDecision): void {
   }
 }
 
-/** Uses a bounded pre-query estimate; expansion occurrence costs are charged by later resolution. */
 function deliveryRequestCost(req: Request, kind: "list" | "item"): number {
   if (kind === "item") return 1;
   const parameters = new URLSearchParams(req.originalUrl.split("?", 2)[1] ?? "");
@@ -323,7 +315,6 @@ function deliveryRequestCost(req: Request, kind: "list" | "item"): number {
   return Math.min(100, 1 + Math.ceil(limit / 10) + depth * 2);
 }
 
-/** Implements If-None-Match weak comparison for safe GET/HEAD revalidation. */
 function etagMatches(header: string | undefined, etag: string): boolean {
   if (header === undefined) return false;
   const target = etag.replace(/^W\//u, "");
@@ -333,7 +324,6 @@ function etagMatches(header: string | undefined, etag: string): boolean {
     .some((value) => value === "*" || value.replace(/^W\//u, "") === target);
 }
 
-/** Returns the latest precise authority timestamp represented by this immutable response. */
 function deliveryLastModified(scope: ResolvedDeliveryScope, data: ApiData): Date {
   const times = [scope.configUpdatedAt.getTime(), scope.schemaUpdatedAt.getTime()];
   if (scope.generationChangedAt !== null) times.push(scope.generationChangedAt.getTime());
@@ -364,7 +354,6 @@ function deliveryLastModified(scope: ResolvedDeliveryScope, data: ApiData): Date
   return new Date(Math.max(...times));
 }
 
-/** Serializes once, derives exact validators, handles conditional requests, and enforces 4 MiB. */
 function sendDeliveryRepresentation(options: {
   readonly req: Request;
   readonly res: Response;
@@ -426,7 +415,6 @@ function sendDeliveryRepresentation(options: {
   res.end(body);
 }
 
-/** Builds one validated scope/auth/quota context shared by every public Delivery read. */
 async function prepareDeliveryRequest(
   req: Request,
   res: Response,
@@ -547,7 +535,6 @@ async function prepareDeliveryRequest(
   return { scopeInput, scope, principal };
 }
 
-/** Creates the isolated wildcard-CORS Delivery protocol router before management CORS. */
 function createDeliveryRouter(deliveryApiEnabled: boolean): Router {
   const router = express.Router();
   router.use((req, res, next) => {
@@ -762,7 +749,6 @@ const previewExposedHeaders = [
   "Retry-After",
 ].join(", ");
 
-/** Applies the complete isolated Preview CORS and anti-leak header set. */
 function setPreviewHeaders(res: Response): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
@@ -772,7 +758,6 @@ function setPreviewHeaders(res: Response): void {
   res.setHeader("Referrer-Policy", "no-referrer");
 }
 
-/** Sends a no-store Preview envelope without validators or a body for HEAD. */
 function sendPreviewResponse(
   req: Request,
   res: Response,
@@ -795,7 +780,6 @@ function sendPreviewResponse(
   res.end(body);
 }
 
-/** Records only the closed parser category and never the raw rejected Preview query. */
 function observePreviewScopeFailure(response: ApiResponse<ApiData>): void {
   if (response.ok || response.error.code !== "PREVIEW_QUERY_INVALID") return;
   const detail = response.error.details?.[0];
@@ -823,7 +807,6 @@ function observePreviewScopeFailure(response: ApiResponse<ApiData>): void {
   void observePreviewQueryRejection(category).catch(() => undefined);
 }
 
-/** Unwraps one Preview runtime step while preserving no-store failures and bearer challenges. */
 function previewStepData<A extends ApiData>(
   req: Request,
   res: Response,
@@ -836,7 +819,6 @@ function previewStepData<A extends ApiData>(
   return result.response.data;
 }
 
-/** Executes authentication and closed Preview quotas before any persisted route scope lookup. */
 async function preparePreviewRequest(
   req: Request,
   res: Response,
@@ -914,7 +896,6 @@ async function preparePreviewRequest(
   return principal;
 }
 
-/** Creates the isolated bearer-only Preview router before credentialed management CORS. */
 function createPreviewRouter(previewApiEnabled: boolean): Router {
   const router = express.Router();
   router.use((req, res, next) => {

@@ -1,11 +1,9 @@
-// Owns the dedicated webhook dispatcher, health boundary, and graceful Effect interruption.
-
 import {
   runWebhookWorker,
   webhookWorkerLiveness,
   webhookWorkerReadiness,
-} from "@framerfordevs/api/operations/webhook/worker/index";
-import { WebhookTelemetry } from "@framerfordevs/api/observability/webhook-telemetry/index";
+} from "@framerfordevs/api/operations/webhook/worker";
+import { WebhookTelemetry } from "@framerfordevs/api/observability/webhook-telemetry";
 import {
   disposeWebhookWorkerRuntime,
   webhookWorkerRuntime,

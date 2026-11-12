@@ -1,5 +1,3 @@
-// Signs short-lived Tooling pagination cursors bound to principal, route, scope, and page size.
-
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 import { Clock, Context, Effect, Layer, Schema } from "effect";
@@ -9,7 +7,6 @@ import {
   SecurityServiceFailure,
 } from "../../../contracts/response/errors";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const cursorLifetimeMs = 15 * 60 * 1_000;
 const cursorMaximumLength = 512;
 const EpochMillis = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0));
@@ -139,9 +136,9 @@ export function makeToolingCursorSigner(
           try: (): unknown => JSON.parse(Buffer.from(payloadText, "base64url").toString("utf8")),
           catch: () => invalidCursor(),
         });
-        const payload = yield* SchemaStrict.decodeUnknownEffect(ToolingCursorPayload)(
-          unknownPayload,
-        ).pipe(Effect.mapError(() => invalidCursor()));
+        const payload = yield* Schema.decodeUnknownEffect(ToolingCursorPayload, {
+          onExcessProperty: "error",
+        })(unknownPayload).pipe(Effect.mapError(() => invalidCursor()));
         const now = yield* Clock.currentTimeMillis;
         if (
           payload.authorityDigest !== authorityDigest(authority) ||

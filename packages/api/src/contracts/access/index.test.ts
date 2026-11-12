@@ -1,7 +1,5 @@
-// Verifies access identity normalization, credential formats, permissions, and issuance boundary contracts.
-
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Schema } from "effect";
 
 import {
   CanonicalEmail,
@@ -24,7 +22,6 @@ import {
   UpdateProjectMemberPolicyInput,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const credentialId = "019fae8b-1234-7000-8000-000000000001";
 const secret = "A".repeat(43);
 const membershipId = "019fae8b-1234-7000-8000-000000000002";
@@ -34,8 +31,9 @@ const localeId = "019fae8b-1234-7000-8000-000000000003";
 describe("access contracts", () => {
   it.effect("canonicalizes invitation email addresses", () =>
     Effect.gen(function* () {
-      const email =
-        yield* SchemaStrict.decodeUnknownEffect(CanonicalEmail)("  Client@Example.COM  ");
+      const email = yield* Schema.decodeUnknownEffect(CanonicalEmail, {
+        onExcessProperty: "error",
+      })("  Client@Example.COM  ");
 
       assert.strictEqual(email, "client@example.com");
     }),
@@ -43,13 +41,19 @@ describe("access contracts", () => {
 
   it.effect("canonicalizes bounded governance search and list defaults", () =>
     Effect.gen(function* () {
-      const search = yield* SchemaStrict.decodeUnknownEffect(ProjectAccessSearch)("  ClIeNt  ");
-      const members = yield* SchemaStrict.decodeUnknownEffect(ListProjectMembersInput)({
+      const search = yield* Schema.decodeUnknownEffect(ProjectAccessSearch, {
+        onExcessProperty: "error",
+      })("  ClIeNt  ");
+      const members = yield* Schema.decodeUnknownEffect(ListProjectMembersInput, {
+        onExcessProperty: "error",
+      })({
         projectId,
         cursor: null,
         limit: 20,
       });
-      const invitations = yield* SchemaStrict.decodeUnknownEffect(ListProjectInvitationsInput)({
+      const invitations = yield* Schema.decodeUnknownEffect(ListProjectInvitationsInput, {
+        onExcessProperty: "error",
+      })({
         projectId,
         cursor: null,
         limit: 20,
@@ -70,10 +74,15 @@ describe("access contracts", () => {
         const key = `${prefix}_${secret}`;
 
         assert.strictEqual(
-          yield* SchemaStrict.decodeUnknownEffect(CredentialKeyPrefix)(prefix),
+          yield* Schema.decodeUnknownEffect(CredentialKeyPrefix, { onExcessProperty: "error" })(
+            prefix,
+          ),
           prefix,
         );
-        assert.strictEqual(yield* SchemaStrict.decodeUnknownEffect(CredentialSecret)(key), key);
+        assert.strictEqual(
+          yield* Schema.decodeUnknownEffect(CredentialSecret, { onExcessProperty: "error" })(key),
+          key,
+        );
       }
     }),
   );
@@ -81,15 +90,21 @@ describe("access contracts", () => {
   it.effect("rejects malformed or incorrectly sized invitation and credential secrets", () =>
     Effect.gen(function* () {
       const exits = yield* Effect.all([
-        Effect.exit(SchemaStrict.decodeUnknownEffect(InvitationToken)("short")),
-        Effect.exit(SchemaStrict.decodeUnknownEffect(InvitationToken)("!".repeat(43))),
         Effect.exit(
-          SchemaStrict.decodeUnknownEffect(CredentialSecret)(
+          Schema.decodeUnknownEffect(InvitationToken, { onExcessProperty: "error" })("short"),
+        ),
+        Effect.exit(
+          Schema.decodeUnknownEffect(InvitationToken, { onExcessProperty: "error" })(
+            "!".repeat(43),
+          ),
+        ),
+        Effect.exit(
+          Schema.decodeUnknownEffect(CredentialSecret, { onExcessProperty: "error" })(
             `ffd_mgmt_${credentialId}_${"A".repeat(42)}`,
           ),
         ),
         Effect.exit(
-          SchemaStrict.decodeUnknownEffect(CredentialSecret)(
+          Schema.decodeUnknownEffect(CredentialSecret, { onExcessProperty: "error" })(
             `ffd_unknown_${credentialId}_${secret}`,
           ),
         ),
@@ -101,7 +116,9 @@ describe("access contracts", () => {
 
   it.effect("defaults Preview authority acknowledgement to false at the decoded boundary", () =>
     Effect.gen(function* () {
-      const input = yield* SchemaStrict.decodeUnknownEffect(IssueApiCredentialInput)({
+      const input = yield* Schema.decodeUnknownEffect(IssueApiCredentialInput, {
+        onExcessProperty: "error",
+      })({
         projectId: "019fae8b-1234-7000-8000-000000000010",
         environmentId: "019fae8b-1234-7000-8000-000000000011",
         family: "preview",
@@ -117,13 +134,17 @@ describe("access contracts", () => {
 
   it.effect("requires a bounded unique credential scope set", () =>
     Effect.gen(function* () {
-      const valid = yield* SchemaStrict.decodeUnknownEffect(CredentialScopes)([
-        "project.read",
-        "content.read",
-      ]);
-      const empty = yield* Effect.exit(SchemaStrict.decodeUnknownEffect(CredentialScopes)([]));
+      const valid = yield* Schema.decodeUnknownEffect(CredentialScopes, {
+        onExcessProperty: "error",
+      })(["project.read", "content.read"]);
+      const empty = yield* Effect.exit(
+        Schema.decodeUnknownEffect(CredentialScopes, { onExcessProperty: "error" })([]),
+      );
       const duplicate = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(CredentialScopes)(["project.read", "project.read"]),
+        Schema.decodeUnknownEffect(CredentialScopes, { onExcessProperty: "error" })([
+          "project.read",
+          "project.read",
+        ]),
       );
 
       assert.deepEqual(valid, ["project.read", "content.read"]);
@@ -135,9 +156,13 @@ describe("access contracts", () => {
   it.effect("accepts all, none, and bounded unique selected locale access", () =>
     Effect.gen(function* () {
       const values = yield* Effect.all([
-        SchemaStrict.decodeUnknownEffect(ProjectLocaleAccess)({ mode: "all" }),
-        SchemaStrict.decodeUnknownEffect(ProjectLocaleAccess)({ mode: "none" }),
-        SchemaStrict.decodeUnknownEffect(ProjectLocaleAccess)({
+        Schema.decodeUnknownEffect(ProjectLocaleAccess, { onExcessProperty: "error" })({
+          mode: "all",
+        }),
+        Schema.decodeUnknownEffect(ProjectLocaleAccess, { onExcessProperty: "error" })({
+          mode: "none",
+        }),
+        Schema.decodeUnknownEffect(ProjectLocaleAccess, { onExcessProperty: "error" })({
           mode: "selected",
           localeIds: [localeId],
         }),
@@ -153,15 +178,15 @@ describe("access contracts", () => {
   it.effect("enforces complete member and invitation policy including owner locale authority", () =>
     Effect.gen(function* () {
       const valid = yield* Effect.all([
-        SchemaStrict.decodeUnknownEffect(ProjectMemberPolicy)({
+        Schema.decodeUnknownEffect(ProjectMemberPolicy, { onExcessProperty: "error" })({
           role: "owner",
           localeAccess: { mode: "all" },
         }),
-        SchemaStrict.decodeUnknownEffect(ProjectInvitationPolicy)({
+        Schema.decodeUnknownEffect(ProjectInvitationPolicy, { onExcessProperty: "error" })({
           role: "client_editor",
           localeAccess: { mode: "selected", localeIds: [localeId] },
         }),
-        SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
+        Schema.decodeUnknownEffect(UpdateProjectMemberPolicyInput, { onExcessProperty: "error" })({
           projectId,
           membershipId,
           version: 2,
@@ -171,25 +196,27 @@ describe("access contracts", () => {
       ]);
       const invalid = yield* Effect.all([
         Effect.exit(
-          SchemaStrict.decodeUnknownEffect(ProjectMemberPolicy)({
+          Schema.decodeUnknownEffect(ProjectMemberPolicy, { onExcessProperty: "error" })({
             role: "owner",
             localeAccess: { mode: "selected", localeIds: [localeId] },
           }),
         ),
         Effect.exit(
-          SchemaStrict.decodeUnknownEffect(ProjectInvitationPolicy)({
+          Schema.decodeUnknownEffect(ProjectInvitationPolicy, { onExcessProperty: "error" })({
             role: "owner",
             localeAccess: { mode: "none" },
           }),
         ),
         Effect.exit(
-          SchemaStrict.decodeUnknownEffect(UpdateProjectMemberPolicyInput)({
-            projectId,
-            membershipId,
-            version: 2,
-            role: "owner",
-            localeAccess: { mode: "none" },
-          }),
+          Schema.decodeUnknownEffect(UpdateProjectMemberPolicyInput, { onExcessProperty: "error" })(
+            {
+              projectId,
+              membershipId,
+              version: 2,
+              role: "owner",
+              localeAccess: { mode: "none" },
+            },
+          ),
         ),
       ]);
 
@@ -204,11 +231,17 @@ describe("access contracts", () => {
   it.effect("uses one strict user-or-credential project actor shape", () =>
     Effect.gen(function* () {
       const actors = yield* Effect.all([
-        SchemaStrict.decodeUnknownEffect(ProjectActor)({ kind: "user", id: "user-1" }),
-        SchemaStrict.decodeUnknownEffect(ProjectActor)({ kind: "credential", id: credentialId }),
+        Schema.decodeUnknownEffect(ProjectActor, { onExcessProperty: "error" })({
+          kind: "user",
+          id: "user-1",
+        }),
+        Schema.decodeUnknownEffect(ProjectActor, { onExcessProperty: "error" })({
+          kind: "credential",
+          id: credentialId,
+        }),
       ]);
       const excess = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ProjectActor)({
+        Schema.decodeUnknownEffect(ProjectActor, { onExcessProperty: "error" })({
           kind: "user",
           id: "user-1",
           issuerId: "user-2",
@@ -227,18 +260,20 @@ describe("access contracts", () => {
     Effect.gen(function* () {
       const exits = yield* Effect.all([
         Effect.exit(
-          SchemaStrict.decodeUnknownEffect(ProjectLocaleAccess)({
+          Schema.decodeUnknownEffect(ProjectLocaleAccess, { onExcessProperty: "error" })({
             mode: "selected",
             localeIds: [],
           }),
         ),
         Effect.exit(
-          SchemaStrict.decodeUnknownEffect(ProjectLocaleAccess)({
+          Schema.decodeUnknownEffect(ProjectLocaleAccess, { onExcessProperty: "error" })({
             mode: "selected",
             localeIds: [localeId, localeId],
           }),
         ),
-        Effect.exit(SchemaStrict.decodeUnknownEffect(LocaleAccessMode)("inherited")),
+        Effect.exit(
+          Schema.decodeUnknownEffect(LocaleAccessMode, { onExcessProperty: "error" })("inherited"),
+        ),
       ]);
 
       assert.isTrue(exits.every((exit) => exit._tag === "Failure"));
@@ -248,24 +283,42 @@ describe("access contracts", () => {
   it.effect("rejects unknown roles, actions, scopes, and invitation states", () =>
     Effect.gen(function* () {
       assert.strictEqual(
-        yield* SchemaStrict.decodeUnknownEffect(ProjectPermissionAction)(
+        yield* Schema.decodeUnknownEffect(ProjectPermissionAction, { onExcessProperty: "error" })(
           "project.member.locale.update",
         ),
         "project.member.locale.update",
       );
       assert.strictEqual(
-        yield* SchemaStrict.decodeUnknownEffect(ProjectPermissionAction)("project.restore"),
+        yield* Schema.decodeUnknownEffect(ProjectPermissionAction, { onExcessProperty: "error" })(
+          "project.restore",
+        ),
         "project.restore",
       );
       assert.strictEqual(
-        yield* SchemaStrict.decodeUnknownEffect(ProjectPermissionAction)("project.audit.read"),
+        yield* Schema.decodeUnknownEffect(ProjectPermissionAction, { onExcessProperty: "error" })(
+          "project.audit.read",
+        ),
         "project.audit.read",
       );
       const exits = yield* Effect.all([
-        Effect.exit(SchemaStrict.decodeUnknownEffect(ProjectRole)("admin")),
-        Effect.exit(SchemaStrict.decodeUnknownEffect(ProjectPermissionAction)("project.delete")),
-        Effect.exit(SchemaStrict.decodeUnknownEffect(CredentialScopes)(["credential.manage"])),
-        Effect.exit(SchemaStrict.decodeUnknownEffect(ProjectInvitationStatus)("used")),
+        Effect.exit(
+          Schema.decodeUnknownEffect(ProjectRole, { onExcessProperty: "error" })("admin"),
+        ),
+        Effect.exit(
+          Schema.decodeUnknownEffect(ProjectPermissionAction, { onExcessProperty: "error" })(
+            "project.delete",
+          ),
+        ),
+        Effect.exit(
+          Schema.decodeUnknownEffect(CredentialScopes, { onExcessProperty: "error" })([
+            "credential.manage",
+          ]),
+        ),
+        Effect.exit(
+          Schema.decodeUnknownEffect(ProjectInvitationStatus, { onExcessProperty: "error" })(
+            "used",
+          ),
+        ),
       ]);
 
       assert.isTrue(exits.every((exit) => exit._tag === "Failure"));

@@ -1,5 +1,3 @@
-// Runs the operator-controlled M9 read-model dry-run/apply boundary without logging content values.
-
 import { Effect } from "effect";
 
 process.loadEnvFile("../../apps/server/.env");

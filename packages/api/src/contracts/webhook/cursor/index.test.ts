@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Schema } from "effect";
 
 import { Cursor } from "../../platform";
 import {
@@ -13,7 +13,6 @@ import {
   encodeWebhookEndpointCursor,
 } from "./index";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const scope = {
   projectId: "019fae8b-1234-7000-8000-000000000001",
   environmentId: "019fae8b-1234-7000-8000-000000000002",
@@ -94,7 +93,7 @@ describe("Webhook keyset cursors", () => {
         createdAt: at,
         deliveryId: ids.delivery,
       });
-      const malformed = SchemaStrict.decodeUnknownSync(Cursor)("not-json");
+      const malformed = Schema.decodeUnknownSync(Cursor, { onExcessProperty: "error" })("not-json");
       assert.isTrue(
         Exit.isFailure(yield* Effect.exit(decodeWebhookEndpointCursor(malformed, scope))),
       );

@@ -1,4 +1,4 @@
-import { Clock, Effect } from "effect";
+import { Clock, Effect, Schema } from "effect";
 
 import {
   IssuedApiCredential,
@@ -14,9 +14,8 @@ import { AuthUserId } from "../contracts/platform";
 import { CredentialRepository } from "../services/credential/repository";
 import { SecretGenerator } from "../services/secret-generator";
 
-import * as SchemaStrict from "../lib/schema-strict";
 const decodeActorId = (actorId: string) =>
-  SchemaStrict.decodeUnknownEffect(AuthUserId)(actorId).pipe(
+  Schema.decodeUnknownEffect(AuthUserId, { onExcessProperty: "error" })(actorId).pipe(
     Effect.mapError(() => UnauthorizedFailure.make()),
   );
 

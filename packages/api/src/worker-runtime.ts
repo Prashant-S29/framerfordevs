@@ -1,5 +1,3 @@
-// Composes the dedicated webhook worker Layer and its single process-lifetime ManagedRuntime.
-
 import { env } from "@framerfordevs/env/server";
 import { Layer, ManagedRuntime } from "effect";
 

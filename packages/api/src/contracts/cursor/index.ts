@@ -11,7 +11,6 @@ import {
   type ProjectListStatus as ProjectListStatusType,
 } from "../platform";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 class WorkspaceCursorPayload extends Schema.Class<WorkspaceCursorPayload>("WorkspaceCursorPayload")(
   {
     version: Schema.Literal(1),
@@ -42,7 +41,7 @@ const invalidCursor = () =>
 
 const encodePayload = Effect.fn("cursor.encode")(function* (payload: object) {
   const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  return yield* SchemaStrict.decodeUnknownEffect(Cursor)(encoded).pipe(
+  return yield* Schema.decodeUnknownEffect(Cursor, { onExcessProperty: "error" })(encoded).pipe(
     Effect.mapError(() => invalidCursor()),
   );
 });
@@ -59,9 +58,9 @@ const decodePayload = Effect.fn("cursor.decode")(function* <A, I>(
     try: (): unknown => JSON.parse(json),
     catch: () => invalidCursor(),
   });
-  return yield* SchemaStrict.decodeUnknownEffect(schema)(unknownPayload).pipe(
-    Effect.mapError(() => invalidCursor()),
-  );
+  return yield* Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(
+    unknownPayload,
+  ).pipe(Effect.mapError(() => invalidCursor()));
 });
 
 export function encodeWorkspaceCursor(payload: {

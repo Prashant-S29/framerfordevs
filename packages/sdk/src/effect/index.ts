@@ -1,8 +1,5 @@
-// Exports stable Effect v3 transport schemas and exact decode helpers for public v1 protocols.
-
 import { Effect, Schema } from "effect";
 
-import * as SchemaStrict from "../schema-strict";
 export type PublicJsonValue =
   | null
   | boolean
@@ -162,7 +159,9 @@ export function recognizeDeliveryContract<A, I>(
     });
   }
   return Effect.map(
-    SchemaStrict.decodeUnknownEffect(schema)(item.data, { onExcessProperty: "error" }),
+    Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(item.data, {
+      onExcessProperty: "error",
+    }),
     (data) => ({
       kind: "recognized_contract" as const,
       schemaRevisionId: item.publication.schemaRevisionId,
@@ -184,7 +183,9 @@ export function recognizePreviewContract<A, I>(
     });
   }
   return Effect.map(
-    SchemaStrict.decodeUnknownEffect(schema)(item.data, { onExcessProperty: "error" }),
+    Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(item.data, {
+      onExcessProperty: "error",
+    }),
     (data) => ({
       kind: "recognized_contract" as const,
       schemaRevisionId: item.preview.schemaRevisionId,
@@ -194,17 +195,22 @@ export function recognizePreviewContract<A, I>(
 }
 
 export function decodePublicEnvelope<A, I>(schema: Schema.Codec<A, I, never>, value: unknown) {
-  return SchemaStrict.decodeUnknownEffect(PublicApiEnvelope(schema))(value, {
-    onExcessProperty: "error",
-  });
+  return Schema.decodeUnknownEffect(PublicApiEnvelope(schema), { onExcessProperty: "error" })(
+    value,
+    {
+      onExcessProperty: "error",
+    },
+  );
 }
 
 export function decodePublicEnvelopeSync<A, I>(schema: Schema.Codec<A, I, never>, value: unknown) {
-  return SchemaStrict.decodeUnknownSync(PublicApiEnvelope(schema))(value, {
+  return Schema.decodeUnknownSync(PublicApiEnvelope(schema), { onExcessProperty: "error" })(value, {
     onExcessProperty: "error",
   });
 }
 
 export function decodePublicData<A, I>(schema: Schema.Codec<A, I, never>, value: unknown) {
-  return SchemaStrict.decodeUnknownEffect(schema)(value, { onExcessProperty: "error" });
+  return Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(value, {
+    onExcessProperty: "error",
+  });
 }

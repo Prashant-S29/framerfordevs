@@ -1,5 +1,3 @@
-// Renders canonical OpenAPI contracts as secondary, read-only developer references.
-
 import { createOpenAPIPage } from "fumadocs-openapi/ui";
 
 export const ApiContractPage = createOpenAPIPage({

@@ -1,10 +1,9 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Cause, Effect, Exit, Option } from "effect";
+import { Cause, Effect, Exit, Option, Schema } from "effect";
 
 import { CredentialPrincipal } from "../../../contracts/access";
 import { makeToolingOAuthTokenVerifier, makeToolingPrincipalAuthenticator } from "./index";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 const unusedManagementVerifier = () => Effect.never;
 const allowInvalidAttempt = () => Effect.void;
 
@@ -99,7 +98,7 @@ describe("Tooling principal authentication", () => {
   });
 
   it.effect("requires every declared management scope after one credential verification", () => {
-    const principal = SchemaStrict.decodeUnknownSync(CredentialPrincipal)({
+    const principal = Schema.decodeUnknownSync(CredentialPrincipal, { onExcessProperty: "error" })({
       credentialId: "019fae8b-1234-7000-8000-000000000001",
       workspaceId: "019fae8b-1234-7000-8000-000000000002",
       projectId: "019fae8b-1234-7000-8000-000000000003",

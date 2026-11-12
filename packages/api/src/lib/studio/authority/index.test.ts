@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ProjectRole } from "../../../contracts/access";
+import { Schema } from "effect";
 import {
   StudioApplicationOrigin,
   StudioMountPath,
@@ -31,23 +32,26 @@ import {
   studioResource,
 } from "./index";
 
-import * as SchemaStrict from "../../schema-strict";
-const registrationId = SchemaStrict.decodeUnknownSync(StudioRegistrationId)(
-  "019fae8b-1234-7000-8000-000000000001",
+const registrationId = Schema.decodeUnknownSync(StudioRegistrationId, {
+  onExcessProperty: "error",
+})("019fae8b-1234-7000-8000-000000000001");
+const projectId = Schema.decodeUnknownSync(ProjectId, { onExcessProperty: "error" })(
+  "019fae8b-1234-7000-8000-000000000002",
 );
-const projectId = SchemaStrict.decodeUnknownSync(ProjectId)("019fae8b-1234-7000-8000-000000000002");
-const environmentId = SchemaStrict.decodeUnknownSync(EnvironmentId)(
+const environmentId = Schema.decodeUnknownSync(EnvironmentId, { onExcessProperty: "error" })(
   "019fae8b-1234-7000-8000-000000000003",
 );
-const userId = SchemaStrict.decodeUnknownSync(AuthUserId)("studio-user");
-const grantId = SchemaStrict.decodeUnknownSync(StudioGrantId)(
+const userId = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })("studio-user");
+const grantId = Schema.decodeUnknownSync(StudioGrantId, { onExcessProperty: "error" })(
   "019fae8b-1234-7000-8000-000000000004",
 );
-const version = SchemaStrict.decodeUnknownSync(ResourceVersion)(3);
-const applicationOrigin = SchemaStrict.decodeUnknownSync(StudioApplicationOrigin)(
-  "https://application.example.test",
+const version = Schema.decodeUnknownSync(ResourceVersion, { onExcessProperty: "error" })(3);
+const applicationOrigin = Schema.decodeUnknownSync(StudioApplicationOrigin, {
+  onExcessProperty: "error",
+})("https://application.example.test");
+const mountPath = Schema.decodeUnknownSync(StudioMountPath, { onExcessProperty: "error" })(
+  "/admin/content/studio",
 );
-const mountPath = SchemaStrict.decodeUnknownSync(StudioMountPath)("/admin/content/studio");
 
 const registration = {
   id: registrationId,
@@ -82,7 +86,9 @@ function currentAuthority() {
     audience: "https://api.example.test/api/studio/v1",
     registrationId,
     registrationVersion: version,
-    runtimeStatus: SchemaStrict.decodeUnknownSync(StudioRuntimeStatus)("active"),
+    runtimeStatus: Schema.decodeUnknownSync(StudioRuntimeStatus, { onExcessProperty: "error" })(
+      "active",
+    ),
     projectId,
     environmentId,
     userId,
@@ -128,9 +134,12 @@ describe("Studio authority kernel", () => {
   });
 
   it("composes canonical HTTPS and loopback callbacks without prefix matching", () => {
-    const loopbackOrigin =
-      SchemaStrict.decodeUnknownSync(StudioApplicationOrigin)("http://127.0.0.1:43210");
-    const loopbackMount = SchemaStrict.decodeUnknownSync(StudioMountPath)("/studio");
+    const loopbackOrigin = Schema.decodeUnknownSync(StudioApplicationOrigin, {
+      onExcessProperty: "error",
+    })("http://127.0.0.1:43210");
+    const loopbackMount = Schema.decodeUnknownSync(StudioMountPath, { onExcessProperty: "error" })(
+      "/studio",
+    );
 
     expect(studioCallbackUri(applicationOrigin, mountPath)).toBe(
       "https://application.example.test/admin/content/studio/auth/callback",
@@ -144,7 +153,9 @@ describe("Studio authority kernel", () => {
   });
 
   it("projects only bounded acknowledgement labels and shell actions", () => {
-    const projectName = SchemaStrict.decodeUnknownSync(ProjectName)("Customer Site");
+    const projectName = Schema.decodeUnknownSync(ProjectName, { onExcessProperty: "error" })(
+      "Customer Site",
+    );
     const projection = studioConsentProjection({
       registrationId,
       registrationVersion: version,
@@ -160,13 +171,16 @@ describe("Studio authority kernel", () => {
       projectName: "Customer Site",
       applicationOrigin: "https://application.example.test",
     });
-    expect(projectStudioActions(SchemaStrict.decodeUnknownSync(ProjectRole)("owner"))).toEqual([
-      "project.read",
-      "project.update",
-    ]);
-    expect(projectStudioActions(SchemaStrict.decodeUnknownSync(ProjectRole)("editor"))).toEqual([
-      "project.read",
-    ]);
+    expect(
+      projectStudioActions(
+        Schema.decodeUnknownSync(ProjectRole, { onExcessProperty: "error" })("owner"),
+      ),
+    ).toEqual(["project.read", "project.update"]);
+    expect(
+      projectStudioActions(
+        Schema.decodeUnknownSync(ProjectRole, { onExcessProperty: "error" })("editor"),
+      ),
+    ).toEqual(["project.read"]);
   });
 
   it("creates only additive non-secret Studio claims", () => {
@@ -193,14 +207,18 @@ describe("Studio authority kernel", () => {
       ["audience_mismatch", { audience: "https://api.example.test/api/tooling/v1" }],
       [
         "registration_inactive",
-        { runtimeStatus: SchemaStrict.decodeUnknownSync(StudioRuntimeStatus)("inactive") },
+        {
+          runtimeStatus: Schema.decodeUnknownSync(StudioRuntimeStatus, {
+            onExcessProperty: "error",
+          })("inactive"),
+        },
       ],
       ["registration_version_mismatch", { registrationVersion: ResourceVersion.make(4) }],
       ["project_mismatch", { projectActive: false }],
       [
         "environment_mismatch",
         {
-          environmentId: SchemaStrict.decodeUnknownSync(EnvironmentId)(
+          environmentId: Schema.decodeUnknownSync(EnvironmentId, { onExcessProperty: "error" })(
             "019fae8b-1234-7000-8000-000000000099",
           ),
         },

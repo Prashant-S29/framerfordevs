@@ -1,5 +1,3 @@
-// Generates one-time invitation/API credentials and verifies digest-only persistence material.
-
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { Context, Effect, Layer, Option, Schema } from "effect";
@@ -13,7 +11,6 @@ import {
 } from "../contracts/access";
 import { SecurityServiceFailure } from "../contracts/response/errors";
 
-import * as SchemaStrict from "../lib/schema-strict";
 export interface CredentialMaterial {
   readonly key: CredentialSecret;
   readonly keyPrefix: CredentialKeyPrefix;
@@ -40,7 +37,7 @@ function decodeGenerated<A, I>(
   schema: Schema.Codec<A, I, never>,
   value: unknown,
 ) {
-  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
+  return Schema.decodeUnknownEffect(schema)(value).pipe(
     Effect.mapError((cause) => securityFailure(`${operation}.decode`, cause)),
   );
 }
@@ -50,11 +47,11 @@ function sha256(value: string): string {
 }
 
 export function parseCredentialKey(value: string): ParsedCredentialKey | undefined {
-  const decoded = Option.getOrUndefined(SchemaStrict.decodeUnknownOption(CredentialSecret)(value));
+  const decoded = Option.getOrUndefined(Schema.decodeUnknownOption(CredentialSecret)(value));
   if (decoded === undefined) return undefined;
   const match = /^ffd_(mgmt|del|prev)_([0-9a-f-]{36})_[A-Za-z0-9_-]{43}$/u.exec(decoded);
   const familyCode = match?.[1];
-  const id = Option.getOrUndefined(SchemaStrict.decodeUnknownOption(ApiCredentialId)(match?.[2]));
+  const id = Option.getOrUndefined(Schema.decodeUnknownOption(ApiCredentialId)(match?.[2]));
   if (id === undefined) return undefined;
 
   switch (familyCode) {
@@ -69,7 +66,6 @@ export function parseCredentialKey(value: string): ParsedCredentialKey | undefin
   }
 }
 
-/** Creates the cryptographic service without retaining credential or invitation material. */
 export function makeSecretGenerator() {
   return {
     generateInvitationToken: Effect.fn("SecretGenerator.generateInvitationToken")(function* () {

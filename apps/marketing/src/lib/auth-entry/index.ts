@@ -1,5 +1,3 @@
-// Validates bounded marketing login-entry search and builds the exact dashboard redirect URL.
-
 const maximumReturnToBytes = 2_048;
 const blockedPathPrefixes = ["/api", "/login", "/rpc"] as const;
 const encodedUnsafeCharacterPattern = /%(?:0[0-9a-f]|1[0-9a-f]|2f|5c|7f)/iu;

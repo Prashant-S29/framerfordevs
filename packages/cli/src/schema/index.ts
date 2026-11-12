@@ -1,5 +1,3 @@
-// Defines strict, non-secret CLI config, Tooling wire, normalized contract, and lock formats.
-
 import { Schema } from "effect";
 
 const Uuid = Schema.String.check(
@@ -74,16 +72,12 @@ export class CliConfigV1 extends Schema.Class<CliConfigV1>("CliConfigV1")(
   Schema.Struct({
     schemaVersion: Schema.Literal(1),
     ...CliConfigBase,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class CliSchemaBuildConfig extends Schema.Class<CliSchemaBuildConfig>(
   "CliSchemaBuildConfig",
-)(
-  Schema.Struct({ entry: RelativeProjectPath }).annotate({
-    closedObject: true,
-  }),
-) {}
+)(Schema.Struct({ entry: RelativeProjectPath })) {}
 
 export class CliConfigV2 extends Schema.Class<CliConfigV2>("CliConfigV2")(
   Schema.Struct({
@@ -91,7 +85,7 @@ export class CliConfigV2 extends Schema.Class<CliConfigV2>("CliConfigV2")(
     ...CliConfigBase,
     schema: RelativeProjectPath,
     schemaBuild: Schema.optionalKey(CliSchemaBuildConfig),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const CliConfig = Schema.Union([CliConfigV1, CliConfigV2]).annotate({
@@ -306,7 +300,7 @@ export class SchemaBuildManifest extends Schema.Class<SchemaBuildManifest>("Sche
   output: Schema.Struct({
     path: RelativeProjectPath,
     sha256: Digest,
-  }).annotate({ closedObject: true }),
+  }),
 }) {}
 
 export class AuthoringLockedCollection extends Schema.Class<AuthoringLockedCollection>(
@@ -347,7 +341,7 @@ export class AuthoringSchemaLock extends Schema.Class<AuthoringSchemaLock>("Auth
     collections: Schema.Array(AuthoringLockedCollection).check(Schema.isMaxLength(100)),
     fields: Schema.Array(AuthoringLockedField).check(Schema.isMaxLength(10_000)),
     enumOptions: Schema.Array(AuthoringLockedEnumOption).check(Schema.isMaxLength(10_000)),
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const ContentMutationOperation = Schema.Literals([
@@ -366,7 +360,7 @@ export class ContentMutationRetryJournal extends Schema.Class<ContentMutationRet
     operation: ContentMutationOperation,
     commandId: Uuid,
     fingerprint: Digest,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export const ControlPlaneMutationOperation = Schema.Literals([
@@ -389,7 +383,7 @@ export class ControlPlaneMutationRetryJournal extends Schema.Class<ControlPlaneM
     operation: ControlPlaneMutationOperation,
     commandId: Uuid,
     fingerprint: Digest,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class SchemaMutationRetryJournal extends Schema.Class<SchemaMutationRetryJournal>(
@@ -400,7 +394,7 @@ export class SchemaMutationRetryJournal extends Schema.Class<SchemaMutationRetry
     operation: Schema.Literal("schema.apply"),
     commandId: Uuid,
     fingerprint: Digest,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class PresentationMutationRetryJournal extends Schema.Class<PresentationMutationRetryJournal>(
@@ -411,7 +405,7 @@ export class PresentationMutationRetryJournal extends Schema.Class<PresentationM
     operation: Schema.Literal("presentation.publish"),
     commandId: Uuid,
     fingerprint: Digest,
-  }).annotate({ closedObject: true }),
+  }),
 ) {}
 
 export class SchemaLock extends Schema.Class<SchemaLock>("SchemaLock")({

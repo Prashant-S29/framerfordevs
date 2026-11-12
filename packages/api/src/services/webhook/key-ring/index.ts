@@ -1,5 +1,3 @@
-// Parses the persistent server/worker webhook encryption key-ring contract without exposing key bytes.
-
 export interface ParsedWebhookKeyRing {
   readonly activeKeyId: string;
   readonly keys: Readonly<Record<string, string>>;

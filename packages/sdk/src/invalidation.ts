@@ -1,5 +1,3 @@
-// Normalizes verified webhook invalidation authority without making framework or network claims.
-
 import type { VerifiedPublicationWebhookEvent } from "./webhooks";
 
 export interface NormalizedInvalidation {

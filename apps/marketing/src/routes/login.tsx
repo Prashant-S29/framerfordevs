@@ -1,5 +1,3 @@
-// Implements the marketing host's validated, no-credential dashboard login redirect entry.
-
 import { env } from "@framerfordevs/env/marketing";
 import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 

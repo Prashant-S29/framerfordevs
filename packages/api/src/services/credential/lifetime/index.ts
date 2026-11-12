@@ -1,5 +1,3 @@
-// Centralizes the approved expiring-only lifetime policy for environment-wide Preview credentials.
-
 export const previewCredentialMaximumLifetimeMs = 30 * 24 * 60 * 60 * 1_000;
 
 interface CredentialLifetime {
@@ -8,7 +6,6 @@ interface CredentialLifetime {
   readonly createdAt: Date;
 }
 
-/** Validates a requested Preview expiry against the server-authoritative issuance instant. */
 export function isCredentialIssueLifetimeCompliant(
   family: string,
   expiresAt: Date | null,
@@ -22,7 +19,6 @@ export function isCredentialIssueLifetimeCompliant(
   );
 }
 
-/** Rejects legacy Preview rows whose original lifetime exceeded the approved maximum. */
 export function isStoredCredentialLifetimeCompliant(credential: CredentialLifetime): boolean {
   return isCredentialIssueLifetimeCompliant(
     credential.family,

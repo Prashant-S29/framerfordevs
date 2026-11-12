@@ -1,5 +1,3 @@
-// Establishes the public Fumadocs provider, metadata, theme, search, and document shell.
-
 import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-router";
 import { RootProvider } from "fumadocs-ui/provider/tanstack";
 import { lazy } from "react";

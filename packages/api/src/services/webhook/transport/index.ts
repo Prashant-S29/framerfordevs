@@ -1,5 +1,3 @@
-// Sends one bounded HTTPS webhook using a prevalidated pinned address and fixed request headers.
-
 import https from "node:https";
 import type { Socket } from "node:net";
 import { TLSSocket } from "node:tls";
@@ -76,10 +74,8 @@ export type WebhookTimeoutScheduler = (
 ) => WebhookTimeoutHandle;
 
 const NodeHttpsAdapter: WebhookHttpsAdapter = {
-  /** Starts one HTTPS request and reports when its TLS connection becomes usable. */
   request: (options, onResponse, onError, onTimeout, onSecureConnect) => {
     const outbound = https.request(options, onResponse);
-    /** Observes the actual socket so the connect deadline includes the TLS handshake. */
     const handleSocket = (socket: Socket) => {
       if (socket instanceof TLSSocket) socket.once("secureConnect", onSecureConnect);
       else socket.once("connect", onSecureConnect);
@@ -91,7 +87,6 @@ const NodeHttpsAdapter: WebhookHttpsAdapter = {
   },
 };
 
-/** Schedules one unreferenced Node timer behind the transport's testable timer contract. */
 function scheduleNodeTimeout(callback: () => void, milliseconds: number): WebhookTimeoutHandle {
   const handle = setTimeout(callback, milliseconds);
   return {
@@ -100,12 +95,10 @@ function scheduleNodeTimeout(callback: () => void, milliseconds: number): Webhoo
   };
 }
 
-/** Wraps a transport failure without exposing its raw network details to callers. */
 function failure(operation: string, cause: unknown) {
   return SecurityServiceFailure.make({ operation, cause });
 }
 
-/** Builds the private non-reusing HTTPS transport with separate connect and total deadlines. */
 export function makeWebhookTransport(
   adapter: WebhookHttpsAdapter = NodeHttpsAdapter,
   scheduleTimeout: WebhookTimeoutScheduler = scheduleNodeTimeout,
@@ -120,7 +113,6 @@ export function makeWebhookTransport(
             let connectTimeout: WebhookTimeoutHandle | undefined;
             let totalTimeout: WebhookTimeoutHandle | undefined;
             let secureConnected = false;
-            /** Clears both independent deadlines after any terminal request outcome. */
             const clearTimeouts = () => {
               connectTimeout?.clear();
               totalTimeout?.clear();

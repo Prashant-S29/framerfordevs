@@ -46,20 +46,20 @@
       }
     },
     "schemas": {
-      "ApiErrorDetail": {
+      "ApiErrorDetailEncoded": {
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "a string at most 64 character(s) long",
             "maxLength": 64,
             "minLength": 1,
-            "title": "maxLength(64)",
             "type": "string"
           },
           "currentRevisionId": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UUID"
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
               },
               {
                 "type": "null"
@@ -67,28 +67,22 @@
             ]
           },
           "currentVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "expectedVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "path": {
-            "description": "a string at most 256 character(s) long",
             "maxLength": 256,
-            "title": "maxLength(256)",
             "type": "string"
           },
           "scope": {
@@ -112,141 +106,109 @@
             "type": "boolean"
           }
         },
-        "required": [],
         "type": "object"
       },
       "DateConfiguration": {
         "additionalProperties": false,
         "properties": {
           "default": {
-            "description": "a string matching the pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
             "maxLength": 10,
-            "minLength": 10,
+            "minLength": 5,
             "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
-            "title": "length(10)",
             "type": "string"
           },
           "maximum": {
-            "description": "a string matching the pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
             "maxLength": 10,
-            "minLength": 10,
+            "minLength": 5,
             "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
-            "title": "length(10)",
             "type": "string"
           },
           "minimum": {
-            "description": "a string matching the pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
             "maxLength": 10,
-            "minLength": 10,
+            "minLength": 5,
             "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
-            "title": "length(10)",
             "type": "string"
           }
         },
-        "required": [],
         "type": "object"
       },
       "DateTimeConfiguration": {
         "additionalProperties": false,
         "properties": {
           "default": {
-            "description": "a string at most 35 character(s) long",
             "maxLength": 35,
-            "minLength": 20,
-            "title": "maxLength(35)",
+            "minLength": 10,
             "type": "string"
           },
           "maximum": {
-            "description": "a string at most 35 character(s) long",
             "maxLength": 35,
-            "minLength": 20,
-            "title": "maxLength(35)",
+            "minLength": 10,
             "type": "string"
           },
           "minimum": {
-            "description": "a string at most 35 character(s) long",
             "maxLength": 35,
-            "minLength": 20,
-            "title": "maxLength(35)",
+            "minLength": 10,
             "type": "string"
           }
         },
-        "required": [],
         "type": "object"
       },
       "DecimalConfiguration": {
         "additionalProperties": false,
         "properties": {
           "default": {
-            "description": "a string matching the pattern ^(?:0|-[1-9][0-9]*|[1-9][0-9]*)(?:\\.[0-9]*[1-9])?$",
             "maxLength": 58,
             "minLength": 1,
             "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)(?:\\.[0-9]*[1-9])?$",
-            "title": "maxLength(58)",
             "type": "string"
           },
           "maximum": {
-            "description": "a string matching the pattern ^(?:0|-[1-9][0-9]*|[1-9][0-9]*)(?:\\.[0-9]*[1-9])?$",
             "maxLength": 58,
             "minLength": 1,
             "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)(?:\\.[0-9]*[1-9])?$",
-            "title": "maxLength(58)",
             "type": "string"
           },
           "minimum": {
-            "description": "a string matching the pattern ^(?:0|-[1-9][0-9]*|[1-9][0-9]*)(?:\\.[0-9]*[1-9])?$",
             "maxLength": 58,
             "minLength": 1,
             "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)(?:\\.[0-9]*[1-9])?$",
-            "title": "maxLength(58)",
             "type": "string"
           },
           "precision": {
-            "description": "a number between 1 and 38",
             "maximum": 38,
             "minimum": 1,
-            "title": "between(1, 38)",
             "type": "integer"
           },
           "scale": {
-            "description": "a number between 0 and 18",
             "maximum": 18,
             "minimum": 0,
-            "title": "between(0, 18)",
             "type": "integer"
           }
         },
-        "required": [],
         "type": "object"
       },
       "EmailConfiguration": {
         "additionalProperties": false,
         "properties": {
           "default": {
-            "description": "a string at most 254 character(s) long",
             "maxLength": 254,
-            "title": "maxLength(254)",
             "type": "string"
           }
         },
-        "required": [],
         "type": "object"
       },
-      "EntryValidationIssue": {
+      "EntryValidationIssueEncoded": {
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "a string matching the pattern ^[a-z][a-z0-9_]{0,63}$",
             "maxLength": 64,
             "minLength": 1,
             "pattern": "^[a-z][a-z0-9_]{0,63}$",
-            "title": "maxLength(64)",
             "type": "string"
           },
           "fieldId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "locale": {
@@ -262,9 +224,8 @@
           "localeId": {
             "anyOf": [
               {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               {
@@ -273,17 +234,13 @@
             ]
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "path": {
-            "description": "a string at most 256 character(s) long",
             "maxLength": 256,
             "minLength": 1,
-            "title": "maxLength(256)",
             "type": "string"
           },
           "scope": {
@@ -309,21 +266,17 @@
         "additionalProperties": false,
         "properties": {
           "default": {
-            "description": "a string matching the pattern ^[a-z][a-z0-9_]{0,62}$",
             "maxLength": 63,
             "minLength": 1,
             "pattern": "^[a-z][a-z0-9_]{0,62}$",
-            "title": "maxLength(63)",
             "type": "string"
           },
           "options": {
-            "description": "an array of at most 100 item(s)",
             "items": {
-              "$ref": "#/components/schemas/EnumOption"
+              "$ref": "#/components/schemas/EnumOptionEncoded"
             },
             "maxItems": 100,
             "minItems": 1,
-            "title": "maxItems(100)",
             "type": "array"
           }
         },
@@ -332,35 +285,28 @@
         ],
         "type": "object"
       },
-      "EnumOption": {
+      "EnumOptionEncoded": {
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "label": {
-            "description": "a string at most 100 character(s) long",
             "maxLength": 100,
             "minLength": 1,
-            "title": "maxLength(100)",
             "type": "string"
           },
           "position": {
-            "description": "a number between 0 and 99",
             "maximum": 99,
             "minimum": 0,
-            "title": "between(0, 99)",
             "type": "integer"
           },
           "value": {
-            "description": "a string matching the pattern ^[a-z][a-z0-9_]{0,62}$",
             "maxLength": 63,
             "minLength": 1,
             "pattern": "^[a-z][a-z0-9_]{0,62}$",
-            "title": "maxLength(63)",
             "type": "string"
           }
         },
@@ -376,21 +322,18 @@
         "additionalProperties": false,
         "properties": {
           "default": {
-            "$ref": "#/components/schemas/ExternalAssetValue"
+            "$ref": "#/components/schemas/ExternalAssetValueEncoded"
           }
         },
-        "required": [],
         "type": "object"
       },
-      "ExternalAssetValue": {
+      "ExternalAssetValueEncoded": {
         "additionalProperties": false,
         "properties": {
           "alt": {
             "anyOf": [
               {
-                "description": "a string at most 500 character(s) long",
                 "maxLength": 500,
-                "title": "maxLength(500)",
                 "type": "string"
               },
               {
@@ -401,10 +344,8 @@
           "height": {
             "anyOf": [
               {
-                "description": "a number between 1 and 100000",
                 "maximum": 100000,
                 "minimum": 1,
-                "title": "between(1, 100000)",
                 "type": "integer"
               },
               {
@@ -432,9 +373,7 @@
           "title": {
             "anyOf": [
               {
-                "description": "a string at most 500 character(s) long",
                 "maxLength": 500,
-                "title": "maxLength(500)",
                 "type": "string"
               },
               {
@@ -443,19 +382,15 @@
             ]
           },
           "url": {
-            "description": "a string at most 2048 character(s) long",
             "maxLength": 2048,
             "minLength": 1,
-            "title": "maxLength(2048)",
             "type": "string"
           },
           "width": {
             "anyOf": [
               {
-                "description": "a number between 1 and 100000",
                 "maximum": 100000,
                 "minimum": 1,
-                "title": "between(1, 100000)",
                 "type": "integer"
               },
               {
@@ -475,14 +410,12 @@
         ],
         "type": "object"
       },
-      "InsertEntryListItemMutation": {
+      "InsertEntryListItemMutationEncoded": {
         "additionalProperties": false,
         "properties": {
           "index": {
-            "description": "a number between 0 and 100",
             "maximum": 100,
             "minimum": 0,
-            "title": "between(0, 100)",
             "type": "integer"
           },
           "operation": {
@@ -492,33 +425,25 @@
             "type": "string"
           },
           "path": {
-            "description": "an array of at most 16 item(s)",
             "items": {
               "anyOf": [
                 {
-                  "description": "a Universally Unique Identifier",
                   "format": "uuid",
-                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                   "type": "string"
                 },
                 {
-                  "description": "a number between 0 and 100",
                   "maximum": 100,
                   "minimum": 0,
-                  "title": "between(0, 100)",
                   "type": "integer"
                 }
               ]
             },
             "maxItems": 16,
             "minItems": 1,
-            "title": "maxItems(16)",
             "type": "array"
           },
-          "value": {
-            "$id": "/schemas/unknown",
-            "title": "unknown"
-          }
+          "value": {}
         },
         "required": [
           "operation",
@@ -531,75 +456,62 @@
       "JsonConfiguration": {
         "additionalProperties": false,
         "properties": {
-          "default": {
-            "$id": "/schemas/unknown",
-            "title": "unknown"
-          },
+          "default": {},
           "maxBytes": {
-            "description": "an integer",
-            "title": "int",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
             "type": "integer"
           },
           "maxDepth": {
-            "description": "an integer",
-            "title": "int",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
             "type": "integer"
           }
         },
-        "required": [],
         "type": "object"
       },
       "ListConfiguration": {
         "additionalProperties": false,
         "properties": {
-          "default": {
-            "$id": "/schemas/unknown",
-            "title": "unknown"
-          },
+          "default": {},
           "maxItems": {
-            "description": "an integer",
-            "title": "int",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
             "type": "integer"
           },
           "minItems": {
-            "description": "an integer",
-            "title": "int",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
             "type": "integer"
           },
           "uniqueItems": {
             "type": "boolean"
           }
         },
-        "required": [],
         "type": "object"
       },
       "LongTextConfiguration": {
         "additionalProperties": false,
         "properties": {
           "default": {
-            "description": "a string at most 50000 character(s) long",
             "maxLength": 50000,
-            "title": "maxLength(50000)",
             "type": "string"
           },
           "maxLength": {
-            "description": "an integer",
-            "title": "int",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
             "type": "integer"
           },
           "minLength": {
-            "description": "an integer",
-            "title": "int",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
             "type": "integer"
           },
           "pattern": {
-            "description": "a string at most 256 character(s) long",
             "maxLength": 256,
-            "title": "maxLength(256)",
             "type": "string"
           }
         },
-        "required": [],
         "type": "object"
       },
       "MoneyConfiguration": {
@@ -609,21 +521,17 @@
             "type": "boolean"
           },
           "currencies": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "description": "a string 3 character(s) long",
               "maxLength": 3,
-              "minLength": 3,
-              "title": "length(3)",
+              "minLength": 2,
               "type": "string"
             },
             "maxItems": 50,
             "minItems": 1,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "default": {
-            "$ref": "#/components/schemas/MoneyValue"
+            "$ref": "#/components/schemas/MoneyValueEncoded"
           }
         },
         "required": [
@@ -631,22 +539,18 @@
         ],
         "type": "object"
       },
-      "MoneyValue": {
+      "MoneyValueEncoded": {
         "additionalProperties": false,
         "properties": {
           "amount": {
-            "description": "a string matching the pattern ^(?:0|-[1-9][0-9]*|[1-9][0-9]*)(?:\\.[0-9]*[1-9])?$",
             "maxLength": 58,
             "minLength": 1,
             "pattern": "^(?:0|-[1-9][0-9]*|[1-9][0-9]*)(?:\\.[0-9]*[1-9])?$",
-            "title": "maxLength(58)",
             "type": "string"
           },
           "currency": {
-            "description": "a string 3 character(s) long",
             "maxLength": 3,
-            "minLength": 3,
-            "title": "length(3)",
+            "minLength": 2,
             "type": "string"
           }
         },
@@ -660,13 +564,49 @@
         "additionalProperties": false,
         "properties": {
           "default": {
-            "type": "number"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "enum": [
+                  "Infinity",
+                  "-Infinity",
+                  "NaN"
+                ],
+                "type": "string"
+              }
+            ]
           },
           "maximum": {
-            "type": "number"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "enum": [
+                  "Infinity",
+                  "-Infinity",
+                  "NaN"
+                ],
+                "type": "string"
+              }
+            ]
           },
           "minimum": {
-            "type": "number"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "enum": [
+                  "Infinity",
+                  "-Infinity",
+                  "NaN"
+                ],
+                "type": "string"
+              }
+            ]
           },
           "mode": {
             "enum": [
@@ -676,29 +616,22 @@
             "type": "string"
           }
         },
-        "required": [],
         "type": "object"
       },
       "ObjectConfiguration": {
         "additionalProperties": false,
         "properties": {
-          "default": {
-            "$id": "/schemas/unknown",
-            "title": "unknown"
-          }
+          "default": {}
         },
-        "required": [],
         "type": "object"
       },
-      "PortableTextBlock": {
+      "PortableTextBlockEncoded": {
         "additionalProperties": false,
         "properties": {
           "_key": {
-            "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
             "maxLength": 64,
             "minLength": 1,
             "pattern": "^[A-Za-z0-9_-]+$",
-            "title": "maxLength(64)",
             "type": "string"
           },
           "_type": {
@@ -708,19 +641,15 @@
             "type": "string"
           },
           "children": {
-            "description": "an array of at most 5000 item(s)",
             "items": {
-              "$ref": "#/components/schemas/PortableTextSpan"
+              "$ref": "#/components/schemas/PortableTextSpanEncoded"
             },
             "maxItems": 5000,
-            "title": "maxItems(5000)",
             "type": "array"
           },
           "level": {
-            "description": "a number between 1 and 3",
             "maximum": 3,
             "minimum": 1,
-            "title": "between(1, 3)",
             "type": "integer"
           },
           "listItem": {
@@ -731,12 +660,10 @@
             "type": "string"
           },
           "markDefs": {
-            "description": "an array of at most 1000 item(s)",
             "items": {
-              "$ref": "#/components/schemas/PortableTextLinkMark"
+              "$ref": "#/components/schemas/PortableTextLinkMarkEncoded"
             },
             "maxItems": 1000,
-            "title": "maxItems(1000)",
             "type": "array"
           },
           "style": {
@@ -761,16 +688,14 @@
         ],
         "type": "object"
       },
-      "PortableTextDocument": {
+      "PortableTextDocumentEncoded": {
         "additionalProperties": false,
         "properties": {
           "blocks": {
-            "description": "an array of at most 500 item(s)",
             "items": {
-              "$ref": "#/components/schemas/PortableTextBlock"
+              "$ref": "#/components/schemas/PortableTextBlockEncoded"
             },
             "maxItems": 500,
-            "title": "maxItems(500)",
             "type": "array"
           },
           "profile": {
@@ -793,15 +718,13 @@
         ],
         "type": "object"
       },
-      "PortableTextLinkMark": {
+      "PortableTextLinkMarkEncoded": {
         "additionalProperties": false,
         "properties": {
           "_key": {
-            "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
             "maxLength": 64,
             "minLength": 1,
             "pattern": "^[A-Za-z0-9_-]+$",
-            "title": "maxLength(64)",
             "type": "string"
           },
           "_type": {
@@ -811,10 +734,8 @@
             "type": "string"
           },
           "href": {
-            "description": "a string at most 2048 character(s) long",
             "maxLength": 2048,
             "minLength": 1,
-            "title": "maxLength(2048)",
             "type": "string"
           }
         },
@@ -825,15 +746,13 @@
         ],
         "type": "object"
       },
-      "PortableTextSpan": {
+      "PortableTextSpanEncoded": {
         "additionalProperties": false,
         "properties": {
           "_key": {
-            "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
             "maxLength": 64,
             "minLength": 1,
             "pattern": "^[A-Za-z0-9_-]+$",
-            "title": "maxLength(64)",
             "type": "string"
           },
           "_type": {
@@ -843,22 +762,16 @@
             "type": "string"
           },
           "marks": {
-            "description": "an array of at most 32 item(s)",
             "items": {
-              "description": "a string at most 64 character(s) long",
               "maxLength": 64,
               "minLength": 1,
-              "title": "maxLength(64)",
               "type": "string"
             },
             "maxItems": 32,
-            "title": "maxItems(32)",
             "type": "array"
           },
           "text": {
-            "description": "a string at most 100000 character(s) long",
             "maxLength": 100000,
-            "title": "maxLength(100000)",
             "type": "string"
           }
         },
@@ -874,7 +787,9 @@
         "additionalProperties": false,
         "properties": {
           "targetCollectionId": {
-            "$ref": "#/components/schemas/UUID"
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
           }
         },
         "required": [
@@ -882,14 +797,12 @@
         ],
         "type": "object"
       },
-      "RemoveEntryListItemMutation": {
+      "RemoveEntryListItemMutationEncoded": {
         "additionalProperties": false,
         "properties": {
           "index": {
-            "description": "a number between 0 and 99",
             "maximum": 99,
             "minimum": 0,
-            "title": "between(0, 99)",
             "type": "integer"
           },
           "operation": {
@@ -899,27 +812,22 @@
             "type": "string"
           },
           "path": {
-            "description": "an array of at most 16 item(s)",
             "items": {
               "anyOf": [
                 {
-                  "description": "a Universally Unique Identifier",
                   "format": "uuid",
-                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                   "type": "string"
                 },
                 {
-                  "description": "a number between 0 and 100",
                   "maximum": 100,
                   "minimum": 0,
-                  "title": "between(0, 100)",
                   "type": "integer"
                 }
               ]
             },
             "maxItems": 16,
             "minItems": 1,
-            "title": "maxItems(16)",
             "type": "array"
           }
         },
@@ -947,7 +855,7 @@
             "type": "array"
           },
           "default": {
-            "$ref": "#/components/schemas/PortableTextDocument"
+            "$ref": "#/components/schemas/PortableTextDocumentEncoded"
           },
           "links": {
             "type": "boolean"
@@ -963,13 +871,13 @@
             "type": "array"
           },
           "maxLength": {
-            "description": "an integer",
-            "title": "int",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
             "type": "integer"
           },
           "minLength": {
-            "description": "an integer",
-            "title": "int",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
             "type": "integer"
           },
           "styles": {
@@ -988,10 +896,9 @@
             "type": "array"
           }
         },
-        "required": [],
         "type": "object"
       },
-      "SetEntryValueMutation": {
+      "SetEntryValueMutationEncoded": {
         "additionalProperties": false,
         "properties": {
           "operation": {
@@ -1001,33 +908,25 @@
             "type": "string"
           },
           "path": {
-            "description": "an array of at most 16 item(s)",
             "items": {
               "anyOf": [
                 {
-                  "description": "a Universally Unique Identifier",
                   "format": "uuid",
-                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                   "type": "string"
                 },
                 {
-                  "description": "a number between 0 and 100",
                   "maximum": 100,
                   "minimum": 0,
-                  "title": "between(0, 100)",
                   "type": "integer"
                 }
               ]
             },
             "maxItems": 16,
             "minItems": 1,
-            "title": "maxItems(16)",
             "type": "array"
           },
-          "value": {
-            "$id": "/schemas/unknown",
-            "title": "unknown"
-          }
+          "value": {}
         },
         "required": [
           "operation",
@@ -1040,67 +939,56 @@
         "additionalProperties": false,
         "properties": {
           "default": {
-            "description": "a string at most 500 character(s) long",
             "maxLength": 500,
-            "title": "maxLength(500)",
             "type": "string"
           },
           "maxLength": {
-            "description": "an integer",
-            "title": "int",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
             "type": "integer"
           },
           "minLength": {
-            "description": "an integer",
-            "title": "int",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
             "type": "integer"
           },
           "pattern": {
-            "description": "a string at most 256 character(s) long",
             "maxLength": 256,
-            "title": "maxLength(256)",
             "type": "string"
           }
         },
-        "required": [],
         "type": "object"
       },
       "SlugConfiguration": {
         "additionalProperties": false,
         "properties": {
           "default": {
-            "description": "a string at most 200 character(s) long",
             "maxLength": 200,
-            "title": "maxLength(200)",
             "type": "string"
           },
           "maxLength": {
-            "description": "an integer",
-            "title": "int",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
             "type": "integer"
           },
           "minLength": {
-            "description": "an integer",
-            "title": "int",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
             "type": "integer"
           },
           "pattern": {
-            "description": "a string at most 256 character(s) long",
             "maxLength": 256,
-            "title": "maxLength(256)",
             "type": "string"
           }
         },
-        "required": [],
         "type": "object"
       },
-      "StudioCollectionConfigurationNotice": {
+      "StudioCollectionConfigurationNoticeEncoded": {
         "additionalProperties": false,
         "properties": {
           "collectionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "displayName": {
@@ -1121,7 +1009,7 @@
         ],
         "type": "object"
       },
-      "StudioContentApiError": {
+      "StudioContentApiErrorEncoded": {
         "additionalProperties": false,
         "properties": {
           "code": {
@@ -1158,28 +1046,21 @@
             "type": "string"
           },
           "details": {
-            "description": "an array of at most 20 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ApiErrorDetail"
+              "$ref": "#/components/schemas/ApiErrorDetailEncoded"
             },
             "maxItems": 20,
             "minItems": 1,
-            "title": "maxItems(20)",
             "type": "array"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "requestId": {
-            "description": "a string matching the pattern ^[A-Za-z0-9._:-]+$",
             "maxLength": 128,
             "minLength": 1,
-            "pattern": "^[A-Za-z0-9._:-]+$",
-            "title": "maxLength(128)",
             "type": "string"
           },
           "retryable": {
@@ -1195,19 +1076,20 @@
         "type": "object"
       },
       "StudioContentApiFailure": {
+        "$ref": "#/components/schemas/StudioContentApiFailureEncoded"
+      },
+      "StudioContentApiFailureEncoded": {
         "additionalProperties": false,
         "properties": {
           "data": {
             "type": "null"
           },
           "error": {
-            "$ref": "#/components/schemas/StudioContentApiError"
+            "$ref": "#/components/schemas/StudioContentApiErrorEncoded"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1225,30 +1107,7 @@
         ],
         "type": "object"
       },
-      "StudioContentCollection": {
-        "additionalProperties": false,
-        "properties": {
-          "capabilities": {
-            "$ref": "#/components/schemas/StudioContentCollectionCapabilities"
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "id": {
-            "description": "a Universally Unique Identifier",
-            "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "displayName",
-          "capabilities"
-        ],
-        "type": "object"
-      },
-      "StudioContentCollectionCapabilities": {
+      "StudioContentCollectionCapabilitiesEncoded": {
         "additionalProperties": false,
         "properties": {
           "canCreate": {
@@ -1272,34 +1131,50 @@
         ],
         "type": "object"
       },
-      "StudioContentContext": {
+      "StudioContentCollectionEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "$ref": "#/components/schemas/StudioContentCollectionCapabilitiesEncoded"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "capabilities"
+        ],
+        "type": "object"
+      },
+      "StudioContentContextEncoded": {
         "additionalProperties": false,
         "properties": {
           "collections": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/StudioContentCollection"
+              "$ref": "#/components/schemas/StudioContentCollectionEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "configurationNotices": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/StudioCollectionConfigurationNotice"
+              "$ref": "#/components/schemas/StudioCollectionConfigurationNoticeEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "locales": {
-            "description": "an array of at most 100 item(s)",
             "items": {
-              "$ref": "#/components/schemas/StudioContentLocale"
+              "$ref": "#/components/schemas/StudioContentLocaleEncoded"
             },
             "maxItems": 100,
-            "title": "maxItems(100)",
             "type": "array"
           }
         },
@@ -1314,16 +1189,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/StudioContentContext"
+            "$ref": "#/components/schemas/StudioContentContextEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1341,7 +1214,7 @@
         ],
         "type": "object"
       },
-      "StudioContentLocale": {
+      "StudioContentLocaleEncoded": {
         "additionalProperties": false,
         "properties": {
           "canRead": {
@@ -1357,9 +1230,8 @@
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "tag": {
@@ -1376,73 +1248,68 @@
         "type": "object"
       },
       "StudioCreateEntryRequest": {
+        "$ref": "#/components/schemas/StudioCreateEntryRequestEncoded"
+      },
+      "StudioCreateEntryRequestEncoded": {
         "additionalProperties": false,
         "properties": {
           "commandId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "contractHash": {
-            "description": "a string matching the pattern ^[0-9a-f]{64}$",
             "maxLength": 64,
-            "minLength": 64,
+            "minLength": 32,
             "pattern": "^[0-9a-f]{64}$",
-            "title": "length(64)",
             "type": "string"
           },
           "displayName": {
             "type": "string"
           },
           "localizedMutations": {
-            "description": "an array of at most 500 item(s)",
             "items": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/SetEntryValueMutation"
+                  "$ref": "#/components/schemas/SetEntryValueMutationEncoded"
                 },
                 {
-                  "$ref": "#/components/schemas/UnsetEntryValueMutation"
+                  "$ref": "#/components/schemas/UnsetEntryValueMutationEncoded"
                 },
                 {
-                  "$ref": "#/components/schemas/InsertEntryListItemMutation"
+                  "$ref": "#/components/schemas/InsertEntryListItemMutationEncoded"
                 },
                 {
-                  "$ref": "#/components/schemas/RemoveEntryListItemMutation"
+                  "$ref": "#/components/schemas/RemoveEntryListItemMutationEncoded"
                 }
               ]
             },
             "maxItems": 500,
-            "title": "maxItems(500)",
             "type": "array"
           },
           "schemaRevisionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "sharedMutations": {
-            "description": "an array of at most 500 item(s)",
             "items": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/SetEntryValueMutation"
+                  "$ref": "#/components/schemas/SetEntryValueMutationEncoded"
                 },
                 {
-                  "$ref": "#/components/schemas/UnsetEntryValueMutation"
+                  "$ref": "#/components/schemas/UnsetEntryValueMutationEncoded"
                 },
                 {
-                  "$ref": "#/components/schemas/InsertEntryListItemMutation"
+                  "$ref": "#/components/schemas/InsertEntryListItemMutationEncoded"
                 },
                 {
-                  "$ref": "#/components/schemas/RemoveEntryListItemMutation"
+                  "$ref": "#/components/schemas/RemoveEntryListItemMutationEncoded"
                 }
               ]
             },
             "maxItems": 500,
-            "title": "maxItems(500)",
             "type": "array"
           }
         },
@@ -1460,16 +1327,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/StudioCreateEntryResult"
+            "$ref": "#/components/schemas/StudioCreateEntryResultEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1487,24 +1352,22 @@
         ],
         "type": "object"
       },
-      "StudioCreateEntryResult": {
+      "StudioCreateEntryResultEncoded": {
         "additionalProperties": false,
         "properties": {
           "commandId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "entry": {
-            "$ref": "#/components/schemas/StudioEntrySummary"
+            "$ref": "#/components/schemas/StudioEntrySummaryEncoded"
           },
           "localizedRevisionId": {
             "anyOf": [
               {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               {
@@ -1513,17 +1376,15 @@
             ]
           },
           "localizedVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "sharedRevisionId": {
             "anyOf": [
               {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               {
@@ -1532,13 +1393,12 @@
             ]
           },
           "sharedVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "validation": {
-            "$ref": "#/components/schemas/StudioEntryValidation"
+            "$ref": "#/components/schemas/StudioEntryValidationEncoded"
           }
         },
         "required": [
@@ -1552,26 +1412,23 @@
         ],
         "type": "object"
       },
-      "StudioEntryDraftProjection": {
+      "StudioEntryDraftProjectionEncoded": {
         "additionalProperties": false,
         "properties": {
           "contractHash": {
-            "description": "a string matching the pattern ^[0-9a-f]{64}$",
             "maxLength": 64,
-            "minLength": 64,
+            "minLength": 32,
             "pattern": "^[0-9a-f]{64}$",
-            "title": "length(64)",
             "type": "string"
           },
           "entry": {
-            "$ref": "#/components/schemas/StudioEntrySummary"
+            "$ref": "#/components/schemas/StudioEntrySummaryEncoded"
           },
           "localizedRevisionId": {
             "anyOf": [
               {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               {
@@ -1580,40 +1437,28 @@
             ]
           },
           "localizedValues": {
-            "patternProperties": {
-              "": {
-                "$id": "/schemas/unknown",
-                "title": "unknown"
-              }
-            },
-            "properties": {},
             "propertyNames": {
-              "description": "a Universally Unique Identifier",
               "format": "uuid",
-              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
               "type": "string"
             },
-            "required": [],
             "type": "object"
           },
           "localizedVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "schemaRevisionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "sharedRevisionId": {
             "anyOf": [
               {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               {
@@ -1622,30 +1467,20 @@
             ]
           },
           "sharedValues": {
-            "patternProperties": {
-              "": {
-                "$id": "/schemas/unknown",
-                "title": "unknown"
-              }
-            },
-            "properties": {},
             "propertyNames": {
-              "description": "a Universally Unique Identifier",
               "format": "uuid",
-              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
               "type": "string"
             },
-            "required": [],
             "type": "object"
           },
           "sharedVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "validation": {
-            "$ref": "#/components/schemas/StudioEntryValidation"
+            "$ref": "#/components/schemas/StudioEntryValidationEncoded"
           }
         },
         "required": [
@@ -1662,7 +1497,7 @@
         ],
         "type": "object"
       },
-      "StudioEntryPage": {
+      "StudioEntryPageEncoded": {
         "additionalProperties": false,
         "properties": {
           "count": {
@@ -1677,10 +1512,8 @@
                     "type": "string"
                   },
                   "value": {
-                    "description": "a number between 0 and 1000",
                     "maximum": 1000,
                     "minimum": 0,
-                    "title": "between(0, 1000)",
                     "type": "integer"
                   }
                 },
@@ -1718,22 +1551,18 @@
             "type": "boolean"
           },
           "items": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/StudioEntrySummary"
+              "$ref": "#/components/schemas/StudioEntrySummaryEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "nextCursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 1024,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(1024)",
                 "type": "string"
               },
               {
@@ -1754,16 +1583,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/StudioEntryPage"
+            "$ref": "#/components/schemas/StudioEntryPageEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1781,11 +1608,10 @@
         ],
         "type": "object"
       },
-      "StudioEntrySummary": {
+      "StudioEntrySummaryEncoded": {
         "additionalProperties": false,
         "properties": {
           "createdAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
@@ -1793,19 +1619,16 @@
             "type": "string"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "nameVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           },
           "updatedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           }
@@ -1819,19 +1642,17 @@
         ],
         "type": "object"
       },
-      "StudioEntryValidation": {
+      "StudioEntryValidationEncoded": {
         "additionalProperties": false,
         "properties": {
           "capped": {
             "type": "boolean"
           },
           "issues": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/EntryValidationIssue"
+              "$ref": "#/components/schemas/EntryValidationIssueEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "status": {
@@ -1850,25 +1671,24 @@
         ],
         "type": "object"
       },
-      "StudioEntryWorkspace": {
+      "StudioEntryWorkspaceEncoded": {
         "additionalProperties": false,
         "properties": {
           "capabilities": {
-            "$ref": "#/components/schemas/StudioContentCollectionCapabilities"
+            "$ref": "#/components/schemas/StudioContentCollectionCapabilitiesEncoded"
           },
           "draft": {
-            "$ref": "#/components/schemas/StudioEntryDraftProjection"
+            "$ref": "#/components/schemas/StudioEntryDraftProjectionEncoded"
           },
           "form": {
-            "$ref": "#/components/schemas/StudioFormProjection"
+            "$ref": "#/components/schemas/StudioFormProjectionEncoded"
           },
           "locale": {
             "type": "string"
           },
           "localeId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           }
         },
@@ -1885,16 +1705,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/StudioEntryWorkspace"
+            "$ref": "#/components/schemas/StudioEntryWorkspaceEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -1918,12 +1736,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -1942,9 +1758,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -1953,9 +1767,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -1990,9 +1803,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -2003,9 +1815,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -2014,10 +1824,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -2051,12 +1859,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -2075,9 +1881,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -2086,9 +1890,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -2123,9 +1926,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -2136,9 +1938,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -2147,10 +1947,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -2184,12 +1982,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -2208,9 +2004,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -2219,9 +2013,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -2256,9 +2049,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -2269,9 +2061,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -2280,10 +2070,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -2317,12 +2105,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -2341,9 +2127,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -2352,9 +2136,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -2389,9 +2172,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -2402,9 +2184,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -2413,10 +2193,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -2450,12 +2228,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -2474,9 +2250,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -2485,9 +2259,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -2522,9 +2295,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -2535,9 +2307,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -2546,10 +2316,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -2583,12 +2351,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -2607,9 +2373,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -2618,9 +2382,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -2655,9 +2418,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -2668,9 +2430,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -2679,10 +2439,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -2716,12 +2474,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -2740,9 +2496,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -2751,9 +2505,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -2788,9 +2541,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -2801,9 +2553,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -2812,10 +2562,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -2849,12 +2597,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -2873,9 +2619,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -2884,9 +2628,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -2921,9 +2664,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -2934,9 +2676,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -2945,10 +2685,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -2982,12 +2720,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -3006,9 +2742,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -3017,9 +2751,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -3054,9 +2787,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -3067,9 +2799,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -3078,10 +2808,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -3115,12 +2843,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -3139,9 +2865,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -3150,9 +2874,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -3187,9 +2910,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -3200,9 +2922,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -3211,10 +2931,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -3248,12 +2966,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -3272,9 +2988,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -3283,9 +2997,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -3320,9 +3033,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -3333,9 +3045,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -3344,10 +3054,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -3381,12 +3089,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -3405,9 +3111,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -3416,9 +3120,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -3453,9 +3156,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -3466,9 +3168,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -3477,10 +3177,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -3514,12 +3212,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -3538,9 +3234,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -3549,9 +3243,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -3586,9 +3279,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -3599,9 +3291,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -3610,10 +3300,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -3647,12 +3335,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -3671,9 +3357,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -3682,9 +3366,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -3719,9 +3402,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -3732,9 +3414,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -3743,10 +3423,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -3780,12 +3458,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -3804,9 +3480,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -3815,9 +3489,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -3852,9 +3525,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -3865,9 +3537,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -3876,10 +3546,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -3913,12 +3581,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -3937,9 +3603,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -3948,9 +3612,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -3985,9 +3648,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -3998,9 +3660,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -4009,10 +3669,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -4046,12 +3704,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -4070,9 +3726,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -4081,9 +3735,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -4118,9 +3771,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -4131,9 +3783,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -4142,10 +3792,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -4179,12 +3827,10 @@
             "additionalProperties": false,
             "properties": {
               "children": {
-                "description": "an array of at most 100 item(s)",
                 "items": {
                   "$ref": "#/components/schemas/StudioFormField"
                 },
                 "maxItems": 100,
-                "title": "maxItems(100)",
                 "type": "array"
               },
               "configuration": {
@@ -4203,9 +3849,7 @@
               "helpText": {
                 "anyOf": [
                   {
-                    "description": "a string at most 500 character(s) long",
                     "maxLength": 500,
-                    "title": "maxLength(500)",
                     "type": "string"
                   },
                   {
@@ -4214,9 +3858,8 @@
                 ]
               },
               "id": {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               "kind": {
@@ -4251,9 +3894,8 @@
               "parentFieldId": {
                 "anyOf": [
                   {
-                    "description": "a Universally Unique Identifier",
                     "format": "uuid",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                     "type": "string"
                   },
                   {
@@ -4264,9 +3906,7 @@
               "placeholder": {
                 "anyOf": [
                   {
-                    "description": "a string at most 200 character(s) long",
                     "maxLength": 200,
-                    "title": "maxLength(200)",
                     "type": "string"
                   },
                   {
@@ -4275,10 +3915,8 @@
                 ]
               },
               "position": {
-                "description": "a number between 0 and 99",
                 "maximum": 99,
                 "minimum": 0,
-                "title": "between(0, 99)",
                 "type": "integer"
               },
               "required": {
@@ -4310,7 +3948,7 @@
           }
         ]
       },
-      "StudioFormGroup": {
+      "StudioFormGroupEncoded": {
         "additionalProperties": false,
         "properties": {
           "columns": {
@@ -4323,9 +3961,7 @@
           "description": {
             "anyOf": [
               {
-                "description": "a string at most 500 character(s) long",
                 "maxLength": 500,
-                "title": "maxLength(500)",
                 "type": "string"
               },
               {
@@ -4334,32 +3970,25 @@
             ]
           },
           "fields": {
-            "description": "an array of at most 100 item(s)",
             "items": {
-              "$ref": "#/components/schemas/StudioFormPlacement"
+              "$ref": "#/components/schemas/StudioFormPlacementEncoded"
             },
             "maxItems": 100,
-            "title": "maxItems(100)",
             "type": "array"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "position": {
-            "description": "a number between 0 and 19",
             "maximum": 19,
             "minimum": 0,
-            "title": "between(0, 19)",
             "type": "integer"
           },
           "title": {
-            "description": "a string at most 100 character(s) long",
             "maxLength": 100,
             "minLength": 1,
-            "title": "maxLength(100)",
             "type": "string"
           }
         },
@@ -4373,21 +4002,18 @@
         ],
         "type": "object"
       },
-      "StudioFormPlacement": {
+      "StudioFormPlacementEncoded": {
         "additionalProperties": false,
         "properties": {
           "fieldId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "helpTextOverride": {
             "anyOf": [
               {
-                "description": "a string at most 500 character(s) long",
                 "maxLength": 500,
-                "title": "maxLength(500)",
                 "type": "string"
               },
               {
@@ -4396,16 +4022,13 @@
             ]
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "position": {
-            "description": "a number between 0 and 99",
             "maximum": 99,
             "minimum": 0,
-            "title": "between(0, 99)",
             "type": "integer"
           }
         },
@@ -4417,90 +4040,69 @@
         ],
         "type": "object"
       },
-      "StudioFormProjection": {
+      "StudioFormProjectionEncoded": {
         "additionalProperties": false,
         "properties": {
           "canEdit": {
             "type": "boolean"
           },
           "collectionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "contractHash": {
-            "description": "a string matching the pattern ^[0-9a-f]{64}$",
             "maxLength": 64,
-            "minLength": 64,
+            "minLength": 32,
             "pattern": "^[0-9a-f]{64}$",
-            "title": "length(64)",
             "type": "string"
           },
           "currencyMinorUnits": {
-            "patternProperties": {
-              "": {
-                "description": "a number between 0 and 3",
-                "maximum": 3,
-                "minimum": 0,
-                "title": "between(0, 3)",
-                "type": "integer"
-              }
+            "additionalProperties": {
+              "maximum": 3,
+              "minimum": 0,
+              "type": "integer"
             },
-            "properties": {},
             "propertyNames": {
-              "description": "a string 3 character(s) long",
               "maxLength": 3,
-              "minLength": 3,
-              "title": "length(3)",
+              "minLength": 2,
               "type": "string"
             },
-            "required": [],
             "type": "object"
           },
           "editableFieldIds": {
-            "description": "an array of at most 100 item(s)",
             "items": {
-              "description": "a Universally Unique Identifier",
               "format": "uuid",
-              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
               "type": "string"
             },
             "maxItems": 100,
-            "title": "maxItems(100)",
             "type": "array"
           },
           "fields": {
-            "description": "an array of at most 100 item(s)",
             "items": {
               "$ref": "#/components/schemas/StudioFormField"
             },
             "maxItems": 100,
-            "title": "maxItems(100)",
             "type": "array"
           },
           "schemaRevisionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "sidebarGroups": {
-            "description": "an array of at most 10 item(s)",
             "items": {
-              "$ref": "#/components/schemas/StudioFormGroup"
+              "$ref": "#/components/schemas/StudioFormGroupEncoded"
             },
             "maxItems": 10,
-            "title": "maxItems(10)",
             "type": "array"
           },
           "tabs": {
-            "description": "an array of at most 10 item(s)",
             "items": {
-              "$ref": "#/components/schemas/StudioFormTab"
+              "$ref": "#/components/schemas/StudioFormTabEncoded"
             },
             "maxItems": 10,
-            "title": "maxItems(10)",
             "type": "array"
           }
         },
@@ -4517,15 +4119,13 @@
         ],
         "type": "object"
       },
-      "StudioFormTab": {
+      "StudioFormTabEncoded": {
         "additionalProperties": false,
         "properties": {
           "description": {
             "anyOf": [
               {
-                "description": "a string at most 500 character(s) long",
                 "maxLength": 500,
-                "title": "maxLength(500)",
                 "type": "string"
               },
               {
@@ -4534,33 +4134,26 @@
             ]
           },
           "groups": {
-            "description": "an array of at most 20 item(s)",
             "items": {
-              "$ref": "#/components/schemas/StudioFormGroup"
+              "$ref": "#/components/schemas/StudioFormGroupEncoded"
             },
             "maxItems": 20,
             "minItems": 1,
-            "title": "maxItems(20)",
             "type": "array"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "position": {
-            "description": "a number between 0 and 9",
             "maximum": 9,
             "minimum": 0,
-            "title": "between(0, 9)",
             "type": "integer"
           },
           "title": {
-            "description": "a string at most 100 character(s) long",
             "maxLength": 100,
             "minLength": 1,
-            "title": "maxLength(100)",
             "type": "string"
           }
         },
@@ -4573,19 +4166,17 @@
         ],
         "type": "object"
       },
-      "StudioMutationReceipt": {
+      "StudioMutationReceiptEncoded": {
         "additionalProperties": false,
         "properties": {
           "commandId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "entryId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "localizedChanged": {
@@ -4594,9 +4185,8 @@
           "localizedRevisionId": {
             "anyOf": [
               {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               {
@@ -4605,9 +4195,8 @@
             ]
           },
           "localizedVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "sharedChanged": {
@@ -4616,9 +4205,8 @@
           "sharedRevisionId": {
             "anyOf": [
               {
-                "description": "a Universally Unique Identifier",
                 "format": "uuid",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                 "type": "string"
               },
               {
@@ -4627,13 +4215,12 @@
             ]
           },
           "sharedVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "validation": {
-            "$ref": "#/components/schemas/StudioEntryValidation"
+            "$ref": "#/components/schemas/StudioEntryValidationEncoded"
           }
         },
         "required": [
@@ -4649,22 +4236,21 @@
         ],
         "type": "object"
       },
-      "StudioNewEntryWorkspace": {
+      "StudioNewEntryWorkspaceEncoded": {
         "additionalProperties": false,
         "properties": {
           "capabilities": {
-            "$ref": "#/components/schemas/StudioContentCollectionCapabilities"
+            "$ref": "#/components/schemas/StudioContentCollectionCapabilitiesEncoded"
           },
           "form": {
-            "$ref": "#/components/schemas/StudioFormProjection"
+            "$ref": "#/components/schemas/StudioFormProjectionEncoded"
           },
           "locale": {
             "type": "string"
           },
           "localeId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           }
         },
@@ -4680,16 +4266,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/StudioNewEntryWorkspace"
+            "$ref": "#/components/schemas/StudioNewEntryWorkspaceEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -4708,15 +4292,17 @@
         "type": "object"
       },
       "StudioRenameEntryRequest": {
+        "$ref": "#/components/schemas/StudioRenameEntryRequestEncoded"
+      },
+      "StudioRenameEntryRequestEncoded": {
         "additionalProperties": false,
         "properties": {
           "displayName": {
             "type": "string"
           },
           "expectedNameVersion": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -4730,16 +4316,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/StudioEntrySummary"
+            "$ref": "#/components/schemas/StudioEntrySummaryEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -4758,82 +4342,75 @@
         "type": "object"
       },
       "StudioSaveEntryDraftRequest": {
+        "$ref": "#/components/schemas/StudioSaveEntryDraftRequestEncoded"
+      },
+      "StudioSaveEntryDraftRequestEncoded": {
         "additionalProperties": false,
         "properties": {
           "commandId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "contractHash": {
-            "description": "a string matching the pattern ^[0-9a-f]{64}$",
             "maxLength": 64,
-            "minLength": 64,
+            "minLength": 32,
             "pattern": "^[0-9a-f]{64}$",
-            "title": "length(64)",
             "type": "string"
           },
           "expectedLocalizedVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "expectedSharedVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "localizedMutations": {
-            "description": "an array of at most 500 item(s)",
             "items": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/SetEntryValueMutation"
+                  "$ref": "#/components/schemas/SetEntryValueMutationEncoded"
                 },
                 {
-                  "$ref": "#/components/schemas/UnsetEntryValueMutation"
+                  "$ref": "#/components/schemas/UnsetEntryValueMutationEncoded"
                 },
                 {
-                  "$ref": "#/components/schemas/InsertEntryListItemMutation"
+                  "$ref": "#/components/schemas/InsertEntryListItemMutationEncoded"
                 },
                 {
-                  "$ref": "#/components/schemas/RemoveEntryListItemMutation"
+                  "$ref": "#/components/schemas/RemoveEntryListItemMutationEncoded"
                 }
               ]
             },
             "maxItems": 500,
-            "title": "maxItems(500)",
             "type": "array"
           },
           "schemaRevisionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "sharedMutations": {
-            "description": "an array of at most 500 item(s)",
             "items": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/SetEntryValueMutation"
+                  "$ref": "#/components/schemas/SetEntryValueMutationEncoded"
                 },
                 {
-                  "$ref": "#/components/schemas/UnsetEntryValueMutation"
+                  "$ref": "#/components/schemas/UnsetEntryValueMutationEncoded"
                 },
                 {
-                  "$ref": "#/components/schemas/InsertEntryListItemMutation"
+                  "$ref": "#/components/schemas/InsertEntryListItemMutationEncoded"
                 },
                 {
-                  "$ref": "#/components/schemas/RemoveEntryListItemMutation"
+                  "$ref": "#/components/schemas/RemoveEntryListItemMutationEncoded"
                 }
               ]
             },
             "maxItems": 500,
-            "title": "maxItems(500)",
             "type": "array"
           }
         },
@@ -4852,16 +4429,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/StudioMutationReceipt"
+            "$ref": "#/components/schemas/StudioMutationReceiptEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -4885,12 +4460,13 @@
           "cursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 1024,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(1024)",
                 "type": "string"
+              },
+              {
+                "type": "null"
               },
               {
                 "type": "null"
@@ -4898,11 +4474,16 @@
             ]
           },
           "limit": {
-            "description": "a number between 10 and 50",
-            "maximum": 50,
-            "minimum": 10,
-            "title": "between(10, 50)",
-            "type": "integer"
+            "anyOf": [
+              {
+                "maximum": 50,
+                "minimum": 10,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "query": {
             "type": "string"
@@ -4913,7 +4494,7 @@
         ],
         "type": "object"
       },
-      "UnsetEntryValueMutation": {
+      "UnsetEntryValueMutationEncoded": {
         "additionalProperties": false,
         "properties": {
           "operation": {
@@ -4923,27 +4504,22 @@
             "type": "string"
           },
           "path": {
-            "description": "an array of at most 16 item(s)",
             "items": {
               "anyOf": [
                 {
-                  "description": "a Universally Unique Identifier",
                   "format": "uuid",
-                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
                   "type": "string"
                 },
                 {
-                  "description": "a number between 0 and 100",
                   "maximum": 100,
                   "minimum": 0,
-                  "title": "between(0, 100)",
                   "type": "integer"
                 }
               ]
             },
             "maxItems": 16,
             "minItems": 1,
-            "title": "maxItems(16)",
             "type": "array"
           }
         },
@@ -4957,20 +4533,11 @@
         "additionalProperties": false,
         "properties": {
           "default": {
-            "description": "a string at most 2048 character(s) long",
             "maxLength": 2048,
-            "title": "maxLength(2048)",
             "type": "string"
           }
         },
-        "required": [],
         "type": "object"
-      },
-      "UUID": {
-        "description": "a Universally Unique Identifier",
-        "format": "uuid",
-        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-        "type": "string"
       }
     },
     "securitySchemes": {

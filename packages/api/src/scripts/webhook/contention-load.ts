@@ -1,5 +1,3 @@
-// Coordinates isolated multi-process dispatcher/attempt contention fixtures through PostgreSQL.
-
 import { createHash, randomUUID } from "node:crypto";
 
 import { db } from "@framerfordevs/db";

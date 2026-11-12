@@ -1,5 +1,3 @@
-// Implements globally shared weighted token buckets with generic Redis protocol commands and bounded failure behavior.
-
 import { createHash } from "node:crypto";
 
 import { createClient } from "@redis/client";
@@ -83,7 +81,6 @@ export interface RedisRateLimitStoreOptions {
   readonly reconnectAttempts: number;
 }
 
-/** Classifies a foreign Redis failure without placing its message in logs or public contracts. */
 function failureReason(cause: unknown): RateLimitStoreFailureReason {
   if (cause instanceof DOMException && cause.name === "AbortError") return "timeout";
   if (cause instanceof Error && /abort|timeout/iu.test(cause.name)) return "timeout";
@@ -93,17 +90,14 @@ function failureReason(cause: unknown): RateLimitStoreFailureReason {
   return "command";
 }
 
-/** Wraps a foreign Redis rejection in the internal typed store error channel. */
 function storeFailure(operation: string, cause: unknown): RateLimitStoreFailure {
   return RateLimitStoreFailure.make({ operation, reason: failureReason(cause), cause });
 }
 
-/** Detects only Redis' script-cache miss so arbitrary command failures are never retried. */
 function isMissingScript(cause: unknown): boolean {
   return cause instanceof Error && cause.message.startsWith("NOSCRIPT");
 }
 
-/** Parses the fixed Lua reply and rejects malformed provider data before manager use. */
 function decodeScriptResult(value: unknown, scriptReloaded: boolean): RateLimitStoreResult | null {
   if (!Array.isArray(value) || value.length !== 4) return null;
   const values = value.map((item) =>
@@ -135,13 +129,11 @@ function decodeScriptResult(value: unknown, scriptReloaded: boolean): RateLimitS
   };
 }
 
-/** Derives a bounded key lifetime from the source-controlled bucket refill profile. */
 function redisBucketTtlMs(request: RateLimitStoreRequest): number {
   const refillPerMs = request.policy.limitPerInterval / request.policy.intervalMs;
   return Math.ceil(request.policy.capacity / refillPerMs) + request.policy.intervalMs;
 }
 
-/** Creates the Redis store over a minimal client port for deterministic adapter testing. */
 export function makeRedisRateLimitStore(client: RedisRateLimitClient): RateLimitStoreService {
   return {
     mode: "redis",
@@ -187,7 +179,6 @@ export function makeRedisRateLimitStore(client: RedisRateLimitClient): RateLimit
   };
 }
 
-/** Creates a lazy, bounded Redis client that does not make application startup depend on Redis. */
 function makeRedisClient(options: RedisRateLimitStoreOptions): {
   readonly client: RedisRateLimitClient;
   readonly close: () => void;
@@ -206,11 +197,9 @@ function makeRedisClient(options: RedisRateLimitStoreOptions): {
   });
   let connection: Promise<void> | null = null;
 
-  /** Prevents EventEmitter's special error event from terminating the process; callers observe command failures. */
   const containRedisError = () => undefined;
   redis.on("error", containRedisError);
 
-  /** Shares one bounded connection attempt across concurrent requests. */
   const ensureConnected = async (): Promise<void> => {
     if (redis.isReady) return;
     if (connection !== null) {
@@ -220,7 +209,6 @@ function makeRedisClient(options: RedisRateLimitStoreOptions): {
     if (redis.isOpen) return;
     const currentConnection = redis.connect().then(() => undefined);
     connection = currentConnection;
-    /** Clears only the completed attempt so a newer connection cannot be overwritten. */
     const clearConnection = () => {
       if (connection === currentConnection) connection = null;
     };
@@ -228,7 +216,6 @@ function makeRedisClient(options: RedisRateLimitStoreOptions): {
     await currentConnection;
   };
 
-  /** Runs one command with an abort signal so reconnect or network stalls cannot hold a request indefinitely. */
   const withTimeout = async <A>(operation: () => Promise<A>): Promise<A> => {
     await ensureConnected();
     return operation();
@@ -258,7 +245,6 @@ function makeRedisClient(options: RedisRateLimitStoreOptions): {
   };
 }
 
-/** Builds the scoped production store while retaining memory fallback as a separate manager dependency. */
 export function makeRedisRateLimitStoreLive(options: RedisRateLimitStoreOptions) {
   return Layer.effect(
     RateLimitStore,

@@ -1,5 +1,3 @@
-// Introduces the secondary wire-contract area and routes developers to independently versioned families.
-
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { HomeLayout } from "fumadocs-ui/layouts/home";
 

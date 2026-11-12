@@ -1,4 +1,4 @@
-import type { ProjectAuditCategory } from "@framerfordevs/api/contracts/control-plane/index";
+import type { ProjectAuditCategory } from "@framerfordevs/api/contracts/control-plane";
 
 export const auditCategories = [
   "all",

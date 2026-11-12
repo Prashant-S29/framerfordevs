@@ -1,5 +1,3 @@
-// Encodes and validates scope-bound opaque cursors for immutable entry and revision ordering.
-
 import { Effect, Schema } from "effect";
 
 import { ApiErrorDetail } from "../../response/api";
@@ -9,7 +7,6 @@ import { LocaleTag } from "../../locale";
 import { Cursor, EnvironmentId, IsoDateTime, ProjectId } from "../../platform";
 import { CollectionId } from "../../schema";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 class EntryCursorPayload extends Schema.Class<EntryCursorPayload>("EntryCursorPayload")({
   version: Schema.Literal(1),
   kind: Schema.Literal("cms_entry"),
@@ -36,7 +33,6 @@ class EntryRevisionCursorPayload extends Schema.Class<EntryRevisionCursorPayload
   revisionId: EntryRevisionId,
 }) {}
 
-/** Produces one non-enumerating bounded cursor validation failure. */
 function invalidEntryCursor() {
   return ValidationFailure.make({
     details: [
@@ -49,15 +45,13 @@ function invalidEntryCursor() {
   });
 }
 
-/** Encodes a checked cursor payload into the shared opaque cursor contract. */
 const encodePayload = Effect.fn("entryCursor.encode")(function* (payload: object) {
   const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  return yield* SchemaStrict.decodeUnknownEffect(Cursor)(encoded).pipe(
+  return yield* Schema.decodeUnknownEffect(Cursor, { onExcessProperty: "error" })(encoded).pipe(
     Effect.mapError(() => invalidEntryCursor()),
   );
 });
 
-/** Decodes unknown base64url JSON while containing parser defects as validation failures. */
 const decodeUnknownPayload = Effect.fn("entryCursor.decodeUnknown")(function* (cursor: Cursor) {
   const json = yield* Effect.try({
     try: () => Buffer.from(cursor, "base64url").toString("utf8"),
@@ -69,7 +63,6 @@ const decodeUnknownPayload = Effect.fn("entryCursor.decodeUnknown")(function* (c
   });
 });
 
-/** Encodes immutable collection-entry ordering and all scope dependencies. */
 export function encodeEntryCursor(payload: {
   readonly projectId: ProjectId;
   readonly environmentId: EnvironmentId;
@@ -81,7 +74,6 @@ export function encodeEntryCursor(payload: {
   return encodePayload({ version: 1, kind: "cms_entry", ...payload });
 }
 
-/** Decodes an entry cursor and rejects reuse in another tenant, collection, or locale scope. */
 export const decodeEntryCursor = Effect.fn("entryCursor.decodeEntry")(function* (
   cursor: Cursor,
   scope: {
@@ -92,9 +84,9 @@ export const decodeEntryCursor = Effect.fn("entryCursor.decodeEntry")(function* 
   },
 ) {
   const unknownPayload = yield* decodeUnknownPayload(cursor);
-  const payload = yield* SchemaStrict.decodeUnknownEffect(EntryCursorPayload)(unknownPayload).pipe(
-    Effect.mapError(() => invalidEntryCursor()),
-  );
+  const payload = yield* Schema.decodeUnknownEffect(EntryCursorPayload, {
+    onExcessProperty: "error",
+  })(unknownPayload).pipe(Effect.mapError(() => invalidEntryCursor()));
   if (
     payload.projectId !== scope.projectId ||
     payload.environmentId !== scope.environmentId ||
@@ -106,7 +98,6 @@ export const decodeEntryCursor = Effect.fn("entryCursor.decodeEntry")(function* 
   return payload;
 });
 
-/** Encodes immutable per-scope revision ordering and every cursor scope dependency. */
 export function encodeEntryRevisionCursor(payload: {
   readonly projectId: ProjectId;
   readonly environmentId: EnvironmentId;
@@ -120,7 +111,6 @@ export function encodeEntryRevisionCursor(payload: {
   return encodePayload({ version: 1, kind: "cms_entry_revision", ...payload });
 }
 
-/** Decodes a revision cursor and rejects entry, locale, or partition reuse. */
 export const decodeEntryRevisionCursor = Effect.fn("entryCursor.decodeRevision")(function* (
   cursor: Cursor,
   scope: {
@@ -133,9 +123,9 @@ export const decodeEntryRevisionCursor = Effect.fn("entryCursor.decodeRevision")
   },
 ) {
   const unknownPayload = yield* decodeUnknownPayload(cursor);
-  const payload = yield* SchemaStrict.decodeUnknownEffect(EntryRevisionCursorPayload)(
-    unknownPayload,
-  ).pipe(Effect.mapError(() => invalidEntryCursor()));
+  const payload = yield* Schema.decodeUnknownEffect(EntryRevisionCursorPayload, {
+    onExcessProperty: "error",
+  })(unknownPayload).pipe(Effect.mapError(() => invalidEntryCursor()));
   if (
     payload.projectId !== scope.projectId ||
     payload.environmentId !== scope.environmentId ||

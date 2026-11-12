@@ -62,7 +62,7 @@ describe("Studio OpenAPI", () => {
   it("generates deterministic exact bytes", () => {
     expect(studioOpenApiJson).toBe(`${JSON.stringify(studioOpenApiDocument, null, 2)}\n`);
     expect(createHash("sha256").update(studioOpenApiJson).digest("hex")).toBe(
-      "e8daa1e9e8b2d16b966cb5f30a019eda73ead1846f8ab151265123a5ee540745",
+      "2a7d78e0b9378fcfdc4e6b626eebcdc00c00c557248a0fc4e6d5146397434346",
     );
   });
 });

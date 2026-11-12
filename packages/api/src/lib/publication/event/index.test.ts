@@ -1,5 +1,3 @@
-// Locks M11 outbox compatibility, authority checks, locale isolation, and canonical event bytes.
-
 import { createHash } from "node:crypto";
 
 import { assert, describe, it } from "@effect/vitest";

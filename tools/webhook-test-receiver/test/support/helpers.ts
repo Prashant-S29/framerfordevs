@@ -1,5 +1,3 @@
-// Provides deterministic signed CloudEvent fixtures for receiver tests without external network access.
-
 import { createHmac } from "node:crypto";
 
 import type { VerifiedEvent } from "../../src/types.js";
@@ -7,7 +5,6 @@ import type { VerifiedEvent } from "../../src/types.js";
 export const testSecret = `whsec_${Buffer.alloc(32, 7).toString("base64url")}`;
 export const testEventId = "019fae8b-1234-7000-8000-000000000006";
 
-/** Creates the smallest approved content-free entry publication event fixture. */
 export function testEvent(): VerifiedEvent {
   return {
     specversion: "1.0",
@@ -41,12 +38,10 @@ export function testEvent(): VerifiedEvent {
   };
 }
 
-/** Encodes the fixture exactly once so signature tests preserve raw-byte behavior. */
 export function testBody(): Buffer {
   return Buffer.from(JSON.stringify(testEvent()), "utf8");
 }
 
-/** Produces one Standard Webhooks-compatible signature for deterministic tests. */
 export function testSignature(timestamp: number, body: Uint8Array): string {
   const key = Buffer.from(testSecret.slice(6), "base64url");
   const message = Buffer.concat([

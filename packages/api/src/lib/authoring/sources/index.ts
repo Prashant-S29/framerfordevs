@@ -1,5 +1,3 @@
-// Reconciles immutable code source identities without allocating or accepting client-generated IDs.
-
 import type { FieldSchema, ListItemSchema, ProjectSchema } from "@framerfordevs/schema";
 
 import type { EnumOptionId } from "../../../contracts/field";
@@ -173,10 +171,6 @@ function indexPersisted<Value>(
   return indexed;
 }
 
-/**
- * Resolves persisted identities for planning. New nodes intentionally retain `null` IDs until the
- * apply transaction allocates server IDs under lock.
- */
 export function reconcileProjectSourceIdentities(
   project: ProjectSchema,
   persisted: PersistedProjectSourceIdentities,

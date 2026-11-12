@@ -36,14 +36,24 @@ function DeviceAuthorizationPage() {
     "idle",
   );
   const [message, setMessage] = useState<string | null>(null);
+  const sessionUser = session.data?.user;
+  const [lookupSource, setLookupSource] = useState<{
+    readonly userCode: string | undefined;
+    readonly user: typeof sessionUser;
+  }>({ userCode: undefined, user: undefined });
+  if (lookupSource.userCode !== search.user_code || lookupSource.user !== sessionUser) {
+    setLookupSource({ userCode: search.user_code, user: sessionUser });
+    if (search.user_code !== undefined && sessionUser) {
+      setStatus("loading");
+      setMessage(null);
+    }
+  }
 
   useEffect(() => {
     const userCode = search.user_code;
-    if (userCode === undefined || !session.data?.user) return;
+    if (userCode === undefined || !sessionUser) return;
 
     let active = true;
-    setStatus("loading");
-    setMessage(null);
     void authClient
       .device({ query: { user_code: userCode } })
       .then(({ data, error }) => {
@@ -79,7 +89,7 @@ function DeviceAuthorizationPage() {
     return () => {
       active = false;
     };
-  }, [search.user_code, session.data?.user]);
+  }, [search.user_code, sessionUser]);
 
   function submitCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

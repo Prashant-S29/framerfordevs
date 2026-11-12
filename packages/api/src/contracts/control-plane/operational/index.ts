@@ -1,5 +1,3 @@
-// Defines the closed M16 operational-administration transport contracts.
-
 import { Schema } from "effect";
 
 import {
@@ -38,10 +36,9 @@ import {
   WebhookOutcome,
   WebhookPublicEventType,
 } from "../../webhook";
-import * as SchemaStrict from "../../../lib/schema-strict";
-import { Uuid, UuidValue } from "../../uuid";
+import { Uuid } from "../../uuid";
 const maximumPageSize = 50;
-const ControlPlaneCommandId = UuidValue.pipe(Schema.brand("ControlPlaneCommandId"));
+const ControlPlaneCommandId = Uuid.pipe(Schema.brand("ControlPlaneCommandId"));
 const ControlPlaneCursorInput = Schema.String.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(2_048),
@@ -73,10 +70,7 @@ export const ControlPlaneCredentialListQuery = Schema.Struct({
   ]),
   cursor: Schema.NullOr(ControlPlaneCursorInput),
   limit: PageLimit,
-}).annotate({
-  identifier: "ControlPlaneCredentialListQuery",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneCredentialListQuery" });
 export type ControlPlaneCredentialListQuery = typeof ControlPlaneCredentialListQuery.Type;
 
 export const ControlPlaneIssueCredentialRequest = Schema.Struct({
@@ -85,39 +79,27 @@ export const ControlPlaneIssueCredentialRequest = Schema.Struct({
   scopes: CredentialScopes,
   ...nullableExpiryAcknowledged.fields,
   previewAuthorityAcknowledged: Schema.Boolean,
-}).annotate({
-  identifier: "ControlPlaneIssueCredentialRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneIssueCredentialRequest" });
 export type ControlPlaneIssueCredentialRequest = typeof ControlPlaneIssueCredentialRequest.Type;
 
 export const ControlPlaneStartCredentialRotationRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
   ...nullableExpiryAcknowledged.fields,
-}).annotate({
-  identifier: "ControlPlaneStartCredentialRotationRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneStartCredentialRotationRequest" });
 export type ControlPlaneStartCredentialRotationRequest =
   typeof ControlPlaneStartCredentialRotationRequest.Type;
 
 export const ControlPlaneCredentialRotationTransitionRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
   authorityAcknowledged: Schema.Literal(true),
-}).annotate({
-  identifier: "ControlPlaneCredentialRotationTransitionRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneCredentialRotationTransitionRequest" });
 export type ControlPlaneCredentialRotationTransitionRequest =
   typeof ControlPlaneCredentialRotationTransitionRequest.Type;
 
 export const ControlPlaneRevokeCredentialRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
   authorityAcknowledged: Schema.Literal(true),
-}).annotate({
-  identifier: "ControlPlaneRevokeCredentialRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneRevokeCredentialRequest" });
 export type ControlPlaneRevokeCredentialRequest = typeof ControlPlaneRevokeCredentialRequest.Type;
 
 export class ControlPlaneCredential extends Schema.Class<ControlPlaneCredential>(
@@ -167,10 +149,7 @@ export const ControlPlaneWebhookEndpointListQuery = Schema.Struct({
   state: Schema.Literals(["all", "enabled", "disabled"]),
   cursor: Schema.NullOr(ControlPlaneCursorInput),
   limit: PageLimit,
-}).annotate({
-  identifier: "ControlPlaneWebhookEndpointListQuery",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneWebhookEndpointListQuery" });
 export type ControlPlaneWebhookEndpointListQuery = typeof ControlPlaneWebhookEndpointListQuery.Type;
 
 export const ControlPlaneCreateWebhookEndpointRequest = Schema.Struct({
@@ -178,10 +157,7 @@ export const ControlPlaneCreateWebhookEndpointRequest = Schema.Struct({
   destination: WebhookDestinationUrl,
   subscriptions: WebhookEventTypes,
   authorityAcknowledged: Schema.Literal(true),
-}).annotate({
-  identifier: "ControlPlaneCreateWebhookEndpointRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneCreateWebhookEndpointRequest" });
 export type ControlPlaneCreateWebhookEndpointRequest =
   typeof ControlPlaneCreateWebhookEndpointRequest.Type;
 
@@ -198,12 +174,7 @@ export const ControlPlaneUpdateWebhookEndpointRequest = Schema.Struct({
       { message: "Destination replacement requires explicit acknowledgement." },
     ),
   )
-  .pipe(
-    Schema.annotate({
-      identifier: "ControlPlaneUpdateWebhookEndpointRequest",
-      closedObject: true,
-    }),
-  );
+  .pipe(Schema.annotate({ identifier: "ControlPlaneUpdateWebhookEndpointRequest" }));
 export type ControlPlaneUpdateWebhookEndpointRequest =
   typeof ControlPlaneUpdateWebhookEndpointRequest.Type;
 
@@ -218,42 +189,28 @@ export const ControlPlaneWebhookEndpointStateRequest = Schema.Struct({
       { message: "Disabling a webhook endpoint requires explicit acknowledgement." },
     ),
   )
-  .pipe(
-    Schema.annotate({
-      identifier: "ControlPlaneWebhookEndpointStateRequest",
-      closedObject: true,
-    }),
-  );
+  .pipe(Schema.annotate({ identifier: "ControlPlaneWebhookEndpointStateRequest" }));
 export type ControlPlaneWebhookEndpointStateRequest =
   typeof ControlPlaneWebhookEndpointStateRequest.Type;
 
 export const ControlPlaneReplaceWebhookSubscriptionsRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
   subscriptions: WebhookEventTypes,
-}).annotate({
-  identifier: "ControlPlaneReplaceWebhookSubscriptionsRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneReplaceWebhookSubscriptionsRequest" });
 export type ControlPlaneReplaceWebhookSubscriptionsRequest =
   typeof ControlPlaneReplaceWebhookSubscriptionsRequest.Type;
 
 export const ControlPlaneStartWebhookSecretRotationRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
   authorityAcknowledged: Schema.Literal(true),
-}).annotate({
-  identifier: "ControlPlaneStartWebhookSecretRotationRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneStartWebhookSecretRotationRequest" });
 export type ControlPlaneStartWebhookSecretRotationRequest =
   typeof ControlPlaneStartWebhookSecretRotationRequest.Type;
 
 export const ControlPlaneWebhookSecretTransitionRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
   authorityAcknowledged: Schema.Literal(true),
-}).annotate({
-  identifier: "ControlPlaneWebhookSecretTransitionRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneWebhookSecretTransitionRequest" });
 export type ControlPlaneWebhookSecretTransitionRequest =
   typeof ControlPlaneWebhookSecretTransitionRequest.Type;
 
@@ -268,10 +225,7 @@ export const ControlPlaneInvalidationMappingListQuery = Schema.Struct({
   state: Schema.Literals(["all", "enabled", "disabled"]),
   cursor: Schema.NullOr(ControlPlaneCursorInput),
   limit: PageLimit,
-}).annotate({
-  identifier: "ControlPlaneInvalidationMappingListQuery",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneInvalidationMappingListQuery" });
 export type ControlPlaneInvalidationMappingListQuery =
   typeof ControlPlaneInvalidationMappingListQuery.Type;
 
@@ -288,30 +242,21 @@ const InvalidationMappingFields = {
 export const ControlPlaneCreateInvalidationMappingRequest = Schema.Struct({
   commandId: ControlPlaneCommandId,
   ...InvalidationMappingFields,
-}).annotate({
-  identifier: "ControlPlaneCreateInvalidationMappingRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneCreateInvalidationMappingRequest" });
 export type ControlPlaneCreateInvalidationMappingRequest =
   typeof ControlPlaneCreateInvalidationMappingRequest.Type;
 
 export const ControlPlaneUpdateInvalidationMappingRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
   ...InvalidationMappingFields,
-}).annotate({
-  identifier: "ControlPlaneUpdateInvalidationMappingRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneUpdateInvalidationMappingRequest" });
 export type ControlPlaneUpdateInvalidationMappingRequest =
   typeof ControlPlaneUpdateInvalidationMappingRequest.Type;
 
 export const ControlPlaneInvalidationMappingStateRequest = Schema.Struct({
   expectedVersion: ResourceVersion,
   state: WebhookEndpointState,
-}).annotate({
-  identifier: "ControlPlaneInvalidationMappingStateRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneInvalidationMappingStateRequest" });
 export type ControlPlaneInvalidationMappingStateRequest =
   typeof ControlPlaneInvalidationMappingStateRequest.Type;
 
@@ -328,10 +273,7 @@ export const ControlPlaneWebhookDeliveryListQuery = Schema.Struct({
   status: Schema.NullOr(WebhookDeliveryStatus),
   cursor: Schema.NullOr(ControlPlaneCursorInput),
   limit: PageLimit,
-}).annotate({
-  identifier: "ControlPlaneWebhookDeliveryListQuery",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneWebhookDeliveryListQuery" });
 export type ControlPlaneWebhookDeliveryListQuery = typeof ControlPlaneWebhookDeliveryListQuery.Type;
 
 export class ControlPlaneWebhookDeliverySummary extends Schema.Class<ControlPlaneWebhookDeliverySummary>(
@@ -385,13 +327,10 @@ export const ControlPlaneReplayWebhookRequest = Schema.Struct({
   eventId: WebhookEventId,
   sourceDeliveryId: Schema.NullOr(WebhookDeliveryId),
   authorityAcknowledged: Schema.Literal(true),
-}).annotate({
-  identifier: "ControlPlaneReplayWebhookRequest",
-  closedObject: true,
-});
+}).annotate({ identifier: "ControlPlaneReplayWebhookRequest" });
 export type ControlPlaneReplayWebhookRequest = typeof ControlPlaneReplayWebhookRequest.Type;
 
-export const ProjectAuditEventId = UuidValue.pipe(Schema.brand("ProjectAuditEventId"));
+export const ProjectAuditEventId = Uuid.pipe(Schema.brand("ProjectAuditEventId"));
 export type ProjectAuditEventId = typeof ProjectAuditEventId.Type;
 
 export const ProjectAuditCategory = Schema.Literals([
@@ -441,12 +380,7 @@ export const ControlPlaneProjectAuditQuery = Schema.Struct({
       { message: "Audit windows must be ordered and no longer than 31 days." },
     ),
   )
-  .pipe(
-    Schema.annotate({
-      identifier: "ControlPlaneProjectAuditQuery",
-      closedObject: true,
-    }),
-  );
+  .pipe(Schema.annotate({ identifier: "ControlPlaneProjectAuditQuery" }));
 export type ControlPlaneProjectAuditQuery = typeof ControlPlaneProjectAuditQuery.Type;
 
 export class HostedOperationalCredentialListInput extends Schema.Class<HostedOperationalCredentialListInput>(
@@ -534,31 +468,35 @@ export const ControlPlaneWebhookAttemptListResponse = ApiSuccessSchema(
 );
 export const ControlPlaneProjectAuditPageResponse = ApiSuccessSchema(ControlPlaneProjectAuditPage);
 
-export const HostedOperationalCredentialListInputSchema = SchemaStrict.toStandardSchemaV1(
+export const HostedOperationalCredentialListInputSchema = Schema.toStandardSchemaV1(
   HostedOperationalCredentialListInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const HostedProjectAuditListInputSchema = SchemaStrict.toStandardSchemaV1(
+export const HostedProjectAuditListInputSchema = Schema.toStandardSchemaV1(
   HostedProjectAuditListInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const HostedWebhookDeliveryListInputSchema = SchemaStrict.toStandardSchemaV1(
+export const HostedWebhookDeliveryListInputSchema = Schema.toStandardSchemaV1(
   HostedWebhookDeliveryListInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const HostedWebhookDeliveryInputSchema = SchemaStrict.toStandardSchemaV1(
+export const HostedWebhookDeliveryInputSchema = Schema.toStandardSchemaV1(
   HostedWebhookDeliveryInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ControlPlaneCredentialPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneCredentialPageOutputSchema = Schema.toStandardSchemaV1(
   ControlPlaneCredentialPageResponse,
 );
-export const ControlPlaneProjectAuditPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneProjectAuditPageOutputSchema = Schema.toStandardSchemaV1(
   ControlPlaneProjectAuditPageResponse,
 );
-export const ControlPlaneWebhookDeliveryPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneWebhookDeliveryPageOutputSchema = Schema.toStandardSchemaV1(
   ControlPlaneWebhookDeliveryPageResponse,
 );
-export const ControlPlaneWebhookDeliveryDetailOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneWebhookDeliveryDetailOutputSchema = Schema.toStandardSchemaV1(
   ControlPlaneWebhookDeliveryDetailResponse,
 );
-export const ControlPlaneWebhookAttemptListOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ControlPlaneWebhookAttemptListOutputSchema = Schema.toStandardSchemaV1(
   ControlPlaneWebhookAttemptListResponse,
 );
 

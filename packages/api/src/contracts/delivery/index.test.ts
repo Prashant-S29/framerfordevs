@@ -1,6 +1,5 @@
-// Verifies Delivery configuration invariants and stable published-response metadata without draft fields.
-
 import { describe, expect, it } from "vitest";
+import { Schema } from "effect";
 
 import {
   DeliveryCollectionConfiguration,
@@ -10,7 +9,6 @@ import {
   UpdateDeliveryConfigurationInput,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const ids = {
   projectId: "019fae8b-1234-7000-8000-000000000001",
   environmentId: "019fae8b-1234-7000-8000-000000000002",
@@ -35,24 +33,33 @@ const capability = {
 
 describe("Delivery contracts", () => {
   it("requires unique lookup to imply filtering and at least one capability", () => {
-    expect(SchemaStrict.decodeUnknownSync(DeliveryFieldCapabilities)([capability])).toHaveLength(1);
+    expect(
+      Schema.decodeUnknownSync(DeliveryFieldCapabilities, { onExcessProperty: "error" })([
+        capability,
+      ]),
+    ).toHaveLength(1);
     expect(() =>
-      SchemaStrict.decodeUnknownSync(DeliveryFieldCapabilities)([
+      Schema.decodeUnknownSync(DeliveryFieldCapabilities, { onExcessProperty: "error" })([
         { ...capability, filterable: false },
       ]),
     ).toThrow();
     expect(() =>
-      SchemaStrict.decodeUnknownSync(DeliveryFieldCapabilities)([
+      Schema.decodeUnknownSync(DeliveryFieldCapabilities, { onExcessProperty: "error" })([
         { ...capability, filterable: false, sortable: false, uniqueLookup: false },
       ]),
     ).toThrow();
     expect(() =>
-      SchemaStrict.decodeUnknownSync(DeliveryFieldCapabilities)([capability, capability]),
+      Schema.decodeUnknownSync(DeliveryFieldCapabilities, { onExcessProperty: "error" })([
+        capability,
+        capability,
+      ]),
     ).toThrow();
   });
 
   it("decodes protected/public management configuration independently from schema history", () => {
-    const configuration = SchemaStrict.decodeUnknownSync(DeliveryCollectionConfiguration)({
+    const configuration = Schema.decodeUnknownSync(DeliveryCollectionConfiguration, {
+      onExcessProperty: "error",
+    })({
       projectId: ids.projectId,
       environmentId: ids.environmentId,
       collectionId: ids.collectionId,
@@ -64,14 +71,16 @@ describe("Delivery contracts", () => {
       updatedByCredentialId: null,
       updatedAt: "2026-08-09T12:00:00.000Z",
     });
-    const credentialConfiguration = SchemaStrict.decodeUnknownSync(DeliveryCollectionConfiguration)(
-      {
-        ...configuration,
-        updatedByUserId: null,
-        updatedByCredentialId: ids.credentialId,
-      },
-    );
-    const publicUpdate = SchemaStrict.decodeUnknownSync(UpdateDeliveryConfigurationInput)({
+    const credentialConfiguration = Schema.decodeUnknownSync(DeliveryCollectionConfiguration, {
+      onExcessProperty: "error",
+    })({
+      ...configuration,
+      updatedByUserId: null,
+      updatedByCredentialId: ids.credentialId,
+    });
+    const publicUpdate = Schema.decodeUnknownSync(UpdateDeliveryConfigurationInput, {
+      onExcessProperty: "error",
+    })({
       projectId: ids.projectId,
       environmentId: ids.environmentId,
       collectionId: ids.collectionId,
@@ -87,7 +96,7 @@ describe("Delivery contracts", () => {
   });
 
   it("returns complete snapshot data with stable publication metadata and no authoring fields", () => {
-    const item = SchemaStrict.decodeUnknownSync(DeliveryItem)({
+    const item = Schema.decodeUnknownSync(DeliveryItem, { onExcessProperty: "error" })({
       id: ids.entryId,
       collectionId: ids.collectionId,
       collection: "articles",
@@ -107,7 +116,7 @@ describe("Delivery contracts", () => {
   });
 
   it("uses cursor metadata without total counts or page numbers", () => {
-    const page = SchemaStrict.decodeUnknownSync(DeliveryPage)({
+    const page = Schema.decodeUnknownSync(DeliveryPage, { onExcessProperty: "error" })({
       items: [],
       page: { limit: 20, nextCursor: null, hasMore: false },
     });

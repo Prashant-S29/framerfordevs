@@ -3,13 +3,13 @@ import { assert, describe, it } from "@effect/vitest";
 import { EnumOptionId } from "../../../contracts/field";
 import { CollectionFieldId, CollectionId, SchemaRevisionId } from "../../../contracts/schema";
 import { validateCompleteProjectSchema } from "../schema-document";
+import { Schema } from "effect";
 import {
   computeCollectionStructureHash,
   computeProjectStructureManifestHash,
   type StructureIdentityMap,
 } from "./index";
 
-import * as SchemaStrict from "../../schema-strict";
 function project(reverseFields = false, reverseOptions = false) {
   const title = {
     sourceKey: "title",
@@ -57,19 +57,19 @@ function typedCollection(value: unknown) {
   return collection;
 }
 
-const collectionId = SchemaStrict.decodeUnknownSync(CollectionId)(
+const collectionId = Schema.decodeUnknownSync(CollectionId, { onExcessProperty: "error" })(
   "019fae8b-1234-7000-8000-000000000101",
 );
-const titleId = SchemaStrict.decodeUnknownSync(CollectionFieldId)(
+const titleId = Schema.decodeUnknownSync(CollectionFieldId, { onExcessProperty: "error" })(
   "019fae8b-1234-7000-8000-000000000102",
 );
-const statusId = SchemaStrict.decodeUnknownSync(CollectionFieldId)(
+const statusId = Schema.decodeUnknownSync(CollectionFieldId, { onExcessProperty: "error" })(
   "019fae8b-1234-7000-8000-000000000103",
 );
-const draftId = SchemaStrict.decodeUnknownSync(EnumOptionId)(
+const draftId = Schema.decodeUnknownSync(EnumOptionId, { onExcessProperty: "error" })(
   "019fae8b-1234-7000-8000-000000000104",
 );
-const publishedId = SchemaStrict.decodeUnknownSync(EnumOptionId)(
+const publishedId = Schema.decodeUnknownSync(EnumOptionId, { onExcessProperty: "error" })(
   "019fae8b-1234-7000-8000-000000000105",
 );
 
@@ -127,9 +127,9 @@ describe("code-owned structure hash", () => {
 
   it("binds source identities to server-generated stable IDs", () => {
     const first = computeCollectionStructureHash(typedCollection(project()), identities);
-    const replacementTitleId = SchemaStrict.decodeUnknownSync(CollectionFieldId)(
-      "019fae8b-1234-7000-8000-000000000199",
-    );
+    const replacementTitleId = Schema.decodeUnknownSync(CollectionFieldId, {
+      onExcessProperty: "error",
+    })("019fae8b-1234-7000-8000-000000000199");
     const replaced = computeCollectionStructureHash(typedCollection(project()), {
       ...identities,
       fields: identities.fields.map((identity) =>
@@ -163,12 +163,12 @@ describe("code-owned structure hash", () => {
   it("binds sorted per-collection revision authority into one project manifest hash", () => {
     const collection = computeCollectionStructureHash(typedCollection(project()), identities);
     if (!collection.valid) throw new Error("Expected a resolved collection structure.");
-    const firstRevision = SchemaStrict.decodeUnknownSync(SchemaRevisionId)(
+    const firstRevision = Schema.decodeUnknownSync(SchemaRevisionId, { onExcessProperty: "error" })(
       "019fae8b-1234-7000-8000-000000000190",
     );
-    const secondRevision = SchemaStrict.decodeUnknownSync(SchemaRevisionId)(
-      "019fae8b-1234-7000-8000-000000000191",
-    );
+    const secondRevision = Schema.decodeUnknownSync(SchemaRevisionId, {
+      onExcessProperty: "error",
+    })("019fae8b-1234-7000-8000-000000000191");
     const first = computeProjectStructureManifestHash([
       {
         collectionSourceKey: "posts",

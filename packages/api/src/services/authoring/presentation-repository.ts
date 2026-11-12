@@ -1,5 +1,3 @@
-// Publishes presentation-only immutable schema revisions under exact collection authority.
-
 import { randomUUID } from "node:crypto";
 
 import { db } from "@framerfordevs/db";
@@ -53,7 +51,6 @@ import {
 import { classifyCollectionSchemaChanges } from "../schema/engine";
 import { decodePublishedSchemaRevisionSync, loadPublishedRevisionRows } from "../schema/repository";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 export type AuthoringPresentationFailureStage =
   | "revision"
   | "active_presentation"
@@ -69,7 +66,7 @@ interface RepositoryOptions {
 const JsonObject = Schema.Record(Schema.String, Schema.Unknown);
 
 function jsonObject(value: unknown): Readonly<Record<string, unknown>> {
-  return SchemaStrict.decodeUnknownSync(JsonObject)(JSON.parse(JSON.stringify(value)));
+  return Schema.decodeUnknownSync(JsonObject)(JSON.parse(JSON.stringify(value)));
 }
 
 function databaseFailure(operation: string, cause: unknown) {
@@ -130,7 +127,7 @@ function presentationRevision(options: {
   readonly revision: typeof cmsSchemaRevision.$inferSelect;
   readonly contractHash: string;
 }) {
-  return SchemaStrict.decodeUnknownSync(AuthoringPresentationRevision)({
+  return Schema.decodeUnknownSync(AuthoringPresentationRevision)({
     collectionId: options.collectionId,
     revisionId: options.revision.id,
     previousRevisionId: options.revision.previousRevisionId,

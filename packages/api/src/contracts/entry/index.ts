@@ -1,5 +1,3 @@
-// Defines M7 named entry identities, bounded draft mutations, validation feedback, revisions, and API envelopes.
-
 import { Schema, SchemaTransformation } from "effect";
 
 import { ApiCredentialId } from "../access";
@@ -16,18 +14,16 @@ import {
 } from "../platform";
 import { CollectionFieldId, CollectionId, ContractHash, SchemaRevisionId } from "../schema";
 
-import * as SchemaStrict from "../../lib/schema-strict";
-import { UuidValue } from "../uuid";
-export const EntryId = UuidValue.pipe(Schema.brand("EntryId"));
+import { Uuid } from "../uuid";
+export const EntryId = Uuid.pipe(Schema.brand("EntryId"));
 export type EntryId = typeof EntryId.Type;
 
-export const EntryRevisionId = UuidValue.pipe(Schema.brand("EntryRevisionId"));
+export const EntryRevisionId = Uuid.pipe(Schema.brand("EntryRevisionId"));
 export type EntryRevisionId = typeof EntryRevisionId.Type;
 
-export const EntryCommandId = UuidValue.pipe(Schema.brand("EntryCommandId"));
+export const EntryCommandId = Uuid.pipe(Schema.brand("EntryCommandId"));
 export type EntryCommandId = typeof EntryCommandId.Type;
 
-/** Detects database-forbidden C0/C1 control characters in management names. */
 function hasEntryNameControlCharacter(value: string): boolean {
   for (const character of value) {
     const codePoint = character.codePointAt(0);
@@ -338,26 +334,35 @@ export class RestoreEntryRevisionInput extends Schema.Class<RestoreEntryRevision
   commandId: EntryCommandId,
 }) {}
 
-export const ListEntriesInputSchema = SchemaStrict.toStandardSchemaV1(ListEntriesInput);
-export const CreateEntryInputSchema = SchemaStrict.toStandardSchemaV1(CreateEntryInput);
-export const RenameEntryInputSchema = SchemaStrict.toStandardSchemaV1(RenameEntryInput);
-export const GetEntryDraftInputSchema = SchemaStrict.toStandardSchemaV1(GetEntryDraftInput);
-export const SaveEntryDraftInputSchema = SchemaStrict.toStandardSchemaV1(SaveEntryDraftInput);
-export const ListEntryRevisionsInputSchema =
-  SchemaStrict.toStandardSchemaV1(ListEntryRevisionsInput);
-export const RestoreEntryRevisionInputSchema =
-  SchemaStrict.toStandardSchemaV1(RestoreEntryRevisionInput);
+export const ListEntriesInputSchema = Schema.toStandardSchemaV1(ListEntriesInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const CreateEntryInputSchema = Schema.toStandardSchemaV1(CreateEntryInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const RenameEntryInputSchema = Schema.toStandardSchemaV1(RenameEntryInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const GetEntryDraftInputSchema = Schema.toStandardSchemaV1(GetEntryDraftInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const SaveEntryDraftInputSchema = Schema.toStandardSchemaV1(SaveEntryDraftInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const ListEntryRevisionsInputSchema = Schema.toStandardSchemaV1(ListEntryRevisionsInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const RestoreEntryRevisionInputSchema = Schema.toStandardSchemaV1(
+  RestoreEntryRevisionInput,
+  { parseOptions: { onExcessProperty: "error" } },
+);
 
-export const CmsEntryOutputSchema = SchemaStrict.toStandardSchemaV1(ApiSuccessSchema(CmsEntry));
-export const CmsEntryPageOutputSchema = SchemaStrict.toStandardSchemaV1(
-  ApiSuccessSchema(CmsEntryPage),
-);
-export const CmsEntryDraftOutputSchema = SchemaStrict.toStandardSchemaV1(
-  ApiSuccessSchema(CmsEntryDraft),
-);
-export const SaveEntryDraftResultOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const CmsEntryOutputSchema = Schema.toStandardSchemaV1(ApiSuccessSchema(CmsEntry));
+export const CmsEntryPageOutputSchema = Schema.toStandardSchemaV1(ApiSuccessSchema(CmsEntryPage));
+export const CmsEntryDraftOutputSchema = Schema.toStandardSchemaV1(ApiSuccessSchema(CmsEntryDraft));
+export const SaveEntryDraftResultOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(SaveEntryDraftResult),
 );
-export const EntryRevisionPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const EntryRevisionPageOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(EntryRevisionPage),
 );

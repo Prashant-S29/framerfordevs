@@ -1,5 +1,3 @@
-// Verifies permissive Preview projection, explicit partition authority, role redaction, and exact sizing.
-
 import { assert, describe, it } from "@effect/vitest";
 
 import { EntryValues } from "../../../contracts/entry";
@@ -8,8 +6,8 @@ import {
   type CollectionFieldDefinition as CollectionField,
 } from "../../../contracts/schema";
 import { compilePreviewDocument, type CompilePreviewDocumentInput } from "./index";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "../../schema-strict";
 const ids = {
   entry: "019fae8b-1234-7000-8000-000000000001",
   collection: "019fae8b-1234-7000-8000-000000000002",
@@ -46,12 +44,10 @@ const ownerEditor = {
   editableByRoles: ["owner"],
 };
 
-/** Decodes strict recursive field fixtures through the production schema. */
 function decodeField(value: unknown): CollectionField {
-  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)(value);
+  return Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })(value);
 }
 
-/** Builds a representative visible, hidden, and mixed-localization contract. */
 function fields(): ReadonlyArray<CollectionField> {
   return [
     decodeField({
@@ -133,12 +129,10 @@ function fields(): ReadonlyArray<CollectionField> {
   ];
 }
 
-/** Decodes stable-ID sparse fragments through the production EntryValues contract. */
 function values(value: unknown) {
-  return SchemaStrict.decodeUnknownSync(EntryValues)(value);
+  return Schema.decodeUnknownSync(EntryValues, { onExcessProperty: "error" })(value);
 }
 
-/** Creates a deterministic compiler input with overrideable role and partitions. */
 function input(overrides: Partial<CompilePreviewDocumentInput> = {}): CompilePreviewDocumentInput {
   return {
     entryId: ids.entry,

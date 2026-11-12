@@ -1,5 +1,3 @@
-// Presents webhook event variants and the complete canonical JSON Schema without duplicating payload definitions.
-
 import webhookSchema from "@framerfordevs/public-contracts/artifacts/webhooks/v1/events.schema.json";
 import { createFileRoute } from "@tanstack/react-router";
 import { HomeLayout } from "fumadocs-ui/layouts/home";

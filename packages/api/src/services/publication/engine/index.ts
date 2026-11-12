@@ -1,5 +1,3 @@
-// Exposes deterministic M8 publication compilation through a replaceable Effect service.
-
 import { Context, Effect, Layer } from "effect";
 
 import {

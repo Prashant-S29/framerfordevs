@@ -1,5 +1,3 @@
-// Locks collection-wide schema matching and exact optional entry/locale matching for entry events.
-
 import { assert, describe, it } from "@effect/vitest";
 
 import { matchInvalidationMappings, type InvalidationMappingRecord } from "./index";

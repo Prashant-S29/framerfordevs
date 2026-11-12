@@ -1,121 +1,31 @@
-# CMS and Platform Implementation Milestones
+# Milestones
 
-**Purpose:** Keep accepted work concise and give future agents enough approved context to design each pending milestone without reconstructing prior discussion. This file is not a substitute for a milestone design/decision record.
+Scope per milestone. Status is in `progress.md`. A pending entry is context, not authorization to design it. Product directions after M30 are in `product.md`.
 
-## Global definition of done
+## Sequencing rules
 
-Every milestone must:
+- One milestone delivers one bounded authority slice and one outcome, well under M13 in size.
+- Server authority and HTTP and CLI contracts come before dependent UI. SDK inclusion needs its own justification.
+- Order: secure Studio runtime, editorial workflows, client-handover safety, production readiness, then visual work. Freeze visual bindings before composition, and publication authority before renderers.
+- Design, implement, validate, and review one milestone at a time. Splitting a milestone during design is allowed. Combining, deleting, or reordering scope needs developer approval and an update here first.
+- Never move schema structure into hosted visual authoring, expose management credentials to Studio, add locale fallback, or replace stable IDs.
 
-1. Implement one bounded authority slice and one coherent user/developer outcome without weakening product invariants.
-2. Deliver stable HTTP for every meaningful operation and noninteractive CLI parity for developer/agent automation; expose SDK methods only for approved content/runtime integration under `decisions/public-http-cli-and-sdk-surface-boundary.md`.
-3. Add deterministic success, failure, authorization, boundary, regression, accessibility, load, concurrency, and failure-injection coverage as applicable.
-4. Preserve typed Effect errors/Layers/runtime boundaries, API envelopes, tenant isolation, bounded validation, redaction, observability, stable identities, immutable revisions/publications, and exact-locale authority.
-5. Pass applicable formatting, lint, structure, contract drift, type-check, test, coverage, build, audit, database-invariant, package, and runtime gates.
-6. Keep `progress.md`, `context.md`, relevant decisions, and durable learnings current.
-7. Stop for developer review; only the developer accepts, commits, publishes, rolls out, deploys, or advances scope.
+## Completed
 
-## Roadmap sizing and sequencing rules
+- 0–1: Stack, auth, database, Docker, and test foundation. Effect runtime, typed errors, envelopes, observability.
+- 2–4: Workspaces, projects, capabilities, audits. Memberships, roles, invitations, credentials. Required English and locale access.
+- 5–8: Versioned schemas with stable IDs. 18 field kinds and generated forms. Entries with shared and localized drafts. Exact-locale publication with immutable snapshots and outbox atomicity.
+- 9–11: Delivery v1 with caching and quotas. Preview v1. Publication events, signed webhooks, invalidation, worker delivery.
+- 12–13: Tooling v1, OAuth CLI, SDK, public contracts, developer portal. Code-first authoring, Authoring v1, local editor.
+- 14–17: Control Plane v1 bootstrap and CLI parity. Governance and operational administration with recovery. Separate marketing, docs, and dashboard hosts.
+- 18A–18B: Studio registration authority, OAuth, mounted Studio runtime, encrypted sessions, framework adapters.
+- 19A–19B: Studio Content v1 and v2 protocols and the mounted browse, search, edit, and recovery experience.
 
-- M13 is the upper bound that future milestones must avoid approaching. Do not combine a new authority model, multiple product surfaces, release rollout, and broad UX migration.
-- Establish portable contracts and server authority before depending UI surfaces; add matching noninteractive CLI paths in the same milestone, while SDK inclusion requires a separate content/runtime justification.
-- Build the secure Studio runtime before moving editorial workflows, then complete client-handover safety and production readiness before visual work.
-- Freeze stable visual bindings before visual composition, add visual publication/dependency authority before renderers, and stop this roadmap after the renderer baseline.
-- Design, approve, implement, validate, and review one milestone at a time. A pending entry supplies context but does not authorize design or implementation ahead of its gate.
-- A pending milestone may be split further during design. Combining, deleting, or reordering approved scope requires explicit developer approval and an update here first.
-
-## Database change gate
-
-Agents may edit an approved Drizzle schema but must never generate, edit, apply, push, or execute a real migration or snapshot. The developer controls generation/application; the agent fully inspects generated SQL/snapshots/journal before application and verifies the live catalog read-only only after developer confirmation. Any agreed pre-application correction is prepared only as a non-authoritative ignored draft under `tmp/migrations/`.
-
-## Completed milestones
-
-| #   | Summary                                                                                                      | Acceptance             |
-| --- | ------------------------------------------------------------------------------------------------------------ | ---------------------- |
-| 0   | Validate the existing stack, auth, database, API, Docker, and test foundation.                               | 26 tests; `7d5a312`    |
-| 1   | Establish stable Effect v3, typed errors, response envelopes, runtime Layers, and observability.             | 90 tests; `c28f6fa`    |
-| 2   | Add workspaces, projects, capabilities, `main`, ownership, audits, and tenant-safe project management.       | 163 tests; `60adb39`   |
-| 3   | Add memberships, roles, policies, invitations, and scoped credential lifecycles.                             | 381 tests; `a74aeb8`   |
-| 4   | Add required English, strict registered locale contracts, ordering, lifecycle, and locale access.            | 453 tests; `68b6f6e`   |
-| 5   | Add stable collection/field identity and versioned draft/classify/acknowledge/publish schema authority.      | 509 tests; `28ca04d`   |
-| 6   | Add all 18 field kinds, recursive validation/localization, editor layout, and generated forms.               | 551 tests; `fbb4767`   |
-| 7   | Add stable entries, shared/localized drafts, revisions, restore, names, and optimistic editing.              | 603 tests; `60bd96f`   |
-| 8   | Add independent exact-locale publication, immutable snapshots, references, history, and outbox atomicity.    | 627 tests; `ad3cd5e`   |
-| 9   | Add bounded production Delivery v1, typed projections, caching, cursors, quotas, and load proof.             | 712 tests; `8559aa4`   |
-| 10  | Add scoped Preview v1, current/historical sources, role projection, dashboard UX, and load proof.            | 780 tests; `aa177b5`   |
-| 11  | Add publication events, secure webhooks, invalidation, retries, replay, worker delivery, and operations UX.  | 868 tests; `fef7205`   |
-| 12  | Add Tooling v1, OAuth-capable CLI, SDK/generation, canonical public contracts, and developer portal.         | 962 tests; `4e87908`   |
-| 13  | Add secure code-first schema/content authoring, Authoring v1, SDK/CLI, local editor, and builder retirement. | 1,184 tests; `9c68942` |
-| 14  | Add portable Control Plane v1 bootstrap, complete CLI parity, hosted controls, and project recovery.         | 1,259 tests; `6ba124a` |
-| 15  | Add governance automation parity across HTTP, CLI, hosted controls, and shared policy authority.             | 1,270 tests; `5460c2b` |
-| 16  | Add operational credential, webhook, audit, delivery, and archive recovery across HTTP, CLI, and hosted UI.  | 1,311 tests; `c3f9430` |
-| 17  | Separate marketing, docs, and dashboard with host-only sessions and canonical same-origin control ingress.   | 1,422 tests; `d6b506d` |
-
-Post-M13 repository/context normalization is developer-approved and committed at `cd31102`. Its owner-directory structure, direct-import policy, generalized pair/prefix checks, stable exports, and production entrypoints are the baseline for all pending work.
-
-## Pending milestones
-
-### Milestone 18A — Studio platform authority
-
-**Status:** `[A]` Developer accepted, committed, and pushed `317a295`; migrations `0019_add_studio_runtime_authority` and `0020_allow_studio_credential_kill_switch` are developer-applied/catalog-verified, with 1,498 accepted tests plus 13 browser specifications.
-
-**Depends on:** M14 and M17.
-
-**Summary:** Establish registration-derived Studio delegation and a bounded server-to-server bootstrap authority before shipping a developer runtime.
-
-- Add explicit inactive/active registration lifecycle without retroactively trusting M14 rows, with exact user-only Control Plane HTTP/CLI/dashboard activation and recovery.
-- Prove and add one deterministic public OAuth Code + S256 PKCE client per active registration, exact Studio resource/scope/claims, current project pre-authorization, and no dynamic registration.
-- Require dashboard-hosted project/origin-specific acknowledgement for every new local Studio session; a project updater cannot silently capture another member's delegated authority.
-- Add shared `studio.oauth.*` and `studio.*` abuse policies, fail-closed session-establishment security audit with a synchronous response-gating fallback, exact revocation/version invalidation, and a five-minute access/eight-hour refresh bound.
-- Ship a private test-only public OAuth harness that proves authorize through bootstrap and cannot enter production imports/artifacts; use it for dashboard acknowledgement browser/accessibility coverage.
-- Add only the role/project/environment-projected Studio v1 bootstrap API and deterministic OpenAPI source; immutable public-contract baseline registration waits for M18B, and browser/BFF packages plus all content/editorial routes remain excluded.
-- Accept explicitly that pre-M23 unauthenticated OAuth ingress has installation-wide overload protection but no trustworthy source fairness.
-- Complete the developer-controlled migration gate and provider compatibility stop gate, then stop for independent M18A review.
-
-**Read before design:** product Studio surface; PRD §§6.1, 20–22; M3, M10, M12, M14, and M17 decisions; Better Auth provider/auth schema; Control Plane registration, policy, audit, and rate-limit authority.
-
-### Milestone 18B — Studio mount and security runtime
-
-**Status:** `[A]` Developer accepted, committed, and pushed `c38b7db`; the migration-free five-package runtime, mounted shell, immutable Studio v1 baseline, Redis/refresh security authority, adapter parity, and validation evidence passed with 1,559 tests plus 14 browser specifications. Publication, production configuration, rollout, and deployment remain gated.
-
-**Depends on:** accepted M18A.
-
-**Summary:** Mount the authenticated empty Studio through a developer-owned BFF after platform delegation authority is accepted.
-
-- Define a framework-neutral Studio SPA mounted at an exact configured path, with deterministic assets/base behavior and no framework-specific business authority.
-- Ship a Web Standards `Request → Response` BFF core, thin Express 5/TanStack Start adapters, direct Fetch conformance, and claims limited to the supported Node/Web Request baseline.
-- Keep OAuth tokens in exact A256GCM server-side sessions behind opaque path-scoped browser cookies; encrypt PKCE attempts, fence refresh before provider dispatch, and make local logout/outage semantics explicit.
-- Ship a production-capable Redis store/limiter adapter plus the custom-store conformance contract; every non-loopback/production runtime requires an explicit shared, process-restart-stable store and has no memory fallback.
-- Preserve the absolute eight-hour platform grant/session bound, validate callback tokens through real bootstrap, then register the accepted Studio artifact bytes as the immutable compatibility baseline.
-- Cover the portable active mount/raw-target guard, exact origin/proxy/CSRF/CSP/cache/cookie behavior, refresh/expiry/revocation/outages/restore, key-retirement forced logout, secret scanning, accessible empty shell, package boundaries, and fixed local bounds.
-- Support one exact `main` origin only; wildcard/per-branch preview deployment lifecycle remains deferred.
-
-**Read before design:** accepted M18A implementation/contracts; M6, M10, M13, M14, and M17 decisions; local editor loopback/protocol/app; content-form package; supported framework request boundaries.
-
-### Milestone 19 — Studio content and localization
-
-**Status:** `[R]` M19A is developer-accepted at `788b782`, and the migration-free M19B compatibility checkpoint is developer-accepted. The complete mounted experience and final readiness/security/artifact/database evidence pass; developer acceptance of M19B and the complete milestone remains pending.
-
-**Depends on:** M18B.
-
-**Summary:** Move everyday role-projected content and exact-locale draft authoring into the mounted project Studio.
-
-- Move role-projected collection and entry browsing into Studio with bounded pagination/search, permission-correct counts, direct-route enforcement, and large-collection behavior.
-- Render the complete 18-kind generated form system with immutable Presentation metadata, shared-field separation, exact enabled-locale tabs, bounded safe reference-label resolution, and no schema-structure authoring.
-- Support entry create/rename, shared and localized draft save, validation/status, optimistic conflicts, retries, unsaved navigation, and source/schema drift recovery.
-- Ensure hidden or read-only collections/fields/locales are removed or immutable in server payload/authority—not merely hidden in React—and reject forged direct requests.
-- Preserve exact locale, role, project/environment, stable ID, revision, and actor authority across Studio BFF and Authoring services.
-- Provide accessible errors, focus, keyboard locale navigation, non-color status, loading/empty/failure states, and approved large-form/list responsiveness.
-- Keep revision comparison/restore, review, publication, Preview, and complete client handover in M20–M21.
-
-**Read before design:** M3–M7 and M13 decisions; content-form package, entry repository/operations, Authoring content API/SDK, current dashboard entry editor, M13 editor application.
+## Pending
 
 ### Milestone 20 — Studio editorial lifecycle
 
-**Status:** Planned; design not started.
-
-**Depends on:** M19.
-
-**Summary:** Complete Studio revision, Presentation, Preview, and publication authority before client handover.
+Complete Studio revision, Presentation, Preview, and publication authority before client handover.
 
 - Add shared/localized revision history, comparison, restore, and changed-since-publish state while preserving immutable history and optimistic authority.
 - Add editorial Presentation viewing/editing/publication for form labels/layout only; code remains the sole schema-structure authority.
@@ -125,33 +35,21 @@ Post-M13 repository/context normalization is developer-approved and committed at
 - Prove parity before retiring duplicate hosted dashboard editorial routes; retain hosted control-plane read-only structure and administration.
 - Exclude review submission/approval, client handover polish, scheduled publishing, visual page editing, and schema mutation.
 
-**Read before design:** M6–M10, M11, and M13 decisions; publication/preview/presentation services and contracts, Studio/content-form work from M18–M19, current dashboard Preview/Presentation, local editor.
-
 ### Milestone 21 — Client handover and editorial safety
 
-**Status:** Planned; preserves the original pre-normalization M14 scope.
-
-**Depends on:** M15 and M19–M20.
-
-**Summary:** Make the completed CMS safe, understandable, accessible, and recoverable for non-technical client handover.
+Make the completed CMS safe, understandable, accessible, and recoverable for non-technical client handover.
 
 - Deliver client-focused Studio navigation, authenticated direct handover links, permission-filtered ordered activity, and project/collection/locale context understandable without implementation knowledge.
-- Enforce collection/field/locale restrictions in payloads, counts, search, direct routes, and direct APIs; clients never receive credentials, API keys, internal IDs, schema controls, protected fields, or forbidden mutations.
+- Enforce collection/field/locale restrictions in payloads, counts, search, direct routes, and direct APIs; clients never receive credentials, keys, internal IDs, schema controls, or protected fields.
 - Let users without publish authority save drafts and submit review while preventing UI/API publication; approval/rejection must preserve exact locale and role permissions.
 - Provide accurate shared/localized revision comparison and restore, translation completeness after required-field changes, and textual draft/publication/pending status beyond color.
 - Preserve work across unsaved navigation, network interruption, retries, and duplicate submissions with deterministic conflict/recovery UX.
 - Require accessible summaries, field associations, focus/announcement, keyboard locale tabs, and developer-approved large-form/list responsiveness.
 - Retain the original manual test: hand a project to a non-technical user and observe the complete edit/review/publish path without exposing implementation authority.
 
-**Read before design:** original M14 section from `9c68942`; M3–M8 and M13 decisions; M15 and M19–M20 output; current accessibility suites and client-facing dashboard/editor flows.
-
 ### Milestone 22 — Data durability and portability
 
-**Status:** Planned; preserves the data/retention half of the original pre-normalization M15.
-
-**Depends on:** M21.
-
-**Summary:** Prove that complete CMS authority can be backed up, restored, transferred, retained, and self-hosted without losing identity or history.
+Prove that complete CMS authority can be backed up, restored, transferred, retained, and self-hosted without losing identity or history.
 
 - Define and prove backup/restore coverage for schemas, drafts, publications, credential metadata, events, audits, source identities, receipts, Presentation, and later Studio registration state.
 - Detect corrupted/incomplete backups and exercise timed restore verification without mutating accepted migration history or weakening encryption/secret policy.
@@ -161,84 +59,54 @@ Post-M13 repository/context normalization is developer-approved and committed at
 - Define self-host compatibility/version contracts, portable configuration/secrets, replaceable infrastructure boundaries, and documented database operations.
 - Add operator-facing recovery drills and evidence ownership, while leaving broad production SLO/security/topology proof to M23.
 
-**Read before design:** original M15 section from `9c68942`; PRD §§17 and 22; M5, M7–M8, M11–M13 decisions; all receipt/audit/outbox schemas, backup-sensitive encrypted fields, package/version metadata.
-
 ### Milestone 23 — Production security and operational readiness
 
-**Status:** Planned; preserves the hardening half of the original pre-normalization M15.
-
-**Depends on:** M17 and M22.
-
-**Summary:** Prove the completed CMS and its production topology can operate securely and predictably under realistic load and failure.
+Prove the completed CMS and its production topology can operate securely and predictably under realistic load and failure.
 
 - Define Delivery/publication/webhook/authoring/control-plane SLOs, independent rate-limit policies, cache/failure modes, actionable dashboards/alerts, incident runbooks, rollback, and timed recovery approval.
 - Prove full tenant/query/service isolation and authorization matrices, plus fuzz/property coverage for schemas, content, rich text, cursors, webhooks, and response encoding.
 - Run simultaneous authoring/publication/delivery/webhook load, soak, concurrency, DB restart/failover, cache outage, telemetry outage, and webhook-capacity isolation with bounded resources/logging.
 - Cover injection, XSS/rich text, CSRF, CORS, SSRF, credential leakage, replay, enumeration, privilege escalation, dependency/container vulnerabilities, and PII/secret scanning.
-- Enforce network-level webhook-worker denial of loopback/private/link-local/CGNAT/internal/cloud-metadata targets while allowing required DNS/public HTTPS, plus provider-appropriate metadata hardening such as IMDSv2-only or disablement.
+- Enforce network-level webhook-worker denial of loopback, private, link-local, CGNAT, internal, and cloud-metadata targets while allowing DNS and public HTTPS, plus IMDSv2-only or disabled metadata.
 - Prove production host/ingress separation for marketing, dashboard/auth, public APIs, docs, management references, metrics/diagnostics, and operator endpoints across hosts, routes, methods, redirects, and CORS/preflight.
 - Retain the original manual gate: exercise rollback/recovery and perform an explicit developer production-readiness review before any release rollout.
 
-**Read before design:** original M15 section from `9c68942`; M1, M3, M9–M13 decisions; security/performance/observability rules; Docker/ingress/worker/load tooling and current operational evidence.
-
 ### Milestone 24 — Environment lifecycle and promotion
 
-**Status:** Planned; design not started.
-
-**Depends on:** M14–M23.
-
-**Summary:** Expand the single-`main` foundation into explicit user-visible environments and safe promotion workflows.
+Expand the single-`main` foundation into explicit user-visible environments and safe promotion workflows.
 
 - Introduce user-visible environments beyond internal `main` without converting projects or changing stable project/resource identities.
 - Define create/list/update/archive and primary/default semantics, environment ordering/naming, dependency guards, and recovery behavior.
 - Scope memberships/policies, locales, credentials, webhooks, schemas, entries, publications, Delivery/Preview/Authoring, Studio registration, audits, and quotas exactly by environment.
 - Define explicit schema/content/config promotion or copy workflows with dry-run, conflict classification, acknowledgements, stable/remapped identity rules, and no implicit production writes.
 - Keep Delivery exact-locale behavior and immutable publications independent per environment; no cross-environment fallback or credential acceptance.
-- Add HTTP/CLI/control-plane/Studio environment lifecycle and selection parity, prevent ambiguous defaults in automation, and keep SDK environment support to explicit runtime/content selection rather than lifecycle administration.
-
-**Read before design:** PRD §7; M2–M5, M8–M13 decisions; current environment columns/services/contracts, CLI config/locks, control-plane and Studio outputs.
+- Add HTTP/CLI/control-plane/Studio environment lifecycle and selection parity, no ambiguous defaults in automation, and SDK environment support limited to explicit runtime/content selection.
 
 ### Milestone 25 — Managed assets and media
 
-**Status:** Planned; design not started.
-
-**Depends on:** M18 and M22–M24.
-
-**Summary:** Add portable, permissioned managed media while preserving existing external-asset and immutable publication contracts.
+Add portable, permissioned managed media while preserving existing external-asset and immutable publication contracts.
 
 - Add managed upload/storage authority and media-library browsing without breaking the existing structured external-asset field contract.
 - Define stable asset identity, project/environment ownership, metadata, variants/transforms, lifecycle, references, publication pinning, and deletion/dependency behavior.
 - Bound file size/type/count, streaming/memory, image/document processing, URLs, malware/content checks, and transformation resource use.
 - Keep storage credentials/signing server-side; protect upload/download routes against tenant leakage, path traversal, SSRF, malicious formats, and unbounded remote fetches.
-- Project assets through role/field/locale permissions into generated forms, Studio, Delivery/Preview, content SDK methods where justified, CLI import/export, audits, and events; storage administration stays outside the SDK.
+- Project assets through role/field/locale permissions into generated forms, Studio, Delivery/Preview, justified SDK methods, CLI import/export, audits, and events; storage administration stays out of the SDK.
 - Preserve portability through replaceable storage/delivery providers and explicit immutable publication behavior.
-
-**Read before design:** PRD §§8.6, 21–22; M3, M6, M8–M11 decisions; external-asset contracts/forms, Studio work, webhook/invalidation and backup boundaries.
 
 ### Milestone 26 — Workflow automation and scheduling
 
-**Status:** Planned; design not started.
-
-**Depends on:** M21 and M24–M25.
-
-**Summary:** Extend safe editorial handover with durable review automation and exact-locale scheduling.
+Extend safe editorial handover with durable review automation and exact-locale scheduling.
 
 - Extend M21 review submission with explicit review notes, assigned reviewers, approval/rejection transitions, and permission-aware workflow state without replacing draft/publication truth.
 - Define workflow identity/versioning, optimistic/idempotent commands, exact locale/environment/resource scope, actor attribution, audits, notifications/events, and safe history.
 - Add scheduled exact-locale publish/unpublish with immutable requested authority, cancellation/rescheduling, stale-draft/schema/reference detection, and no silent revalidation bypass.
 - Ensure only the worker executes due schedules, with durable claiming, retries, crash recovery, bounded backlog, observability, and atomic publication/audit/outbox semantics.
-- Expose complete HTTP/CLI/Studio parity, machine-safe dry-runs/status, timezone/clock rules, accessible review queues, and clear failure/recovery states; add SDK methods only if a separate trusted content-integration need is proven.
+- Expose complete HTTP/CLI/Studio parity, machine-safe dry-runs/status, timezone/clock rules, accessible review queues, and clear failure/recovery states; SDK methods only for a proven content-integration need.
 - Preserve immediate publication paths and do not couple workflow/scheduling to future visual-site publication before M29 designs that authority.
-
-**Read before design:** M3–M4, M7–M8, M11, M13 decisions; M21 handover behavior, publication repositories, worker lease patterns, event/webhook systems.
 
 ### Milestone 27 — Visual-builder readiness contracts
 
-**Status:** Planned; preserves the original pre-normalization M16 and must complete before visual editing.
-
-**Depends on:** M20–M26.
-
-**Summary:** Freeze the stable CMS binding and compatibility baseline required before any visual-editor authority is introduced.
+Freeze the stable CMS binding and compatibility baseline required before any visual-editor authority is introduced.
 
 - Freeze stable-ID CMS binding contracts that survive label changes and non-breaking schema revisions and report affected bindings before breaking schema publication.
 - Define internal CMS and future provider boundaries without implementing external REST/GraphQL/database integrations in this roadmap.
@@ -248,15 +116,9 @@ Post-M13 repository/context normalization is developer-approved and committed at
 - Guarantee visual enablement leaves Delivery integrations unchanged and requires no copy/migration of entries, publications, members, policies, locales, or assets.
 - Retain the original manual review: resolve a simulated visual-site binding against an existing CMS project and prove no migration.
 
-**Read before design:** original M16 section from `9c68942`; product canonical representation; PRD §§18 and 23; M5–M6, M8–M11, M13 decisions; public contracts, invalidation mappings, Delivery/Preview projections.
-
 ### Milestone 28 — Visual Studio composition
 
-**Status:** Planned; design not started.
-
-**Depends on:** M27.
-
-**Summary:** Add framework-neutral visual-site resources and permission-aware composition workflows to Studio.
+Add framework-neutral visual-site resources and permission-aware composition workflows to Studio.
 
 - Introduce stable site, page, route, component-node, reusable-component, style, breakpoint, design-token, navigation, SEO, and binding identities separate from CMS content and Presentation.
 - Store framework-neutral structured presentation resources rather than generated HTML or framework component instances.
@@ -266,15 +128,9 @@ Post-M13 repository/context normalization is developer-approved and committed at
 - Add immutable draft revisions, optimistic commands, undo/redo boundaries, conflict/recovery UX, accessibility, performance budgets, and large-tree virtualization.
 - Keep publication/rendering authority in M29–M30; previews may use bounded design-time projection but cannot become production output.
 
-**Read before design:** product visual-builder/canonical model/principles; M3, M5–M6, M13, and M27 decisions/contracts; Studio architecture from M18–M21.
-
 ### Milestone 29 — Visual publication and dependencies
 
-**Status:** Planned; design not started.
-
-**Depends on:** M27–M28.
-
-**Summary:** Give visual resources immutable publication, Preview, dependency, and targeted invalidation authority over stable CMS bindings.
+Give visual resources immutable publication, Preview, dependency, and targeted invalidation authority over stable CMS bindings.
 
 - Define validate/classify/acknowledge/publish lifecycle for immutable visual revisions, routes, component trees, styles, tokens, SEO, navigation, and bindings.
 - Resolve and pin exact CMS publication/schema/locale dependencies without copying CMS content or weakening independent content publication.
@@ -284,15 +140,9 @@ Post-M13 repository/context normalization is developer-approved and committed at
 - Commit visual publication pointers, audits, outbox/events, dependency state, and idempotent receipts atomically with rollback/concurrency proof.
 - Expose HTTP/CLI/Studio administration parity while leaving SDK exposure to M30 renderer consumption and managed deployment to later product work.
 
-**Read before design:** M5, M8, M10–M11, M13, M27 decisions/contracts; schema classification, publication snapshots/events, invalidation mappings, Preview authority.
-
 ### Milestone 30 — Renderer SDK and framework adapters
 
-**Status:** Planned; final numbered milestone in the current roadmap.
-
-**Depends on:** M27–M29.
-
-**Summary:** Complete the current roadmap with a portable renderer baseline for developer-owned CSR, SSR, and static delivery.
+Complete the current roadmap with a portable renderer baseline for developer-owned CSR, SSR, and static delivery.
 
 - Define a versioned canonical renderer input contract for immutable visual publications, routes, locales, component manifests, design tokens, assets, and pinned CMS bindings.
 - Support developer-owned CSR, SSR, incremental/static, and fully static rendering with documented freshness, caching, failure, and hydration behavior.
@@ -300,15 +150,3 @@ Post-M13 repository/context normalization is developer-approved and committed at
 - Define custom-component resolution, safe prop/data projection, missing/incompatible component behavior, rich-text/asset rendering boundaries, and code-splitting/tree-shaking budgets.
 - Translate dependency manifests/events into supported tag/path/regeneration/build-hook behavior while preserving exact targeted invalidation.
 - Add fixture compatibility, deterministic output, accessibility/security, performance/bundle, version-skew, and existing-CMS-without-migration proof.
-
-**Read before design:** product delivery modes/canonical representation; PRD §§18, 22–23; M9–M11, M27–M29 contracts; SDK/package/release conventions.
-
-## Long-term directions outside this roadmap
-
-Managed hosting, external backend/data adapters, billing, analytics, and a plugin marketplace remain durable product directions in `product.md`. They are intentionally not assigned milestone numbers here. Reassess and sequence them only after the developer accepts M30 and confirms the next product horizon.
-
-## Cross-cutting blocked and developer-controlled gates
-
-- QuickJS issue #255 continues to block Tier 2 production/default activation and hard-memory proof; it does not block M14–M30.
-- Schema/SDK/CLI package versioning/publication, OAuth production rollout, production domains/configuration, deployments, and milestone acceptance remain separate developer-controlled gates; the staged SDK exports must remain within the implemented content/runtime boundary through first publication.
-- No pending milestone may silently move schema structure back into hosted visual authoring, expose management credentials to Studio browser code, add locale fallback, replace stable IDs with labels/API/source keys, or weaken immutable/idempotent authority.

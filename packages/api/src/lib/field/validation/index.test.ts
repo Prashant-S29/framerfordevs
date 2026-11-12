@@ -1,5 +1,3 @@
-// Verifies deterministic field values, recursive bounds, localization, and structured-content safety.
-
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 
@@ -21,12 +19,14 @@ import {
   validateFieldValue,
 } from "./index";
 
-import * as SchemaStrict from "../../schema-strict";
-const emptyShortText = SchemaStrict.decodeUnknownSync(ShortTextConfiguration)({});
-const emptyObject = SchemaStrict.decodeUnknownSync(ObjectConfiguration)({});
-const emptyList = SchemaStrict.decodeUnknownSync(ListConfiguration)({});
+const emptyShortText = Schema.decodeUnknownSync(ShortTextConfiguration, {
+  onExcessProperty: "error",
+})({});
+const emptyObject = Schema.decodeUnknownSync(ObjectConfiguration, { onExcessProperty: "error" })(
+  {},
+);
+const emptyList = Schema.decodeUnknownSync(ListConfiguration, { onExcessProperty: "error" })({});
 
-/** Creates a root or nested object definition for recursive-shape tests. */
 function objectField(
   id: string,
   children: ReadonlyArray<ValueFieldDefinition>,
@@ -46,7 +46,6 @@ function objectField(
   };
 }
 
-/** Creates a short-text leaf with inherited or explicit localization. */
 function textField(id: string, localization: "localized" | "shared" | null): ValueFieldDefinition {
   return {
     id,
@@ -61,7 +60,6 @@ function textField(id: string, localization: "localized" | "shared" | null): Val
   };
 }
 
-/** Creates a list definition with one supplied item node. */
 function listField(
   id: string,
   item: ValueFieldDefinition,
@@ -80,7 +78,6 @@ function listField(
   };
 }
 
-/** Nests object definitions to an exact field depth with a leaf at the bottom. */
 function nestedObjectDepth(depth: number): ValueFieldDefinition {
   let child = textField(`leaf_${depth}`, null);
   for (let current = depth - 1; current >= 1; current -= 1) {
@@ -112,7 +109,9 @@ describe("exact decimal and money validation", () => {
   });
 
   it("enforces decimal precision, scale, and exact bounds", () => {
-    const configuration = SchemaStrict.decodeUnknownSync(DecimalConfiguration)({
+    const configuration = Schema.decodeUnknownSync(DecimalConfiguration, {
+      onExcessProperty: "error",
+    })({
       precision: 6,
       scale: 2,
       minimum: "-10.5",
@@ -137,7 +136,9 @@ describe("exact decimal and money validation", () => {
   });
 
   it("validates money currencies and minor units without rounding", () => {
-    const configuration = SchemaStrict.decodeUnknownSync(MoneyConfiguration)({
+    const configuration = Schema.decodeUnknownSync(MoneyConfiguration, {
+      onExcessProperty: "error",
+    })({
       currencies: ["USD", "JPY"],
       allowNegative: false,
     });
@@ -251,21 +252,23 @@ describe("recursive definition policy", () => {
       apiKey: "body",
       position: 0,
       kind: "rich_text",
-      configuration: SchemaStrict.decodeUnknownSync(RichTextConfiguration)({
-        default: {
-          version: 1,
-          profile: "ffd-portable-text",
-          blocks: [
-            {
-              _key: "block1",
-              _type: "block",
-              style: "normal",
-              children: [{ _key: "span1", _type: "span", text: "Hello", marks: ["strong"] }],
-              markDefs: [],
-            },
-          ],
+      configuration: Schema.decodeUnknownSync(RichTextConfiguration, { onExcessProperty: "error" })(
+        {
+          default: {
+            version: 1,
+            profile: "ffd-portable-text",
+            blocks: [
+              {
+                _key: "block1",
+                _type: "block",
+                style: "normal",
+                children: [{ _key: "span1", _type: "span", text: "Hello", marks: ["strong"] }],
+                markDefs: [],
+              },
+            ],
+          },
         },
-      }),
+      ),
     };
     const money: ValueFieldDefinition = {
       ...base,
@@ -273,7 +276,7 @@ describe("recursive definition policy", () => {
       apiKey: "price",
       position: 1,
       kind: "money",
-      configuration: SchemaStrict.decodeUnknownSync(MoneyConfiguration)({
+      configuration: Schema.decodeUnknownSync(MoneyConfiguration, { onExcessProperty: "error" })({
         currencies: ["USD"],
         default: { amount: "19.99", currency: "USD" },
       }),
@@ -284,7 +287,9 @@ describe("recursive definition policy", () => {
       apiKey: "image",
       position: 2,
       kind: "external_asset",
-      configuration: SchemaStrict.decodeUnknownSync(ExternalAssetConfiguration)({
+      configuration: Schema.decodeUnknownSync(ExternalAssetConfiguration, {
+        onExcessProperty: "error",
+      })({
         default: {
           source: "external",
           url: "https://example.com/image.jpg",
@@ -304,7 +309,9 @@ describe("recursive definition policy", () => {
 
 describe("structured and untrusted values", () => {
   it("accepts the approved Portable Text profile and rejects unsafe links", () => {
-    const configuration = SchemaStrict.decodeUnknownSync(RichTextConfiguration)({});
+    const configuration = Schema.decodeUnknownSync(RichTextConfiguration, {
+      onExcessProperty: "error",
+    })({});
     const field: ValueFieldDefinition = {
       id: "body",
       apiKey: "body",
@@ -355,7 +362,9 @@ describe("structured and untrusted values", () => {
           position: 0,
           children: [],
           kind: "decimal",
-          configuration: SchemaStrict.decodeUnknownSync(DecimalConfiguration)({
+          configuration: Schema.decodeUnknownSync(DecimalConfiguration, {
+            onExcessProperty: "error",
+          })({
             precision: 6,
             scale: 2,
           }),
@@ -365,7 +374,9 @@ describe("structured and untrusted values", () => {
           id: "money_property",
           apiKey: "money_property",
           kind: "money",
-          configuration: SchemaStrict.decodeUnknownSync(MoneyConfiguration)({
+          configuration: Schema.decodeUnknownSync(MoneyConfiguration, {
+            onExcessProperty: "error",
+          })({
             currencies: ["USD"],
             allowNegative: true,
           }),
@@ -375,21 +386,27 @@ describe("structured and untrusted values", () => {
           id: "slug_property",
           apiKey: "slug_property",
           kind: "slug",
-          configuration: SchemaStrict.decodeUnknownSync(SlugConfiguration)({}),
+          configuration: Schema.decodeUnknownSync(SlugConfiguration, { onExcessProperty: "error" })(
+            {},
+          ),
         };
         const richTextField: ValueFieldDefinition = {
           ...decimalField,
           id: "rich_property",
           apiKey: "rich_property",
           kind: "rich_text",
-          configuration: SchemaStrict.decodeUnknownSync(RichTextConfiguration)({}),
+          configuration: Schema.decodeUnknownSync(RichTextConfiguration, {
+            onExcessProperty: "error",
+          })({}),
         };
         const assetField: ValueFieldDefinition = {
           ...decimalField,
           id: "asset_property",
           apiKey: "asset_property",
           kind: "external_asset",
-          configuration: SchemaStrict.decodeUnknownSync(ExternalAssetConfiguration)({}),
+          configuration: Schema.decodeUnknownSync(ExternalAssetConfiguration, {
+            onExcessProperty: "error",
+          })({}),
         };
         const mixedObject = objectField(
           "mixed_property",
@@ -472,7 +489,9 @@ describe("structured and untrusted values", () => {
       position: 0,
       children: [],
       kind: "external_asset",
-      configuration: SchemaStrict.decodeUnknownSync(ExternalAssetConfiguration)({}),
+      configuration: Schema.decodeUnknownSync(ExternalAssetConfiguration, {
+        onExcessProperty: "error",
+      })({}),
     };
     const result = validateFieldValue(assetField, {
       source: "external",

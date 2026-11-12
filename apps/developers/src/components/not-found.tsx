@@ -1,5 +1,3 @@
-// Provides an accessible public-only fallback for unknown developer-documentation routes.
-
 import { Link } from "@tanstack/react-router";
 import { HomeLayout } from "fumadocs-ui/layouts/home";
 

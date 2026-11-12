@@ -1,5 +1,3 @@
-// Summarizes persisted webhook captures by safe fixed dimensions without printing event bodies or identities.
-
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -10,7 +8,6 @@ interface CaptureSummary {
   readonly phase: string;
 }
 
-/** Narrows unknown JSON into the small body-free shape needed by the report. */
 function captureSummary(value: unknown): CaptureSummary | null {
   if (typeof value !== "object" || value === null) return null;
   if (!("scenario" in value) || typeof value.scenario !== "string") return null;
@@ -35,7 +32,6 @@ function captureSummary(value: unknown): CaptureSummary | null {
   };
 }
 
-/** Walks one directory recursively and returns only capture JSON paths. */
 async function captureFiles(directory: string): Promise<ReadonlyArray<string>> {
   let entries;
   try {
@@ -56,12 +52,10 @@ async function captureFiles(directory: string): Promise<ReadonlyArray<string>> {
   return nested.flat();
 }
 
-/** Increments one closed summary key without retaining request identity. */
 function increment(summary: Record<string, number>, key: string): void {
   summary[key] = (summary[key] ?? 0) + 1;
 }
 
-/** Reads all captures and prints aggregate scenario/status/verification evidence only. */
 async function main(): Promise<void> {
   const dataDirectory = process.env.DATA_DIR ?? "./data";
   const files = await captureFiles(join(dataDirectory, "captures"));

@@ -1,19 +1,17 @@
-// Verifies new-partition defaults are projected into stable field identities without replacing saved values.
-
 import {
   CollectionFieldDefinition,
   defaultFieldEditorMetadata,
-} from "@framerfordevs/api/contracts/schema/index";
+} from "@framerfordevs/api/contracts/schema";
 
 import { describe, expect, it } from "vitest";
 
 import { applyGeneratedFormDefaults, applyNewEntryPartitionDefaults } from "./index";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const rootId = "019fae8b-1234-7000-8000-000000000081";
 const childId = "019fae8b-1234-7000-8000-000000000082";
 
-const child = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+const child = Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })({
   id: childId,
   parentFieldId: rootId,
   nodeRole: "object_property",
@@ -29,7 +27,9 @@ const child = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   children: [],
 });
 
-const mixedObject = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+const mixedObject = Schema.decodeUnknownSync(CollectionFieldDefinition, {
+  onExcessProperty: "error",
+})({
   id: rootId,
   parentFieldId: null,
   nodeRole: "root",
@@ -45,7 +45,9 @@ const mixedObject = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   children: [child],
 });
 
-const atomicObject = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+const atomicObject = Schema.decodeUnknownSync(CollectionFieldDefinition, {
+  onExcessProperty: "error",
+})({
   ...mixedObject,
   required: false,
   localization: "localized",

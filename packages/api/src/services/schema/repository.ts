@@ -94,7 +94,6 @@ import {
   authorizeCmsActorProject,
 } from "../project-access";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
 }
@@ -128,7 +127,7 @@ function decodeDatabaseValue<A, I>(
   schema: Schema.Codec<A, I, never>,
   value: unknown,
 ) {
-  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
+  return Schema.decodeUnknownEffect(schema)(value).pipe(
     Effect.mapError((cause) => databaseFailure(`${operation}.decode`, cause)),
   );
 }
@@ -385,13 +384,12 @@ async function selectCollection(
   return row;
 }
 
-/** Expands the M6 `{}` sentinel shared by historical current and revision field rows. */
 export function decodePersistedFieldEditorMetadataSync(
   editorMetadata: Readonly<Record<string, unknown>>,
 ): FieldEditorMetadata {
   return Object.keys(editorMetadata).length === 0
     ? defaultFieldEditorMetadata
-    : SchemaStrict.decodeUnknownSync(FieldEditorMetadata)(editorMetadata);
+    : Schema.decodeUnknownSync(FieldEditorMetadata)(editorMetadata);
 }
 
 function fieldValue(
@@ -399,7 +397,7 @@ function fieldValue(
 ) {
   const id = "fieldId" in row ? row.fieldId : row.id;
   const editor = decodePersistedFieldEditorMetadataSync(row.editorMetadata);
-  return SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+  return Schema.decodeUnknownSync(CollectionFieldDefinition)({
     id,
     parentFieldId: row.parentFieldId,
     nodeRole: row.nodeRole,
@@ -447,13 +445,13 @@ function draftStateSync(
     currencyRegistryProfile:
       collection.currencyRegistryProfile === null
         ? null
-        : SchemaStrict.decodeUnknownSync(Schema.String)(collection.currencyRegistryProfile),
-    collection: SchemaStrict.decodeUnknownSync(CmsCollection)(collectionValue(collection)),
+        : Schema.decodeUnknownSync(Schema.String)(collection.currencyRegistryProfile),
+    collection: Schema.decodeUnknownSync(CmsCollection)(collectionValue(collection)),
     fields,
     editorLayout:
       collection.editorLayout === null
         ? syntheticEditorLayout(fields)
-        : SchemaStrict.decodeUnknownSync(EditorLayout)(collection.editorLayout),
+        : Schema.decodeUnknownSync(EditorLayout)(collection.editorLayout),
   };
 }
 
@@ -507,7 +505,7 @@ export function decodePublishedSchemaRevisionSync(rows: {
   const editorLayout =
     revision.editorLayout === null
       ? syntheticEditorLayout(fields)
-      : SchemaStrict.decodeUnknownSync(EditorLayout)(revision.editorLayout);
+      : Schema.decodeUnknownSync(EditorLayout)(revision.editorLayout);
   const contractHash = hashSchemaContract({
     formatVersion: revision.formatVersion,
     validationProfile: revision.validationProfile,
@@ -515,7 +513,7 @@ export function decodePublishedSchemaRevisionSync(rows: {
     collectionApiKey: revision.collectionApiKey,
     fields,
   });
-  const published = SchemaStrict.decodeUnknownSync(PublishedSchemaRevision)({
+  const published = Schema.decodeUnknownSync(PublishedSchemaRevision)({
     id: revision.id,
     workspaceId: revision.workspaceId,
     projectId: revision.projectId,
@@ -586,7 +584,6 @@ interface MaterializedAuthoringFields {
   readonly issues: ReadonlyArray<SchemaValidationIssue>;
 }
 
-/** Materializes one bounded authoring tree while preserving immutable active identities. */
 function materializeAuthoringFields(
   fields: ReadonlyArray<CollectionFieldAuthoringNode>,
   currentFields: ReadonlyArray<CollectionFieldDefinition>,
@@ -697,7 +694,7 @@ function materializeAuthoringFields(
       continue;
     }
 
-    const candidate = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+    const candidate = Schema.decodeUnknownSync(CollectionFieldDefinition)({
       id: fieldId,
       parentFieldId: current.parent?.id ?? null,
       nodeRole,
@@ -742,7 +739,6 @@ function materializeAuthoringFields(
   };
 }
 
-/** Preserves placements for retained roots and appends only newly introduced roots. */
 function reconcileRootPlacements(
   layout: EditorLayout,
   previousRoots: ReadonlyArray<CollectionFieldDefinition>,
@@ -856,7 +852,7 @@ function appendRootPlacement(layout: EditorLayout, field: CollectionFieldDefinit
       },
     ],
   };
-  return SchemaStrict.decodeUnknownSync(EditorLayout)({
+  return Schema.decodeUnknownSync(EditorLayout)({
     ...layout,
     tabs: layout.tabs.map((tab) =>
       tab.id === lastTab.id
@@ -870,7 +866,7 @@ function appendRootPlacement(layout: EditorLayout, field: CollectionFieldDefinit
 }
 
 function removeRootPlacement(layout: EditorLayout, fieldId: string): EditorLayout {
-  return SchemaStrict.decodeUnknownSync(EditorLayout)({
+  return Schema.decodeUnknownSync(EditorLayout)({
     ...layout,
     tabs: layout.tabs.map((tab) => ({
       ...tab,
@@ -1374,7 +1370,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
             ).length;
             const fieldId = randomUUID();
             const editor = nodeRole === "list_item" && parent ? parent.editor : input.field.editor;
-            const candidate = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+            const candidate = Schema.decodeUnknownSync(CollectionFieldDefinition)({
               id: fieldId,
               parentFieldId: input.parentFieldId,
               nodeRole,
@@ -1576,7 +1572,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
             if (unchanged)
               return outcomeWith("success", { draft: decodeDraftSync(collection, rows) });
 
-            const candidate = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+            const candidate = Schema.decodeUnknownSync(CollectionFieldDefinition)({
               id: current.id,
               parentFieldId: current.parentFieldId,
               nodeRole: currentDefinition.nodeRole,
@@ -1917,7 +1913,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               .map((row) => {
                 const node = fieldValue(row);
                 return affected.some((value) => value.id === row.id)
-                  ? SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+                  ? Schema.decodeUnknownSync(CollectionFieldDefinition)({
                       ...node,
                       position: node.position - 1,
                     })
@@ -2303,7 +2299,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               validationProfile: draft.validationProfile,
               currencyRegistryProfile: draft.currencyRegistryProfile,
               contractHash: draft.contractHash,
-              role: SchemaStrict.decodeUnknownSync(ProjectRole)(authorization.access.role),
+              role: Schema.decodeUnknownSync(ProjectRole)(authorization.access.role),
               canEdit: isRoleAllowed(authorization.access.role, "content.write"),
               fields: draft.fields,
               editorLayout: draft.editorLayout,
@@ -2353,7 +2349,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
               validationProfile: revision.validationProfile,
               currencyRegistryProfile: revision.currencyRegistryProfile,
               contractHash: revision.contractHash,
-              role: SchemaStrict.decodeUnknownSync(ProjectRole)(authorization.access.role),
+              role: Schema.decodeUnknownSync(ProjectRole)(authorization.access.role),
               canEdit: isRoleAllowed(authorization.access.role, "content.write"),
               fields: revision.fields,
               editorLayout: revision.editorLayout,
@@ -2467,7 +2463,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 return outcome("conflict");
               const expected = fingerprintSchemaPublication(
                 input,
-                SchemaStrict.decodeUnknownSync(SchemaHash)(existing.schemaHash),
+                Schema.decodeUnknownSync(SchemaHash)(existing.schemaHash),
               );
               if (existing.commandFingerprint !== expected) return outcome("conflict");
               const rows = await loadPublishedRevisionRows(transaction, {

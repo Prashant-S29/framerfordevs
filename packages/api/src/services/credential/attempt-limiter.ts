@@ -1,11 +1,8 @@
-// Preserves the credential-verification limiter facade while delegating enforcement to the central manager.
-
 import { Context, Effect, Layer } from "effect";
 
 import { RateLimitedFailure } from "../../contracts/response/errors";
 import { RateLimitManager, type RateLimitManagerService } from "../rate-limit/manager";
 
-/** Adapts credential verification to the shared weighted policy without exposing arbitrary limits. */
 export function makeCredentialAttemptLimiter(manager: RateLimitManagerService) {
   return {
     assertAllowed: Effect.fn("CredentialAttemptLimiter.assertAllowed")(function* (source: string) {

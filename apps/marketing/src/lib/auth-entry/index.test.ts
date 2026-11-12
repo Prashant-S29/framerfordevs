@@ -1,5 +1,3 @@
-// Verifies marketing login entry accepts only bounded dashboard-relative destinations.
-
 import { describe, expect, it } from "vitest";
 
 import { buildDashboardLoginUrl, getSafeDashboardReturnTo, parseLoginEntrySearch } from "./index";

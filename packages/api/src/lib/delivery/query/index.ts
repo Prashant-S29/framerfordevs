@@ -1,5 +1,3 @@
-// Parses the strict raw Delivery query grammar into canonical typed predicates without Express or database dependencies.
-
 import { createHash } from "node:crypto";
 
 import type {
@@ -62,12 +60,10 @@ const equalityOnlyKinds = new Set<DeliveryQueryScalarKind>([...textKinds, "boole
 const fieldKeyPattern = /^[a-z][a-z0-9_]{0,62}$/u;
 const cursorPattern = /^[A-Za-z0-9_-]+$/u;
 
-/** Creates one bounded issue that identifies grammar/capability, never the supplied value. */
 function issue(path: string, code: string, message: string): DeliveryQueryIssue {
   return { path: path.slice(0, 256), code, message: message.slice(0, 512) };
 }
 
-/** Reads one singleton parameter while rejecting duplicate query coercion ambiguity. */
 function singleton(
   parameters: URLSearchParams,
   key: string,
@@ -94,7 +90,6 @@ function singleton(
   return value;
 }
 
-/** Applies the closed operator matrix for the configured scalar kind. */
 function operatorAllowed(
   kind: DeliveryQueryScalarKind,
   operator: string,
@@ -113,7 +108,6 @@ function operatorAllowed(
   return orderedKinds.has(kind);
 }
 
-/** Rejects controls and normalizes exact text comparisons to NFC. */
 function canonicalText(value: string): string | null {
   if (value.length > 2_048) return null;
   for (const character of value) {
@@ -123,7 +117,6 @@ function canonicalText(value: string): string | null {
   return value.normalize("NFC");
 }
 
-/** Decodes one raw filter value into its exact comparison representation. */
 export function decodeDeliveryFilterValue(
   kind: DeliveryQueryScalarKind,
   value: string,
@@ -164,7 +157,6 @@ export function decodeDeliveryFilterValue(
   return null;
 }
 
-/** Parses, validates, and deterministically orders all dynamic filter parameters. */
 function parseFilters(
   parameters: URLSearchParams,
   capabilities: ReadonlyMap<string, DeliveryQueryCapability>,
@@ -241,7 +233,6 @@ function parseFilters(
   );
 }
 
-/** Parses one configured field sort with mandatory entry-ID tie-breaking deferred to SQL. */
 function parseSort(
   rawSort: string | null,
   capabilities: ReadonlyMap<string, DeliveryQueryCapability>,
@@ -275,7 +266,6 @@ function parseSort(
   };
 }
 
-/** Parses normalized expansion paths while rejecting indexes, duplicates, and depth/count excess. */
 function parseExpand(
   rawExpand: string | null,
   issues: Array<DeliveryQueryIssue>,
@@ -324,7 +314,6 @@ export function decodeDeliveryExpand(
   return issues.length === 0 ? { ok: true, value } : { ok: false, issues };
 }
 
-/** Hashes only canonical public query authority for cursor binding without retaining raw values. */
 function queryHash(value: Omit<ParsedDeliveryListQuery, "cursor" | "queryHash">): string {
   return createHash("sha256")
     .update(
@@ -345,7 +334,6 @@ function queryHash(value: Omit<ParsedDeliveryListQuery, "cursor" | "queryHash">)
     .digest("hex");
 }
 
-/** Parses the list endpoint from the original query string so duplicate keys cannot be hidden. */
 export function parseDeliveryListQuery(
   rawQuery: string,
   configuredCapabilities: ReadonlyArray<DeliveryQueryCapability>,

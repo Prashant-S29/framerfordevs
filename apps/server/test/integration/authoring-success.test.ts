@@ -1,11 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import type { ApplicationEffectTransform } from "@framerfordevs/api/context";
-import {
-  RateLimitDecision,
-  rateLimitPolicies,
-} from "@framerfordevs/api/contracts/rate-limit/index";
-import { applicationRuntime, disposeApplicationRuntime } from "@framerfordevs/api/runtime/index";
+import { RateLimitDecision, rateLimitPolicies } from "@framerfordevs/api/contracts/rate-limit";
+import { applicationRuntime, disposeApplicationRuntime } from "@framerfordevs/api/runtime";
 import {
   makePublicationRepository,
   PublicationRepository,
@@ -13,11 +10,11 @@ import {
 import {
   RateLimitManager,
   type RateLimitManagerService,
-} from "@framerfordevs/api/services/rate-limit/manager/index";
+} from "@framerfordevs/api/services/rate-limit/manager";
 import {
   makeToolingPrincipalAuthenticator,
   ToolingPrincipalAuthenticator,
-} from "@framerfordevs/api/services/tooling/principal-authenticator/index";
+} from "@framerfordevs/api/services/tooling/principal-authenticator";
 import { db } from "@framerfordevs/db";
 import { and, eq, inArray, or } from "@framerfordevs/db/query";
 import {
@@ -66,13 +63,12 @@ import {
   workspace,
   workspaceMembership,
 } from "@framerfordevs/db/schema/platform";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createApp } from "../../src/app";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const suffix = randomUUID();
 const email = `m13-authoring-http-${suffix}@example.test`;
 const password = "M13-Authoring-HTTP-Password-123!";
@@ -91,7 +87,7 @@ let toolingPrincipalAuthenticatorOverride: typeof downgradedOAuthAuthenticator |
 const permissiveRateLimitManager: RateLimitManagerService = {
   evaluate: (input) =>
     Effect.succeed(
-      SchemaStrict.decodeUnknownSync(RateLimitDecision)({
+      Schema.decodeUnknownSync(RateLimitDecision, { onExcessProperty: "error" })({
         allowed: true,
         policy: input.policy,
         cost: input.cost,

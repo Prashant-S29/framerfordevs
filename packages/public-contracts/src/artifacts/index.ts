@@ -1,5 +1,3 @@
-// Canonicalizes and validates only registry-declared public artifacts before hashing or publication.
-
 import { createHash } from "node:crypto";
 
 import {
@@ -136,7 +134,6 @@ function digest(bytes: string): string {
   return createHash("sha256").update(bytes, "utf8").digest("hex");
 }
 
-/** Validates and serializes one explicit source without filesystem discovery. */
 export function canonicalizePublicArtifact(kind: PublicArtifactKind, source: unknown): string {
   assertJsonValue(source, kind, new Set());
   validateKind(kind, source);
@@ -146,7 +143,6 @@ export function canonicalizePublicArtifact(kind: PublicArtifactKind, source: unk
   return bytes;
 }
 
-/** Produces byte-stable artifacts without scanning source or output directories. */
 export function generatePublicArtifacts(): ReadonlyArray<GeneratedPublicArtifact> {
   return publicContractRegistryKeys.map((key) => {
     const entry = publicContractRegistry[key];

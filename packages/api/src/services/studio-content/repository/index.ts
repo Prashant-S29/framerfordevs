@@ -1,5 +1,3 @@
-// Composes current Studio user, locale, schema projection, and anomaly-audit authority.
-
 import { db } from "@framerfordevs/db";
 import { and, eq, gt, inArray, isNotNull, lt, or, sql } from "@framerfordevs/db/query";
 import {
@@ -11,7 +9,7 @@ import {
 } from "@framerfordevs/db/schema/cms";
 import { projectLocale } from "@framerfordevs/db/schema/locale";
 import { environment, projectCapability } from "@framerfordevs/db/schema/platform";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 import { ProjectRole } from "../../../contracts/access";
 import { type LocaleTag, ProjectLocaleId } from "../../../contracts/locale";
@@ -50,7 +48,6 @@ import { type ApplicationDb, selectUserProjectAccess } from "../../project-acces
 import { decodePublishedSchemaRevisionSync } from "../../schema/repository";
 import { ensureProjectionInvalidAudit } from "../projection-audit";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 interface StudioContentRepositoryOptions {
   readonly database?: Pick<ApplicationDb, "transaction">;
 }
@@ -199,7 +196,7 @@ async function selectCollectionAuthority(
     .from(cmsSchemaRevisionField)
     .where(eq(cmsSchemaRevisionField.revisionId, revision.revision.id))
     .orderBy(cmsSchemaRevisionField.position, cmsSchemaRevisionField.fieldId);
-  const role = SchemaStrict.decodeUnknownSync(ProjectRole)(access.role);
+  const role = Schema.decodeUnknownSync(ProjectRole)(access.role);
   if (persistedFields.length === 0) {
     return role === "owner" || role === "developer"
       ? { kind: "configuration_invalid" as const, reason: "empty_schema" as const }
@@ -244,10 +241,10 @@ async function selectCollectionAuthority(
   if (decision.kind === "configuration_invalid") {
     if (decision.reason === "projection_invalid") {
       await ensureProjectionInvalidAudit(executor, {
-        workspaceId: SchemaStrict.decodeUnknownSync(WorkspaceId)(access.project.workspaceId),
+        workspaceId: Schema.decodeUnknownSync(WorkspaceId)(access.project.workspaceId),
         projectId: scope.projectId,
         environmentId: scope.environmentId,
-        schemaRevisionId: SchemaStrict.decodeUnknownSync(SchemaRevisionId)(revision.revision.id),
+        schemaRevisionId: Schema.decodeUnknownSync(SchemaRevisionId)(revision.revision.id),
         actorId,
         occurredAt: now,
       });
@@ -258,11 +255,11 @@ async function selectCollectionAuthority(
   return {
     kind: "success" as const,
     authority: {
-      workspaceId: SchemaStrict.decodeUnknownSync(WorkspaceId)(access.project.workspaceId),
+      workspaceId: Schema.decodeUnknownSync(WorkspaceId)(access.project.workspaceId),
       role,
-      localeId: SchemaStrict.decodeUnknownSync(ProjectLocaleId)(locale.id),
+      localeId: Schema.decodeUnknownSync(ProjectLocaleId)(locale.id),
       locale: scope.locale,
-      schemaRevisionId: SchemaStrict.decodeUnknownSync(SchemaRevisionId)(revision.revision.id),
+      schemaRevisionId: Schema.decodeUnknownSync(SchemaRevisionId)(revision.revision.id),
       canCreate: canWriteLocalized,
       canRename: canWriteLocalized,
       canWriteLocalized,
@@ -378,7 +375,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
               if (row.displayName === null) {
                 throw new Error("Studio entry query returned a null display name.");
               }
-              return SchemaStrict.decodeUnknownSync(StudioEntrySummary)({
+              return Schema.decodeUnknownSync(StudioEntrySummary)({
                 id: row.id,
                 displayName: row.displayName,
                 nameVersion: row.nameVersion,
@@ -390,7 +387,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
             return {
               kind: "success" as const,
               result: {
-                page: SchemaStrict.decodeUnknownSync(StudioEntryPage)({
+                page: Schema.decodeUnknownSync(StudioEntryPage)({
                   items,
                   hasMore: rows.length > input.limit,
                   nextCursor: null,
@@ -399,7 +396,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
                 finalBrowseOrder:
                   input.search === null && final !== undefined
                     ? {
-                        createdAt: SchemaStrict.decodeUnknownSync(IsoDateTime)(
+                        createdAt: Schema.decodeUnknownSync(IsoDateTime)(
                           final.createdAt.toISOString(),
                         ),
                         entryId: final.id,
@@ -465,7 +462,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
                 return row?.displayName === null || row === undefined
                   ? []
                   : [
-                      SchemaStrict.decodeUnknownSync(StudioResolvedEntryLabel)({
+                      Schema.decodeUnknownSync(StudioResolvedEntryLabel)({
                         id: row.id,
                         displayName: row.displayName,
                       }),
@@ -526,7 +523,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
               .limit(1);
             if (capability?.status !== "enabled") return { kind: "cms_disabled" as const };
 
-            const role = SchemaStrict.decodeUnknownSync(ProjectRole)(access.role);
+            const role = Schema.decodeUnknownSync(ProjectRole)(access.role);
             const enabledLocales = await transaction
               .select({
                 id: projectLocale.id,
@@ -551,7 +548,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
             );
             const roleCanWrite = isRoleAllowed(role, "content.write");
             const locales = effectiveLocales.map((locale) =>
-              SchemaStrict.decodeUnknownSync(StudioContentLocale)({
+              Schema.decodeUnknownSync(StudioContentLocale)({
                 id: locale.id,
                 tag: locale.tag,
                 displayName: locale.displayName,
@@ -562,7 +559,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
             if (locales.length === 0) {
               return {
                 kind: "success" as const,
-                context: SchemaStrict.decodeUnknownSync(StudioContentContext)({
+                context: Schema.decodeUnknownSync(StudioContentContext)({
                   locales: [],
                   collections: [],
                   configurationNotices: [],
@@ -626,7 +623,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
               if (persistedFields.length === 0) {
                 if (supportRole) {
                   configurationNotices.push(
-                    SchemaStrict.decodeUnknownSync(StudioCollectionConfigurationNotice)({
+                    Schema.decodeUnknownSync(StudioCollectionConfigurationNotice)({
                       collectionId: revision.collectionId,
                       displayName: revision.collectionDisplayName,
                       reason: "empty_schema",
@@ -674,7 +671,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
               if (decision.kind === "hidden") continue;
               if (decision.kind === "configuration_invalid") {
                 configurationNotices.push(
-                  SchemaStrict.decodeUnknownSync(StudioCollectionConfigurationNotice)({
+                  Schema.decodeUnknownSync(StudioCollectionConfigurationNotice)({
                     collectionId: revision.collectionId,
                     displayName: revision.collectionDisplayName,
                     reason: decision.reason,
@@ -682,12 +679,10 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
                 );
                 if (decision.reason === "projection_invalid") {
                   await ensureProjectionInvalidAudit(transaction, {
-                    workspaceId: SchemaStrict.decodeUnknownSync(WorkspaceId)(
-                      access.project.workspaceId,
-                    ),
+                    workspaceId: Schema.decodeUnknownSync(WorkspaceId)(access.project.workspaceId),
                     projectId: scope.projectId,
                     environmentId: scope.environmentId,
-                    schemaRevisionId: SchemaStrict.decodeUnknownSync(SchemaRevisionId)(revision.id),
+                    schemaRevisionId: Schema.decodeUnknownSync(SchemaRevisionId)(revision.id),
                     actorId,
                     occurredAt: now,
                   });
@@ -696,7 +691,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
               }
               const canMutate = roleCanWrite && projectedEditableFieldCount > 0;
               collections.push(
-                SchemaStrict.decodeUnknownSync(StudioContentCollection)({
+                Schema.decodeUnknownSync(StudioContentCollection)({
                   id: revision.collectionId,
                   displayName: revision.collectionDisplayName,
                   capabilities: {
@@ -710,7 +705,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
             }
             return {
               kind: "success" as const,
-              context: SchemaStrict.decodeUnknownSync(StudioContentContext)({
+              context: Schema.decodeUnknownSync(StudioContentContext)({
                 locales,
                 collections,
                 configurationNotices,

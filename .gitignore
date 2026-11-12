@@ -6,17 +6,13 @@ node_modules
 
 # Build outputs
 dist
-build
+/build
 *.tsbuildinfo
-
-# Generated files
-apps/web/src/routeTree.gen.ts
 
 # Environment variables
 .env
 .env*.local
-delivery-load.env
-preview-load.env
+apps/server/load/*.env
 
 # IDEs and editors
 .vscode/*
@@ -56,3 +52,8 @@ coverage
 .cache
 tmp
 temp
+
+# Claude Code local state
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+CLAUDE.local.md

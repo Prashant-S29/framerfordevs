@@ -1,16 +1,13 @@
-// Validates Presentation authority files before loading credentials or network clients.
-
 import { lstat, readFile, realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
-import { Cause, Effect, Option } from "effect";
+import { Cause, Effect, Option, Schema } from "effect";
 
 import { parseArguments, stringFlag, validateFlags } from "../../command-arguments";
 import { CliConfigFileSystemLive, loadCliConfig } from "../../config";
 import { readAuthoringEnvironmentAuthority } from "../../schema/authoring/files";
 import { PresentationEditDocument } from "../document";
 
-import * as SchemaStrict from "../../schema-strict";
 const maximumDocumentBytes = 1_048_576;
 const apiKeyPattern = /^[a-z][a-z0-9_]{0,62}$/u;
 
@@ -65,9 +62,12 @@ async function readPresentationDocument(projectRoot: string, pathValue: string) 
   }
   try {
     const value: unknown = JSON.parse(bytes);
-    return SchemaStrict.decodeUnknownSync(PresentationEditDocument)(value, {
-      onExcessProperty: "error",
-    });
+    return Schema.decodeUnknownSync(PresentationEditDocument, { onExcessProperty: "error" })(
+      value,
+      {
+        onExcessProperty: "error",
+      },
+    );
   } catch {
     throw new Error("CLI_PRESENTATION_FILE_INVALID");
   }

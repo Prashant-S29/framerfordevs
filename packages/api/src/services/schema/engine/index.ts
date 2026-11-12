@@ -1,5 +1,3 @@
-// Owns aggregate M6 schema validation, canonical dual hashes, change classification, and publication authority.
-
 import { createHash } from "node:crypto";
 
 import { Context, Effect, Layer } from "effect";
@@ -79,22 +77,18 @@ const classificationRank: Readonly<Record<SchemaChangeClassification, number>> =
   non_breaking: 2,
 };
 
-/** Hashes canonical UTF-8 text with SHA-256. */
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-/** Returns deterministic JSON text after the aggregate preflight has rejected unsafe values. */
 function canonicalStringify(value: unknown): string {
   return canonicalizeSchemaDocument(value);
 }
 
-/** Orders field definitions by authoring position and stable identity. */
 function compareFields(left: CollectionFieldDefinition, right: CollectionFieldDefinition): number {
   return left.position - right.position || left.id.localeCompare(right.id);
 }
 
-/** Copies decoded schema classes into plain JSON data without invoking serializers. */
 function plainJsonData(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(plainJsonData);
   if (typeof value !== "object" || value === null) return value;
@@ -103,7 +97,6 @@ function plainJsonData(value: unknown): unknown {
   return output;
 }
 
-/** Reconstructs the M5 hash document retained by migrated format-v1 revisions. */
 function canonicalLegacyManagementDocument(state: PublishedSchemaHashState): object {
   return {
     formatVersion: 1,
@@ -126,7 +119,6 @@ function canonicalLegacyManagementDocument(state: PublishedSchemaHashState): obj
   };
 }
 
-/** Produces the complete management document used for the schema hash and aggregate limit. */
 function canonicalManagementDocument(state: PublishedSchemaHashState): object {
   if (state.formatVersion === 1) return canonicalLegacyManagementDocument(state);
   return {
@@ -143,7 +135,6 @@ function canonicalManagementDocument(state: PublishedSchemaHashState): object {
   };
 }
 
-/** Normalizes configuration metadata that is presentation-only out of the API contract. */
 function contractConfiguration(field: CollectionFieldDefinition): unknown {
   switch (field.kind) {
     case "enum":
@@ -178,7 +169,6 @@ function contractConfiguration(field: CollectionFieldDefinition): unknown {
   }
 }
 
-/** Compiles one recursive API/value-contract field with effective localization. */
 function contractField(
   field: CollectionFieldDefinition,
   inheritedLocalization: Exclude<FieldLocalization, "mixed"> | null,
@@ -212,7 +202,6 @@ export interface SchemaContractState {
   readonly fields: ReadonlyArray<CollectionFieldDefinition>;
 }
 
-/** Produces the renderer-independent content contract excluded from layout/editor changes. */
 export function compileCollectionContract(state: SchemaContractState): object {
   return {
     formatVersion: state.formatVersion,
@@ -238,22 +227,18 @@ function publishedHashStateFromDraft(draft: SchemaDraftState): PublishedSchemaHa
   };
 }
 
-/** Computes the full immutable published-revision schema hash. */
 export function hashPublishedSchemaRevision(state: PublishedSchemaHashState): SchemaHash {
   return SchemaHash.make(sha256(canonicalStringify(canonicalManagementDocument(state))));
 }
 
-/** Computes the full management schema hash. */
 export function hashCollectionDraft(draft: SchemaDraftState): SchemaHash {
   return hashPublishedSchemaRevision(publishedHashStateFromDraft(draft));
 }
 
-/** Computes one value/API contract hash independently from editor presentation. */
 export function hashSchemaContract(state: SchemaContractState): ContractHash {
   return ContractHash.make(sha256(canonicalStringify(compileCollectionContract(state))));
 }
 
-/** Computes the current draft value/API contract hash. */
 export function hashCollectionContract(draft: SchemaDraftState): ContractHash {
   return hashSchemaContract({
     formatVersion: draft.formatVersion,
@@ -264,7 +249,6 @@ export function hashCollectionContract(draft: SchemaDraftState): ContractHash {
   });
 }
 
-/** Converts a bounded field-kernel issue into the public schema validation contract. */
 function schemaIssue(options: {
   readonly path: string;
   readonly code: string;
@@ -273,7 +257,6 @@ function schemaIssue(options: {
   return SchemaValidationIssue.make(options);
 }
 
-/** Validates recursive definitions, profiles, layout, publication completeness, and aggregate size. */
 export function validateCollectionDraft(
   draft: SchemaDraftState,
   purpose: SchemaValidationPurpose,
@@ -347,7 +330,6 @@ export function validateCollectionDraft(
   return { valid: issues.length === 0, issues };
 }
 
-/** Fingerprints exact publication authority and acknowledgement input. */
 export function fingerprintSchemaPublication(
   input: PublishCollectionSchemaInput,
   schemaHash: SchemaHash,
@@ -369,7 +351,6 @@ export function fingerprintSchemaPublication(
   );
 }
 
-/** Creates one deterministic bounded schema change. */
 function makeChange(options: {
   readonly code: SchemaChangeCode;
   readonly classification: SchemaChangeClassification;
@@ -402,7 +383,6 @@ function makeChange(options: {
   };
 }
 
-/** Returns the strictest classification from one coalesced configuration change. */
 function strictest(values: ReadonlyArray<SchemaChangeClassification>): SchemaChangeClassification {
   return values.reduce<SchemaChangeClassification>(
     (current, value) => (classificationRank[value] < classificationRank[current] ? value : current),
@@ -410,7 +390,6 @@ function strictest(values: ReadonlyArray<SchemaChangeClassification>): SchemaCha
   );
 }
 
-/** Compares optional minimum/maximum constraints where a tighter bound is riskier. */
 function classifyBounds(
   beforeMinimum: number | string | undefined,
   afterMinimum: number | string | undefined,
@@ -430,7 +409,6 @@ function classifyBounds(
   return minimumTightened || maximumTightened ? "potentially_breaking" : "non_breaking";
 }
 
-/** Coalesces one kind-preserving configuration mutation into a conservative classification. */
 function classifyConfiguration(
   before: CollectionFieldDefinition,
   after: CollectionFieldDefinition,
@@ -585,7 +563,6 @@ function classifyConfiguration(
   return strictest(classifications);
 }
 
-/** Maps every field identity to its effective inherited localization. */
 function effectiveLocalizations(
   roots: ReadonlyArray<CollectionFieldDefinition>,
 ): ReadonlyMap<string, FieldLocalization | null> {
@@ -610,7 +587,6 @@ function effectiveLocalizations(
   return values;
 }
 
-/** Compares one stable field identity across published and draft contracts. */
 function compareField(
   published: CollectionFieldDefinition,
   draft: CollectionFieldDefinition,
@@ -716,7 +692,6 @@ function compareField(
   return changes;
 }
 
-/** Classifies all deterministic M6 management-schema changes by stable identity. */
 export function classifyCollectionSchemaChanges(
   published: PublishedSchemaRevision | null,
   draft: SchemaDraftState,
@@ -872,12 +847,10 @@ export function classifyCollectionSchemaChanges(
   });
 }
 
-/** Returns only the exact risky changes requiring publication acknowledgement. */
 export function requiredAcknowledgementChanges(changes: SchemaChangeSet): SchemaChanges {
   return changes.items.filter((change) => change.classification !== "non_breaking");
 }
 
-/** Requires the acknowledgement set to equal every risky change ID, with no broad or extra bypass. */
 export function hasExactSchemaAcknowledgements(
   changes: SchemaChangeSet,
   acknowledgedChangeIds: AcknowledgedSchemaChangeIds,
@@ -890,7 +863,6 @@ export function hasExactSchemaAcknowledgements(
   );
 }
 
-/** Constructs the replaceable aggregate schema service. */
 export function makeSchemaEngine() {
   return {
     validateDraft: Effect.fn("SchemaEngine.validateDraft")(

@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Fiber, Layer } from "effect";
+import { Effect, Fiber, Layer, Schema } from "effect";
 import { TestClock } from "effect/testing";
 
 import { CredentialStore, StoredOAuthAuthority, makeCredentialStore } from "../credential-store";
@@ -10,7 +10,6 @@ import {
   loginWithDeviceAuthorization,
 } from "./index";
 
-import * as SchemaStrict from "../schema-strict";
 function success(value: unknown, status = 200) {
   return Promise.resolve(
     new Response(JSON.stringify(value), {
@@ -164,7 +163,7 @@ describe("OAuth device CLI flow", () => {
       const store = yield* CredentialStore;
       yield* store.save(
         "https://api.example.com",
-        SchemaStrict.decodeUnknownSync(StoredOAuthAuthority)({
+        Schema.decodeUnknownSync(StoredOAuthAuthority, { onExcessProperty: "error" })({
           version: 1,
           accessToken: "expired-access",
           refreshToken: "old-refresh",

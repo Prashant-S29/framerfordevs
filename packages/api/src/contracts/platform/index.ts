@@ -2,8 +2,7 @@ import { Schema, SchemaTransformation, Effect } from "effect";
 
 import { ApiSuccessSchema } from "../response/api";
 
-import * as SchemaStrict from "../../lib/schema-strict";
-import { UuidValue } from "../uuid";
+import { Uuid } from "../uuid";
 const projectKeyPattern = /^[a-z][a-z0-9-]{0,62}$/u;
 
 function hasControlCharacter(value: string): boolean {
@@ -34,22 +33,22 @@ const SafeName = NormalizedString.check(
   }),
 );
 
-export const WorkspaceId = UuidValue.pipe(Schema.brand("WorkspaceId"));
+export const WorkspaceId = Uuid.pipe(Schema.brand("WorkspaceId"));
 export type WorkspaceId = typeof WorkspaceId.Type;
 
-export const WorkspaceMembershipId = UuidValue.pipe(Schema.brand("WorkspaceMembershipId"));
+export const WorkspaceMembershipId = Uuid.pipe(Schema.brand("WorkspaceMembershipId"));
 export type WorkspaceMembershipId = typeof WorkspaceMembershipId.Type;
 
-export const ProjectId = UuidValue.pipe(Schema.brand("ProjectId"));
+export const ProjectId = Uuid.pipe(Schema.brand("ProjectId"));
 export type ProjectId = typeof ProjectId.Type;
 
-export const EnvironmentId = UuidValue.pipe(Schema.brand("EnvironmentId"));
+export const EnvironmentId = Uuid.pipe(Schema.brand("EnvironmentId"));
 export type EnvironmentId = typeof EnvironmentId.Type;
 
-export const ProjectCapabilityId = UuidValue.pipe(Schema.brand("ProjectCapabilityId"));
+export const ProjectCapabilityId = Uuid.pipe(Schema.brand("ProjectCapabilityId"));
 export type ProjectCapabilityId = typeof ProjectCapabilityId.Type;
 
-export const AuditEventId = UuidValue.pipe(Schema.brand("AuditEventId"));
+export const AuditEventId = Uuid.pipe(Schema.brand("AuditEventId"));
 export type AuditEventId = typeof AuditEventId.Type;
 
 export const AuthUserId = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)).pipe(
@@ -236,22 +235,36 @@ export class ProjectPage extends Schema.Class<ProjectPage>("ProjectPage")({
   nextCursor: Schema.NullOr(Cursor),
 }) {}
 
-export const CreateWorkspaceInputSchema = SchemaStrict.toStandardSchemaV1(CreateWorkspaceInput);
-export const ListWorkspacesInputSchema = SchemaStrict.toStandardSchemaV1(ListWorkspacesInput);
-export const CreateProjectInputSchema = SchemaStrict.toStandardSchemaV1(CreateProjectInput);
-export const ListProjectsInputSchema = SchemaStrict.toStandardSchemaV1(ListProjectsInput);
-export const GetProjectInputSchema = SchemaStrict.toStandardSchemaV1(GetProjectInput);
-export const UpdateProjectInputSchema = SchemaStrict.toStandardSchemaV1(UpdateProjectInput);
-export const ArchiveProjectInputSchema = SchemaStrict.toStandardSchemaV1(ArchiveProjectInput);
-export const RestoreProjectInputSchema = SchemaStrict.toStandardSchemaV1(RestoreProjectInput);
-export const EnableCapabilityInputSchema = SchemaStrict.toStandardSchemaV1(EnableCapabilityInput);
+export const CreateWorkspaceInputSchema = Schema.toStandardSchemaV1(CreateWorkspaceInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const ListWorkspacesInputSchema = Schema.toStandardSchemaV1(ListWorkspacesInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const CreateProjectInputSchema = Schema.toStandardSchemaV1(CreateProjectInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const ListProjectsInputSchema = Schema.toStandardSchemaV1(ListProjectsInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const GetProjectInputSchema = Schema.toStandardSchemaV1(GetProjectInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const UpdateProjectInputSchema = Schema.toStandardSchemaV1(UpdateProjectInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const ArchiveProjectInputSchema = Schema.toStandardSchemaV1(ArchiveProjectInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const RestoreProjectInputSchema = Schema.toStandardSchemaV1(RestoreProjectInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const EnableCapabilityInputSchema = Schema.toStandardSchemaV1(EnableCapabilityInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
 
-export const WorkspaceOutputSchema = SchemaStrict.toStandardSchemaV1(ApiSuccessSchema(Workspace));
-export const WorkspacePageOutputSchema = SchemaStrict.toStandardSchemaV1(
-  ApiSuccessSchema(WorkspacePage),
-);
-export const ProjectOutputSchema = SchemaStrict.toStandardSchemaV1(ApiSuccessSchema(Project));
-export const ProjectPageOutputSchema = SchemaStrict.toStandardSchemaV1(
-  ApiSuccessSchema(ProjectPage),
-);
-export const CapabilityOutputSchema = SchemaStrict.toStandardSchemaV1(ApiSuccessSchema(Capability));
+export const WorkspaceOutputSchema = Schema.toStandardSchemaV1(ApiSuccessSchema(Workspace));
+export const WorkspacePageOutputSchema = Schema.toStandardSchemaV1(ApiSuccessSchema(WorkspacePage));
+export const ProjectOutputSchema = Schema.toStandardSchemaV1(ApiSuccessSchema(Project));
+export const ProjectPageOutputSchema = Schema.toStandardSchemaV1(ApiSuccessSchema(ProjectPage));
+export const CapabilityOutputSchema = Schema.toStandardSchemaV1(ApiSuccessSchema(Capability));

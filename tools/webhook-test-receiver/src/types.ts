@@ -1,5 +1,3 @@
-// Defines the receiver's bounded scenario, verification, event, and persisted-capture contracts.
-
 export const scenarioKeys = [
   "success",
   "retry-twice",

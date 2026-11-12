@@ -42,23 +42,19 @@
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
-    "check": "oxlint && oxfmt --check . && pnpm run check:structure",
-    "check:structure": "node scripts/check-repository-structure.mjs",
+    "check": "oxlint && oxfmt --check . && pnpm run check:structure && pnpm run check:kb && pnpm run check:boundaries",
+    "check:structure": "node scripts/check/repository-structure.mjs",
     "format": "oxfmt --write .",
-    "format:check": "oxfmt --check ."
-  },
-  "dependencies": {
-    "@framerfordevs/env": "workspace:*",
-    "dotenv": "catalog:",
-    "zod": "catalog:"
+    "format:check": "oxfmt --check .",
+    "check:kb": "node scripts/check/knowledge-base.mjs",
+    "check:boundaries": "turbo boundaries"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.7",
     "@changesets/cli": "^2.31.1",
     "@framerfordevs/config": "workspace:*",
     "@types/node": "catalog:",
     "oxfmt": "^0.78.0",
-    "oxlint": "1.76.0",
+    "oxlint": "^1.93.0",
     "turbo": "^2.11.11",
     "typescript": "catalog:"
   },

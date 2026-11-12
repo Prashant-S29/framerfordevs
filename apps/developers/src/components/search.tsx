@@ -1,5 +1,3 @@
-// Connects the Fumadocs search dialog to the self-hosted static documentation index.
-
 "use client";
 
 import { useDocsSearch } from "fumadocs-core/search/client";

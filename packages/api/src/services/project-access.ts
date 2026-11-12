@@ -121,7 +121,6 @@ export interface ActorProjectAuthorizationOptions {
   readonly requirePrimaryCredentialEnvironment?: boolean;
 }
 
-/** Authorizes the shared user/credential actor while preserving exact credential environment scope. */
 export async function authorizeProjectActor(
   executor: ApplicationExecutor,
   actor: ProjectActor,

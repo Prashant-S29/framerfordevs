@@ -8,18 +8,18 @@ import {
   IssuedProjectInvitation,
   ProjectInvitation,
   ProjectMember,
-} from "@framerfordevs/api/contracts/access/index";
-import { StudioRegistration } from "@framerfordevs/api/contracts/control-plane/index";
-import { ProjectLocale } from "@framerfordevs/api/contracts/locale/index";
-import { Project } from "@framerfordevs/api/contracts/platform/index";
+} from "@framerfordevs/api/contracts/access";
+import { StudioRegistration } from "@framerfordevs/api/contracts/control-plane";
+import { ProjectLocale } from "@framerfordevs/api/contracts/locale";
+import { Project } from "@framerfordevs/api/contracts/platform";
 import {
   EntryPublicationPage,
   EntryPublicationPlan,
   EntryPublicationStatus,
   EntryPublicationSummary,
-} from "@framerfordevs/api/contracts/publication/index";
-import { CollectionDraftSchema } from "@framerfordevs/api/contracts/schema/index";
-import { WebhookEndpoint } from "@framerfordevs/api/contracts/webhook/index";
+} from "@framerfordevs/api/contracts/publication";
+import { CollectionDraftSchema } from "@framerfordevs/api/contracts/schema";
+import { WebhookEndpoint } from "@framerfordevs/api/contracts/webhook";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -53,9 +53,9 @@ import {
   WebhookEndpointActions,
 } from "@/components/webhook-controls";
 import { orpc } from "@/utils/orpc";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
-const locale = SchemaStrict.decodeUnknownSync(ProjectLocale)({
+const locale = Schema.decodeUnknownSync(ProjectLocale, { onExcessProperty: "error" })({
   id: "019fae8b-1234-7000-8000-000000000004",
   workspaceId: "019fae8b-1234-7000-8000-000000000002",
   projectId: "019fae8b-1234-7000-8000-000000000001",
@@ -68,7 +68,7 @@ const locale = SchemaStrict.decodeUnknownSync(ProjectLocale)({
   updatedAt: "2026-07-29T00:00:00.000Z",
 });
 
-const hindiLocale = SchemaStrict.decodeUnknownSync(ProjectLocale)({
+const hindiLocale = Schema.decodeUnknownSync(ProjectLocale, { onExcessProperty: "error" })({
   ...locale,
   id: "019fae8b-1234-7000-8000-000000000005",
   tag: "hi",
@@ -76,7 +76,7 @@ const hindiLocale = SchemaStrict.decodeUnknownSync(ProjectLocale)({
   position: 1,
 });
 
-const member = SchemaStrict.decodeUnknownSync(ProjectMember)({
+const member = Schema.decodeUnknownSync(ProjectMember, { onExcessProperty: "error" })({
   id: "019fae8b-1234-7000-8000-000000000006",
   projectId: "019fae8b-1234-7000-8000-000000000001",
   userId: "accessible-user",
@@ -90,7 +90,9 @@ const member = SchemaStrict.decodeUnknownSync(ProjectMember)({
   updatedAt: "2026-07-29T00:00:00.000Z",
 });
 
-const acceptedInvitation = SchemaStrict.decodeUnknownSync(ProjectInvitation)({
+const acceptedInvitation = Schema.decodeUnknownSync(ProjectInvitation, {
+  onExcessProperty: "error",
+})({
   id: "019fae8b-1234-7000-8000-000000000007",
   projectId: "019fae8b-1234-7000-8000-000000000001",
   email: "accepted@example.test",
@@ -105,7 +107,7 @@ const acceptedInvitation = SchemaStrict.decodeUnknownSync(ProjectInvitation)({
   updatedAt: "2026-09-16T00:00:00.000Z",
 });
 
-const project = SchemaStrict.decodeUnknownSync(Project)({
+const project = Schema.decodeUnknownSync(Project, { onExcessProperty: "error" })({
   id: "019fae8b-1234-7000-8000-000000000001",
   workspaceId: "019fae8b-1234-7000-8000-000000000002",
   name: "Accessible project",
@@ -117,8 +119,6 @@ const project = SchemaStrict.decodeUnknownSync(Project)({
   updatedAt: "2026-07-29T00:00:00.000Z",
   environment: {
     id: "019fae8b-1234-7000-8000-000000000003",
-    workspaceId: "019fae8b-1234-7000-8000-000000000002",
-    projectId: "019fae8b-1234-7000-8000-000000000001",
     key: "main",
     name: "main",
     isPrimary: true,
@@ -127,7 +127,7 @@ const project = SchemaStrict.decodeUnknownSync(Project)({
   capabilities: [],
 });
 
-const webhookEndpoint = SchemaStrict.decodeUnknownSync(WebhookEndpoint)({
+const webhookEndpoint = Schema.decodeUnknownSync(WebhookEndpoint, { onExcessProperty: "error" })({
   id: "019fae8b-1234-7000-8000-000000000071",
   projectId: project.id,
   environmentId: project.environment.id,
@@ -146,7 +146,9 @@ const webhookEndpoint = SchemaStrict.decodeUnknownSync(WebhookEndpoint)({
   updatedAt: "2026-08-12T00:00:00.000Z",
 });
 
-const collectionDraft = SchemaStrict.decodeUnknownSync(CollectionDraftSchema)({
+const collectionDraft = Schema.decodeUnknownSync(CollectionDraftSchema, {
+  onExcessProperty: "error",
+})({
   formatVersion: 2,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
@@ -236,7 +238,7 @@ describe("platform management accessibility", () => {
   it("has accessible project restoration semantics", async () => {
     renderWithQueryClient(
       <RestoreProjectDialog
-        project={SchemaStrict.decodeUnknownSync(Project)({
+        project={Schema.decodeUnknownSync(Project, { onExcessProperty: "error" })({
           ...project,
           version: 2,
           archivedAt: "2026-08-14T00:00:00.000Z",
@@ -248,7 +250,9 @@ describe("platform management accessibility", () => {
 
   it("has accessible Studio registration and runtime semantics", async () => {
     const queryClient = new QueryClient();
-    const registration = SchemaStrict.decodeUnknownSync(StudioRegistration)({
+    const registration = Schema.decodeUnknownSync(StudioRegistration, {
+      onExcessProperty: "error",
+    })({
       id: "019fae8b-1234-7000-8000-000000000009",
       projectId: project.id,
       environmentId: project.environment.id,
@@ -484,23 +488,25 @@ describe("platform management accessibility", () => {
 
   it("keeps one-time invitation tokens out of the mutation cache and clears the dialog copy", async () => {
     const token = "t".repeat(43);
-    const issued = SchemaStrict.decodeUnknownSync(IssuedProjectInvitation)({
-      invitation: {
-        id: "019fae8b-1234-7000-8000-000000000099",
-        projectId: project.id,
-        email: "invitee@example.test",
-        role: "client_editor",
-        localeAccess: { mode: "all" },
-        status: "pending",
-        version: 1,
-        expiresAt: "2026-09-23T00:00:00.000Z",
-        acceptedAt: null,
-        revokedAt: null,
-        createdAt: "2026-09-16T00:00:00.000Z",
-        updatedAt: "2026-09-16T00:00:00.000Z",
+    const issued = Schema.decodeUnknownSync(IssuedProjectInvitation, { onExcessProperty: "error" })(
+      {
+        invitation: {
+          id: "019fae8b-1234-7000-8000-000000000099",
+          projectId: project.id,
+          email: "invitee@example.test",
+          role: "client_editor",
+          localeAccess: { mode: "all" },
+          status: "pending",
+          version: 1,
+          expiresAt: "2026-09-23T00:00:00.000Z",
+          acceptedAt: null,
+          revokedAt: null,
+          createdAt: "2026-09-16T00:00:00.000Z",
+          updatedAt: "2026-09-16T00:00:00.000Z",
+        },
+        token,
       },
-      token,
-    });
+    );
     const createInvitation = vi.fn(async () => ({
       ok: true as const,
       data: issued,
@@ -541,7 +547,7 @@ describe("platform management accessibility", () => {
   });
 
   it("warns that legacy non-expiring Preview credentials fail closed", async () => {
-    const credential = SchemaStrict.decodeUnknownSync(ApiCredential)({
+    const credential = Schema.decodeUnknownSync(ApiCredential, { onExcessProperty: "error" })({
       id: "019fae8b-1234-7000-8000-000000000099",
       workspaceId: project.workspaceId,
       projectId: project.id,
@@ -568,7 +574,7 @@ describe("platform management accessibility", () => {
   });
 
   it("has accessible staged credential rotation and pending-state recovery semantics", async () => {
-    const baseCredential = SchemaStrict.decodeUnknownSync(ApiCredential)({
+    const baseCredential = Schema.decodeUnknownSync(ApiCredential, { onExcessProperty: "error" })({
       id: "019fae8b-1234-7000-8000-000000000091",
       workspaceId: project.workspaceId,
       projectId: project.id,
@@ -586,7 +592,9 @@ describe("platform management accessibility", () => {
       createdAt: "2026-09-16T00:00:00.000Z",
       updatedAt: "2026-09-16T00:00:00.000Z",
     });
-    const pendingRotation = SchemaStrict.decodeUnknownSync(ApiCredentialRotation)({
+    const pendingRotation = Schema.decodeUnknownSync(ApiCredentialRotation, {
+      onExcessProperty: "error",
+    })({
       id: "019fae8b-1234-7000-8000-000000000092",
       projectId: project.id,
       environmentId: project.environment.id,
@@ -616,7 +624,9 @@ describe("platform management accessibility", () => {
     expect((await axe.run(await screen.findByRole("alertdialog"))).violations).toEqual([]);
     pending.unmount();
 
-    const overlapRotation = SchemaStrict.decodeUnknownSync(ApiCredentialRotation)({
+    const overlapRotation = Schema.decodeUnknownSync(ApiCredentialRotation, {
+      onExcessProperty: "error",
+    })({
       ...pendingRotation,
       status: "overlap",
       version: 2,
@@ -716,7 +726,9 @@ describe("platform management accessibility", () => {
       maximumBytes: 1_048_576,
       bucket: "small",
     };
-    const summary = SchemaStrict.decodeUnknownSync(EntryPublicationSummary)({
+    const summary = Schema.decodeUnknownSync(EntryPublicationSummary, {
+      onExcessProperty: "error",
+    })({
       id: publicationId,
       snapshotId: publicationId,
       entryId: scope.entryId,
@@ -739,7 +751,7 @@ describe("platform management accessibility", () => {
       publishedAt: "2026-08-09T12:00:00.000Z",
       current: true,
     });
-    const status = SchemaStrict.decodeUnknownSync(EntryPublicationStatus)({
+    const status = Schema.decodeUnknownSync(EntryPublicationStatus, { onExcessProperty: "error" })({
       entryId: scope.entryId,
       localeId: locale.id,
       locale: scope.locale,
@@ -757,7 +769,7 @@ describe("platform management accessibility", () => {
       schemaChanged: false,
       changedSincePublication: false,
     });
-    const plan = SchemaStrict.decodeUnknownSync(EntryPublicationPlan)({
+    const plan = Schema.decodeUnknownSync(EntryPublicationPlan, { onExcessProperty: "error" })({
       entryId: scope.entryId,
       localeId: locale.id,
       locale: scope.locale,

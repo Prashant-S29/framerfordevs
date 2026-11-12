@@ -1,5 +1,3 @@
-// Exercises exact-byte signatures, overlap verification, freshness, tampering, and replay reservation.
-
 import { assert, describe, it } from "@effect/vitest";
 
 import { projectPublicationEvent, type PublicationOutboxRecord } from "../../publication/event";

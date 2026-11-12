@@ -57,20 +57,20 @@
       }
     },
     "schemas": {
-      "ApiErrorDetail": {
+      "ApiErrorDetailEncoded": {
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "a string at most 64 character(s) long",
             "maxLength": 64,
             "minLength": 1,
-            "title": "maxLength(64)",
             "type": "string"
           },
           "currentRevisionId": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UUID"
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
               },
               {
                 "type": "null"
@@ -78,28 +78,22 @@
             ]
           },
           "currentVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "expectedVersion": {
-            "description": "a non-negative number",
+            "maximum": 9007199254740991,
             "minimum": 0,
-            "title": "greaterThanOrEqualTo(0)",
             "type": "integer"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "path": {
-            "description": "a string at most 256 character(s) long",
             "maxLength": 256,
-            "title": "maxLength(256)",
             "type": "string"
           },
           "scope": {
@@ -116,7 +110,7 @@
         ],
         "type": "object"
       },
-      "DeliveryApiError": {
+      "DeliveryApiErrorEncoded": {
         "additionalProperties": false,
         "properties": {
           "code": {
@@ -138,28 +132,21 @@
             "type": "string"
           },
           "details": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/ApiErrorDetail"
+              "$ref": "#/components/schemas/ApiErrorDetailEncoded"
             },
             "maxItems": 50,
             "minItems": 1,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "requestId": {
-            "description": "a string matching the pattern ^[A-Za-z0-9._:-]+$",
             "maxLength": 128,
             "minLength": 1,
-            "pattern": "^[A-Za-z0-9._:-]+$",
-            "title": "maxLength(128)",
             "type": "string"
           },
           "retryable": {
@@ -175,19 +162,20 @@
         "type": "object"
       },
       "DeliveryApiFailure": {
+        "$ref": "#/components/schemas/DeliveryApiFailureEncoded"
+      },
+      "DeliveryApiFailureEncoded": {
         "additionalProperties": false,
         "properties": {
           "data": {
             "type": "null"
           },
           "error": {
-            "$ref": "#/components/schemas/DeliveryApiError"
+            "$ref": "#/components/schemas/DeliveryApiErrorEncoded"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -205,38 +193,30 @@
         ],
         "type": "object"
       },
-      "DeliveryItem": {
+      "DeliveryItemEncoded": {
         "additionalProperties": false,
         "properties": {
           "collection": {
             "type": "string"
           },
           "collectionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "data": {
-            "additionalProperties": {
-              "$id": "/schemas/unknown",
-              "title": "unknown"
-            },
-            "properties": {},
-            "required": [],
             "type": "object"
           },
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "locale": {
             "type": "string"
           },
           "publication": {
-            "$ref": "#/components/schemas/DeliveryPublicationMetadata"
+            "$ref": "#/components/schemas/DeliveryPublicationMetadataEncoded"
           }
         },
         "required": [
@@ -253,16 +233,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/DeliveryItem"
+            "$ref": "#/components/schemas/DeliveryItemEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -280,20 +258,18 @@
         ],
         "type": "object"
       },
-      "DeliveryPage": {
+      "DeliveryPageEncoded": {
         "additionalProperties": false,
         "properties": {
           "items": {
-            "description": "an array of at most 50 item(s)",
             "items": {
-              "$ref": "#/components/schemas/DeliveryItem"
+              "$ref": "#/components/schemas/DeliveryItemEncoded"
             },
             "maxItems": 50,
-            "title": "maxItems(50)",
             "type": "array"
           },
           "page": {
-            "$ref": "#/components/schemas/DeliveryPageMetadata"
+            "$ref": "#/components/schemas/DeliveryPageMetadataEncoded"
           }
         },
         "required": [
@@ -302,27 +278,23 @@
         ],
         "type": "object"
       },
-      "DeliveryPageMetadata": {
+      "DeliveryPageMetadataEncoded": {
         "additionalProperties": false,
         "properties": {
           "hasMore": {
             "type": "boolean"
           },
           "limit": {
-            "description": "a number between 1 and 50",
             "maximum": 50,
             "minimum": 1,
-            "title": "between(1, 50)",
             "type": "integer"
           },
           "nextCursor": {
             "anyOf": [
               {
-                "description": "a string matching the pattern ^[A-Za-z0-9_-]+$",
                 "maxLength": 1024,
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9_-]+$",
-                "title": "maxLength(1024)",
                 "type": "string"
               },
               {
@@ -342,16 +314,14 @@
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/DeliveryPage"
+            "$ref": "#/components/schemas/DeliveryPageEncoded"
           },
           "error": {
             "type": "null"
           },
           "message": {
-            "description": "a string at most 512 character(s) long",
             "maxLength": 512,
             "minLength": 1,
-            "title": "maxLength(512)",
             "type": "string"
           },
           "ok": {
@@ -369,30 +339,26 @@
         ],
         "type": "object"
       },
-      "DeliveryPublicationMetadata": {
+      "DeliveryPublicationMetadataEncoded": {
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "publishedAt": {
-            "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
             "type": "string"
           },
           "schemaRevisionId": {
-            "description": "a Universally Unique Identifier",
             "format": "uuid",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
           "sequence": {
-            "description": "a number greater than or equal to 1",
+            "maximum": 9007199254740991,
             "minimum": 1,
-            "title": "greaterThanOrEqualTo(1)",
             "type": "integer"
           }
         },
@@ -403,12 +369,6 @@
           "publishedAt"
         ],
         "type": "object"
-      },
-      "UUID": {
-        "description": "a Universally Unique Identifier",
-        "format": "uuid",
-        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-        "type": "string"
       }
     },
     "securitySchemes": {

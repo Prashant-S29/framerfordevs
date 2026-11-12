@@ -1,5 +1,3 @@
-// Verifies that portal content, links, search input, routes, and artifacts stay on the closed public surface.
-
 import { publicContractRegistryKeys } from "@framerfordevs/public-contracts/metadata";
 import { describe, expect, it } from "vitest";
 

@@ -57,7 +57,6 @@ import {
 } from "./project-access";
 import { projectPolicyProjection } from "./policy";
 
-import * as SchemaStrict from "../lib/schema-strict";
 function outcome<K extends string>(kind: K): { readonly kind: K } {
   return { kind };
 }
@@ -91,7 +90,7 @@ function decodeDatabaseValue<A, I>(
   schema: Schema.Codec<A, I, never>,
   value: unknown,
 ) {
-  return SchemaStrict.decodeUnknownEffect(schema)(value).pipe(
+  return Schema.decodeUnknownEffect(schema)(value).pipe(
     Effect.mapError((cause) => databaseFailure(`${operation}.decode`, cause)),
   );
 }

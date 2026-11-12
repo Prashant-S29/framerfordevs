@@ -1,7 +1,5 @@
-// Translates one fully identity-resolved code collection into existing M6 field definitions.
-
 import type { CollectionSchema, FieldSchema, ListItemSchema } from "@framerfordevs/schema";
-import { Result } from "effect";
+import { Result, Schema } from "effect";
 
 import {
   CollectionFieldDefinition,
@@ -12,7 +10,6 @@ import {
 import { flattenFieldTree } from "../../field/tree";
 import type { StructureIdentityMap } from "../hash";
 
-import * as SchemaStrict from "../../schema-strict";
 export interface CodeSchemaCandidateIssue {
   readonly path: string;
   readonly code: "source_identity_missing" | "candidate_field_invalid";
@@ -166,7 +163,7 @@ function compileSiblings(
       configuration: compileConfiguration(node, fieldId, context, nodePath),
       children,
     };
-    const decoded = SchemaStrict.decodeUnknownResult(CollectionFieldDefinition, {
+    const decoded = Schema.decodeUnknownResult(CollectionFieldDefinition, {
       errors: "all",
       onExcessProperty: "error",
     })(candidate);
@@ -183,11 +180,6 @@ function compileSiblings(
   return compiled;
 }
 
-/**
- * Preserves current field/enum presentation while replacing only code-owned structure. All source
- * identities must already have server IDs, so this runs after allocation in apply or for fully
- * resolved read-only candidates.
- */
 export function compileCodeCollectionFields(
   collection: CollectionSchema,
   identities: StructureIdentityMap,

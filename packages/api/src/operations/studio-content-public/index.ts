@@ -1,7 +1,5 @@
-// Orchestrates Studio-token revalidation and bounded Studio Content operations.
-
 import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { EntryId, type EntryValidation, EntryValidationIssue } from "../../contracts/entry";
 import { AuthUserId } from "../../contracts/platform";
@@ -50,7 +48,6 @@ import { StudioContentCursorSigner } from "../../services/studio-content/cursor-
 import { StudioContentRepository } from "../../services/studio-content/repository";
 import { StudioRepository } from "../../services/studio/repository";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 function invalidPath() {
   return ValidationFailure.make({
     details: [
@@ -105,9 +102,10 @@ function unavailableMutation() {
 }
 
 export function decodeStudioContentScope(projectId: string, environmentId: string) {
-  return SchemaStrict.decodeUnknownEffect(StudioContentScope)({ projectId, environmentId }).pipe(
-    Effect.mapError(() => invalidPath()),
-  );
+  return Schema.decodeUnknownEffect(StudioContentScope, { onExcessProperty: "error" })({
+    projectId,
+    environmentId,
+  }).pipe(Effect.mapError(() => invalidPath()));
 }
 
 export function decodeStudioCollectionLocaleScope(
@@ -116,7 +114,7 @@ export function decodeStudioCollectionLocaleScope(
   collectionId: string,
   locale: string,
 ) {
-  return SchemaStrict.decodeUnknownEffect(StudioCollectionLocaleScope)({
+  return Schema.decodeUnknownEffect(StudioCollectionLocaleScope, { onExcessProperty: "error" })({
     projectId,
     environmentId,
     collectionId,
@@ -125,42 +123,56 @@ export function decodeStudioCollectionLocaleScope(
 }
 
 export function decodeStudioListEntriesQuery(value: unknown) {
-  return SchemaStrict.decodeUnknownEffect(StudioListEntriesQuery)(value, {
+  return Schema.decodeUnknownEffect(StudioListEntriesQuery, { onExcessProperty: "error" })(value, {
     onExcessProperty: "error",
   }).pipe(Effect.mapError(() => invalidPath()));
 }
 
 export function decodeStudioSearchEntriesRequest(value: unknown) {
-  return SchemaStrict.decodeUnknownEffect(StudioSearchEntriesRequest)(value, {
-    onExcessProperty: "error",
-  }).pipe(Effect.mapError(() => invalidPath()));
+  return Schema.decodeUnknownEffect(StudioSearchEntriesRequest, { onExcessProperty: "error" })(
+    value,
+    {
+      onExcessProperty: "error",
+    },
+  ).pipe(Effect.mapError(() => invalidPath()));
 }
 
 export function decodeStudioResolveEntriesRequest(value: unknown) {
-  return SchemaStrict.decodeUnknownEffect(StudioResolveEntriesRequest)(value, {
-    onExcessProperty: "error",
-  }).pipe(Effect.mapError(() => invalidPath()));
+  return Schema.decodeUnknownEffect(StudioResolveEntriesRequest, { onExcessProperty: "error" })(
+    value,
+    {
+      onExcessProperty: "error",
+    },
+  ).pipe(Effect.mapError(() => invalidPath()));
 }
 
 export function decodeStudioCreateEntryRequest(value: unknown) {
-  return SchemaStrict.decodeUnknownEffect(StudioCreateEntryRequest)(value, {
-    onExcessProperty: "error",
-  }).pipe(Effect.mapError(() => invalidPath()));
+  return Schema.decodeUnknownEffect(StudioCreateEntryRequest, { onExcessProperty: "error" })(
+    value,
+    {
+      onExcessProperty: "error",
+    },
+  ).pipe(Effect.mapError(() => invalidPath()));
 }
 
 export function decodeStudioRenameEntryRequest(value: unknown) {
-  return SchemaStrict.decodeUnknownEffect(StudioRenameEntryRequest)(value, {
-    onExcessProperty: "error",
-  }).pipe(Effect.mapError(() => invalidPath()));
+  return Schema.decodeUnknownEffect(StudioRenameEntryRequest, { onExcessProperty: "error" })(
+    value,
+    {
+      onExcessProperty: "error",
+    },
+  ).pipe(Effect.mapError(() => invalidPath()));
 }
 
 export function decodeStudioSaveEntryDraftRequest(value: unknown) {
-  return SchemaStrict.decodeUnknownEffect(StudioSaveEntryDraftRequest)(value, {
-    onExcessProperty: "error",
-  }).pipe(Effect.mapError(() => invalidPath()));
+  return Schema.decodeUnknownEffect(StudioSaveEntryDraftRequest, { onExcessProperty: "error" })(
+    value,
+    {
+      onExcessProperty: "error",
+    },
+  ).pipe(Effect.mapError(() => invalidPath()));
 }
 
-/** Revalidates immutable Studio grant authority before entering content policy. */
 export const revalidateStudioContentPrincipal = Effect.fn(
   "studio_content.public.principal.revalidate",
 )(function* (principal: StudioOAuthPrincipal, scope: StudioContentScope) {
@@ -184,9 +196,9 @@ export const studioNestedCollectionOperations = [
 export type StudioNestedCollectionOperation = (typeof studioNestedCollectionOperations)[number];
 
 function decodeActorId(principal: StudioOAuthPrincipal) {
-  return SchemaStrict.decodeUnknownEffect(AuthUserId)(principal.userId).pipe(
-    Effect.mapError(() => invalidPath()),
-  );
+  return Schema.decodeUnknownEffect(AuthUserId, { onExcessProperty: "error" })(
+    principal.userId,
+  ).pipe(Effect.mapError(() => invalidPath()));
 }
 
 const authorizeCurrentStudioCollection = Effect.fn(
@@ -208,7 +220,6 @@ const authorizeCurrentStudioCollection = Effect.fn(
   );
 });
 
-/** Applies one shared projection/configuration gate before every nested collection operation. */
 export const authorizeStudioCollectionOperation = Effect.fn(
   "studio_content.public.collection.authorize",
 )(function* (
@@ -284,7 +295,10 @@ const listStudioEntries = Effect.fn("studio_content.public.entries.list")(functi
           searchOrder: result.finalSearchOrder,
         })
       : null;
-  return SchemaStrict.decodeUnknownSync(StudioEntryPage)({ ...result.page, nextCursor });
+  return Schema.decodeUnknownSync(StudioEntryPage, { onExcessProperty: "error" })({
+    ...result.page,
+    nextCursor,
+  });
 });
 
 export const browseStudioEntries = Effect.fn("studio_content.public.entries.browse")(function* (
@@ -382,7 +396,7 @@ function studioEntrySummary(entry: {
   readonly updatedAt: string;
 }) {
   if (entry.displayName === null) return null;
-  return SchemaStrict.decodeUnknownSync(StudioEntrySummary)({
+  return Schema.decodeUnknownSync(StudioEntrySummary, { onExcessProperty: "error" })({
     id: entry.id,
     displayName: entry.displayName,
     nameVersion: entry.nameVersion,
@@ -392,7 +406,7 @@ function studioEntrySummary(entry: {
 }
 
 export function decodeStudioEntryId(value: string) {
-  return SchemaStrict.decodeUnknownEffect(EntryId)(value).pipe(
+  return Schema.decodeUnknownEffect(EntryId, { onExcessProperty: "error" })(value).pipe(
     Effect.mapError(() => invalidPath()),
   );
 }
@@ -427,7 +441,7 @@ export const getStudioNewEntryWorkspace = Effect.fn("studio_content.public.works
         return yield* AuthoringStaleSchemaFailure.make();
       }
     }
-    return SchemaStrict.decodeUnknownSync(StudioNewEntryWorkspace)({
+    return Schema.decodeUnknownSync(StudioNewEntryWorkspace, { onExcessProperty: "error" })({
       localeId: authority.localeId,
       locale: authority.locale,
       form: projectStudioForm(form),
@@ -488,7 +502,7 @@ export const getStudioEntryWorkspace = Effect.fn("studio_content.public.workspac
     const entry = studioEntrySummary(draft.entry);
     if (entry === null) return yield* NotFoundFailure.make({ resource: "entry" });
     const projectedForm = projectStudioForm(form);
-    return SchemaStrict.decodeUnknownSync(StudioEntryWorkspace)({
+    return Schema.decodeUnknownSync(StudioEntryWorkspace, { onExcessProperty: "error" })({
       localeId: authority.localeId,
       locale: authority.locale,
       form: projectedForm,
@@ -550,7 +564,7 @@ export const createStudioEntry = Effect.fn("studio_content.public.entry.create")
     .pipe(Effect.mapError(adaptStudioCreateError));
   const entry = studioEntrySummary(result.entry);
   if (entry === null) return yield* NotFoundFailure.make({ resource: "entry" });
-  return SchemaStrict.decodeUnknownSync(StudioCreateEntryResult)({
+  return Schema.decodeUnknownSync(StudioCreateEntryResult, { onExcessProperty: "error" })({
     entry,
     commandId: result.commandId,
     sharedVersion: result.sharedVersion,
@@ -618,7 +632,7 @@ export const saveStudioEntryDraft = Effect.fn("studio_content.public.entry.save"
   const result = yield* (yield* EntryRepository)
     .saveDraft(actorId, { ...scope, entryId, ...request }, now, requestId)
     .pipe(Effect.mapError(adaptStudioSaveError));
-  return SchemaStrict.decodeUnknownSync(StudioMutationReceipt)({
+  return Schema.decodeUnknownSync(StudioMutationReceipt, { onExcessProperty: "error" })({
     entryId: result.entryId,
     commandId: result.commandId,
     sharedChanged: result.sharedChanged,
@@ -659,7 +673,6 @@ export const getStudioContentContext = Effect.fn("studio_content.public.context.
   return context;
 });
 
-/** Adapts the content scope to the accepted bootstrap verifier without changing Studio v1. */
 export function studioBootstrapScope(scope: StudioContentScope): StudioBootstrapScope {
   return StudioBootstrapScope.make({
     projectId: scope.projectId,

@@ -128,7 +128,7 @@ framerfordevs/
 
 Each workspace owns its source, tests, dependencies, configuration, and Turbo tasks. Focused unit/component tests stay beside their single source owner as `src/**/*.test.*`; database, HTTP, filesystem, and multi-module tests live under `test/integration/`; independent protocol tests use `test/contract/`; broad accessibility suites use `test/accessibility/`; and workspace-local fixtures/helpers use `test/support/`. Cross-workspace system or performance suites belong in private `tools/*` workspaces rather than an anonymous root test directory.
 
-See [`knowledge_base/decisions/repository-test-structure.md`](knowledge_base/decisions/repository-test-structure.md) for the complete placement and boundary rules.
+See [`.claude/rules/testing.md`](.claude/rules/testing.md) for the complete placement and boundary rules.
 
 ## Available Scripts
 

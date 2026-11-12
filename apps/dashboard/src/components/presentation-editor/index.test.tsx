@@ -1,8 +1,8 @@
 /** @vitest-environment jsdom */
 
-import { AuthoringFieldPresentation } from "@framerfordevs/api/contracts/authoring/presentation/index";
-import { EditorLayout } from "@framerfordevs/api/contracts/field/index";
-import { CollectionFieldDefinition } from "@framerfordevs/api/contracts/schema/index";
+import { AuthoringFieldPresentation } from "@framerfordevs/api/contracts/authoring/presentation";
+import { EditorLayout } from "@framerfordevs/api/contracts/field";
+import { CollectionFieldDefinition } from "@framerfordevs/api/contracts/schema";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
@@ -10,14 +10,14 @@ import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LayoutGroupEditor, PresentationFieldCard } from "./index";
+import { Schema } from "effect";
 
-import * as SchemaStrict from "@framerfordevs/api/lib/schema-strict/index";
 const fieldId = "019fae8b-1234-7000-8000-000000000201";
 const draftId = "019fae8b-1234-7000-8000-000000000202";
 const liveId = "019fae8b-1234-7000-8000-000000000203";
 const roles = ["owner", "developer"] as const;
 
-const field = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
+const field = Schema.decodeUnknownSync(CollectionFieldDefinition, { onExcessProperty: "error" })({
   id: fieldId,
   parentFieldId: null,
   nodeRole: "root",
@@ -43,7 +43,9 @@ const field = SchemaStrict.decodeUnknownSync(CollectionFieldDefinition)({
   children: [],
 });
 
-const presentation = SchemaStrict.decodeUnknownSync(AuthoringFieldPresentation)({
+const presentation = Schema.decodeUnknownSync(AuthoringFieldPresentation, {
+  onExcessProperty: "error",
+})({
   fieldId,
   displayLabel: "Status",
   position: 0,
@@ -54,7 +56,7 @@ const presentation = SchemaStrict.decodeUnknownSync(AuthoringFieldPresentation)(
   ],
 });
 
-const layout = SchemaStrict.decodeUnknownSync(EditorLayout)({
+const layout = Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })({
   version: 1,
   tabs: [
     {
@@ -123,9 +125,9 @@ describe("presentation editor controls", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Move Live up" }));
-    const reordered = SchemaStrict.decodeUnknownSync(AuthoringFieldPresentation)(
-      onChange.mock.calls.at(-1)?.[0],
-    );
+    const reordered = Schema.decodeUnknownSync(AuthoringFieldPresentation, {
+      onExcessProperty: "error",
+    })(onChange.mock.calls.at(-1)?.[0]);
     expect(reordered.enumOptions.map((option) => option.optionId)).toEqual([liveId, draftId]);
     expect(reordered.enumOptions.map((option) => option.position)).toEqual([0, 1]);
 
@@ -163,7 +165,7 @@ describe("presentation editor controls", () => {
       screen.getByLabelText("Group"),
       "019fae8b-1234-7000-8000-000000000213",
     );
-    const moved = SchemaStrict.decodeUnknownSync(EditorLayout)(
+    const moved = Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error" })(
       onLayoutChange.mock.calls.at(-1)?.[0],
     );
     expect(moved.tabs[0]?.groups[0]?.fields).toHaveLength(0);

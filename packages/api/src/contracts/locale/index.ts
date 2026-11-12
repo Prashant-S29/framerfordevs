@@ -9,8 +9,7 @@ import {
 } from "./tag";
 import { IsoDateTime, ProjectId, ResourceVersion, WorkspaceId } from "../platform";
 
-import * as SchemaStrict from "../../lib/schema-strict";
-import { UuidValue } from "../uuid";
+import { Uuid } from "../uuid";
 export { canonicalizeLocaleTag } from "./tag";
 
 function hasControlCharacter(value: string): boolean {
@@ -67,7 +66,7 @@ export const LocaleDisplayName = NormalizedString.check(
 ).pipe(Schema.brand("LocaleDisplayName"));
 export type LocaleDisplayName = typeof LocaleDisplayName.Type;
 
-export const ProjectLocaleId = UuidValue.pipe(Schema.brand("ProjectLocaleId"));
+export const ProjectLocaleId = Uuid.pipe(Schema.brand("ProjectLocaleId"));
 export type ProjectLocaleId = typeof ProjectLocaleId.Type;
 
 export const ProjectLocaleStatus = Schema.Literals(["enabled", "disabled", "removed"]);
@@ -187,23 +186,26 @@ export class ResolvedProjectLocale extends Schema.Class<ResolvedProjectLocale>(
   tag: LocaleTag,
 }) {}
 
-export const ListProjectLocalesInputSchema =
-  SchemaStrict.toStandardSchemaV1(ListProjectLocalesInput);
-export const CreateProjectLocaleInputSchema =
-  SchemaStrict.toStandardSchemaV1(CreateProjectLocaleInput);
-export const UpdateProjectLocaleDisplayNameInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ListProjectLocalesInputSchema = Schema.toStandardSchemaV1(ListProjectLocalesInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const CreateProjectLocaleInputSchema = Schema.toStandardSchemaV1(CreateProjectLocaleInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const UpdateProjectLocaleDisplayNameInputSchema = Schema.toStandardSchemaV1(
   UpdateProjectLocaleDisplayNameInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ReorderProjectLocalesInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ReorderProjectLocalesInputSchema = Schema.toStandardSchemaV1(
   ReorderProjectLocalesInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const UpdateProjectLocaleStatusInputSchema = SchemaStrict.toStandardSchemaV1(
+export const UpdateProjectLocaleStatusInputSchema = Schema.toStandardSchemaV1(
   UpdateProjectLocaleStatusInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
 
-export const ProjectLocaleOutputSchema = SchemaStrict.toStandardSchemaV1(
-  ApiSuccessSchema(ProjectLocale),
-);
-export const ProjectLocaleListOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const ProjectLocaleOutputSchema = Schema.toStandardSchemaV1(ApiSuccessSchema(ProjectLocale));
+export const ProjectLocaleListOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(ProjectLocaleList),
 );

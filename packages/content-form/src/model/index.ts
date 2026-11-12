@@ -1,5 +1,3 @@
-// Defines the browser-safe, role-projected DTO consumed by the controlled content renderer.
-
 export const contentFieldKinds = [
   "short_text",
   "long_text",
@@ -299,7 +297,6 @@ function copyGroup(group: ContentLayoutGroup): ContentLayoutGroup {
   };
 }
 
-/** Projects management or Authoring form authority into the renderer's exact minimal DTO. */
 export function adaptContentFormDefinition(
   definition: ContentFormDefinition,
 ): ContentFormDefinition {

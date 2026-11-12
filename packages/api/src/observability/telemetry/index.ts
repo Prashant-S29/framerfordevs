@@ -1,5 +1,3 @@
-// Defines bounded application metrics and the replaceable telemetry service used by business operations.
-
 import { Context, Effect, Layer, Metric, Schema } from "effect";
 
 import type { RateLimitEnforcementMode, RateLimitPolicy } from "../../contracts/rate-limit";

@@ -1,5 +1,3 @@
-// Acquires hosted authority only after local extraction, then owns one in-memory loopback session.
-
 import { randomBytes } from "node:crypto";
 
 import { Effect, Layer, ManagedRuntime } from "effect";

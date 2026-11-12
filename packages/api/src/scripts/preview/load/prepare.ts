@@ -1,10 +1,7 @@
-// Issues compliant short-lived Preview load credentials through normal audited controls.
-
 import { readFile, writeFile } from "node:fs/promises";
 
 import { Effect, Schema } from "effect";
 
-import * as SchemaStrict from "../../../lib/schema-strict";
 import { Uuid } from "../../../contracts/uuid";
 const help = process.argv.includes("--help") || process.argv.includes("-h");
 if (help) {
@@ -24,7 +21,7 @@ if (help) {
 }
 
 const serverEnvironmentPath = "../../apps/server/.env";
-const loadEnvironmentPath = "../../preview-load.env";
+const loadEnvironmentPath = "../../apps/server/load/preview.env";
 process.loadEnvFile(serverEnvironmentPath);
 try {
   process.loadEnvFile(loadEnvironmentPath);
@@ -150,7 +147,9 @@ if (activeExisting.length > 0 && !replaceExisting) {
 }
 
 await ensureRuntimeEnvironment();
-const actorId = SchemaStrict.decodeUnknownSync(AuthUserId)(authority.actorId);
+const actorId = Schema.decodeUnknownSync(AuthUserId, { onExcessProperty: "error" })(
+  authority.actorId,
+);
 const credentials = makeCredentialRepository();
 const secrets = makeSecretGenerator();
 const issuedKeys: Array<string> = [];
@@ -170,7 +169,9 @@ for (let index = 1; index <= requestedCredentialCount; index += 1) {
   await Effect.runPromise(
     credentials.issueCredential(
       actorId,
-      SchemaStrict.decodeUnknownSync(accessContracts.IssueApiCredentialInput)({
+      Schema.decodeUnknownSync(accessContracts.IssueApiCredentialInput, {
+        onExcessProperty: "error",
+      })({
         projectId,
         environmentId: authority.environmentId,
         family: "preview",

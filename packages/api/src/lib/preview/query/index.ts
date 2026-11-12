@@ -1,12 +1,9 @@
-// Parses the closed bounded Preview query grammar without consulting headers, persistence, or credentials.
-
-import { Option } from "effect";
+import { Option, Schema } from "effect";
 
 import { EntryRevisionId } from "../../../contracts/entry";
 import { canonicalizeLocaleTag } from "../../../contracts/locale/tag";
 import { previewLimits, type PreviewRevisionSelector } from "../../../contracts/preview";
 
-import * as SchemaStrict from "../../schema-strict";
 export interface PreviewQueryIssue {
   readonly path: string;
   readonly code: string;
@@ -28,12 +25,10 @@ export type PreviewQueryResult<A> =
 
 const textEncoder = new TextEncoder();
 
-/** Creates one deterministic query rejection without echoing raw selector values. */
 function invalid(path: string, code: string, message: string): PreviewQueryResult<never> {
   return { ok: false, issues: [{ path, code, message }] };
 }
 
-/** Performs common byte, allowlist, singleton, and exact-locale validation. */
 function parseBaseQuery(
   rawQuery: string,
   allowed: ReadonlySet<string>,
@@ -67,7 +62,6 @@ function parseBaseQuery(
   return { ok: true, value: { parameters, locale } };
 }
 
-/** Decodes one explicit historical source selector, including version-0 absence. */
 function parseRevisionSelector(
   parameters: URLSearchParams,
   key: "sharedRevision" | "localizedRevision",
@@ -81,13 +75,14 @@ function parseRevisionSelector(
     );
   }
   if (raw === "none") return { ok: true, value: "none" };
-  const revisionId = Option.getOrUndefined(SchemaStrict.decodeUnknownOption(EntryRevisionId)(raw));
+  const revisionId = Option.getOrUndefined(
+    Schema.decodeUnknownOption(EntryRevisionId, { onExcessProperty: "error" })(raw),
+  );
   return revisionId === undefined
     ? invalid(key, "revision_selector_invalid", "Use `none` or a valid revision ID.")
     : { ok: true, value: revisionId };
 }
 
-/** Parses the current-draft route, which accepts only one explicit locale. */
 export function parseCurrentPreviewQuery(
   rawQuery: string,
 ): PreviewQueryResult<CurrentPreviewQuery> {
@@ -95,7 +90,6 @@ export function parseCurrentPreviewQuery(
   return parsed.ok ? { ok: true, value: { locale: parsed.value.locale } } : parsed;
 }
 
-/** Parses the historical route with mandatory shared and localized source authority. */
 export function parseRevisionPreviewQuery(
   rawQuery: string,
 ): PreviewQueryResult<RevisionPreviewQuery> {

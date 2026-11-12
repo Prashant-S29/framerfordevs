@@ -1,5 +1,3 @@
-// A256GCM envelope encryption with explicit key IDs and authority-bound associated data.
-
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 import type { StudioCiphertext } from "../store";

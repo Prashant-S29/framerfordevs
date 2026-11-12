@@ -1,5 +1,3 @@
-// Renders credential-free dashboard Preview controls, exact source authority, and renderer-neutral JSON.
-
 import { Alert, AlertDescription, AlertTitle } from "@framerfordevs/ui/components/alert";
 import { Badge } from "@framerfordevs/ui/components/badge";
 import { Button, buttonVariants } from "@framerfordevs/ui/components/button";

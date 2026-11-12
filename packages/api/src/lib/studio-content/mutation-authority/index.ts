@@ -1,5 +1,3 @@
-// Rejects stable-ID mutations outside the exact role-projected Studio form before M7 execution.
-
 import type { EntryValueMutation } from "../../../contracts/entry";
 import {
   studioContentLimits,

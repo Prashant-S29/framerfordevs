@@ -1,6 +1,6 @@
 import { parentPort, workerData } from "node:worker_threads";
 
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 
 import { ExperimentalSchemaBuildError } from "../../errors";
 import {
@@ -9,7 +9,6 @@ import {
 } from "./protocol";
 import { runExperimentalSchemaBuildInWorker } from "./runner";
 
-import * as SchemaStrict from "../../schema-strict";
 const protocolFailure = ExperimentalSchemaBuildError.make({
   code: "worker_protocol_invalid",
   relativePath: null,
@@ -18,7 +17,11 @@ const protocolFailure = ExperimentalSchemaBuildError.make({
 const program = Effect.suspend(() =>
   Object.keys(process.env).length === 0 ? Effect.void : Effect.fail(protocolFailure),
 ).pipe(
-  Effect.andThen(SchemaStrict.decodeUnknownEffect(ExperimentalSchemaBuildWorkerInput)(workerData)),
+  Effect.andThen(
+    Schema.decodeUnknownEffect(ExperimentalSchemaBuildWorkerInput, { onExcessProperty: "error" })(
+      workerData,
+    ),
+  ),
   Effect.mapError(() => protocolFailure),
   Effect.flatMap(runExperimentalSchemaBuildInWorker),
   Effect.match({

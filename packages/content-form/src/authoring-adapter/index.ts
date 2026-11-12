@@ -1,5 +1,3 @@
-// Projects a recursively decoded Authoring DTO into the renderer's minimal inert authority.
-
 import {
   adaptContentFormDefinition,
   type ContentEditorLayout,
@@ -154,7 +152,6 @@ function adaptAuthoringField(field: AuthoringContentFormFieldSource): ContentFor
   }
 }
 
-/** Removes transport/revision/role metadata after strict Authoring v1 decoding. */
 export function adaptAuthoringGeneratedForm(
   definition: AuthoringContentFormSource,
 ): ContentFormDefinition {

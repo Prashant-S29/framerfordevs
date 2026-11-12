@@ -1,8 +1,5 @@
-// Canonicalizes untrusted IPv4/IPv6 source strings into stable network-byte identities for HMAC limiting.
-
 import { isIP } from "node:net";
 
-/** Converts a validated dotted IPv4 address into one canonical byte identity. */
 function canonicalIpv4(value: string): string | null {
   const parts = value.split(".");
   if (parts.length !== 4) return null;
@@ -11,7 +8,6 @@ function canonicalIpv4(value: string): string | null {
   return `4:${Buffer.from(bytes).toString("hex")}`;
 }
 
-/** Expands a URL-canonicalized IPv6 host into its exact sixteen network bytes. */
 function ipv6Bytes(canonicalHost: string): ReadonlyArray<number> | null {
   const compressed = canonicalHost.split("::");
   if (compressed.length > 2) return null;
@@ -34,7 +30,6 @@ function ipv6Bytes(canonicalHost: string): ReadonlyArray<number> | null {
   return bytes;
 }
 
-/** Maps IPv4-mapped IPv6 addresses to the same four-byte identity as ordinary IPv4 input. */
 function canonicalIpv6(value: string): string | null {
   try {
     const hostname = new URL(`http://[${value}]/`).hostname;
@@ -50,7 +45,6 @@ function canonicalIpv6(value: string): string | null {
   }
 }
 
-/** Validates, removes a zone suffix, and canonicalizes equivalent IP spellings without DNS access. */
 export function canonicalizeNetworkSource(value: string | undefined): string | null {
   if (value === undefined) return null;
   const trimmed = value.trim();
@@ -63,7 +57,6 @@ export function canonicalizeNetworkSource(value: string | undefined): string | n
   return null;
 }
 
-/** Chooses Express' trust-proxy-aware IP, then the direct socket, then one shared fail-safe bucket. */
 export function selectCanonicalNetworkSource(
   expressIp: string | undefined,
   directSocketAddress: string | undefined,

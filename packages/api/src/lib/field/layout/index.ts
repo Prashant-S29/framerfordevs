@@ -1,5 +1,3 @@
-// Validates bounded M6 editor layout independently from React, Effect, persistence, and delivery contracts.
-
 import type {
   EditorLayout,
   FieldEditorMetadata,
@@ -46,7 +44,6 @@ const contentWriteRoles = new Set<ProjectRole>([
 ]);
 const textEncoder = new TextEncoder();
 
-/** Appends one bounded safe layout issue. */
 function addLayoutIssue(
   collector: MutableLayoutIssues,
   path: string,
@@ -60,7 +57,6 @@ function addLayoutIssue(
   collector.issues.push({ path, code, message });
 }
 
-/** Returns the role intersection while retaining deterministic left-side order. */
 function intersectRoles(
   left: ReadonlyArray<ProjectRole>,
   right: ReadonlyArray<ProjectRole>,
@@ -73,7 +69,6 @@ function intersectRoles(
   return intersection;
 }
 
-/** Checks that positions are unique, dense, and begin at zero. */
 function validateDensePositions(
   positions: ReadonlyArray<number>,
   collector: MutableLayoutIssues,
@@ -102,7 +97,6 @@ function validateDensePositions(
   }
 }
 
-/** Validates editor field-level role narrowing before applying layout visibility. */
 function validateFieldRoles(field: LayoutFieldDefinition, collector: MutableLayoutIssues): void {
   const roleArrays: ReadonlyArray<
     readonly ["visibleToRoles" | "editableByRoles", ReadonlyArray<ProjectRole>]
@@ -158,7 +152,6 @@ function validateFieldRoles(field: LayoutFieldDefinition, collector: MutableLayo
   }
 }
 
-/** Validates complete placement coverage, hierarchy visibility, identity, order, and size. */
 export function validateEditorLayout(
   layout: EditorLayout,
   fields: ReadonlyArray<LayoutFieldDefinition>,

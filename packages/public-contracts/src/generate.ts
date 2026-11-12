@@ -1,5 +1,3 @@
-// Writes or verifies only the source-controlled public registry's canonical artifact paths.
-
 import { constants } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";

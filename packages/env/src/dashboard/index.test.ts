@@ -1,5 +1,3 @@
-// Verifies dashboard public origins are exact, normalized, and complete.
-
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const validEnvironment = {

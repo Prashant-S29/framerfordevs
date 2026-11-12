@@ -1,5 +1,3 @@
-// Narrows Studio bearer tokens into exact delegated user authority.
-
 import { verifyStudioOAuthAccessToken, type StudioOAuthPrincipal } from "@framerfordevs/auth";
 import { Context, Effect, Layer } from "effect";
 

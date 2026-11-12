@@ -1,5 +1,5 @@
-import { canonicalizeLocaleTag } from "@framerfordevs/api/contracts/locale/tag/index";
-import type { ProjectLocale } from "@framerfordevs/api/contracts/locale/index";
+import { canonicalizeLocaleTag } from "@framerfordevs/api/contracts/locale/tag";
+import type { ProjectLocale } from "@framerfordevs/api/contracts/locale";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,7 +47,7 @@ import {
   PlusIcon,
   RotateCcwIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { LocaleTabs } from "@/components/entry/locale-tabs";
@@ -104,11 +104,10 @@ export function ProjectLocaleSettings({
   const items = locales.data?.data.items ?? [];
   const enabledLocales = items.filter((locale) => locale.status === "enabled");
 
-  useEffect(() => {
-    if (selectedLocaleId === "" && enabledLocales[0]) {
-      setSelectedLocaleId(enabledLocales[0].id);
-    }
-  }, [enabledLocales, selectedLocaleId]);
+  const defaultLocaleId = enabledLocales[0]?.id ?? "";
+  if (selectedLocaleId === "" && defaultLocaleId !== "") {
+    setSelectedLocaleId(defaultLocaleId);
+  }
 
   return (
     <Card>

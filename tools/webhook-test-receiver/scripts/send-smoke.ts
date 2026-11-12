@@ -1,11 +1,8 @@
-// Sends one synthetic signed content-free event through a configured public tunnel without printing authority.
-
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 const secretPattern = /^whsec_[A-Za-z0-9_-]{43}$/u;
 
-/** Reads the single local success-scenario secret used only by this opt-in smoke command. */
 async function readSuccessSecret(): Promise<string> {
   const entries = (await readFile("secrets/success.txt", "utf8"))
     .split(/\r?\n/u)
@@ -18,7 +15,6 @@ async function readSuccessSecret(): Promise<string> {
   return secret;
 }
 
-/** Parses the public tunnel origin without accepting credentials, ports, or paths. */
 function publicOrigin(): URL {
   const raw = process.env.PUBLIC_BASE_URL;
   if (raw === undefined) throw new Error("Set PUBLIC_BASE_URL to the tunnel HTTPS origin.");
@@ -37,7 +33,6 @@ function publicOrigin(): URL {
   return url;
 }
 
-/** Creates one complete synthetic event using no application content or durable identity. */
 function smokeEvent(eventId: string) {
   const projectId = randomUUID();
   const environmentId = randomUUID();
@@ -67,7 +62,6 @@ function smokeEvent(eventId: string) {
   };
 }
 
-/** Executes the public signed request and reports only its terminal status. */
 async function main(): Promise<void> {
   const origin = publicOrigin();
   const secret = await readSuccessSecret();

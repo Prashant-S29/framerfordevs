@@ -1,5 +1,3 @@
-// Defines M8 exact-locale publication authority, validation plans, status, and command results.
-
 import { Schema } from "effect";
 
 import { ApiCredentialId } from "../access";
@@ -15,14 +13,13 @@ import { LocaleTag, ProjectLocaleId } from "../locale";
 import { AuthUserId, Cursor, EnvironmentId, IsoDateTime, PageLimit, ProjectId } from "../platform";
 import { CollectionFieldId, CollectionId, ContractHash, SchemaRevisionId } from "../schema";
 
-import * as SchemaStrict from "../../lib/schema-strict";
-import { UuidValue } from "../uuid";
+import { Uuid } from "../uuid";
 const digestPattern = /^[0-9a-f]{64}$/u;
 
-export const EntryPublicationId = UuidValue.pipe(Schema.brand("EntryPublicationId"));
+export const EntryPublicationId = Uuid.pipe(Schema.brand("EntryPublicationId"));
 export type EntryPublicationId = typeof EntryPublicationId.Type;
 
-export const EntryDeliverySnapshotId = UuidValue.pipe(Schema.brand("EntryDeliverySnapshotId"));
+export const EntryDeliverySnapshotId = Uuid.pipe(Schema.brand("EntryDeliverySnapshotId"));
 export type EntryDeliverySnapshotId = typeof EntryDeliverySnapshotId.Type;
 
 export const EntryPublicationSequence = Schema.Number.check(
@@ -234,30 +231,37 @@ export class UnpublishEntryResult extends Schema.Class<UnpublishEntryResult>(
   unpublishedAt: IsoDateTime,
 }) {}
 
-export const GetEntryPublicationStatusInputSchema = SchemaStrict.toStandardSchemaV1(
+export const GetEntryPublicationStatusInputSchema = Schema.toStandardSchemaV1(
   GetEntryPublicationStatusInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const ValidateEntryPublicationInputSchema = SchemaStrict.toStandardSchemaV1(
+export const ValidateEntryPublicationInputSchema = Schema.toStandardSchemaV1(
   ValidateEntryPublicationInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
-export const PublishEntryInputSchema = SchemaStrict.toStandardSchemaV1(PublishEntryInput);
-export const UnpublishEntryInputSchema = SchemaStrict.toStandardSchemaV1(UnpublishEntryInput);
-export const ListEntryPublicationsInputSchema = SchemaStrict.toStandardSchemaV1(
+export const PublishEntryInputSchema = Schema.toStandardSchemaV1(PublishEntryInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const UnpublishEntryInputSchema = Schema.toStandardSchemaV1(UnpublishEntryInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const ListEntryPublicationsInputSchema = Schema.toStandardSchemaV1(
   ListEntryPublicationsInput,
+  { parseOptions: { onExcessProperty: "error" } },
 );
 
-export const EntryPublicationStatusOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const EntryPublicationStatusOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(EntryPublicationStatus),
 );
-export const EntryPublicationPlanOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const EntryPublicationPlanOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(EntryPublicationPlan),
 );
-export const PublishEntryResultOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const PublishEntryResultOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(PublishEntryResult),
 );
-export const UnpublishEntryResultOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const UnpublishEntryResultOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(UnpublishEntryResult),
 );
-export const EntryPublicationPageOutputSchema = SchemaStrict.toStandardSchemaV1(
+export const EntryPublicationPageOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(EntryPublicationPage),
 );

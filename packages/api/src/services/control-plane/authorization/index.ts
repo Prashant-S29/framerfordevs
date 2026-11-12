@@ -1,5 +1,3 @@
-// Maps Control Plane actions onto the shared project policy and exact primary-environment authority.
-
 import type { ProjectPermissionAction } from "../../../contracts/access";
 import type {
   ControlPlaneActor,
@@ -27,7 +25,6 @@ export function controlPlaneProjectPolicyAction(
   return projectPolicyAction[action];
 }
 
-/** Uses current membership/scope policy; credentials are additionally restricted to primary authority. */
 export function authorizeControlPlaneProject(
   executor: ApplicationExecutor,
   actor: ControlPlaneActor,

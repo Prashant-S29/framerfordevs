@@ -21,11 +21,12 @@ import {
   isPortableStudioMountPath,
 } from "./index";
 
-import * as SchemaStrict from "../../lib/schema-strict";
 const commandId = "019fae8b-1234-7000-8000-000000000001";
 
 const decodeExits = <A, I>(schema: Schema.Codec<A, I, never>, values: ReadonlyArray<unknown>) =>
-  Effect.forEach(values, (value) => Effect.exit(SchemaStrict.decodeUnknownEffect(schema)(value)));
+  Effect.forEach(values, (value) =>
+    Effect.exit(Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(value)),
+  );
 
 describe("Control Plane contracts", () => {
   it.effect("accepts canonical HTTPS and explicit loopback Studio origins", () =>
@@ -104,12 +105,16 @@ describe("Control Plane contracts", () => {
 
   it.effect("normalizes names while rejecting excess create fields", () =>
     Effect.gen(function* () {
-      const request = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneCreateWorkspaceRequest)({
+      const request = yield* Schema.decodeUnknownEffect(ControlPlaneCreateWorkspaceRequest, {
+        onExcessProperty: "error",
+      })({
         commandId,
         name: "  Product Workspace  ",
       });
       const excess = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneCreateWorkspaceRequest)({
+        Schema.decodeUnknownEffect(ControlPlaneCreateWorkspaceRequest, {
+          onExcessProperty: "error",
+        })({
           commandId,
           name: "Product Workspace",
           ownerId: commandId,
@@ -124,16 +129,25 @@ describe("Control Plane contracts", () => {
   it.effect("accepts empty or unique initial capabilities and rejects duplicates", () =>
     Effect.gen(function* () {
       const empty = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneInitialCapabilities)([]),
+        Schema.decodeUnknownEffect(ControlPlaneInitialCapabilities, { onExcessProperty: "error" })(
+          [],
+        ),
       );
       const cms = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneInitialCapabilities)(["cms"]),
+        Schema.decodeUnknownEffect(ControlPlaneInitialCapabilities, { onExcessProperty: "error" })([
+          "cms",
+        ]),
       );
       const duplicate = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneInitialCapabilities)(["cms", "cms"]),
+        Schema.decodeUnknownEffect(ControlPlaneInitialCapabilities, { onExcessProperty: "error" })([
+          "cms",
+          "cms",
+        ]),
       );
       const unknown = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneInitialCapabilities)(["billing"]),
+        Schema.decodeUnknownEffect(ControlPlaneInitialCapabilities, { onExcessProperty: "error" })([
+          "billing",
+        ]),
       );
 
       assert.isTrue(Exit.isSuccess(empty));
@@ -146,21 +160,25 @@ describe("Control Plane contracts", () => {
   it.effect("keeps project creation closed and command-idempotent", () =>
     Effect.gen(function* () {
       const valid = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneCreateProjectRequest)({
-          commandId,
-          name: "Product Site",
-          key: "product-site",
-          description: null,
-          initialCapabilities: ["cms"],
-        }),
+        Schema.decodeUnknownEffect(ControlPlaneCreateProjectRequest, { onExcessProperty: "error" })(
+          {
+            commandId,
+            name: "Product Site",
+            key: "product-site",
+            description: null,
+            initialCapabilities: ["cms"],
+          },
+        ),
       );
       const missingCommand = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneCreateProjectRequest)({
-          name: "Product Site",
-          key: "product-site",
-          description: null,
-          initialCapabilities: ["cms"],
-        }),
+        Schema.decodeUnknownEffect(ControlPlaneCreateProjectRequest, { onExcessProperty: "error" })(
+          {
+            name: "Product Site",
+            key: "product-site",
+            description: null,
+            initialCapabilities: ["cms"],
+          },
+        ),
       );
 
       assert.isTrue(Exit.isSuccess(valid));
@@ -170,24 +188,27 @@ describe("Control Plane contracts", () => {
 
   it.effect("distinguishes Studio create-only and positive-version update requests", () =>
     Effect.gen(function* () {
-      const createOnly = yield* SchemaStrict.decodeUnknownEffect(
+      const createOnly = yield* Schema.decodeUnknownEffect(
         ControlPlanePutStudioRegistrationRequest,
+        { onExcessProperty: "error" },
       )({
         commandId,
         expectedVersion: null,
         applicationOrigin: "https://studio.example.com",
         mountPath: "/studio",
       });
-      const update = yield* SchemaStrict.decodeUnknownEffect(
-        ControlPlanePutStudioRegistrationRequest,
-      )({
+      const update = yield* Schema.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest, {
+        onExcessProperty: "error",
+      })({
         commandId,
         expectedVersion: 2,
         applicationOrigin: "https://studio.example.com",
         mountPath: "/studio-v2",
       });
       const zeroVersion = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest)({
+        Schema.decodeUnknownEffect(ControlPlanePutStudioRegistrationRequest, {
+          onExcessProperty: "error",
+        })({
           commandId,
           expectedVersion: 0,
           applicationOrigin: "https://studio.example.com",
@@ -203,20 +224,26 @@ describe("Control Plane contracts", () => {
 
   it.effect("requires a positive expected version for user-controlled Studio runtime changes", () =>
     Effect.gen(function* () {
-      const valid = yield* SchemaStrict.decodeUnknownEffect(ControlPlaneSetStudioRuntimeRequest)({
+      const valid = yield* Schema.decodeUnknownEffect(ControlPlaneSetStudioRuntimeRequest, {
+        onExcessProperty: "error",
+      })({
         commandId,
         expectedVersion: 3,
         enabled: true,
       });
       const createStyle = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneSetStudioRuntimeRequest)({
+        Schema.decodeUnknownEffect(ControlPlaneSetStudioRuntimeRequest, {
+          onExcessProperty: "error",
+        })({
           commandId,
           expectedVersion: null,
           enabled: true,
         }),
       );
       const excess = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneSetStudioRuntimeRequest)({
+        Schema.decodeUnknownEffect(ControlPlaneSetStudioRuntimeRequest, {
+          onExcessProperty: "error",
+        })({
           commandId,
           expectedVersion: 3,
           enabled: false,
@@ -243,7 +270,7 @@ describe("Control Plane contracts", () => {
     const message = "m".repeat(512);
     const success = (data: unknown) => ({ ok: true, data, error: null, message });
     const assertWithinLimit = <A, I>(schema: Schema.Codec<A, I, never>, input: unknown) => {
-      const decoded = SchemaStrict.decodeUnknownSync(schema)(input);
+      const decoded = Schema.decodeUnknownSync(schema, { onExcessProperty: "error" })(input);
       assert.isAtMost(
         Buffer.byteLength(JSON.stringify(decoded), "utf8"),
         controlPlaneLimits.responseBytes,
@@ -338,19 +365,29 @@ describe("Control Plane contracts", () => {
   it.effect("keeps the public error-code union closed", () =>
     Effect.gen(function* () {
       const commandConflict = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneApiErrorCode)("COMMAND_CONFLICT"),
+        Schema.decodeUnknownEffect(ControlPlaneApiErrorCode, { onExcessProperty: "error" })(
+          "COMMAND_CONFLICT",
+        ),
       );
       const cursorInvalid = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneApiErrorCode)("CONTROL_PLANE_CURSOR_INVALID"),
+        Schema.decodeUnknownEffect(ControlPlaneApiErrorCode, { onExcessProperty: "error" })(
+          "CONTROL_PLANE_CURSOR_INVALID",
+        ),
       );
       const invitationConflict = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneApiErrorCode)("INVITATION_CONFLICT"),
+        Schema.decodeUnknownEffect(ControlPlaneApiErrorCode, { onExcessProperty: "error" })(
+          "INVITATION_CONFLICT",
+        ),
       );
       const localeConflict = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneApiErrorCode)("LOCALE_CONFLICT"),
+        Schema.decodeUnknownEffect(ControlPlaneApiErrorCode, { onExcessProperty: "error" })(
+          "LOCALE_CONFLICT",
+        ),
       );
       const internalCode = yield* Effect.exit(
-        SchemaStrict.decodeUnknownEffect(ControlPlaneApiErrorCode)("DATABASE_FAILURE"),
+        Schema.decodeUnknownEffect(ControlPlaneApiErrorCode, { onExcessProperty: "error" })(
+          "DATABASE_FAILURE",
+        ),
       );
 
       assert.isTrue(Exit.isSuccess(commandConflict));
