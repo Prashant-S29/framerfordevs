@@ -41,7 +41,7 @@ function collection(options?: {
     revisionSequence: options?.revisionId === undefined ? 1 : 2,
     contractHash: options?.contractHash ?? "b".repeat(64),
     contract: {
-      formatVersion: 2,
+      formatVersion: 1,
       validationProfile: "ffd-fields@1",
       currencyRegistryProfile: null,
       collectionApiKey: "blog_posts",

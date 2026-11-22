@@ -68,6 +68,40 @@ const contentCapabilities = {
   canRename: true,
   canSaveLocalized: true,
   canSaveShared: true,
+  canPublish: true,
+};
+const contentPublicationId = "abababab-abab-4bab-8bab-abababababab";
+const contentPublicationSummary = {
+  id: contentPublicationId,
+  sequence: 1,
+  schemaRevisionId: contentRevisionId,
+  contractHash: "a".repeat(64),
+  changedFieldIds: [contentFieldId],
+  publishedAt: "2026-09-28T00:00:00.000Z",
+  current: true,
+};
+const contentPublicationStatus = {
+  state: "published",
+  stateVersion: 1,
+  currentPublication: contentPublicationSummary,
+  sharedChanged: false,
+  localizedChanged: true,
+  schemaChanged: false,
+  changedSincePublication: true,
+};
+const contentRevisionSummary = {
+  id: contentLocalizedRevisionId,
+  scope: "localized",
+  sequence: 2,
+  previousRevisionId: contentSharedRevisionId,
+  schemaRevisionId: contentRevisionId,
+  contractHash: "a".repeat(64),
+  changedFieldIds: [contentFieldId],
+  restoredFromRevisionId: null,
+  authoredByUserId: "studio-user",
+  authoredByCredentialId: null,
+  authoredAt: "2026-09-28T00:00:00.000Z",
+  compatible: true,
 };
 const contentEntry = {
   id: contentEntryId,
@@ -253,6 +287,7 @@ function studioContentSuccessData(url: string, method: string): Readonly<Record<
           displayName: "English",
           canRead: true,
           canWrite: true,
+          canPublish: true,
         },
       ],
       collections: [
@@ -302,6 +337,7 @@ function studioContentSuccessData(url: string, method: string): Readonly<Record<
         localizedValues: { [contentFieldId]: "Title" },
         validation: contentValidation,
       },
+      publication: contentPublicationStatus,
     };
   }
   if (pathname.endsWith("/name") && method === "PATCH") return contentEntry;
@@ -330,6 +366,85 @@ function studioContentSuccessData(url: string, method: string): Readonly<Record<
     };
   }
   throw new Error(`Missing Studio Content success fixture for ${method} ${url}.`);
+}
+
+function studioHistorySuccessData(url: string): Readonly<Record<string, unknown>> {
+  const pathname = new URL(url).pathname;
+  const delivery = { status: "verified", currentPublicationId: contentPublicationId };
+  if (pathname.endsWith("/revisions")) return { items: [contentRevisionSummary], nextCursor: null };
+  if (pathname.includes("/compare/")) {
+    return {
+      from: contentRevisionSummary,
+      to: contentRevisionSummary,
+      items: [
+        {
+          fieldId: contentFieldId,
+          change: "changed",
+          before: "Old",
+          after: "New",
+          inCurrentSchema: true,
+        },
+      ],
+      restrictedChanges: false,
+      schemaDiffers: false,
+    };
+  }
+  if (pathname.endsWith("/restore")) {
+    return {
+      entryId: contentEntryId,
+      commandId: contentCommandId,
+      sharedChanged: false,
+      sharedVersion: 1,
+      sharedRevisionId: contentSharedRevisionId,
+      localizedChanged: true,
+      localizedVersion: 3,
+      localizedRevisionId: contentLocalizedRevisionId,
+      validation: contentValidation,
+    };
+  }
+  if (pathname.includes("/revisions/")) {
+    return { revision: contentRevisionSummary, values: { [contentFieldId]: "Old" } };
+  }
+  if (pathname.endsWith("/publications")) {
+    return { items: [contentPublicationSummary], nextCursor: null };
+  }
+  if (pathname.endsWith("/publication")) return contentPublicationStatus;
+  if (pathname.endsWith("/validate")) {
+    return {
+      authorityHash: "d".repeat(64),
+      stateVersion: 1,
+      currentPublicationId: contentPublicationId,
+      schemaRevisionId: contentRevisionId,
+      contractHash: "a".repeat(64),
+      sharedVersion: 1,
+      sharedRevisionId: contentSharedRevisionId,
+      localizedVersion: 2,
+      localizedRevisionId: contentLocalizedRevisionId,
+      wouldCreatePublication: true,
+      validation: contentValidation,
+      entryIssues: [],
+    };
+  }
+  if (pathname.endsWith("/publish")) {
+    return {
+      commandId: contentCommandId,
+      resultKind: "changed",
+      stateVersion: 2,
+      publication: contentPublicationSummary,
+      delivery,
+    };
+  }
+  if (pathname.endsWith("/unpublish")) {
+    return {
+      commandId: contentCommandId,
+      resultKind: "changed",
+      stateVersion: 3,
+      unpublishedPublicationId: contentPublicationId,
+      unpublishedAt: "2026-09-28T00:00:00.000Z",
+      delivery: { status: "superseded", currentPublicationId: contentPublicationId },
+    };
+  }
+  throw new Error(`Missing Studio history fixture for ${url}.`);
 }
 
 const assets = {
@@ -476,7 +591,240 @@ function percentile95(values: ReadonlyArray<number>) {
 }
 
 describe("Studio Fetch runtime", () => {
-  it("adapts only the nine finite Studio Content v2 operation families without exposing bearer authority", async () => {
+  it("adapts the nine revision and publication families with the same transport guarantees", async () => {
+    const setup = config();
+    const baseFetch = setup.value.fetch;
+    const calls: Array<{
+      readonly url: string;
+      readonly method: string;
+      readonly authorization: string | null;
+      readonly headerNames: ReadonlyArray<string>;
+      readonly body: string | null;
+    }> = [];
+    let upstream: (url: string) => Response = (url) =>
+      Response.json({
+        ok: true,
+        data: studioHistorySuccessData(url),
+        error: null,
+        message: "Content operation completed.",
+      });
+    const contentFetch: typeof globalThis.fetch = async (input, init) => {
+      const url =
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("/api/studio-content/v1/")) {
+        const headers = new Headers(init?.headers);
+        calls.push({
+          url,
+          method: init?.method ?? "GET",
+          authorization: headers.get("authorization"),
+          headerNames: [...headers.keys()].toSorted(),
+          body: typeof init?.body === "string" ? init.body : null,
+        });
+        return upstream(url);
+      }
+      return baseFetch(input, init);
+    };
+    const handler = createStudioFetchHandler({ ...setup.value, fetch: contentFetch });
+    const session = await authenticate(handler);
+    const browserHeaders = {
+      Cookie: session,
+      Origin: "http://localhost:4100",
+      "Sec-Fetch-Site": "same-origin",
+    };
+    const jsonHeaders = { ...browserHeaders, "Content-Type": "application/json" };
+    const entryBase = `/studio/api/content/collections/${contentCollectionId}/locales/en/entries/${contentEntryId}`;
+    const hash = "a".repeat(64);
+    const send = (path: string, init: RequestInit = {}) => {
+      const request = new Request(`http://localhost:4100${entryBase}${path}`, {
+        headers: init.body === undefined ? browserHeaders : jsonHeaders,
+        ...init,
+      });
+      const url = new URL(request.url);
+      return handler.fetch(request, { rawTarget: `${url.pathname}${url.search}` });
+    };
+    const restoreBody = {
+      scope: "localized",
+      schemaRevisionId: contentRevisionId,
+      contractHash: hash,
+      expectedVersion: 2,
+      commandId: contentCommandId,
+    };
+    const publishBody = {
+      commandId: contentCommandId,
+      authorityHash: "d".repeat(64),
+      expectedStateVersion: 1,
+      expectedPublicationId: contentPublicationId,
+      expectedSchemaRevisionId: contentRevisionId,
+      expectedContractHash: hash,
+      expectedSharedVersion: 1,
+      expectedSharedRevisionId: contentSharedRevisionId,
+      expectedLocalizedVersion: 2,
+      expectedLocalizedRevisionId: contentLocalizedRevisionId,
+    };
+    const unpublishBody = {
+      commandId: contentCommandId,
+      expectedStateVersion: 2,
+      expectedPublicationId: contentPublicationId,
+    };
+    const accepted = [
+      ["/revisions?scope=localized&limit=10", {}],
+      [`/revisions/${contentLocalizedRevisionId}`, {}],
+      [`/revisions/${contentSharedRevisionId}/compare/${contentLocalizedRevisionId}`, {}],
+      [
+        `/revisions/${contentSharedRevisionId}/restore`,
+        { method: "POST", body: JSON.stringify(restoreBody) },
+      ],
+      ["/publication", {}],
+      ["/publications?limit=10", {}],
+      ["/publication/validate", { method: "POST", body: "{}" }],
+      ["/publication/publish", { method: "POST", body: JSON.stringify(publishBody) }],
+      ["/publication/unpublish", { method: "POST", body: JSON.stringify(unpublishBody) }],
+    ] as const;
+    for (const [path, init] of accepted) {
+      const response = await send(path, init);
+      expect(response.status, `${path} ${await response.clone().text()}`).toBe(200);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(await response.text()).not.toContain("access-1");
+    }
+    expect(calls).toHaveLength(9);
+    const upstreamBase = `http://localhost:3000/api/studio-content/v1/projects/${projectId}/environments/${environmentId}/collections/${contentCollectionId}/locales/en/entries/${contentEntryId}`;
+    expect(calls.map(({ method, url }) => `${method} ${url.replace(upstreamBase, "")}`)).toEqual([
+      "GET /revisions?scope=localized&limit=10",
+      `GET /revisions/${contentLocalizedRevisionId}`,
+      `GET /revisions/${contentSharedRevisionId}/compare/${contentLocalizedRevisionId}`,
+      `POST /revisions/${contentSharedRevisionId}/restore`,
+      "GET /publication",
+      "GET /publications?limit=10",
+      "POST /publication/validate",
+      "POST /publication/publish",
+      "POST /publication/unpublish",
+    ]);
+    expect(calls.every((call) => call.authorization === "Bearer access-1")).toBe(true);
+    expect(
+      calls.every((call) =>
+        call.headerNames.every((name) =>
+          ["accept", "authorization", "content-type", "x-request-id"].includes(name),
+        ),
+      ),
+    ).toBe(true);
+    expect(calls[7]?.body).toBe(JSON.stringify(publishBody));
+
+    const rejected = [
+      ["/revisions", {}],
+      ["/revisions?scope=all", {}],
+      ["/revisions?scope=shared&limit=9", {}],
+      ["/revisions?scope=shared&scope=shared", {}],
+      ["/publications?scope=shared", {}],
+      ["/publication?expand=all", {}],
+      ["/revisions/not-a-uuid", {}],
+      [`/revisions/${contentSharedRevisionId}/compare/not-a-uuid`, {}],
+      [`/revisions/${contentSharedRevisionId}/compare/${contentLocalizedRevisionId}/extra`, {}],
+      ["/publication", { method: "DELETE" }],
+      ["/publication/publish", {}],
+      ["/publication/validate", { method: "POST", body: JSON.stringify({ dryRun: true }) }],
+      [
+        `/revisions/${contentSharedRevisionId}/restore`,
+        { method: "POST", body: JSON.stringify({ ...restoreBody, extra: true }) },
+      ],
+      [
+        "/publication/publish",
+        { method: "POST", body: JSON.stringify({ ...publishBody, authorityHash: "short" }) },
+      ],
+      [
+        "/publication/unpublish",
+        { method: "POST", body: JSON.stringify({ ...unpublishBody, force: true }) },
+      ],
+      [
+        "/publication/publish",
+        { method: "POST", body: JSON.stringify({ ...publishBody, padding: "x".repeat(4_096) }) },
+      ],
+      [
+        "/publication/validate",
+        {
+          method: "POST",
+          body: "{}",
+          headers: { ...browserHeaders, "Content-Type": "text/plain" },
+        },
+      ],
+      [
+        "/publication",
+        { headers: { ...browserHeaders, Authorization: "Bearer browser-controlled" } },
+      ],
+      [
+        "/publication",
+        { headers: { Origin: "https://evil.example", "Sec-Fetch-Site": "cross-site" } },
+      ],
+    ] as const;
+    for (const [path, init] of rejected) {
+      const response = await send(path, init);
+      expect([400, 401, 403, 404, 405, 413, 415], path).toContain(response.status);
+    }
+    expect(calls).toHaveLength(9);
+
+    const failures = [
+      ["REVISION_INCOMPATIBLE", 409],
+      ["PUBLICATION_STATE_CONFLICT", 409],
+      ["PUBLICATION_INVALID", 422],
+      ["DRAFT_VERSION_CONFLICT", 409],
+    ] as const;
+    for (const [code, status] of failures) {
+      upstream = () =>
+        Response.json(
+          {
+            ok: false,
+            data: null,
+            error: { code, message: "Rejected.", retryable: false, requestId: "request-1" },
+            message: "Rejected.",
+          },
+          { status },
+        );
+      const response = await send("/publication/publish", {
+        method: "POST",
+        body: JSON.stringify(publishBody),
+      });
+      expect(response.status, code).toBe(status);
+      expect((await response.json()).error.code).toBe(code);
+    }
+    upstream = () =>
+      Response.json(
+        {
+          ok: false,
+          data: null,
+          error: {
+            code: "PUBLICATION_INVALID",
+            message: "Rejected.",
+            retryable: false,
+            requestId: "request-1",
+          },
+          message: "Rejected.",
+        },
+        { status: 409 },
+      );
+    const incoherent = await send("/publication/publish", {
+      method: "POST",
+      body: JSON.stringify(publishBody),
+    });
+    expect(incoherent.status).toBe(502);
+
+    upstream = (url) =>
+      Response.json({
+        ok: true,
+        data: { ...studioHistorySuccessData(url), accessToken: "leak" },
+        error: null,
+        message: "Content operation completed.",
+      });
+    expect((await send("/publication")).status).toBe(502);
+    upstream = () =>
+      Response.json({
+        ok: true,
+        data: { ...contentPublicationStatus, currentPublication: null },
+        error: null,
+        message: "Content operation completed.",
+      });
+    expect((await send("/publication")).status).toBe(502);
+  });
+
+  it("adapts the nine authoring Studio Content operation families without exposing bearer authority", async () => {
     const setup = config();
     const baseFetch = setup.value.fetch;
     const contentCalls: Array<{
@@ -491,7 +839,7 @@ describe("Studio Fetch runtime", () => {
     const contentFetch: typeof globalThis.fetch = async (input, init) => {
       const url =
         typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      if (url.includes("/api/studio-content/v2/")) {
+      if (url.includes("/api/studio-content/v1/")) {
         const headers = new Headers(init?.headers);
         contentCalls.push({
           url,
@@ -588,7 +936,7 @@ describe("Studio Fetch runtime", () => {
       ["count", "hasMore", "items", "nextCursor"],
       ["items"],
       ["capabilities", "form", "locale", "localeId"],
-      ["capabilities", "draft", "form", "locale", "localeId"],
+      ["capabilities", "draft", "form", "locale", "localeId", "publication"],
       [
         "commandId",
         "entry",
@@ -819,7 +1167,7 @@ describe("Studio Fetch runtime", () => {
       fetch: async (input, init) => {
         const url =
           typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-        if (!url.includes("/api/studio-content/v2/")) return baseFetch(input, init);
+        if (!url.includes("/api/studio-content/v1/")) return baseFetch(input, init);
         return Response.json({
           ok: true,
           data: {
@@ -905,14 +1253,14 @@ describe("Studio Fetch runtime", () => {
     await handler.dispose();
   });
 
-  it("preserves both closed configuration reasons across all eight v2 nested operations", async () => {
+  it("preserves both closed configuration reasons across all eight nested operations", async () => {
     let reason: "empty_schema" | "projection_invalid" = "empty_schema";
     const setup = config();
     const baseFetch = setup.value.fetch;
     const contentFetch: typeof globalThis.fetch = async (input, init) => {
       const url =
         typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      if (!url.includes("/api/studio-content/v2/")) return baseFetch(input, init);
+      if (!url.includes("/api/studio-content/v1/")) return baseFetch(input, init);
       return Response.json(
         {
           ok: false,
@@ -1026,7 +1374,7 @@ describe("Studio Fetch runtime", () => {
       const contentFetch: typeof globalThis.fetch = async (input, init) => {
         const url =
           typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-        if (url.includes("/api/studio-content/v2/")) {
+        if (url.includes("/api/studio-content/v1/")) {
           return Response.json({
             ok: true,
             data: studioContentSuccessData(url, init?.method ?? "GET"),
@@ -1097,7 +1445,7 @@ describe("Studio Fetch runtime", () => {
     let responseBody = JSON.stringify({
       ok: true,
       data: studioContentSuccessData(
-        `http://localhost:3000/api/studio-content/v2/projects/${projectId}/environments/${environmentId}/collections/${collectionId}/locales/en/entries`,
+        `http://localhost:3000/api/studio-content/v1/projects/${projectId}/environments/${environmentId}/collections/${collectionId}/locales/en/entries`,
         "POST",
       ),
       error: null,
@@ -1107,7 +1455,7 @@ describe("Studio Fetch runtime", () => {
       fetch: async (input, init) => {
         const url =
           typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-        if (url.includes("/api/studio-content/v2/")) {
+        if (url.includes("/api/studio-content/v1/")) {
           upstreamBodyBytes = Buffer.byteLength(String(init?.body ?? ""), "utf8");
           return new Response(responseBody, {
             status: 200,
@@ -1266,6 +1614,7 @@ describe("Studio Fetch runtime", () => {
           },
           validation: contentValidation,
         },
+        publication: contentPublicationStatus,
       },
       error: null,
       message: "Content operation completed.",
@@ -1337,7 +1686,7 @@ describe("Studio Fetch runtime", () => {
       fetch: async (input, init) => {
         const url =
           typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-        if (!url.includes("/api/studio-content/v2/")) return baseFetch(input, init);
+        if (!url.includes("/api/studio-content/v1/")) return baseFetch(input, init);
         const fixture = fixtures[index++];
         if (fixture === undefined) throw new Error("Missing failure fixture.");
         const [status, code] = fixture;
@@ -1441,7 +1790,7 @@ describe("Studio Fetch runtime", () => {
           ok: true,
           data: {
             ...studioContentSuccessData(
-              `http://localhost:3000/api/studio-content/v2/projects/${projectId}/environments/${environmentId}/context`,
+              `http://localhost:3000/api/studio-content/v1/projects/${projectId}/environments/${environmentId}/context`,
               "GET",
             ),
             unexpected: true,
@@ -1582,7 +1931,7 @@ describe("Studio Fetch runtime", () => {
     const contentFetch: typeof globalThis.fetch = async (input, init) => {
       const url =
         typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      if (!url.includes("/api/studio-content/v2/")) return baseFetch(input, init);
+      if (!url.includes("/api/studio-content/v1/")) return baseFetch(input, init);
       const response = invalid[index];
       index += 1;
       if (response === undefined) throw new Error("Missing invalid response fixture.");
@@ -1655,7 +2004,7 @@ describe("Studio Fetch runtime", () => {
       fetch: async (input, init) => {
         const url =
           typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-        if (!url.includes("/api/studio-content/v2/")) return baseFetch(input, init);
+        if (!url.includes("/api/studio-content/v1/")) return baseFetch(input, init);
         const data = invalidData[index++];
         if (data === undefined) throw new Error("Missing invalid nested DTO fixture.");
         return Response.json({
@@ -2069,7 +2418,7 @@ describe("Studio Fetch runtime", () => {
         fetch: async (input, init) => {
           const url =
             typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-          if (!url.includes("/api/studio-content/v2/")) return baseFetch(input, init);
+          if (!url.includes("/api/studio-content/v1/")) return baseFetch(input, init);
           markUpstreamStarted?.();
           return new Promise<Response>((_resolve, reject) => {
             init?.signal?.addEventListener(

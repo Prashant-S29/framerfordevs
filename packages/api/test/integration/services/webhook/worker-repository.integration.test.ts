@@ -17,6 +17,12 @@ import { Effect } from "effect";
 
 import { projectPublicationEvent } from "../../../../src/lib/publication/event";
 import { makeWebhookWorkerRepository } from "../../../../src/services/webhook/worker-repository";
+import {
+  createPublishedCollectionFixture,
+  removePublishedCollectionFixture,
+  type PublishedCollectionFixture,
+} from "../../../support/published-collection";
+import { assertIndexDefinitions, assertIndexedQuery } from "../../../support/query-plan";
 
 interface FixtureScope {
   readonly workspaceId: string;
@@ -26,48 +32,31 @@ interface FixtureScope {
   readonly schemaRevisionId: string;
 }
 
+let published: PublishedCollectionFixture | undefined;
 let scope: FixtureScope | undefined;
 const insertedEventIds: Array<string> = [];
 const insertedEndpointIds: Array<string> = [];
 let fixtureSequence = 900_000;
 
 function requiredScope(): FixtureScope {
-  if (!scope) throw new Error("M11 worker integration requires an existing published collection.");
+  if (!scope)
+    throw new Error("Webhook worker integration requires a published collection fixture.");
   return scope;
 }
 
 describe("Webhook worker repository PostgreSQL integration", () => {
   beforeAll(async () => {
-    const result = await db.execute(sql`select
-      r.workspace_id as "workspaceId",
-      r.project_id as "projectId",
-      r.environment_id as "environmentId",
-      r.collection_id as "collectionId",
-      r.id as "schemaRevisionId"
-      from cms_schema_revision r
-      join project p
-        on p.id = r.project_id
-        and p.workspace_id = r.workspace_id
-        and p.archived_at is null
-      order by r.id
-      limit 1`);
-    const row = result.rows[0];
-    if (
-      row &&
-      typeof row.workspaceId === "string" &&
-      typeof row.projectId === "string" &&
-      typeof row.environmentId === "string" &&
-      typeof row.collectionId === "string" &&
-      typeof row.schemaRevisionId === "string"
-    ) {
-      scope = {
-        workspaceId: row.workspaceId,
-        projectId: row.projectId,
-        environmentId: row.environmentId,
-        collectionId: row.collectionId,
-        schemaRevisionId: row.schemaRevisionId,
-      };
-    }
+    published = await createPublishedCollectionFixture(
+      "webhook-worker",
+      new Date("2026-08-12T00:00:00.000Z"),
+    );
+    scope = {
+      workspaceId: published.workspaceId,
+      projectId: published.projectId,
+      environmentId: published.environmentId,
+      collectionId: published.collectionId,
+      schemaRevisionId: published.schemaRevisionId,
+    };
   });
 
   it("projects a supported event once and marks a zero-endpoint row processed", async () => {
@@ -90,6 +79,7 @@ describe("Webhook worker repository PostgreSQL integration", () => {
         schemaRevisionId: current.schemaRevisionId,
         sequence: fixtureSequence,
         schemaHash: "a".repeat(64),
+        contractHash: "b".repeat(64),
         changedFieldIds: [],
         invalidationTags: [
           `project:${current.projectId}`,
@@ -104,8 +94,7 @@ describe("Webhook worker repository PostgreSQL integration", () => {
 
     const [stored] = await db.select().from(outboxEvent).where(eq(outboxEvent.id, id));
     if (!stored) throw new Error("Inserted outbox event could not be loaded.");
-    const projection = projectPublicationEvent(stored);
-    assert.isFalse(projection.ok, "legacy rows require dispatcher contract reconstruction");
+    assert.isTrue(projectPublicationEvent(stored).ok);
 
     await db.update(outboxEvent).set({ processedAt: null }).where(eq(outboxEvent.id, id));
     const worker = makeWebhookWorkerRepository();
@@ -241,52 +230,82 @@ describe("Webhook worker repository PostgreSQL integration", () => {
 
   it("uses bounded dispatcher, queue, lease, subscription, attempt, and mapping indexes", async () => {
     const current = requiredScope();
-    const plans = await db.transaction(async (transaction) => {
+    await db.transaction(async (transaction) => {
       await transaction.execute(sql`set local enable_seqscan = off`);
-      const outbox = await transaction.execute(
-        sql`explain (format json) select id from outbox_event where processed_at is null and available_at <= now() order by available_at, id limit 100 for update skip locked`,
+      await transaction.execute(sql`set local enable_sort = off`);
+      await assertIndexedQuery(
+        transaction,
+        sql`select id from outbox_event where processed_at is null and available_at <= now() order by available_at, id limit 100 for update skip locked`,
+        { table: "outbox_event", allowBitmap: true, order: "index" },
       );
-      const queue = await transaction.execute(
-        sql`explain (format json) select id from webhook_delivery where status in ('queued', 'retry_scheduled') and next_attempt_at <= now() order by next_attempt_at, id limit 1 for update skip locked`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select id from webhook_delivery where status in ('queued', 'retry_scheduled') and next_attempt_at <= now() order by next_attempt_at, id limit 1 for update skip locked`,
+        { table: "webhook_delivery", allowBitmap: true, order: "index" },
       );
-      const lease = await transaction.execute(
-        sql`explain (format json) select id from webhook_delivery where status = 'delivering' and lease_expires_at <= now() order by lease_expires_at, id limit 1 for update skip locked`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select id from webhook_delivery where status = 'delivering' and lease_expires_at <= now() order by lease_expires_at, id limit 1 for update skip locked`,
+        { table: "webhook_delivery", allowBitmap: true, order: "index" },
       );
-      const subscriptions = await transaction.execute(
-        sql`explain (format json) select endpoint_id from webhook_endpoint_subscription where environment_id = ${current.environmentId} and event_type = 'cms.entry.published' and active_from <= now() and active_until is null`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select endpoint_id from webhook_endpoint_subscription where environment_id = ${current.environmentId} and event_type = 'cms.entry.published' and active_from <= now() and active_until is null`,
+        { table: "webhook_endpoint_subscription", allowBitmap: true },
       );
-      const attempts = await transaction.execute(
-        sql`explain (format json) select id from webhook_delivery_attempt where delivery_id = ${randomUUID()} order by attempt_number desc`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select id from webhook_delivery_attempt where delivery_id = ${randomUUID()} order by attempt_number desc nulls last limit 51`,
+        { table: "webhook_delivery_attempt", allowBitmap: true, order: "index" },
       );
-      const mappings = await transaction.execute(
-        sql`explain (format json) select id from cms_invalidation_route_mapping where environment_id = ${current.environmentId} and collection_id = ${current.collectionId} and state = 'enabled' order by id`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select id from cms_invalidation_route_mapping where environment_id = ${current.environmentId} and collection_id = ${current.collectionId} and state = 'enabled' order by id`,
+        { table: "cms_invalidation_route_mapping", allowBitmap: true, order: "index" },
       );
-      return JSON.stringify([
-        outbox.rows,
-        queue.rows,
-        lease.rows,
-        subscriptions.rows,
-        attempts.rows,
-        mappings.rows,
-      ]);
     });
-    assert.include(plans, "outbox_event_pending_available_id_idx");
-    assert.include(plans, "webhook_delivery_ready_idx");
-    assert.include(plans, "webhook_delivery_expired_lease_idx");
-    assert.match(
-      plans,
-      /webhook_subscription_(?:dispatch_idx|endpoint_type_active_unique)/u,
-      "subscription eligibility must use a bounded active or dispatch index",
-    );
-    assert.match(plans, /webhook_attempt_delivery_(?:number_idx|number_unique)/u);
-    assert.include(plans, "cms_invalidation_mapping_match_idx");
+    await assertIndexDefinitions(db, [
+      {
+        table: "outbox_event",
+        name: "outbox_event_pending_available_id_idx",
+        keys: "available_at, id",
+        where: "(processed_at IS NULL)",
+      },
+      {
+        table: "webhook_delivery",
+        name: "webhook_delivery_ready_idx",
+        keys: "next_attempt_at, id",
+        where:
+          "((status)::text = ANY ((ARRAY['queued'::character varying, 'retry_scheduled'::character varying])::text[]))",
+      },
+      {
+        table: "webhook_delivery",
+        name: "webhook_delivery_expired_lease_idx",
+        keys: "lease_expires_at, id",
+        where: "((status)::text = 'delivering'::text)",
+      },
+      {
+        table: "webhook_endpoint_subscription",
+        name: "webhook_subscription_dispatch_idx",
+        keys: "environment_id, event_type, active_from, endpoint_id",
+      },
+      {
+        table: "webhook_delivery_attempt",
+        name: "webhook_attempt_delivery_number_idx",
+        keys: "delivery_id, attempt_number DESC NULLS LAST",
+      },
+      {
+        table: "cms_invalidation_route_mapping",
+        name: "cms_invalidation_mapping_match_idx",
+        keys: "environment_id, collection_id, state, id",
+      },
+    ]);
   });
 
   it("serializes endpoint claims, recovers expiry, and rejects stale finalization tokens", async () => {
     const current = requiredScope();
-    const actorResult = await db.execute(sql`select id from "user" order by id limit 1`);
-    const actorId = actorResult.rows[0]?.id;
-    if (typeof actorId !== "string") throw new Error("M11 worker integration requires a user.");
+    const actorId = published?.ownerId;
+    if (actorId === undefined) throw new Error("Webhook worker integration requires an owner.");
 
     const now = new Date("2000-01-01T00:02:00.000Z");
     const eventId = randomUUID();
@@ -532,8 +551,10 @@ describe("Webhook worker repository PostgreSQL integration", () => {
         .where(inArray(webhookEndpointDestination.endpointId, insertedEndpointIds));
       await db.delete(webhookEndpoint).where(inArray(webhookEndpoint.id, insertedEndpointIds));
     }
-    if (insertedEventIds.length === 0) return;
-    await db.delete(publicationEvent).where(inArray(publicationEvent.eventId, insertedEventIds));
-    await db.delete(outboxEvent).where(inArray(outboxEvent.id, insertedEventIds));
+    if (insertedEventIds.length > 0) {
+      await db.delete(publicationEvent).where(inArray(publicationEvent.eventId, insertedEventIds));
+      await db.delete(outboxEvent).where(inArray(outboxEvent.id, insertedEventIds));
+    }
+    if (published) await removePublishedCollectionFixture(published);
   });
 });

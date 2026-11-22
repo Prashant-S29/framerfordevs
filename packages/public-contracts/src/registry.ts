@@ -3,7 +3,6 @@ import { controlPlaneOpenApiDocument } from "@framerfordevs/api/contracts/contro
 import { deliveryOpenApiDocument } from "@framerfordevs/api/contracts/delivery/openapi";
 import { previewOpenApiDocument } from "@framerfordevs/api/contracts/preview/openapi";
 import { studioContentOpenApiDocument } from "@framerfordevs/api/contracts/studio-content/openapi";
-import { studioContentV2OpenApiDocument } from "@framerfordevs/api/contracts/studio-content/openapi/v2";
 import { studioOpenApiDocument } from "@framerfordevs/api/contracts/studio/openapi";
 import { toolingOpenApiDocument } from "@framerfordevs/api/contracts/tooling/openapi";
 import { PublicationWebhookEvent } from "@framerfordevs/api/contracts/webhook";
@@ -65,10 +64,6 @@ export const publicContractRegistry = {
   "studio-content/v1": {
     ...publicContractMetadata["studio-content/v1"],
     source: () => studioContentOpenApiDocument,
-  },
-  "studio-content/v2": {
-    ...publicContractMetadata["studio-content/v2"],
-    source: () => studioContentV2OpenApiDocument,
   },
   "tooling/v1": {
     ...publicContractMetadata["tooling/v1"],

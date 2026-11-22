@@ -69,7 +69,6 @@ function commit(
   options?: {
     force?: boolean;
     stage?: GeneratorCommitStage;
-    lockFileName?: "schema.lock.json" | "generated.lock.json";
   },
 ) {
   return commitGenerationPlan({
@@ -77,7 +76,6 @@ function commit(
     outputDirectory: join(root, "src", "framerfordevs"),
     plan: generation,
     transactionId: options?.stage ?? "success",
-    ...(options?.lockFileName === undefined ? {} : { lockFileName: options.lockFileName }),
     ...(options?.force === undefined ? {} : { force: options.force }),
     ...(options?.stage === undefined
       ? {}
@@ -103,7 +101,7 @@ async function assertPlanInstalled(root: string, generation: GenerationPlan) {
     );
   }
   assert.strictEqual(
-    await readFile(join(root, ".framerfordevs", "schema.lock.json"), "utf8"),
+    await readFile(join(root, ".framerfordevs", "generated.lock.json"), "utf8"),
     generation.lockBytes,
   );
 }
@@ -123,15 +121,15 @@ describe("generator filesystem transaction", () => {
     }
   });
 
-  it("keeps config-v2 generated ownership separate from authoring lock authority", async () => {
+  it("keeps generated ownership separate from authoring lock authority", async () => {
     const root = await temporaryDirectory();
     try {
-      const authoringLock = '{"lockVersion":2,"authority":"preserve"}\n';
+      const authoringLock = '{"lockVersion":1,"authority":"preserve"}\n';
       await mkdir(join(root, ".framerfordevs"), { recursive: true });
       await writeFile(join(root, ".framerfordevs", "schema.lock.json"), authoringLock, "utf8");
-      const generation = plan("v2");
+      const generation = plan("separate");
 
-      await Effect.runPromise(commit(root, generation, { lockFileName: "generated.lock.json" }));
+      await Effect.runPromise(commit(root, generation));
 
       assert.strictEqual(
         await readFile(join(root, ".framerfordevs", "schema.lock.json"), "utf8"),
@@ -191,7 +189,7 @@ describe("generator filesystem transaction", () => {
       assert.strictEqual(outputResult._tag, "Failure");
       assert.strictEqual(lockResult._tag, "Failure");
       assert.isFalse(await exists(join(outside, "framerfordevs")));
-      assert.isFalse(await exists(join(outside, "schema.lock.json")));
+      assert.isFalse(await exists(join(outside, "generated.lock.json")));
     } finally {
       await rm(outside, { recursive: true, force: true });
       await rm(outputRoot, { recursive: true, force: true });

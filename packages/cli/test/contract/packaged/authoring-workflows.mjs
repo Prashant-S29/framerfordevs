@@ -19,6 +19,23 @@ const fieldId = "019fae8b-1234-7000-8000-000000000006";
 const digest = "a".repeat(64);
 const structureHash = "b".repeat(64);
 const token = "packaged-management-token";
+const invalidEntryId = "019fae8b-1234-7000-8000-000000000012";
+const otherRevisionId = "019fae8b-1234-7000-8000-000000000013";
+const revisionSummary = {
+  id: revisionId,
+  entryId,
+  scope: "localized",
+  locale: "en-US",
+  sequence: 1,
+  previousRevisionId: null,
+  schemaRevisionId: revisionId,
+  contractHash: digest,
+  changedFieldIds: [fieldId],
+  restoredFromRevisionId: null,
+  authoredByUserId: null,
+  authoredByCredentialId: projectId,
+  authoredAt: "2026-08-24T00:00:00.000Z",
+};
 const project = {
   collections: [
     {
@@ -244,6 +261,82 @@ const server = createServer(async (request, response) => {
       });
       return;
     }
+    const compare = /\/revisions\/([^/]+)\/compare\/([^/]+)$/u.exec(url.pathname);
+    if (compare !== null && request.method === "GET") {
+      success(response, {
+        entryId,
+        scope: "localized",
+        from: revisionSummary,
+        to: { ...revisionSummary, id: compare[2], sequence: 2 },
+        items:
+          compare[1] === compare[2]
+            ? []
+            : [
+                {
+                  fieldId,
+                  apiKey: "title",
+                  change: "changed",
+                  before: "Hosted value",
+                  after: "Fixture value",
+                  inCurrentSchema: true,
+                },
+              ],
+        restrictedChanges: false,
+        schemaDiffers: false,
+      });
+      return;
+    }
+    if (url.pathname.endsWith("/restore") && request.method === "POST") {
+      success(response, {
+        entryId,
+        commandId: requestBody.commandId,
+        sharedChanged: false,
+        sharedVersion: 0,
+        sharedRevisionId: null,
+        localizedChanged: true,
+        localizedVersion: 2,
+        localizedRevisionId: otherRevisionId,
+        validation,
+      });
+      return;
+    }
+    if (url.pathname.endsWith("/revisions") && request.method === "GET") {
+      success(response, { items: [revisionSummary], nextCursor: null });
+      return;
+    }
+    if (url.pathname.endsWith(`/revisions/${revisionId}`) && request.method === "GET") {
+      success(response, {
+        revision: revisionSummary,
+        values: { title: "Hosted value" },
+        compatible: true,
+        currentSchemaRevisionId: revisionId,
+        currentContractHash: digest,
+      });
+      return;
+    }
+    if (url.pathname.endsWith(`/entries/${invalidEntryId}/publication/validate`)) {
+      success(response, {
+        entryId: invalidEntryId,
+        locale: "en-US",
+        stateVersion: 0,
+        currentPublicationId: null,
+        schemaRevisionId: revisionId,
+        contractHash: digest,
+        sharedRevisionId: null,
+        sharedVersion: 0,
+        localizedRevisionId: null,
+        localizedVersion: 0,
+        valid: false,
+        issues: [{ path: "title", code: "required", message: "Title is required." }],
+        capped: false,
+        contentHash: null,
+        authorityHash: null,
+        size: null,
+        referencesWouldRefresh: false,
+        wouldCreatePublication: true,
+      });
+      return;
+    }
     if (url.pathname.endsWith("/entries") && request.method === "GET") {
       success(response, { items: [summary], nextCursor: null });
       return;
@@ -346,6 +439,7 @@ const server = createServer(async (request, response) => {
         stateVersion: 1,
         resultKind: "changed",
         publication,
+        delivery: { status: "verified", currentPublicationId: publication.id },
       });
       return;
     }
@@ -379,6 +473,7 @@ const server = createServer(async (request, response) => {
         unpublishedPublicationId: publication.id,
         unpublishedPublicationSequence: 1,
         unpublishedAt: "2026-08-24T00:00:00.000Z",
+        delivery: { status: "verified", currentPublicationId: null },
       });
       return;
     }
@@ -406,11 +501,25 @@ async function run(arguments_) {
   return JSON.parse(result.stdout);
 }
 
+async function runWithExit(arguments_) {
+  try {
+    const result = await executeFile(process.execPath, [packagedBin, ...arguments_, "--json"], {
+      cwd: root,
+      env: { PATH: process.env.PATH ?? "", HOME: root, FFD_MANAGEMENT_TOKEN: token },
+      timeout: 15_000,
+    });
+    return { exitCode: 0, value: JSON.parse(result.stdout) };
+  } catch (failure) {
+    if (typeof failure?.code !== "number" || typeof failure.stdout !== "string") throw failure;
+    return { exitCode: failure.code, value: JSON.parse(failure.stdout) };
+  }
+}
+
 try {
   await writeFile(
     join(root, "framerfordevs.config.json"),
     JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 1,
       apiBaseUrl: `http://127.0.0.1:${address.port}`,
       projectId,
       environment: "main",
@@ -494,6 +603,82 @@ try {
     ]),
   );
 
+  const entryFlags = ["--collection", "posts", "--entry", entryId, "--locale", "en-US"];
+  const revisions = await run(["entry", "revisions", ...entryFlags, "--scope", "localized"]);
+  results.push(revisions);
+  const revision = await run(["entry", "revision", ...entryFlags, "--revision", revisionId]);
+  results.push(revision);
+  const different = await runWithExit([
+    "entry",
+    "diff",
+    ...entryFlags,
+    "--from",
+    revisionId,
+    "--to",
+    otherRevisionId,
+  ]);
+  const equal = await runWithExit([
+    "entry",
+    "diff",
+    ...entryFlags,
+    "--from",
+    revisionId,
+    "--to",
+    revisionId,
+  ]);
+  const restored = await run([
+    "entry",
+    "restore",
+    ...entryFlags,
+    "--revision",
+    revisionId,
+    "--scope",
+    "localized",
+  ]);
+  results.push(restored);
+  const valid = await runWithExit(["entry", "validate", ...entryFlags]);
+  const invalid = await runWithExit([
+    "entry",
+    "validate",
+    "--collection",
+    "posts",
+    "--entry",
+    invalidEntryId,
+    "--locale",
+    "en-US",
+  ]);
+  const restoreRequest = requests.find((request) => request.path.endsWith("/restore"));
+  if (
+    revisions.items?.[0]?.id !== revisionId ||
+    revision.revision?.values?.title !== "Hosted value" ||
+    different.exitCode !== 1 ||
+    different.value.different !== true ||
+    equal.exitCode !== 0 ||
+    equal.value.different !== false ||
+    valid.exitCode !== 0 ||
+    valid.value.accepted !== true ||
+    invalid.exitCode !== 2 ||
+    invalid.value.accepted !== false ||
+    restored.restored?.localizedRevisionId !== otherRevisionId ||
+    restoreRequest?.body.scope !== "localized" ||
+    restoreRequest.body.expectedVersion !== 1 ||
+    restoreRequest.body.commandId !== restored.restored.commandId ||
+    !requests.some(
+      (request) => request.path.endsWith("/revisions") && request.query === "?scope=localized",
+    )
+  ) {
+    throw new Error("Packaged revision, diff, restore, or validate workflow drifted.");
+  }
+  const published = results.find((result) => result.command === "entry publish");
+  const unpublished = results.find((result) => result.command === "entry unpublish");
+  if (
+    published?.delivery?.status !== "verified" ||
+    unpublished?.delivery?.status !== "verified" ||
+    unpublished.delivery.currentPublicationId !== null
+  ) {
+    throw new Error("Packaged publish or unpublish omitted the Delivery read-back.");
+  }
+
   if (results.some((result) => result.accepted !== true)) {
     throw new Error("Packaged Authoring workflow returned an unaccepted result.");
   }
@@ -526,7 +711,9 @@ try {
   ) {
     throw new Error("Packaged Presentation publication was not observed.");
   }
-  process.stdout.write("packaged Authoring schema, Presentation, and content workflows passed\n");
+  process.stdout.write(
+    "packaged Authoring schema, Presentation, content, and revision workflows passed\n",
+  );
 } finally {
   await new Promise((resolve) => server.close(resolve));
   await rm(root, { recursive: true, force: true });

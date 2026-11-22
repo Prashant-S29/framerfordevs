@@ -233,7 +233,7 @@ export function buildAuthoringPresentationCandidate(options: {
     readonly editorLayout: EditorLayout;
   };
 }): AuthoringPresentationBuildResult {
-  if (options.current.formatVersion !== 2 || options.current.validationProfile !== "ffd-fields@1") {
+  if (options.current.validationProfile !== "ffd-fields@1") {
     return {
       valid: false,
       issues: [
@@ -278,7 +278,7 @@ export function buildAuthoringPresentationCandidate(options: {
     };
   }
   const draft: SchemaDraftState = {
-    formatVersion: 2,
+    formatVersion: options.current.formatVersion,
     validationProfile: options.current.validationProfile,
     currencyRegistryProfile: options.current.currencyRegistryProfile,
     collection: Schema.decodeUnknownSync(CmsCollection, { onExcessProperty: "error" })({
@@ -320,7 +320,7 @@ export function buildAuthoringPresentationCandidate(options: {
       source: "published",
       collectionId: options.current.collectionId,
       revisionId: options.current.id,
-      formatVersion: 2,
+      formatVersion: options.current.formatVersion,
       validationProfile: options.current.validationProfile,
       currencyRegistryProfile: options.current.currencyRegistryProfile,
       contractHash,

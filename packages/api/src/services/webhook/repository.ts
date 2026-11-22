@@ -556,7 +556,10 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                     ),
               ),
             )
-            .orderBy(desc(webhookEndpoint.createdAt), desc(webhookEndpoint.id))
+            .orderBy(
+              sql`${webhookEndpoint.createdAt} desc nulls last`,
+              sql`${webhookEndpoint.id} desc nulls last`,
+            )
             .limit(input.limit + 1),
         catch: (cause) => databaseFailure("webhook.endpoint.list", cause),
       });
@@ -1664,7 +1667,10 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                     ),
               ),
             )
-            .orderBy(desc(webhookDelivery.createdAt), desc(webhookDelivery.id))
+            .orderBy(
+              sql`${webhookDelivery.createdAt} desc nulls last`,
+              sql`${webhookDelivery.id} desc nulls last`,
+            )
             .limit(input.limit + 1),
         catch: (cause) => databaseFailure("webhook.delivery.summary.list", cause),
       });
@@ -1760,7 +1766,10 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                     ),
               ),
             )
-            .orderBy(desc(webhookDelivery.createdAt), desc(webhookDelivery.id))
+            .orderBy(
+              sql`${webhookDelivery.createdAt} desc nulls last`,
+              sql`${webhookDelivery.id} desc nulls last`,
+            )
             .limit(input.limit + 1),
         catch: (cause) => databaseFailure("webhook.delivery.list", cause),
       });
@@ -1894,7 +1903,7 @@ export function makeWebhookRepository(database: ApplicationDb = db) {
                   : lt(webhookDeliveryAttempt.attemptNumber, cursor.attemptNumber),
               ),
             )
-            .orderBy(desc(webhookDeliveryAttempt.attemptNumber))
+            .orderBy(sql`${webhookDeliveryAttempt.attemptNumber} desc nulls last`)
             .limit(input.limit + 1),
         catch: (cause) => databaseFailure("webhook.attempt.list", cause),
       });

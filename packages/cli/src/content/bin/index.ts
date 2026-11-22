@@ -10,7 +10,7 @@ import {
 } from "../../schema/authoring/files";
 import { parseArguments, stringFlag, validateFlags } from "../../command-arguments";
 import { CliConfigFileSystemLive, loadCliConfig } from "../../config";
-import type { CliConfigV2 } from "../../schema";
+import type { CliConfig } from "../../schema";
 
 const maximumMutationBytes = 1_048_576;
 export type ContentCommand =
@@ -19,11 +19,27 @@ export type ContentCommand =
   | "entry create"
   | "entry update"
   | "entry publish"
-  | "entry unpublish";
+  | "entry unpublish"
+  | "entry revisions"
+  | "entry revision"
+  | "entry diff"
+  | "entry restore"
+  | "entry validate";
+
+export type ContentRevisionScope = "shared" | "localized";
+
+export interface PreparedRevisionFlags {
+  readonly scope: ContentRevisionScope | undefined;
+  readonly revisionId: string | undefined;
+  readonly fromRevisionId: string | undefined;
+  readonly toRevisionId: string | undefined;
+  readonly cursor: string | undefined;
+  readonly limit: number | undefined;
+}
 
 export interface PreparedContentCommand {
   readonly command: ContentCommand;
-  readonly config: CliConfigV2;
+  readonly config: CliConfig;
   readonly projectRoot: string;
   readonly collection: string;
   readonly locale: string;
@@ -32,6 +48,7 @@ export interface PreparedContentCommand {
   readonly mutations: ReadonlyArray<AuthoringMutation>;
   readonly environmentId: string | null;
   readonly createAuthority: { readonly revisionId: string; readonly contractHash: string } | null;
+  readonly revision: PreparedRevisionFlags;
 }
 
 function contentCommand(value: string): ContentCommand | null {
@@ -42,6 +59,11 @@ function contentCommand(value: string): ContentCommand | null {
     case "entry update":
     case "entry publish":
     case "entry unpublish":
+    case "entry revisions":
+    case "entry revision":
+    case "entry diff":
+    case "entry restore":
+    case "entry validate":
       return value;
     default:
       return null;
@@ -50,6 +72,57 @@ function contentCommand(value: string): ContentCommand | null {
 const apiKeyPattern = /^[a-z][a-z0-9_]{0,62}$/u;
 const localePattern = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/u;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const cursorPattern = /^[A-Za-z0-9_-]{1,512}$/u;
+const limitPattern = /^[1-9][0-9]?$/u;
+const entryCommands: ReadonlySet<ContentCommand> = new Set([
+  "entry get",
+  "entry update",
+  "entry publish",
+  "entry unpublish",
+  "entry revisions",
+  "entry revision",
+  "entry diff",
+  "entry restore",
+  "entry validate",
+]);
+
+function optionalUuid(value: string | undefined, required: boolean) {
+  if (value === undefined) return !required;
+  return uuidPattern.test(value);
+}
+
+function revisionScope(value: string | undefined): ContentRevisionScope | undefined {
+  return value === "shared" || value === "localized" ? value : undefined;
+}
+
+function prepareRevisionFlags(
+  command: ContentCommand,
+  arguments_: ReturnType<typeof parseArguments>,
+): PreparedRevisionFlags | null {
+  const rawScope = stringFlag(arguments_, "scope");
+  const scope = revisionScope(rawScope);
+  const revisionId = stringFlag(arguments_, "revision");
+  const fromRevisionId = stringFlag(arguments_, "from");
+  const toRevisionId = stringFlag(arguments_, "to");
+  const cursor = stringFlag(arguments_, "cursor");
+  const rawLimit = stringFlag(arguments_, "limit");
+  const limit = rawLimit === undefined ? undefined : Number(rawLimit);
+  const needsScope = command === "entry revisions" || command === "entry restore";
+  const needsRevision = command === "entry revision" || command === "entry restore";
+  const needsRange = command === "entry diff";
+  if (
+    (needsScope ? scope === undefined : rawScope !== undefined) ||
+    !optionalUuid(revisionId, needsRevision) ||
+    !optionalUuid(fromRevisionId, needsRange) ||
+    !optionalUuid(toRevisionId, needsRange) ||
+    (cursor !== undefined && !cursorPattern.test(cursor)) ||
+    (rawLimit !== undefined &&
+      (!limitPattern.test(rawLimit) || limit === undefined || limit < 1 || limit > 50))
+  ) {
+    return null;
+  }
+  return { scope, revisionId, fromRevisionId, toRevisionId, cursor, limit };
+}
 
 function failureCode(failure: unknown) {
   const tagged =
@@ -138,9 +211,6 @@ export function prepareContentCommand(
       catch: () => new Error("CLI_FLAG_INVALID"),
     });
     const loaded = yield* loadCliConfig(startDirectory);
-    if (loaded.config.schemaVersion !== 2) {
-      return yield* Effect.fail(new Error("CLI_CONFIG_V2_REQUIRED"));
-    }
     const collection = stringFlag(arguments_.parsed, "collection");
     const locale = stringFlag(arguments_.parsed, "locale");
     const entryId = stringFlag(arguments_.parsed, "entry");
@@ -153,16 +223,15 @@ export function prepareContentCommand(
       collection.endsWith("_") ||
       locale.length > 64 ||
       !localePattern.test(locale) ||
-      ((arguments_.command === "entry get" ||
-        arguments_.command === "entry update" ||
-        arguments_.command === "entry publish" ||
-        arguments_.command === "entry unpublish") &&
+      (entryCommands.has(arguments_.command) &&
         (entryId === undefined || !uuidPattern.test(entryId))) ||
       (arguments_.command === "entry create" &&
         (name === undefined || name.length < 1 || name.length > 100))
     ) {
       return yield* Effect.fail(new Error("CLI_CONTENT_FLAGS_INVALID"));
     }
+    const revision = prepareRevisionFlags(arguments_.command, arguments_.parsed);
+    if (revision === null) return yield* Effect.fail(new Error("CLI_CONTENT_FLAGS_INVALID"));
     const mutationPath = stringFlag(arguments_.parsed, "mutations");
     if (arguments_.command === "entry update" && mutationPath === undefined) {
       return yield* Effect.fail(new Error("CLI_MUTATION_FILE_REQUIRED"));
@@ -205,8 +274,14 @@ export function prepareContentCommand(
       mutations,
       environmentId: Option.getOrNull(environmentAuthority)?.environmentId ?? null,
       createAuthority,
+      revision,
     };
   }).pipe(Effect.provide(CliConfigFileSystemLive));
+}
+
+export function contentExitCode(value: object): 0 | 1 | 2 {
+  if (Reflect.get(value, "accepted") === false) return 2;
+  return Reflect.get(value, "different") === true ? 1 : 0;
 }
 
 export async function runContentCli(rawArguments: ReadonlyArray<string>) {
@@ -228,7 +303,7 @@ export async function runContentCli(rawArguments: ReadonlyArray<string>) {
     process.stdout.write(
       json ? `${JSON.stringify(value)}\n` : `${JSON.stringify(value, null, 2)}\n`,
     );
-    if (Reflect.get(value, "accepted") === false) process.exitCode = 2;
+    process.exitCode = contentExitCode(value);
   } catch (failure) {
     const code = failureCode(failure);
     process.stderr.write(

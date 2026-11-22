@@ -7,7 +7,7 @@ import { initializeEditorOnline, type EditorOnlineDependencies } from "./index";
 const project = { collections: [{ sourceKey: "posts", apiKey: "posts", fields: [] }] };
 const prepared: PreparedEditorCommand = {
   config: {
-    schemaVersion: 2,
+    schemaVersion: 1,
     apiBaseUrl: "https://api.example.test",
     projectId: "019fae8b-1234-7000-8000-000000000001",
     environment: "main",

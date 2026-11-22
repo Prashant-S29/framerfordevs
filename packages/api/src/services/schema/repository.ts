@@ -61,6 +61,7 @@ import {
   type GetDraftGeneratedFormInput,
   type GetPublishedGeneratedFormInput,
   type ValidateCollectionSchemaInput,
+  SchemaFormatVersion,
 } from "../../contracts/schema";
 import { EditorLayout, FieldEditorMetadata } from "../../contracts/field";
 import {
@@ -440,7 +441,7 @@ function draftStateSync(
 ): SchemaDraftState {
   const fields = decodeFieldTreeSync(rows);
   return {
-    formatVersion: 2,
+    formatVersion: 1,
     validationProfile: fieldSystemValidationProfile,
     currencyRegistryProfile:
       collection.currencyRegistryProfile === null
@@ -507,7 +508,7 @@ export function decodePublishedSchemaRevisionSync(rows: {
       ? syntheticEditorLayout(fields)
       : Schema.decodeUnknownSync(EditorLayout)(revision.editorLayout);
   const contractHash = hashSchemaContract({
-    formatVersion: revision.formatVersion,
+    formatVersion: Schema.decodeUnknownSync(SchemaFormatVersion)(revision.formatVersion),
     validationProfile: revision.validationProfile,
     currencyRegistryProfile: revision.currencyRegistryProfile,
     collectionApiKey: revision.collectionApiKey,
@@ -2638,7 +2639,7 @@ export function makeSchemaRepository(options: RepositoryOptions = {}) {
                 collectionApiKey: collection.apiKey,
                 collectionDisplayName: collection.displayName,
                 collectionDescription: collection.description,
-                formatVersion: 2,
+                formatVersion: draft.formatVersion,
                 validationProfile: draft.validationProfile,
                 currencyRegistryProfile: draft.currencyRegistryProfile,
                 editorLayout: editorLayoutValue(draft.editorLayout),

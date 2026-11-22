@@ -5,13 +5,13 @@ import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { runSchemaExportOnline, runSchemaPlanOnline, runSchemaPushOnline } from "./index";
-import type { CliConfigV2 } from "../../../schema";
+import type { CliConfig } from "../../../schema";
 
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const digest = "a".repeat(64);
-const config: CliConfigV2 = {
-  schemaVersion: 2,
+const config: CliConfig = {
+  schemaVersion: 1,
   apiBaseUrl: "https://api.example.test",
   projectId,
   environment: "main",
@@ -213,7 +213,7 @@ describe("schema Authoring online boundary", () => {
         await readFile(join(root, ".framerfordevs/schema.lock.json"), "utf8"),
       );
       expect(lock).toMatchObject({
-        lockVersion: 2,
+        lockVersion: 1,
         projectId,
         environmentId,
         projectManifestHash: "e".repeat(64),

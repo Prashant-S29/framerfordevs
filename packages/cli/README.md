@@ -87,7 +87,7 @@ Control Plane administration is intentionally absent from `@framerfordevs/sdk`.
 }
 ```
 
-The CLI searches ancestors, rejects ambiguous configurations, bounds all input, and rejects output/schema paths that escape the linked project. Existing schema-version 1 files remain valid for M12 pull/check/generate commands; M13 schema authoring commands require version 2 and return a stable configuration error otherwise.
+The CLI searches ancestors, rejects ambiguous configurations, bounds all input, and rejects output/schema paths that escape the linked project.
 
 ## Pull, check, and generation
 
@@ -97,7 +97,7 @@ The CLI searches ancestors, rejects ambiguous configurations, bounds all input, 
 - `--allow-metadata-only` permits only metadata-only drift for check; it never hides type or breaking drift.
 - `--force` is required before replacing an output directory not already owned by the generator.
 
-Generation transactionally writes TypeScript models, strict Delivery schemas, permissive Preview schemas, JSON Schema, typed clients, and stable-revision helpers. Config v1 records generated-file ownership in `.framerfordevs/schema.lock.json`; config v2 uses `.framerfordevs/generated.lock.json` so generation cannot replace the separate code-authoring authority in `.framerfordevs/schema.lock.json` v2. Paths, files, fields, locales, and response sizes are bounded.
+Generation transactionally writes TypeScript models, strict Delivery schemas, permissive Preview schemas, JSON Schema, typed clients, and stable-revision helpers. Generation records ownership in `.framerfordevs/generated.lock.json`, so it cannot replace the separate code-authoring authority in `.framerfordevs/schema.lock.json`. Paths, files, fields, locales, and response sizes are bounded.
 
 ## Static Tier 1 schema extraction
 
@@ -107,7 +107,7 @@ Extraction runs in a short-lived worker with an empty environment, fixed V8 heap
 
 ## Schema export, plan, and push
 
-All schema-authoring commands require config v2:
+Schema-authoring commands:
 
 ```sh
 ffd schema export [--json]
@@ -115,11 +115,11 @@ ffd schema plan [--json]
 ffd schema push --acknowledge <change-id>... [--json]
 ```
 
-`schema export` retrieves current server-owned source identities, atomically bootstraps deterministic Tier 1 source and `.framerfordevs/schema.lock.json` v2, and refuses an unowned, locally modified, cross-project, or Tier 2-generated target.
+`schema export` retrieves current server-owned source identities, atomically bootstraps deterministic Tier 1 source and `.framerfordevs/schema.lock.json`, and refuses an unowned, locally modified, cross-project, or Tier 2-generated target.
 
 Plan and push verify any experimental build manifest without executing Tier 2, then statically extract and strictly validate the Tier 1 graph before dynamically loading credentials or HTTP clients. They resolve the configured environment UUID through the exact first Tooling manifest page, which supports both OAuth and environment-scoped management credentials without environment enumeration. Invalid or stale local input performs no authenticated or network work.
 
-Plan returns exact server change IDs/classifications and exits `2` for validation issues. Push performs a fresh plan and requires the supplied acknowledgement set to equal every potentially-breaking/breaking change ID—duplicates, missing IDs, extra IDs, and broad confirmation are rejected without applying. It then journals only a command UUID and canonical fingerprint before the mutation request, applies exact current/plan authority, clears the journal after a confirmed response, and writes lock v2 from server-returned stable mappings. Transport uncertainty retains the content-free journal: an unchanged plan reuses the command UUID, while changed authority fails closed with a journal conflict pending reconciliation.
+Plan returns exact server change IDs/classifications and exits `2` for validation issues. Push performs a fresh plan and requires the supplied acknowledgement set to equal every potentially-breaking/breaking change ID—duplicates, missing IDs, extra IDs, and broad confirmation are rejected without applying. It then journals only a command UUID and canonical fingerprint before the mutation request, applies exact current/plan authority, clears the journal after a confirmed response, and writes the lock from server-returned stable mappings. Transport uncertainty retains the content-free journal: an unchanged plan reuses the command UUID, while changed authority fails closed with a journal conflict pending reconciliation.
 
 ## Presentation commands
 
@@ -142,9 +142,18 @@ ffd entry create --collection <key> --locale <tag> --name <name> [--mutations <f
 ffd entry update --collection <key> --entry <id> --locale <tag> --mutations <file>
 ffd entry publish --collection <key> --entry <id> --locale <tag>
 ffd entry unpublish --collection <key> --entry <id> --locale <tag>
+ffd entry revisions --collection <key> --entry <id> --locale <tag> --scope shared|localized [--cursor <cursor>] [--limit <n>]
+ffd entry revision --collection <key> --entry <id> --locale <tag> --revision <id>
+ffd entry diff --collection <key> --entry <id> --locale <tag> --from <revision-id> --to <revision-id>
+ffd entry restore --collection <key> --entry <id> --locale <tag> --revision <id> --scope shared|localized
+ffd entry validate --collection <key> --entry <id> --locale <tag>
 ```
 
-List is repeated-cursor-safe and capped at 1,000 summaries. Get returns one exact-locale role-projected draft. Content commands use the environment UUID from same-project lock v2 when available, so content-only management credentials do not need schema-read scope; OAuth can fall back to the Tooling manifest for read/update/publish commands. Create additionally requires current revision/contract authority from lock v2, so run schema export or push first. Update reads current optimistic draft versions before saving. Publish validates and then uses the exact returned publication authority; unpublish first reads exact current state.
+List is repeated-cursor-safe and capped at 1,000 summaries. Get returns one exact-locale role-projected draft. Content commands use the environment UUID from the same-project lock when available, so content-only management credentials do not need schema-read scope; OAuth can fall back to the Tooling manifest for read/update/publish commands. Create additionally requires current revision/contract authority from the lock, so run schema export or push first. Update reads current optimistic draft versions before saving. Publish validates and then uses the exact returned publication authority; unpublish first reads exact current state.
+
+Publish and unpublish print a top-level `delivery` read-back. Its `status` is `verified` when the origin Delivery head matches the command result, and `superseded` when a later command already changed it. CDN and cache invalidation stay asynchronous.
+
+Revisions prints one page of shared or localized revision summaries, newest first. The page holds 1 to 50 items, 20 by default. Pass `nextCursor` back with `--cursor` to read the next page. Revision prints one revision with its stored values. Diff compares two revisions of the same entry and scope by stable field ID. It exits `1` when the revisions differ and `0` when they are equal. Restore reads the current draft version of the scope, then restores the revision as a new draft revision with a journaled command ID. The server rejects a revision from another schema contract with `REVISION_INCOMPATIBLE`. Validate prints the publication plan and exits `2` when the plan is invalid, the same as `ffd schema plan`.
 
 Mutation files are relative to the linked project, regular non-symlinked UTF-8 JSON files no larger than 1 MiB, and strictly decode at most 500 API-key-path mutations. Update requires at least one mutation. Files and values are never copied to output, errors, locks, or retry journals.
 
@@ -163,7 +172,7 @@ unset FFD_EDITOR_TOKEN
 
 Prefer OAuth native credential storage when rollout is enabled or `--token-stdin` for a management credential. The stdin mode rejects an exported `FFD_MANAGEMENT_TOKEN` as ambiguous, reads one bounded whitespace-free token only after credential-blind schema preparation, and keeps the long-lived editor's initial OS environment credential-free.
 
-The editor loads exact config v2, verifies any experimental-output manifest without executing Tier 2, and statically extracts the closed Tier 1 graph before constructing credential or network authority. It compares hosted code-owned structure, binds a random IPv4 loopback port, opens a fragment-challenged browser session, and serves bundled CSP-locked no-store React assets. The loopback boundary rejects non-loopback peers, Host confusion, invalid mutation Origin/session/content type/body bounds, queries, traversal, unknown routes, and redirects. Hosted bearer authority remains only in mutable Node memory, never enters browser assets/URLs/storage, and is cleared before shutdown completes.
+The editor loads the exact config, verifies any experimental-output manifest without executing Tier 2, and statically extracts the closed Tier 1 graph before constructing credential or network authority. It compares hosted code-owned structure, binds a random IPv4 loopback port, opens a fragment-challenged browser session, and serves bundled CSP-locked no-store React assets. The loopback boundary rejects non-loopback peers, Host confusion, invalid mutation Origin/session/content type/body bounds, queries, traversal, unknown routes, and redirects. Hosted bearer authority remains only in mutable Node memory, never enters browser assets/URLs/storage, and is cleared before shutdown completes.
 
 The TanStack Query application supports collection/entry/locale navigation, defaults to the first hosted project locale while offering the bounded hosted locale list, create and optimistic rename, role-projected shared/localized forms, exact optimistic save, server validation summaries, exact-locale publish/unpublish, persisted credential-free Preview URL templates, conflict-preserving explicit reload, unsaved navigation warnings, responsive keyboard operation, and automated axe coverage. Node exposes only a strictly decoded operation allowlist and retains content-free command journals on uncertain transport. The verified Tier 1 graph is watched through the restricted extractor; invalid or structurally drifted code preserves the last valid view read-only, while hosted structure authority and presentation are refreshed. Portable Text remains a separate lazy browser chunk.
 
@@ -178,7 +187,7 @@ ffd schema build
 ffd schema build --check --json
 ```
 
-It is available only when version 2 configuration opts in with a local composition entry:
+It is available only when the configuration opts in with a local composition entry:
 
 ```json
 {

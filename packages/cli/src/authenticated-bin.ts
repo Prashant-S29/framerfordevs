@@ -230,7 +230,7 @@ function commandEffect(
     return Effect.gen(function* () {
       const config = yield* Schema.decodeUnknownEffect(CliConfig, { onExcessProperty: "error" })(
         {
-          schemaVersion: 2,
+          schemaVersion: 1,
           apiBaseUrl,
           projectId,
           environment,
@@ -289,7 +289,6 @@ function commandEffect(
         rootDirectory: loaded.directory,
         outputDirectory: loaded.outputDirectory,
         plan,
-        lockFileName: generationLockFileName(loaded.config),
         force: booleanFlag(arguments_, "force"),
       });
       return { command, files: committed.files, output: loaded.config.output };
@@ -304,7 +303,7 @@ function commandEffect(
         revisions: currentAuthority.revisions,
       });
       const locked = yield* readBoundedJson(
-        join(loaded.directory, ".framerfordevs", generationLockFileName(loaded.config)),
+        join(loaded.directory, ".framerfordevs", generationLockFileName),
         SchemaLock,
         16 * 1_024 * 1_024,
       );
@@ -381,6 +380,11 @@ function commandEffect(
         "ffd entry update --collection <key> --entry <id> --locale <tag> --mutations <file>",
         "ffd entry publish --collection <key> --entry <id> --locale <tag>",
         "ffd entry unpublish --collection <key> --entry <id> --locale <tag>",
+        "ffd entry revisions --collection <key> --entry <id> --locale <tag> --scope shared|localized [--cursor <cursor>] [--limit <n>]",
+        "ffd entry revision --collection <key> --entry <id> --locale <tag> --revision <id>",
+        "ffd entry diff --collection <key> --entry <id> --locale <tag> --from <revision-id> --to <revision-id>",
+        "ffd entry restore --collection <key> --entry <id> --locale <tag> --revision <id> --scope shared|localized",
+        "ffd entry validate --collection <key> --entry <id> --locale <tag>",
         "ffd editor",
         "ffd generate [--offline] [--force]",
       ],

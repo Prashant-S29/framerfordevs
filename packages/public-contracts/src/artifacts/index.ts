@@ -11,7 +11,6 @@ export interface GeneratedPublicArtifact {
   readonly key: PublicContractRegistryKey;
   readonly kind: PublicArtifactKind;
   readonly outputPath: string;
-  readonly baselinePath: string;
   readonly digest: string;
   readonly bytes: string;
 }
@@ -151,7 +150,6 @@ export function generatePublicArtifacts(): ReadonlyArray<GeneratedPublicArtifact
       key,
       kind: entry.kind,
       outputPath: entry.outputPath,
-      baselinePath: entry.baselinePath,
       digest: digest(bytes),
       bytes,
     };

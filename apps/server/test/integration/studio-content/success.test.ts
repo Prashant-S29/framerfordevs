@@ -10,6 +10,7 @@ import {
 import { EditorLayout } from "@framerfordevs/api/contracts/field";
 import { LocaleTag, ProjectLocaleId } from "@framerfordevs/api/contracts/locale";
 import { IsoDateTime, WorkspaceId } from "@framerfordevs/api/contracts/platform";
+import { EntryPublicationStatus } from "@framerfordevs/api/contracts/publication";
 import {
   CollectionFieldDefinition,
   ContractHash,
@@ -33,6 +34,10 @@ import {
   makeSchemaRepository,
   SchemaRepository,
 } from "@framerfordevs/api/services/schema/repository";
+import {
+  makePublicationRepository,
+  PublicationRepository,
+} from "@framerfordevs/api/services/publication/repository";
 import {
   makeStudioOAuthTokenVerifier,
   StudioOAuthTokenVerifier,
@@ -160,7 +165,7 @@ const form = Schema.decodeUnknownSync(GeneratedFormDefinition, { onExcessPropert
   source: "published",
   collectionId: ids.collection,
   revisionId: ids.revision,
-  formatVersion: 2,
+  formatVersion: 1,
   validationProfile: "field-system@1",
   currencyRegistryProfile: "iso-4217@2026-01-01",
   contractHash: ContractHash.make(hash),
@@ -203,7 +208,16 @@ const draft = Schema.decodeUnknownSync(CmsEntryDraft, { onExcessProperty: "error
   validation,
 });
 const context = Schema.decodeUnknownSync(StudioContentContext, { onExcessProperty: "error" })({
-  locales: [{ id: ids.locale, tag: "en", displayName: "English", canRead: true, canWrite: true }],
+  locales: [
+    {
+      id: ids.locale,
+      tag: "en",
+      displayName: "English",
+      canRead: true,
+      canWrite: true,
+      canPublish: true,
+    },
+  ],
   collections: [
     {
       id: ids.collection,
@@ -213,6 +227,7 @@ const context = Schema.decodeUnknownSync(StudioContentContext, { onExcessPropert
         canRename: true,
         canSaveLocalized: true,
         canSaveShared: true,
+        canPublish: true,
       },
     },
   ],
@@ -258,6 +273,7 @@ const contentRepository: ReturnType<typeof makeStudioContentRepository> = {
       canRename: true,
       canWriteLocalized: true,
       canWriteShared: true,
+      canPublish: true,
     }),
   getContext: () => Effect.succeed(context),
   listEntries: (_actor, input) =>
@@ -316,6 +332,30 @@ const entryRepository = {
       }),
     ),
 };
+const publicationRepository = {
+  ...makePublicationRepository(),
+  getStatus: () =>
+    Effect.succeed(
+      Schema.decodeUnknownSync(EntryPublicationStatus, { onExcessProperty: "error" })({
+        entryId: ids.entry,
+        localeId: ids.locale,
+        locale: "en",
+        state: "unpublished",
+        stateVersion: 0,
+        currentPublication: null,
+        currentSchemaRevisionId: ids.revision,
+        currentContractHash: hash,
+        currentSharedRevisionId: ids.sharedRevision,
+        currentSharedVersion: 1,
+        currentLocalizedRevisionId: ids.localizedRevision,
+        currentLocalizedVersion: 1,
+        sharedChanged: false,
+        localizedChanged: false,
+        schemaChanged: false,
+        changedSincePublication: false,
+      }),
+    ),
+};
 const rateLimitManager: RateLimitManagerService = {
   evaluate: (input) =>
     Effect.succeed(
@@ -339,14 +379,13 @@ const transform: ApplicationEffectTransform = (effect) =>
     Effect.provideService(StudioContentRepository, contentRepository),
     Effect.provideService(SchemaRepository, schemaRepository),
     Effect.provideService(EntryRepository, entryRepository),
+    Effect.provideService(PublicationRepository, publicationRepository),
     Effect.provideService(RateLimitManager, rateLimitManager),
   );
 const api = request(createApp({ hostRoutingEnabled: false, studioEffectTransform: transform }));
 const headers = { Authorization: `Bearer ${token}` };
 const root = `/api/studio-content/v1/projects/${ids.project}/environments/${ids.environment}`;
 const entries = `${root}/collections/${ids.collection}/locales/en/entries`;
-const rootV2 = `/api/studio-content/v2/projects/${ids.project}/environments/${ids.environment}`;
-const entriesV2 = `${rootV2}/collections/${ids.collection}/locales/en/entries`;
 
 function mutationBody() {
   return {
@@ -373,7 +412,7 @@ describe("Studio Content HTTP success surface", () => {
   it("serves all finite success families with projected no-store responses", async () => {
     const responses = [
       await api.get(`${root}/context`).set(headers),
-      await api.get(entries).set(headers),
+      await api.get(`${entries}?limit=25`).set(headers),
       await api.post(`${entries}/search`).set(headers).send({ query: "Ar", limit: 25 }),
       await api.get(`${entries}/new`).set(headers),
       await api.get(`${entries}/${ids.entry}`).set(headers),
@@ -409,24 +448,26 @@ describe("Studio Content HTTP success surface", () => {
     expect(responses[0]?.body.data.collections[0].id).toBe(ids.collection);
     expect(responses[1]?.body.data.items[0].id).toBe(ids.entry);
     expect(responses[4]?.body.data.draft.localizedValues[ids.field]).toBe("Visible title");
+    expect(responses[4]?.body.data.publication.state).toBe("never_published");
+    expect(responses[4]?.body.data.capabilities.canPublish).toBe(true);
     expect(responses[7]?.body.data.localizedVersion).toBe(2);
   });
 
-  it("serves bounded v2 reference labels while immutable v1 has no resolution route", async () => {
-    const v2 = await api
-      .post(`${entriesV2}/resolve`)
-      .set(headers)
-      .send({ entryIds: [ids.entry] });
-    expect(v2.status, JSON.stringify(v2.body)).toBe(200);
-    expect(v2.body.data).toEqual({ items: [{ id: ids.entry, displayName: "Article" }] });
-    expect(v2.headers["cache-control"]).toContain("no-store");
-
-    const v1 = await api
+  it("serves bounded reference labels", async () => {
+    const response = await api
       .post(`${entries}/resolve`)
       .set(headers)
       .send({ entryIds: [ids.entry] });
-    expect(v1.status).toBe(404);
-    expect(v1.body.error.code).toBe("NOT_FOUND");
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(response.body.data).toEqual({ items: [{ id: ids.entry, displayName: "Article" }] });
+    expect(response.headers["cache-control"]).toContain("no-store");
+  });
+
+  it("does not mount a second Studio Content major", async () => {
+    const response = await api
+      .get(`/api/studio-content/v2/projects/${ids.project}/environments/${ids.environment}/context`)
+      .set(headers);
+    expect(response.status).toBe(404);
   });
 
   it("interrupts platform work when the caller aborts the request", async () => {
@@ -452,6 +493,7 @@ describe("Studio Content HTTP success surface", () => {
         Effect.provideService(StudioContentRepository, slowContentRepository),
         Effect.provideService(SchemaRepository, schemaRepository),
         Effect.provideService(EntryRepository, entryRepository),
+        Effect.provideService(PublicationRepository, publicationRepository),
         Effect.provideService(RateLimitManager, rateLimitManager),
       );
     const server = createApp({
@@ -504,6 +546,7 @@ describe("Studio Content HTTP success surface", () => {
           Effect.provideService(StudioContentRepository, slowContentRepository),
           Effect.provideService(SchemaRepository, schemaRepository),
           Effect.provideService(EntryRepository, entryRepository),
+          Effect.provideService(PublicationRepository, publicationRepository),
           Effect.provideService(RateLimitManager, rateLimitManager),
         );
       const deadlineApi = request(

@@ -81,6 +81,13 @@ import { makeLocaleRepository } from "../../../src/services/locale/repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 import { makeSchemaRepository } from "../../../src/services/schema/repository";
 import { makeStudioContentRepository } from "../../../src/services/studio-content/repository";
+import {
+  assertIndexDefinitions,
+  assertIndexedAccess,
+  assertIndexedQuery,
+  explainPlan,
+  type QueryPlan,
+} from "../../support/query-plan";
 
 const suffix = randomUUID();
 const ownerId = `m7-entry-owner-${suffix}`;
@@ -2605,58 +2612,112 @@ describe("entry repository PostgreSQL integration", () => {
           .limit(1),
       );
       if (!english) throw new Error("English locale fixture is unavailable.");
-      const plans = yield* Effect.promise(() =>
+      yield* Effect.promise(() =>
         db.transaction(async (transaction) => {
           await transaction.execute(sql`set local enable_seqscan = off`);
-          const entriesPlan = await transaction.execute(
-            sql`explain (format json) select id from cms_entry where collection_id = ${collectionId} order by created_at desc, id desc limit 25`,
+          await transaction.execute(sql`set local enable_sort = off`);
+          await assertIndexedQuery(
+            transaction,
+            sql`select id from cms_entry where collection_id = ${collectionId} order by created_at desc nulls last, id desc nulls last limit 25`,
+            { table: "cms_entry", allowBitmap: true, order: "index" },
           );
-          const sharedPlan = await transaction.execute(
-            sql`explain (format json) select id from cms_entry_shared_revision where entry_id = ${entryId} order by sequence desc limit 25`,
+          await assertIndexedQuery(
+            transaction,
+            sql`select id from cms_entry_shared_revision where entry_id = ${entryId} order by sequence desc nulls last, id desc nulls last limit 25`,
+            { table: "cms_entry_shared_revision", allowBitmap: true, order: "index-prefix" },
           );
-          const localePlan = await transaction.execute(
-            sql`explain (format json) select id from cms_entry_locale_revision where entry_id = ${entryId} and locale_id = ${english.id} order by sequence desc limit 25`,
+          await assertIndexedQuery(
+            transaction,
+            sql`select id from cms_entry_locale_revision where entry_id = ${entryId} and locale_id = ${english.id} order by sequence desc nulls last, id desc nulls last limit 25`,
+            { table: "cms_entry_locale_revision", allowBitmap: true, order: "index-prefix" },
           );
-          const createReplayPlan = await transaction.execute(
-            sql`explain (format json) select id from cms_entry where collection_id = ${collectionId} and create_command_id = ${randomUUID()} order by create_command_id limit 1`,
+          await assertIndexedQuery(
+            transaction,
+            sql`select id from cms_entry where collection_id = ${collectionId} and create_command_id = ${randomUUID()} order by create_command_id limit 1`,
+            { table: "cms_entry", allowBitmap: true, order: "index" },
           );
-          const saveReplayPlan = await transaction.execute(
-            sql`explain (format json) select result_kind from cms_entry_draft_command where entry_id = ${entryId} and command_id = ${randomUUID()} limit 1`,
+          await assertIndexedQuery(
+            transaction,
+            sql`select result_kind from cms_entry_draft_command where entry_id = ${entryId} and command_id = ${randomUUID()} limit 1`,
+            { table: "cms_entry_draft_command", allowBitmap: true },
           );
-          const entryCredentialPlan = await transaction.execute(
-            sql`explain (format json) select id from cms_entry where created_by_credential_id = ${managementCredentialId} limit 20`,
+          await assertIndexedQuery(
+            transaction,
+            sql`select id from cms_entry where created_by_credential_id = ${managementCredentialId} limit 20`,
+            { table: "cms_entry", allowBitmap: true },
           );
-          const sharedCredentialPlan = await transaction.execute(
-            sql`explain (format json) select id from cms_entry_shared_revision where authored_by_credential_id = ${managementCredentialId} limit 20`,
+          await assertIndexedQuery(
+            transaction,
+            sql`select id from cms_entry_shared_revision where authored_by_credential_id = ${managementCredentialId} limit 20`,
+            { table: "cms_entry_shared_revision", allowBitmap: true },
           );
-          const localeCredentialPlan = await transaction.execute(
-            sql`explain (format json) select id from cms_entry_locale_revision where authored_by_credential_id = ${managementCredentialId} limit 20`,
+          await assertIndexedQuery(
+            transaction,
+            sql`select id from cms_entry_locale_revision where authored_by_credential_id = ${managementCredentialId} limit 20`,
+            { table: "cms_entry_locale_revision", allowBitmap: true },
           );
-          const commandCredentialPlan = await transaction.execute(
-            sql`explain (format json) select command_id from cms_entry_draft_command where completed_by_credential_id = ${managementCredentialId} limit 20`,
+          await assertIndexedQuery(
+            transaction,
+            sql`select command_id from cms_entry_draft_command where completed_by_credential_id = ${managementCredentialId} limit 20`,
+            { table: "cms_entry_draft_command", allowBitmap: true },
           );
-          return JSON.stringify([
-            entriesPlan.rows,
-            sharedPlan.rows,
-            localePlan.rows,
-            createReplayPlan.rows,
-            saveReplayPlan.rows,
-            entryCredentialPlan.rows,
-            sharedCredentialPlan.rows,
-            localeCredentialPlan.rows,
-            commandCredentialPlan.rows,
-          ]);
         }),
       );
-      assert.include(plans, "cms_entry_collection_created_id_idx");
-      assert.match(plans, /cms_entry_shared_revision_entry_(sequence_idx|sequence_unique)/u);
-      assert.match(plans, /cms_entry_locale_revision_entry_locale_(sequence_idx|sequence_unique)/u);
-      assert.match(plans, /cms_entry_collection_(?:create_command_unique|created_id_idx)/u);
-      assert.match(plans, /cms_entry_draft_command_(?:entry_command_pk|entry_completed_idx)/u);
-      assert.include(plans, "cms_entry_created_by_credential_idx");
-      assert.include(plans, "cms_entry_shared_revision_author_credential_idx");
-      assert.include(plans, "cms_entry_locale_revision_author_credential_idx");
-      assert.include(plans, "cms_entry_draft_command_completed_by_credential_idx");
+      yield* Effect.promise(() =>
+        assertIndexDefinitions(db, [
+          {
+            table: "cms_entry",
+            name: "cms_entry_collection_created_id_idx",
+            keys: "collection_id, created_at DESC NULLS LAST, id DESC NULLS LAST",
+          },
+          {
+            table: "cms_entry_shared_revision",
+            name: "cms_entry_shared_revision_entry_sequence_idx",
+            keys: "entry_id, sequence DESC NULLS LAST",
+          },
+          {
+            table: "cms_entry_locale_revision",
+            name: "cms_entry_locale_revision_entry_locale_sequence_idx",
+            keys: "entry_id, locale_id, sequence DESC NULLS LAST",
+          },
+          {
+            table: "cms_entry",
+            name: "cms_entry_collection_create_command_unique",
+            keys: "collection_id, create_command_id",
+            unique: true,
+          },
+          {
+            table: "cms_entry_draft_command",
+            name: "cms_entry_draft_command_entry_command_pk",
+            keys: "entry_id, command_id",
+            unique: true,
+          },
+          {
+            table: "cms_entry",
+            name: "cms_entry_created_by_credential_idx",
+            keys: "created_by_credential_id",
+            where: "(created_by_credential_id IS NOT NULL)",
+          },
+          {
+            table: "cms_entry_shared_revision",
+            name: "cms_entry_shared_revision_author_credential_idx",
+            keys: "authored_by_credential_id",
+            where: "(authored_by_credential_id IS NOT NULL)",
+          },
+          {
+            table: "cms_entry_locale_revision",
+            name: "cms_entry_locale_revision_author_credential_idx",
+            keys: "authored_by_credential_id",
+            where: "(authored_by_credential_id IS NOT NULL)",
+          },
+          {
+            table: "cms_entry_draft_command",
+            name: "cms_entry_draft_command_completed_by_credential_idx",
+            keys: "completed_by_credential_id",
+            where: "(completed_by_credential_id IS NOT NULL)",
+          },
+        ]),
+      );
     }),
   );
 
@@ -2684,7 +2745,7 @@ describe("entry repository PostgreSQL integration", () => {
       if (value === undefined) throw new Error("Performance sample was unavailable.");
       return value;
     };
-    let plans = "";
+    const plans: Array<QueryPlan> = [];
 
     try {
       await db.transaction(async (transaction) => {
@@ -2722,16 +2783,13 @@ describe("entry repository PostgreSQL integration", () => {
         const cappedCountQuery = sql`select id from cms_entry where workspace_id = ${currentWorkspace.id} and project_id = ${currentProject.id} and environment_id = ${currentProject.environment.id} and collection_id = ${currentCollection.id} and display_name is not null and lower(display_name) collate "C" like ${pattern} escape '\\' limit 1001`;
 
         await transaction.execute(sql`set local enable_seqscan = off`);
-        const browse = await transaction.execute(sql`explain (format json) ${browseQuery}`);
+        plans.push(await explainPlan(transaction, browseQuery));
         await transaction.execute(sql`set local enable_seqscan = on`);
-        const search = await transaction.execute(sql`explain (format json) ${searchQuery}`);
-        const continuation = await transaction.execute(
-          sql`explain (format json) ${continuationQuery}`,
+        plans.push(
+          await explainPlan(transaction, searchQuery),
+          await explainPlan(transaction, continuationQuery),
+          await explainPlan(transaction, cappedCountQuery),
         );
-        const cappedCount = await transaction.execute(
-          sql`explain (format json) ${cappedCountQuery}`,
-        );
-        plans = JSON.stringify([browse.rows, search.rows, continuation.rows, cappedCount.rows]);
 
         for (let sample = 0; sample < 20; sample += 1) {
           const browseTiming = await transaction.execute(
@@ -2761,10 +2819,22 @@ describe("entry repository PostgreSQL integration", () => {
       .from(cmsEntry)
       .where(sql`${cmsEntry.displayName} like ${`${prefix}%`}`);
     assert.strictEqual(residue?.count, 0);
-    assert.include(plans, "cms_entry_collection_created_id_idx");
-    assert.strictEqual(plans.match(/cms_entry_studio_name_search_idx/gu)?.length, 3, plans);
-    assert.notInclude(plans, '"Node Type":"Sort"');
-    assert.notInclude(plans, '"Node Type":"Seq Scan"');
+    const [browse, search, continuation, cappedCount] = plans;
+    if (!browse || !search || !continuation || !cappedCount) {
+      assert.fail("PostgreSQL query plans were unavailable.");
+    }
+    assertIndexedAccess(browse, { table: "cms_entry", order: "index" });
+    assertIndexedAccess(search, { table: "cms_entry", order: "index" });
+    assertIndexedAccess(continuation, { table: "cms_entry", order: "index" });
+    assertIndexedAccess(cappedCount, { table: "cms_entry", allowBitmap: true, order: "index" });
+    await assertIndexDefinitions(db, [
+      {
+        table: "cms_entry",
+        name: "cms_entry_studio_name_search_idx",
+        keys: 'workspace_id, project_id, environment_id, collection_id, lower((display_name)::text) COLLATE "C" text_pattern_ops, id',
+        where: "(display_name IS NOT NULL)",
+      },
+    ]);
     assert.isBelow(percentile95(timings.browse), 150, "browse database p95 exceeded 150 ms");
     assert.isBelow(percentile95(timings.search), 150, "search database p95 exceeded 150 ms");
     assert.isBelow(

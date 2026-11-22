@@ -93,7 +93,7 @@ function compareText(left: string, right: string) {
 
 function makeLock(input: AuthoringSchemaLockInput, schemaFileSha256: string) {
   return Schema.decodeUnknownSync(AuthoringSchemaLock, { onExcessProperty: "error" })({
-    lockVersion: 2,
+    lockVersion: 1,
     authoringApi: "authoring/v1",
     projectId: input.projectId,
     environmentId: input.environmentId,

@@ -1025,6 +1025,10 @@ describe("Authoring successful HTTP lifecycles", () => {
           resultKind: "changed",
           publication: { current: true, sequence: 1 },
         });
+        expect(published.body.data.delivery).toEqual({
+          status: "verified",
+          currentPublicationId: published.body.data.publication.id,
+        });
 
         const publishReplay = await api
           .post(`${publicationPath}/publish`)
@@ -1068,6 +1072,10 @@ describe("Authoring successful HTTP lifecycles", () => {
           stateVersion: 2,
           resultKind: "changed",
           unpublishedPublicationId: publicationId,
+        });
+        expect(unpublished.body.data.delivery).toEqual({
+          status: "verified",
+          currentPublicationId: null,
         });
 
         const unpublishReplay = await api
@@ -1590,6 +1598,16 @@ describe("Authoring successful HTTP lifecycles", () => {
         .post(`${publicationPath}/unpublish`)
         .set(authorization)
         .send({ commandId, expectedStateVersion: 0, expectedPublicationId: null }),
+      api.get(`${entryPath}/revisions?scope=shared`).set(authorization),
+      api.get(`${entryPath}/revisions/${commandId}`).set(authorization),
+      api.get(`${entryPath}/revisions/${commandId}/compare/${commandId}`).set(authorization),
+      api.post(`${entryPath}/revisions/${commandId}/restore`).set(authorization).send({
+        scope: "shared",
+        schemaRevisionId,
+        contractHash,
+        expectedVersion: 2,
+        commandId,
+      }),
     ];
     for (const pending of requests) {
       const response = await pending;
@@ -1599,4 +1617,249 @@ describe("Authoring successful HTTP lifecycles", () => {
       expect(JSON.stringify(response.body)).not.toContain("downgraded.oauth.token");
     }
   }, 20_000);
+
+  it("lists, reads, compares, and restores revisions with exact scope and contract authority", async () => {
+    rateLimitManagerOverride = permissiveRateLimitManager;
+    const entryId = requireValue(contentEntryId, "content entry");
+    const entriesBase = `/api/authoring/v1/projects/${projectId}/environments/${environmentId}/collections/articles/locales/en/entries`;
+    const entryPath = `${entriesBase}/${entryId}`;
+    const revisionsPath = `${entryPath}/revisions`;
+    const readOnlyBearer = bearer(requireValue(publicationKey, "publication credential"));
+
+    const sharedPage = await api.get(`${revisionsPath}?scope=shared&limit=10`).set(readOnlyBearer);
+    expect(sharedPage.status).toBe(200);
+    const sharedItems: ReadonlyArray<{ id: string; sequence: number; scope: string }> =
+      sharedPage.body.data.items;
+    expect(sharedItems.length).toBeGreaterThanOrEqual(2);
+    expect(sharedItems.every((item) => item.scope === "shared")).toBe(true);
+    const firstShared = sharedItems.find((item) => item.sequence === 1);
+    const secondShared = sharedItems.find((item) => item.sequence === 2);
+    if (firstShared === undefined || secondShared === undefined)
+      throw new Error("Shared revisions are missing.");
+    expect(sharedPage.body.data.items[0]).toMatchObject({
+      entryId,
+      locale: null,
+      authoredByUserId: null,
+      authoredByCredentialId: credentialId,
+    });
+
+    const localizedPage = await api
+      .get(`${revisionsPath}?scope=localized&limit=1`)
+      .set(readOnlyBearer);
+    expect(localizedPage.status).toBe(200);
+    expect(localizedPage.body.data.items).toHaveLength(1);
+    expect(localizedPage.body.data.items[0]).toMatchObject({ scope: "localized", locale: "en" });
+    const localizedRevisionId = localizedPage.body.data.items[0].id;
+
+    const firstRevision = await api.get(`${revisionsPath}/${firstShared.id}`).set(readOnlyBearer);
+    expect(firstRevision.status).toBe(200);
+    expect(firstRevision.body.data).toMatchObject({
+      revision: { id: firstShared.id, scope: "shared", sequence: 1, contractHash },
+      values: { internal_note: "Initial note" },
+      compatible: true,
+      currentSchemaRevisionId: schemaRevisionId,
+      currentContractHash: contractHash,
+    });
+
+    const comparison = await api
+      .get(`${revisionsPath}/${firstShared.id}/compare/${secondShared.id}`)
+      .set(readOnlyBearer);
+    expect(comparison.status).toBe(200);
+    expect(comparison.body.data).toMatchObject({
+      entryId,
+      scope: "shared",
+      from: { id: firstShared.id },
+      to: { id: secondShared.id },
+      restrictedChanges: false,
+      schemaDiffers: false,
+    });
+    expect(comparison.body.data.items).toEqual([
+      expect.objectContaining({
+        apiKey: "internal_note",
+        change: "changed",
+        before: "Initial note",
+        after: "Updated note",
+        inCurrentSchema: true,
+      }),
+    ]);
+
+    const crossScope = await api
+      .get(`${revisionsPath}/${firstShared.id}/compare/${localizedRevisionId}`)
+      .set(readOnlyBearer);
+    expect(crossScope.status).toBe(400);
+    expect(crossScope.body.error.code).toBe("VALIDATION_ERROR");
+
+    const hindiLocalized = await api
+      .get(
+        `${entriesBase.replace("/locales/en/", "/locales/hi/")}/${entryId}/revisions/${localizedRevisionId}`,
+      )
+      .set(readOnlyBearer);
+    expect(hindiLocalized.status).toBe(404);
+    expect(hindiLocalized.body.error.code).toBe("NOT_FOUND");
+
+    const missingEntry = await api
+      .get(`${entriesBase}/${randomUUID()}/revisions/${firstShared.id}`)
+      .set(readOnlyBearer);
+    expect(missingEntry.status).toBe(404);
+    expect(missingEntry.body.error.code).toBe("NOT_FOUND");
+
+    for (const invalidQuery of [
+      "",
+      "?scope=draft",
+      "?scope=shared&scope=localized",
+      "?scope=shared&limit=51",
+      "?scope=shared&extra=1",
+    ]) {
+      const invalid = await api.get(`${revisionsPath}${invalidQuery}`).set(readOnlyBearer);
+      expect(invalid.status).toBe(400);
+      expect(invalid.body.error.code).toBe("VALIDATION_ERROR");
+    }
+    const queryOnRead = await api
+      .get(`${revisionsPath}/${firstShared.id}?scope=shared`)
+      .set(readOnlyBearer);
+    expect(queryOnRead.status).toBe(400);
+    expect(queryOnRead.body.error.code).toBe("VALIDATION_ERROR");
+
+    await resetCredentialAttemptLimit();
+    const writeOnly = await rpc(browser, "platform/projects/credentials/issue", {
+      projectId,
+      environmentId,
+      family: "management",
+      name: "M20A Authoring write-only revisions",
+      scopes: ["content.write"],
+      expiresAt: null,
+      nonExpiringAcknowledged: true,
+    });
+    expect(writeOnly.status).toBe(200);
+    const writeOnlyBearer = bearer(writeOnly.body.json.data.key);
+    for (const path of [
+      `${revisionsPath}?scope=shared`,
+      `${revisionsPath}/${firstShared.id}`,
+      `${revisionsPath}/${firstShared.id}/compare/${secondShared.id}`,
+    ]) {
+      const denied = await api.get(path).set(writeOnlyBearer);
+      expect(denied.status).toBe(401);
+      expect(denied.body.error.code).toBe("CREDENTIAL_INVALID");
+    }
+
+    const draftPath = `${entryPath}/draft`;
+    const draft = await api.get(draftPath).set(bearer());
+    expect(draft.status).toBe(200);
+    const restoreBody = {
+      scope: "shared",
+      schemaRevisionId,
+      contractHash,
+      expectedVersion: draft.body.data.sharedVersion,
+      commandId: randomUUID(),
+    };
+    const restorePath = `${revisionsPath}/${firstShared.id}/restore`;
+    const deniedRestore = await api.post(restorePath).set(readOnlyBearer).send(restoreBody);
+    expect(deniedRestore.status).toBe(401);
+    expect(deniedRestore.body.error.code).toBe("CREDENTIAL_INVALID");
+    await resetCredentialAttemptLimit();
+
+    const unknownKey = await api
+      .post(restorePath)
+      .set(bearer())
+      .send({ ...restoreBody, values: {} });
+    expect(unknownKey.status).toBe(400);
+    expect(unknownKey.body.error.code).toBe("VALIDATION_ERROR");
+
+    const wrongScope = await api
+      .post(restorePath)
+      .set(bearer())
+      .send({ ...restoreBody, scope: "localized", commandId: randomUUID() });
+    expect(wrongScope.status).toBe(404);
+    expect(wrongScope.body.error.code).toBe("NOT_FOUND");
+
+    const restored = await api.post(restorePath).set(bearer()).send(restoreBody);
+    expect(restored.status).toBe(200);
+    expect(restored.body.data).toMatchObject({
+      entryId,
+      commandId: restoreBody.commandId,
+      sharedChanged: true,
+      sharedVersion: draft.body.data.sharedVersion + 1,
+      localizedChanged: false,
+      localizedVersion: draft.body.data.localizedVersion,
+    });
+    const restoreReplay = await api.post(restorePath).set(bearer()).send(restoreBody);
+    expect(restoreReplay.status).toBe(200);
+    expect(restoreReplay.body.data).toEqual(restored.body.data);
+    const staleRestore = await api
+      .post(restorePath)
+      .set(bearer())
+      .send({ ...restoreBody, commandId: randomUUID() });
+    expect(staleRestore.status).toBe(409);
+    expect(staleRestore.body.error.code).toBe("DRAFT_CONFLICT");
+    const restoredDraft = await api.get(draftPath).set(bearer());
+    expect(restoredDraft.body.data.sharedValues).toEqual({ internal_note: "Initial note" });
+    const restoredRevision = await api
+      .get(`${revisionsPath}/${restored.body.data.sharedRevisionId}`)
+      .set(readOnlyBearer);
+    expect(restoredRevision.status).toBe(200);
+    expect(restoredRevision.body.data.revision.restoredFromRevisionId).toBe(firstShared.id);
+    const unchanged = await api
+      .get(`${revisionsPath}/${firstShared.id}/compare/${restored.body.data.sharedRevisionId}`)
+      .set(readOnlyBearer);
+    expect(unchanged.status).toBe(200);
+    expect(unchanged.body.data.items).toEqual([]);
+
+    const schemaBase = `/api/authoring/v1/projects/${projectId}/environments/${environmentId}/schema`;
+    const extendedSchema = {
+      collections: [
+        {
+          ...articlesCollection,
+          fields: [
+            ...articlesCollection.fields,
+            {
+              sourceKey: "summary",
+              apiKey: "summary",
+              kind: "short_text",
+              required: false,
+              localization: "localized",
+              configuration: {},
+            },
+          ],
+        },
+      ],
+    };
+    const plan = await api
+      .post(`${schemaBase}/plan`)
+      .set(bearer())
+      .send({ project: extendedSchema });
+    expect(plan.status).toBe(200);
+    const applied = await api
+      .post(`${schemaBase}/apply`)
+      .set(bearer())
+      .send({
+        project: extendedSchema,
+        commandId: randomUUID(),
+        expectedCurrent: plan.body.data.current,
+        expectedPlanHash: plan.body.data.planHash,
+        acknowledgedChangeIds: plan.body.data.changes
+          .filter((change: { classification: string }) => change.classification !== "non_breaking")
+          .map((change: { changeId: string }) => change.changeId),
+      });
+    expect(applied.status).toBe(200);
+    const nextRevision = applied.body.data.revisions[0];
+    expect(nextRevision.contractHash).not.toBe(contractHash);
+
+    const incompatibleRead = await api
+      .get(`${revisionsPath}/${firstShared.id}`)
+      .set(readOnlyBearer);
+    expect(incompatibleRead.status).toBe(200);
+    expect(incompatibleRead.body.data).toMatchObject({
+      compatible: false,
+      currentContractHash: nextRevision.contractHash,
+    });
+    const incompatible = await api.post(restorePath).set(bearer()).send({
+      scope: "shared",
+      schemaRevisionId: nextRevision.revisionId,
+      contractHash: nextRevision.contractHash,
+      expectedVersion: restored.body.data.sharedVersion,
+      commandId: randomUUID(),
+    });
+    expect(incompatible.status).toBe(409);
+    expect(incompatible.body.error.code).toBe("REVISION_INCOMPATIBLE");
+  }, 30_000);
 });

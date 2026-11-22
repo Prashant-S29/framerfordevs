@@ -242,6 +242,50 @@ export class EntryRevisionPage extends Schema.Class<EntryRevisionPage>("EntryRev
   nextCursor: Schema.NullOr(Cursor),
 }) {}
 
+export const entryRevisionComparisonLimits = { maximumItems: 200 } as const;
+
+export const EntryRevisionComparisonChange = Schema.Literals(["added", "removed", "changed"]);
+export type EntryRevisionComparisonChange = typeof EntryRevisionComparisonChange.Type;
+
+export class EntryRevisionComparisonItem extends Schema.Class<EntryRevisionComparisonItem>(
+  "EntryRevisionComparisonItem",
+)({
+  fieldId: CollectionFieldId,
+  change: EntryRevisionComparisonChange,
+  before: Schema.optionalKey(Schema.Unknown),
+  after: Schema.optionalKey(Schema.Unknown),
+  inCurrentSchema: Schema.Boolean,
+}) {}
+
+export class CmsEntryRevision extends Schema.Class<CmsEntryRevision>("CmsEntryRevision")({
+  entry: CmsEntry,
+  localeId: ProjectLocaleId,
+  locale: LocaleTag,
+  revision: EntryRevisionSummary,
+  values: EntryValues,
+  compatible: Schema.Boolean,
+  currentSchemaRevisionId: SchemaRevisionId,
+  currentContractHash: ContractHash,
+}) {}
+
+export class EntryRevisionComparison extends Schema.Class<EntryRevisionComparison>(
+  "EntryRevisionComparison",
+)({
+  entry: CmsEntry,
+  localeId: ProjectLocaleId,
+  locale: LocaleTag,
+  scope: EntryRevisionScope,
+  from: EntryRevisionSummary,
+  to: EntryRevisionSummary,
+  items: Schema.Array(EntryRevisionComparisonItem).check(
+    Schema.isMaxLength(entryRevisionComparisonLimits.maximumItems),
+  ),
+  restrictedChanges: Schema.Boolean,
+  schemaDiffers: Schema.Boolean,
+  currentSchemaRevisionId: SchemaRevisionId,
+  currentContractHash: ContractHash,
+}) {}
+
 const EntryScopeInputFields = {
   projectId: ProjectId,
   environmentId: EnvironmentId,
@@ -321,6 +365,23 @@ export class ListEntryRevisionsInput extends Schema.Class<ListEntryRevisionsInpu
   limit: PageLimit,
 }) {}
 
+export class GetEntryRevisionInput extends Schema.Class<GetEntryRevisionInput>(
+  "GetEntryRevisionInput",
+)({
+  ...EntryScopeInputFields,
+  entryId: EntryId,
+  revisionId: EntryRevisionId,
+}) {}
+
+export class CompareEntryRevisionsInput extends Schema.Class<CompareEntryRevisionsInput>(
+  "CompareEntryRevisionsInput",
+)({
+  ...EntryScopeInputFields,
+  entryId: EntryId,
+  fromRevisionId: EntryRevisionId,
+  toRevisionId: EntryRevisionId,
+}) {}
+
 export class RestoreEntryRevisionInput extends Schema.Class<RestoreEntryRevisionInput>(
   "RestoreEntryRevisionInput",
 )({
@@ -352,6 +413,13 @@ export const SaveEntryDraftInputSchema = Schema.toStandardSchemaV1(SaveEntryDraf
 export const ListEntryRevisionsInputSchema = Schema.toStandardSchemaV1(ListEntryRevisionsInput, {
   parseOptions: { onExcessProperty: "error" },
 });
+export const GetEntryRevisionInputSchema = Schema.toStandardSchemaV1(GetEntryRevisionInput, {
+  parseOptions: { onExcessProperty: "error" },
+});
+export const CompareEntryRevisionsInputSchema = Schema.toStandardSchemaV1(
+  CompareEntryRevisionsInput,
+  { parseOptions: { onExcessProperty: "error" } },
+);
 export const RestoreEntryRevisionInputSchema = Schema.toStandardSchemaV1(
   RestoreEntryRevisionInput,
   { parseOptions: { onExcessProperty: "error" } },
@@ -365,4 +433,10 @@ export const SaveEntryDraftResultOutputSchema = Schema.toStandardSchemaV1(
 );
 export const EntryRevisionPageOutputSchema = Schema.toStandardSchemaV1(
   ApiSuccessSchema(EntryRevisionPage),
+);
+export const CmsEntryRevisionOutputSchema = Schema.toStandardSchemaV1(
+  ApiSuccessSchema(CmsEntryRevision),
+);
+export const EntryRevisionComparisonOutputSchema = Schema.toStandardSchemaV1(
+  ApiSuccessSchema(EntryRevisionComparison),
 );

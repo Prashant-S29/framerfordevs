@@ -12,6 +12,7 @@ import {
   GeneratorOutputUnownedError,
 } from "../errors";
 import type { GenerationPlan } from "../generator";
+import { generationLockFileName as lockFileName } from "../config";
 import { SchemaLock } from "../schema";
 
 export type FileSystemEntryKind = "missing" | "file" | "directory" | "symbolic_link" | "other";
@@ -127,7 +128,6 @@ export interface CommitGenerationOptions {
   readonly rootDirectory: string;
   readonly outputDirectory: string;
   readonly plan: GenerationPlan;
-  readonly lockFileName?: "schema.lock.json" | "generated.lock.json";
   readonly force?: boolean;
   readonly transactionId?: string;
   readonly beforeStage?: (stage: GeneratorCommitStage) => Effect.Effect<void, GeneratorCommitError>;
@@ -173,10 +173,6 @@ export const commitGenerationPlan = Effect.fn("GeneratorFileSystem.commit")(func
   const outputDirectory = resolve(options.outputDirectory);
   const outputParent = dirname(outputDirectory);
   const lockDirectory = join(rootDirectory, ".framerfordevs");
-  const lockFileName = options.lockFileName ?? "schema.lock.json";
-  if (lockFileName !== "schema.lock.json" && lockFileName !== "generated.lock.json") {
-    return yield* GeneratorOutputUnownedError.make();
-  }
   const lockPath = join(lockDirectory, lockFileName);
   const safeOutputChain = yield* validateDirectoryChain(fileSystem, rootDirectory, outputParent);
   const safeLockChain = yield* validateDirectoryChain(fileSystem, rootDirectory, lockDirectory);

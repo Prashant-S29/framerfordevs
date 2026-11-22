@@ -88,7 +88,7 @@ const editorLayout = {
 };
 
 const draft = Schema.decodeUnknownSync(CollectionDraftSchema, { onExcessProperty: "error" })({
-  formatVersion: 2,
+  formatVersion: 1,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
   contractHash: "b".repeat(64),
@@ -136,7 +136,7 @@ const revision = Schema.decodeUnknownSync(PublishedSchemaRevision, { onExcessPro
   collectionId,
   sequence: 1,
   previousRevisionId: null,
-  formatVersion: 2,
+  formatVersion: 1,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
   collectionApiKey: "articles",

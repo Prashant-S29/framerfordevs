@@ -4,6 +4,7 @@ import {
   type CollectionFieldDefinition,
   ContractHash,
   GeneratedFormDefinition,
+  type SchemaFormatVersion,
 } from "../../../contracts/schema";
 import { iso4217MinorUnits } from "../../../registry/iso-4217.generated";
 import { flattenFieldTree } from "../tree";
@@ -126,7 +127,7 @@ export function generatedFormDefinition(options: {
   readonly source: "draft" | "published";
   readonly collectionId: string;
   readonly revisionId: string | null;
-  readonly formatVersion: number;
+  readonly formatVersion: SchemaFormatVersion;
   readonly validationProfile: string;
   readonly currencyRegistryProfile: string | null;
   readonly contractHash: ContractHash;

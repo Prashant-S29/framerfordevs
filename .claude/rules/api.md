@@ -3,6 +3,8 @@ paths:
   - "packages/api/src/**"
   - "apps/server/src/**"
   - "packages/studio-server/src/**"
+  - "packages/public-contracts/**"
+  - "packages/cli/src/**"
 ---
 
 # API contracts
@@ -16,3 +18,9 @@ Application-owned APIs return `ApiSuccess<T> | ApiFailure`, discriminated by `ok
 - Never expose stack traces, SQL, internal paths, secrets, tokens, cookies, or raw causes.
 - Map typed errors and defects in the centralized boundary handlers. Do not create one-off response shapes in feature handlers.
 - Protocol-owned endpoints, such as Better Auth and OAuth, keep their native format.
+
+## Versions before the first release
+
+- Nothing is released yet. Change every public contract, protocol, and local file format in place at v1. Never add a new major, a successor document, or a second format version.
+- `pnpm run contracts:check` makes sure that the generated artifacts match the source. Regenerate them with every contract change, so the diff shows the change for review.
+- Frozen release baselines come back at the first release. The developer decides when that is.

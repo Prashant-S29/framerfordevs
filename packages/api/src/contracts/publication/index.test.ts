@@ -3,6 +3,7 @@ import { Effect, Exit, Schema } from "effect";
 
 import { EffectSchemaToJsonSchemaConverter } from "../response/effect-schema-converter";
 import {
+  EntryDeliveryReadBack,
   EntryPublicationHash,
   EntryPublicationPageOutputSchema,
   EntryPublicationPlanOutputSchema,
@@ -78,5 +79,22 @@ describe("publication contracts", () => {
     ]) {
       assert.doesNotThrow(() => converter.convert(schema, { strategy: "output" }));
     }
+  });
+
+  it("accepts only verified or superseded Delivery read-back with a nullable publication", () => {
+    const decode = Schema.decodeUnknownExit(EntryDeliveryReadBack, { onExcessProperty: "error" });
+    assert.isTrue(Exit.isSuccess(decode({ status: "verified", currentPublicationId: null })));
+    assert.isTrue(
+      Exit.isSuccess(
+        decode({
+          status: "superseded",
+          currentPublicationId: "019fae8b-1234-7000-8000-000000000009",
+        }),
+      ),
+    );
+    assert.isTrue(Exit.isFailure(decode({ status: "pending", currentPublicationId: null })));
+    assert.isTrue(
+      Exit.isFailure(decode({ status: "verified", currentPublicationId: null, extra: true })),
+    );
   });
 });

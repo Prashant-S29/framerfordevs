@@ -7,7 +7,7 @@ import { canonicalJsonBytes, sha256, toJsonValue } from "../../../canonical";
 import { CredentialStore, CredentialStoreLive } from "../../../credential-store";
 import { getValidAccessToken } from "../../../oauth-device";
 import { acquireSchemaApplyCommand, clearSchemaApplyCommand } from "../../../retry-journal";
-import type { CliConfigV2 } from "../../../schema";
+import type { CliConfig } from "../../../schema";
 import { makeToolingHttpClient } from "../../../tooling-http-client";
 
 function planCommand(): "schema plan" {
@@ -55,9 +55,7 @@ function resolveEnvironmentId(
     .pipe(Effect.map((manifest) => manifest.environmentId));
 }
 
-const clientAuthority = Effect.fn("cli.authoring.authority.resolve")(function* (
-  config: CliConfigV2,
-) {
+const clientAuthority = Effect.fn("cli.authoring.authority.resolve")(function* (config: CliConfig) {
   const token = yield* tokenForOrigin(config.apiBaseUrl);
   const tooling = makeToolingHttpClient({ baseUrl: config.apiBaseUrl, token });
   const environmentId = yield* resolveEnvironmentId(tooling, config.projectId, config.environment);
@@ -79,7 +77,7 @@ function request<A>(operation: () => Promise<A>) {
   });
 }
 
-const exportOnline = Effect.fn("cli.authoring.schema.export")(function* (config: CliConfigV2) {
+const exportOnline = Effect.fn("cli.authoring.schema.export")(function* (config: CliConfig) {
   const authority = yield* clientAuthority(config);
   const response = yield* request(() => authority.client.schema.export());
   if (response.body === null) return yield* Effect.fail(new Error("CLI_AUTHORING_RESPONSE_EMPTY"));
@@ -89,7 +87,7 @@ const exportOnline = Effect.fn("cli.authoring.schema.export")(function* (config:
 });
 
 const planOnline = Effect.fn("cli.authoring.schema.plan")(function* (input: {
-  readonly config: CliConfigV2;
+  readonly config: CliConfig;
   readonly project: ProjectSchema;
   readonly projectSha256: string;
 }) {
@@ -114,7 +112,7 @@ const planOnline = Effect.fn("cli.authoring.schema.plan")(function* (input: {
 });
 
 const pushOnline = Effect.fn("cli.authoring.schema.push")(function* (input: {
-  readonly config: CliConfigV2;
+  readonly config: CliConfig;
   readonly projectRoot: string;
   readonly schemaPath: string;
   readonly project: ProjectSchema;
@@ -228,12 +226,12 @@ async function run<A, E>(effect: Effect.Effect<A, E, CredentialStore>) {
   }
 }
 
-export function runSchemaExportOnline(config: CliConfigV2) {
+export function runSchemaExportOnline(config: CliConfig) {
   return run(exportOnline(config));
 }
 
 export function runSchemaPlanOnline(input: {
-  readonly config: CliConfigV2;
+  readonly config: CliConfig;
   readonly project: ProjectSchema;
   readonly projectSha256: string;
 }) {
@@ -241,7 +239,7 @@ export function runSchemaPlanOnline(input: {
 }
 
 export function runSchemaPushOnline(input: {
-  readonly config: CliConfigV2;
+  readonly config: CliConfig;
   readonly projectRoot: string;
   readonly schemaPath: string;
   readonly project: ProjectSchema;

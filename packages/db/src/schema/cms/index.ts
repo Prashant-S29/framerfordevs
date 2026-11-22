@@ -769,7 +769,7 @@ export const cmsSchemaRevision = pgTable(
       "cms_revision_collection_description_valid",
       sql`${table.collectionDescription} is null or (char_length(${table.collectionDescription}) <= 500 and ${table.collectionDescription} = btrim(${table.collectionDescription}) and ${table.collectionDescription} !~ '[[:cntrl:]]')`,
     ),
-    check("cms_revision_format_version_valid", sql`${table.formatVersion} in (1, 2)`),
+    check("cms_revision_format_version_valid", sql`${table.formatVersion} = 1`),
     check(
       "cms_revision_validation_profile_valid",
       sql`${table.validationProfile} ~ '^[a-z0-9][a-z0-9@._-]{0,63}$'`,

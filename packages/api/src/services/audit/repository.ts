@@ -137,7 +137,10 @@ export function makeAuditRepository(database: ApplicationDb = db) {
                   cursorCondition,
                 ),
               )
-              .orderBy(sql`${auditEvent.occurredAt} desc`, sql`${auditEvent.id} desc`)
+              .orderBy(
+                sql`${auditEvent.occurredAt} desc nulls last`,
+                sql`${auditEvent.id} desc nulls last`,
+              )
               .limit(input.limit + 1);
             await transaction.insert(auditEvent).values({
               workspaceId: authorization.access.project.workspaceId,

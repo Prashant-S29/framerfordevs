@@ -248,6 +248,7 @@
               "PUBLICATION_CONFLICT",
               "PUBLICATION_INVALID",
               "COMMAND_CONFLICT",
+              "REVISION_INCOMPATIBLE",
               "RISKY_ACKNOWLEDGEMENT_REQUIRED",
               "SOURCE_IDENTITY_CONFLICT",
               "REQUEST_TOO_LARGE",
@@ -989,8 +990,7 @@
           },
           "formatVersion": {
             "enum": [
-              1,
-              2
+              1
             ],
             "type": "number"
           },
@@ -1907,6 +1907,9 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
+          "delivery": {
+            "$ref": "#/components/schemas/EntryDeliveryReadBackEncoded"
+          },
           "entryId": {
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
@@ -1937,7 +1940,8 @@
           "commandId",
           "stateVersion",
           "resultKind",
-          "publication"
+          "publication",
+          "delivery"
         ],
         "type": "object"
       },
@@ -2074,6 +2078,453 @@
           "data",
           "error",
           "message"
+        ],
+        "type": "object"
+      },
+      "AuthoringRestoreRevisionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "contractHash": {
+            "maxLength": 64,
+            "minLength": 32,
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "expectedVersion": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "schemaRevisionId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "shared",
+              "localized"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "schemaRevisionId",
+          "contractHash",
+          "expectedVersion",
+          "commandId"
+        ],
+        "type": "object"
+      },
+      "AuthoringRestoreRevisionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AuthoringSaveEntryDraftResultEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "AuthoringRevisionComparisonEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "entryId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "from": {
+            "$ref": "#/components/schemas/AuthoringRevisionSummaryEncoded"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuthoringRevisionComparisonItemEncoded"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "restrictedChanges": {
+            "type": "boolean"
+          },
+          "schemaDiffers": {
+            "type": "boolean"
+          },
+          "scope": {
+            "enum": [
+              "shared",
+              "localized"
+            ],
+            "type": "string"
+          },
+          "to": {
+            "$ref": "#/components/schemas/AuthoringRevisionSummaryEncoded"
+          }
+        },
+        "required": [
+          "entryId",
+          "scope",
+          "from",
+          "to",
+          "items",
+          "restrictedChanges",
+          "schemaDiffers"
+        ],
+        "type": "object"
+      },
+      "AuthoringRevisionComparisonItemEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "$ref": "#/components/schemas/AuthoringJsonValue"
+          },
+          "apiKey": {
+            "anyOf": [
+              {
+                "maxLength": 63,
+                "minLength": 1,
+                "pattern": "^[a-z][a-z0-9_]{0,62}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "before": {
+            "$ref": "#/components/schemas/AuthoringJsonValue"
+          },
+          "change": {
+            "enum": [
+              "added",
+              "removed",
+              "changed"
+            ],
+            "type": "string"
+          },
+          "fieldId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "inCurrentSchema": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "fieldId",
+          "apiKey",
+          "change",
+          "inCurrentSchema"
+        ],
+        "type": "object"
+      },
+      "AuthoringRevisionComparisonResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AuthoringRevisionComparisonEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "AuthoringRevisionEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "compatible": {
+            "type": "boolean"
+          },
+          "currentContractHash": {
+            "maxLength": 64,
+            "minLength": 32,
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "currentSchemaRevisionId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "revision": {
+            "$ref": "#/components/schemas/AuthoringRevisionSummaryEncoded"
+          },
+          "values": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AuthoringJsonValue"
+            },
+            "propertyNames": {
+              "maxLength": 63,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "revision",
+          "values",
+          "compatible",
+          "currentSchemaRevisionId",
+          "currentContractHash"
+        ],
+        "type": "object"
+      },
+      "AuthoringRevisionPageEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuthoringRevisionSummaryEncoded"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "AuthoringRevisionPageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AuthoringRevisionPageEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "AuthoringRevisionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AuthoringRevisionEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "AuthoringRevisionSummaryEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "authoredAt": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+            "type": "string"
+          },
+          "authoredByCredentialId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "authoredByUserId": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changedFieldIds": {
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "contractHash": {
+            "maxLength": 64,
+            "minLength": 32,
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "entryId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previousRevisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "restoredFromRevisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schemaRevisionId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "shared",
+              "localized"
+            ],
+            "type": "string"
+          },
+          "sequence": {
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "entryId",
+          "scope",
+          "locale",
+          "sequence",
+          "previousRevisionId",
+          "schemaRevisionId",
+          "contractHash",
+          "changedFieldIds",
+          "restoredFromRevisionId",
+          "authoredByUserId",
+          "authoredByCredentialId",
+          "authoredAt"
         ],
         "type": "object"
       },
@@ -2556,7 +3007,6 @@
             "enum": [
               "collection.metadata.updated",
               "collection.api_key.updated",
-              "schema.format.upgraded",
               "schema.currency_profile.updated",
               "editor_layout.updated",
               "field.added.optional",
@@ -3083,6 +3533,9 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
           },
+          "delivery": {
+            "$ref": "#/components/schemas/EntryDeliveryReadBackEncoded"
+          },
           "entryId": {
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
@@ -3140,7 +3593,8 @@
           "resultKind",
           "unpublishedPublicationId",
           "unpublishedPublicationSequence",
-          "unpublishedAt"
+          "unpublishedAt",
+          "delivery"
         ],
         "type": "object"
       },
@@ -3482,6 +3936,35 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "EntryDeliveryReadBackEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "currentPublicationId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "verified",
+              "superseded"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "currentPublicationId"
+        ],
         "type": "object"
       },
       "EntryPublicationSizeEncoded": {
@@ -6608,7 +7091,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -6995,7 +7478,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -7370,7 +7853,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -7756,7 +8239,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -8098,7 +8581,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -8482,7 +8965,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -8824,7 +9307,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -9244,7 +9727,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -9630,7 +10113,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -10016,7 +10499,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -10159,6 +10642,1588 @@
           "content.publish"
         ],
         "x-required-oauth-scope": "authoring:content:publish"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionKey}/locales/{locale}/entries/{entryId}/revisions": {
+      "get": {
+        "operationId": "listAuthoringEntryRevisions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "enum": [
+                "shared",
+                "localized"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 512,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringRevisionPageResponse"
+                }
+              }
+            },
+            "description": "List one scope of immutable entry revisions with bounded keyset pagination",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The bounded route scope or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "Bearer authentication is missing or invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The principal lacks the required grant or current project policy.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The tenant-scoped project or environment is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The bounded request or response limit was exceeded.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The request exceeded an Authoring rate policy.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "A sanitized internal contract defect occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "AuthoringOAuth": [
+              "authoring:read"
+            ]
+          },
+          {
+            "AuthoringManagementCredential": []
+          }
+        ],
+        "summary": "List one scope of immutable entry revisions with bounded keyset pagination",
+        "x-required-management-scopes": [
+          "content.read"
+        ],
+        "x-required-oauth-scope": "authoring:read"
+      },
+      "options": {
+        "operationId": "denylistAuthoringEntryRevisionsBrowserPreflight",
+        "responses": {
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "Browser-origin Authoring requests are not allowed.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "Authoring data routes do not support browser CORS"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionKey}/locales/{locale}/entries/{entryId}/revisions/{fromRevisionId}/compare/{toRevisionId}": {
+      "get": {
+        "operationId": "compareAuthoringEntryRevisions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fromRevisionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "toRevisionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringRevisionComparisonResponse"
+                }
+              }
+            },
+            "description": "Compare two revisions of the same entry scope by stable field ID",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The bounded route scope or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "Bearer authentication is missing or invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The principal lacks the required grant or current project policy.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The tenant-scoped project or environment is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The bounded request or response limit was exceeded.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The request exceeded an Authoring rate policy.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "A sanitized internal contract defect occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "AuthoringOAuth": [
+              "authoring:read"
+            ]
+          },
+          {
+            "AuthoringManagementCredential": []
+          }
+        ],
+        "summary": "Compare two revisions of the same entry scope by stable field ID",
+        "x-required-management-scopes": [
+          "content.read"
+        ],
+        "x-required-oauth-scope": "authoring:read"
+      },
+      "options": {
+        "operationId": "denycompareAuthoringEntryRevisionsBrowserPreflight",
+        "responses": {
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "Browser-origin Authoring requests are not allowed.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "Authoring data routes do not support browser CORS"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionKey}/locales/{locale}/entries/{entryId}/revisions/{revisionId}": {
+      "get": {
+        "operationId": "getAuthoringEntryRevision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revisionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringRevisionResponse"
+                }
+              }
+            },
+            "description": "Get one immutable entry revision with its stored values",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The bounded route scope or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "Bearer authentication is missing or invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The principal lacks the required grant or current project policy.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The tenant-scoped project or environment is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The bounded request or response limit was exceeded.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The request exceeded an Authoring rate policy.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "A sanitized internal contract defect occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "AuthoringOAuth": [
+              "authoring:read"
+            ]
+          },
+          {
+            "AuthoringManagementCredential": []
+          }
+        ],
+        "summary": "Get one immutable entry revision with its stored values",
+        "x-required-management-scopes": [
+          "content.read"
+        ],
+        "x-required-oauth-scope": "authoring:read"
+      },
+      "options": {
+        "operationId": "denygetAuthoringEntryRevisionBrowserPreflight",
+        "responses": {
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "Browser-origin Authoring requests are not allowed.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "Authoring data routes do not support browser CORS"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionKey}/locales/{locale}/entries/{entryId}/revisions/{revisionId}/restore": {
+      "options": {
+        "operationId": "denyrestoreAuthoringEntryRevisionBrowserPreflight",
+        "responses": {
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "Browser-origin Authoring requests are not allowed.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "Authoring data routes do not support browser CORS"
+      },
+      "post": {
+        "operationId": "restoreAuthoringEntryRevision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionKey",
+            "required": true,
+            "schema": {
+              "maxLength": 63,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]{0,62}$",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revisionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthoringRestoreRevisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringRestoreRevisionResponse"
+                }
+              }
+            },
+            "description": "Restore one compatible revision as a new draft revision of its scope",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The bounded route scope or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "Bearer authentication is missing or invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The principal lacks the required grant or current project policy.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The tenant-scoped project or environment is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The bounded request or response limit was exceeded.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "The request exceeded an Authoring rate policy.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "A sanitized internal contract defect occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthoringApiFailure"
+                }
+              }
+            },
+            "description": "A required dependency is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "AuthoringOAuth": [
+              "authoring:draft:write"
+            ]
+          },
+          {
+            "AuthoringManagementCredential": []
+          }
+        ],
+        "summary": "Restore one compatible revision as a new draft revision of its scope",
+        "x-required-management-scopes": [
+          "content.write"
+        ],
+        "x-required-oauth-scope": "authoring:draft:write"
       }
     },
     "/projects/{projectId}/environments/{environmentId}/collections/{collectionKey}/presentation": {
@@ -10339,7 +12404,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -10704,7 +12769,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -11062,7 +13127,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -11376,7 +13441,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -11766,7 +13831,7 @@
                 }
               }
             },
-            "description": "Current schema, command, acknowledgement, or source authority conflicts.",
+            "description": "Current schema, command, acknowledgement, revision, or source authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"

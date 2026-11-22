@@ -121,7 +121,7 @@ const layout = Schema.decodeUnknownSync(EditorLayout, { onExcessProperty: "error
 
 function currentRevision() {
   const draft = {
-    formatVersion: 2 as const,
+    formatVersion: 1 as const,
     validationProfile: "ffd-fields@1" as const,
     currencyRegistryProfile: null,
     collection: Schema.decodeUnknownSync(CmsCollection, { onExcessProperty: "error" })({
@@ -151,7 +151,7 @@ function currentRevision() {
     collectionId,
     sequence: 1,
     previousRevisionId: null,
-    formatVersion: 2,
+    formatVersion: 1,
     validationProfile: "ffd-fields@1",
     currencyRegistryProfile: null,
     collectionApiKey: "articles",

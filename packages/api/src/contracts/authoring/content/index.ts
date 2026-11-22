@@ -2,18 +2,25 @@ import { Schema } from "effect";
 
 import { ApiSuccessSchema } from "../../response/api";
 import { AuthoringJsonValue, AuthoringValueMutation, AuthoringValueMutations } from "..";
+import { ApiCredentialId } from "../../access";
 import {
+  ChangedEntryFieldIds,
   EntryCommandId,
   EntryDisplayName,
   EntryDraftVersion,
   EntryId,
   EntryNameVersion,
+  EntryRevisionComparisonChange,
   EntryRevisionId,
+  EntryRevisionScope,
+  EntryRevisionSequence,
+  entryRevisionComparisonLimits,
 } from "../../entry";
 import { LocaleTag } from "../../locale";
-import { Cursor, IsoDateTime, PageLimit } from "../../platform";
+import { AuthUserId, Cursor, IsoDateTime, PageLimit } from "../../platform";
 import {
   CollectionApiKey,
+  CollectionFieldId,
   ContractHash,
   GeneratedFormDefinition,
   SchemaRevisionId,
@@ -39,14 +46,13 @@ export class AuthoringEntryPage extends Schema.Class<AuthoringEntryPage>("Author
   nextCursor: Schema.NullOr(Cursor),
 }) {}
 
-export const AuthoringEntryValues = Schema.Record(
-  Schema.String.check(
-    Schema.isMinLength(1),
-    Schema.isMaxLength(63),
-    Schema.isPattern(/^[a-z][a-z0-9_]{0,62}$/u),
-  ),
-  AuthoringJsonValue,
+const AuthoringValueKey = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(63),
+  Schema.isPattern(/^[a-z][a-z0-9_]{0,62}$/u),
 );
+
+export const AuthoringEntryValues = Schema.Record(AuthoringValueKey, AuthoringJsonValue);
 export type AuthoringEntryValues = typeof AuthoringEntryValues.Type;
 
 export class AuthoringEntryValidationIssue extends Schema.Class<AuthoringEntryValidationIssue>(
@@ -151,9 +157,87 @@ export class AuthoringSaveEntryDraftResult extends Schema.Class<AuthoringSaveEnt
   validation: AuthoringEntryValidation,
 }) {}
 
+export class AuthoringRevisionSummary extends Schema.Class<AuthoringRevisionSummary>(
+  "AuthoringRevisionSummary",
+)({
+  id: EntryRevisionId,
+  entryId: EntryId,
+  scope: EntryRevisionScope,
+  locale: Schema.NullOr(LocaleTag),
+  sequence: EntryRevisionSequence,
+  previousRevisionId: Schema.NullOr(EntryRevisionId),
+  schemaRevisionId: SchemaRevisionId,
+  contractHash: ContractHash,
+  changedFieldIds: ChangedEntryFieldIds,
+  restoredFromRevisionId: Schema.NullOr(EntryRevisionId),
+  authoredByUserId: Schema.NullOr(AuthUserId),
+  authoredByCredentialId: Schema.NullOr(ApiCredentialId),
+  authoredAt: IsoDateTime,
+}) {}
+
+export class AuthoringRevisionPage extends Schema.Class<AuthoringRevisionPage>(
+  "AuthoringRevisionPage",
+)({
+  items: Schema.Array(AuthoringRevisionSummary).check(Schema.isMaxLength(50)),
+  nextCursor: Schema.NullOr(Cursor),
+}) {}
+
+export class AuthoringRevision extends Schema.Class<AuthoringRevision>("AuthoringRevision")({
+  revision: AuthoringRevisionSummary,
+  values: AuthoringEntryValues,
+  compatible: Schema.Boolean,
+  currentSchemaRevisionId: SchemaRevisionId,
+  currentContractHash: ContractHash,
+}) {}
+
+export class AuthoringRevisionComparisonItem extends Schema.Class<AuthoringRevisionComparisonItem>(
+  "AuthoringRevisionComparisonItem",
+)({
+  fieldId: CollectionFieldId,
+  apiKey: Schema.NullOr(AuthoringValueKey),
+  change: EntryRevisionComparisonChange,
+  before: Schema.optionalKey(AuthoringJsonValue),
+  after: Schema.optionalKey(AuthoringJsonValue),
+  inCurrentSchema: Schema.Boolean,
+}) {}
+
+export class AuthoringRevisionComparison extends Schema.Class<AuthoringRevisionComparison>(
+  "AuthoringRevisionComparison",
+)({
+  entryId: EntryId,
+  scope: EntryRevisionScope,
+  from: AuthoringRevisionSummary,
+  to: AuthoringRevisionSummary,
+  items: Schema.Array(AuthoringRevisionComparisonItem).check(
+    Schema.isMaxLength(entryRevisionComparisonLimits.maximumItems),
+  ),
+  restrictedChanges: Schema.Boolean,
+  schemaDiffers: Schema.Boolean,
+}) {}
+
+export const AuthoringListRevisionsQuery = Schema.Struct({
+  scope: EntryRevisionScope,
+  cursor: Schema.NullOr(Cursor),
+  limit: PageLimit,
+}).annotate({ identifier: "AuthoringListRevisionsQuery" });
+export type AuthoringListRevisionsQuery = typeof AuthoringListRevisionsQuery.Type;
+
+export const AuthoringRestoreRevisionRequest = Schema.Struct({
+  scope: EntryRevisionScope,
+  schemaRevisionId: SchemaRevisionId,
+  contractHash: ContractHash,
+  expectedVersion: EntryDraftVersion,
+  commandId: EntryCommandId,
+}).annotate({ identifier: "AuthoringRestoreRevisionRequest" });
+export type AuthoringRestoreRevisionRequest = typeof AuthoringRestoreRevisionRequest.Type;
+
 export const AuthoringEntryPageResponse = ApiSuccessSchema(AuthoringEntryPage);
 export const AuthoringCreateEntryResponse = ApiSuccessSchema(AuthoringCreateEntryResult);
 export const AuthoringEntryDraftResponse = ApiSuccessSchema(AuthoringEntryDraft);
 export const AuthoringRenameEntryResponse = ApiSuccessSchema(AuthoringEntrySummary);
 export const AuthoringSaveEntryDraftResponse = ApiSuccessSchema(AuthoringSaveEntryDraftResult);
 export const AuthoringGeneratedFormResponse = ApiSuccessSchema(AuthoringGeneratedForm);
+export const AuthoringRevisionPageResponse = ApiSuccessSchema(AuthoringRevisionPage);
+export const AuthoringRevisionResponse = ApiSuccessSchema(AuthoringRevision);
+export const AuthoringRevisionComparisonResponse = ApiSuccessSchema(AuthoringRevisionComparison);
+export const AuthoringRestoreRevisionResponse = ApiSuccessSchema(AuthoringSaveEntryDraftResult);

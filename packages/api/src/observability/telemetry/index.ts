@@ -170,7 +170,11 @@ export type AuthoringEndpoint =
   | "publication_status"
   | "publication_validate"
   | "publication_publish"
-  | "publication_unpublish";
+  | "publication_unpublish"
+  | "revision_list"
+  | "revision_get"
+  | "revision_compare"
+  | "revision_restore";
 export type AuthoringSubject = "oauth_user" | "management_credential" | "unknown";
 export type AuthoringSizeBucket = "none" | "small" | "medium" | "large" | "near_limit";
 export type AuthoringCostBucket = "1" | "2-5" | "6-20" | "21-50" | "51-100";

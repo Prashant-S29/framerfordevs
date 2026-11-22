@@ -35,6 +35,20 @@ export interface AuthoringListOptions extends ClientRequestOptions {
   readonly cursor?: string;
 }
 
+/**
+ * Query options for one bounded page of entry revisions.
+ *
+ * `scope` selects shared or localized revisions. Localized revisions belong to the client locale.
+ */
+export interface AuthoringListRevisionsOptions extends ClientRequestOptions {
+  readonly scope: AuthoringRevisionScope;
+  readonly limit?: number;
+  readonly cursor?: string;
+}
+
+/** The value scope of one entry revision. */
+export type AuthoringRevisionScope = "shared" | "localized";
+
 export type AuthoringData = JsonObject;
 export type AuthoringImportEntryResult =
   | {
@@ -402,6 +416,19 @@ export class AuthoringPublicationPlan extends Schema.Class<AuthoringPublicationP
   wouldCreatePublication: Schema.Boolean,
 }) {}
 
+/**
+ * The origin Delivery read model after a publish or unpublish command.
+ *
+ * `verified` means the current publication head matches the command result. `superseded` means a
+ * later command already changed the head. CDN and cache invalidation stay asynchronous.
+ */
+export class AuthoringDeliveryReadBack extends Schema.Class<AuthoringDeliveryReadBack>(
+  "SdkAuthoringDeliveryReadBack",
+)({
+  status: Schema.Literals(["verified", "superseded"]),
+  currentPublicationId: Schema.NullOr(Uuid),
+}) {}
+
 export class AuthoringPublishResult extends Schema.Class<AuthoringPublishResult>(
   "SdkAuthoringPublishResult",
 )({
@@ -411,6 +438,7 @@ export class AuthoringPublishResult extends Schema.Class<AuthoringPublishResult>
   stateVersion: Version,
   resultKind: Schema.Literals(["changed", "no_op"]),
   publication: AuthoringPublicationSummary,
+  delivery: AuthoringDeliveryReadBack,
 }) {}
 
 export class AuthoringUnpublishResult extends Schema.Class<AuthoringUnpublishResult>(
@@ -424,6 +452,91 @@ export class AuthoringUnpublishResult extends Schema.Class<AuthoringUnpublishRes
   unpublishedPublicationId: Schema.NullOr(Uuid),
   unpublishedPublicationSequence: Schema.NullOr(PositiveVersion),
   unpublishedAt: IsoDateTime,
+  delivery: AuthoringDeliveryReadBack,
+}) {}
+
+const RevisionScope = Schema.Literals(["shared", "localized"]);
+
+/** Metadata of one immutable shared or localized entry revision. */
+export class AuthoringRevisionSummary extends Schema.Class<AuthoringRevisionSummary>(
+  "SdkAuthoringRevisionSummary",
+)({
+  id: Uuid,
+  entryId: Uuid,
+  scope: RevisionScope,
+  locale: Schema.NullOr(Locale),
+  sequence: PositiveVersion,
+  previousRevisionId: Schema.NullOr(Uuid),
+  schemaRevisionId: Uuid,
+  contractHash: Digest,
+  changedFieldIds: Schema.Array(Uuid).check(Schema.isMaxLength(100)),
+  restoredFromRevisionId: Schema.NullOr(Uuid),
+  authoredByUserId: Schema.NullOr(
+    Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
+  ),
+  authoredByCredentialId: Schema.NullOr(Uuid),
+  authoredAt: IsoDateTime,
+}) {}
+
+/** One bounded page of revision summaries, newest first. */
+export class AuthoringRevisionPage extends Schema.Class<AuthoringRevisionPage>(
+  "SdkAuthoringRevisionPage",
+)({
+  items: Schema.Array(AuthoringRevisionSummary).check(Schema.isMaxLength(50)),
+  nextCursor: Schema.NullOr(Cursor),
+}) {}
+
+/**
+ * One revision with its stored values keyed by API key.
+ *
+ * `compatible` is true only when the revision contract equals the current published contract.
+ */
+export class AuthoringRevision extends Schema.Class<AuthoringRevision>("SdkAuthoringRevision")({
+  revision: AuthoringRevisionSummary,
+  values: JsonObjectSchema,
+  compatible: Schema.Boolean,
+  currentSchemaRevisionId: Uuid,
+  currentContractHash: Digest,
+}) {}
+
+/** One field that differs between two revisions, identified by its stable field ID. */
+export class AuthoringRevisionComparisonItem extends Schema.Class<AuthoringRevisionComparisonItem>(
+  "SdkAuthoringRevisionComparisonItem",
+)({
+  fieldId: Uuid,
+  apiKey: Schema.NullOr(ApiKey),
+  change: Schema.Literals(["added", "removed", "changed"]),
+  before: Schema.optionalKey(JsonValueSchema),
+  after: Schema.optionalKey(JsonValueSchema),
+  inCurrentSchema: Schema.Boolean,
+}) {}
+
+/** The field differences between two revisions of the same entry scope. */
+export class AuthoringRevisionComparison extends Schema.Class<AuthoringRevisionComparison>(
+  "SdkAuthoringRevisionComparison",
+)({
+  entryId: Uuid,
+  scope: RevisionScope,
+  from: AuthoringRevisionSummary,
+  to: AuthoringRevisionSummary,
+  items: Schema.Array(AuthoringRevisionComparisonItem).check(Schema.isMaxLength(200)),
+  restrictedChanges: Schema.Boolean,
+  schemaDiffers: Schema.Boolean,
+}) {}
+
+/**
+ * Restores one compatible revision as a new draft revision of its scope.
+ *
+ * `expectedVersion` is the current draft version of that scope. `commandId` makes retries safe.
+ */
+export class AuthoringRestoreRevisionRequest extends Schema.Class<AuthoringRestoreRevisionRequest>(
+  "SdkAuthoringRestoreRevisionRequest",
+)({
+  scope: RevisionScope,
+  schemaRevisionId: Uuid,
+  contractHash: Digest,
+  expectedVersion: Version,
+  commandId: Uuid,
 }) {}
 
 const AuthoringErrorDetail = Schema.Struct({
@@ -447,6 +560,7 @@ const AuthoringErrorCode = Schema.Literals([
   "PUBLICATION_CONFLICT",
   "PUBLICATION_INVALID",
   "COMMAND_CONFLICT",
+  "REVISION_INCOMPATIBLE",
   "RISKY_ACKNOWLEDGEMENT_REQUIRED",
   "SOURCE_IDENTITY_CONFLICT",
   "REQUEST_TOO_LARGE",
@@ -847,6 +961,98 @@ export function authoringV1(options: AuthoringClientOptions) {
           AuthoringUnpublishResult,
           input,
         ),
+      /**
+       * Lists one bounded page of shared or localized revisions for an entry, newest first.
+       * Requires `authoring:read` or the `content.read` management scope.
+       */
+      listRevisions: (
+        collectionKey: string,
+        locale: string,
+        entryId: string,
+        input: AuthoringListRevisionsOptions,
+      ) => {
+        const queryInput = Schema.decodeUnknownSync(
+          Schema.Struct({
+            scope: RevisionScope,
+            limit: Schema.optionalKey(
+              Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 50 })),
+            ),
+            cursor: Schema.optionalKey(Cursor),
+          }),
+          { onExcessProperty: "error" },
+        )({
+          scope: input.scope,
+          ...(input.limit === undefined ? {} : { limit: input.limit }),
+          ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+        });
+        const query = new URLSearchParams({ scope: queryInput.scope });
+        if (queryInput.limit !== undefined) query.set("limit", String(queryInput.limit));
+        if (queryInput.cursor !== undefined) query.set("cursor", queryInput.cursor);
+        return request(
+          `${entryPath(collectionKey, locale, entryId)}/revisions?${query}`,
+          "GET",
+          undefined,
+          AuthoringRevisionPage,
+          input,
+        );
+      },
+      /**
+       * Reads one revision with its stored values. A localized revision must belong to `locale`.
+       * Requires `authoring:read` or the `content.read` management scope.
+       */
+      getRevision: (
+        collectionKey: string,
+        locale: string,
+        entryId: string,
+        revisionId: string,
+        input: ClientRequestOptions = {},
+      ) =>
+        request(
+          `${entryPath(collectionKey, locale, entryId)}/revisions/${pathValue(Uuid, revisionId)}`,
+          "GET",
+          undefined,
+          AuthoringRevision,
+          input,
+        ),
+      /**
+       * Compares two revisions of the same entry and scope by stable field ID.
+       * Requires `authoring:read` or the `content.read` management scope.
+       */
+      compareRevisions: (
+        collectionKey: string,
+        locale: string,
+        entryId: string,
+        fromRevisionId: string,
+        toRevisionId: string,
+        input: ClientRequestOptions = {},
+      ) =>
+        request(
+          `${entryPath(collectionKey, locale, entryId)}/revisions/${pathValue(Uuid, fromRevisionId)}/compare/${pathValue(Uuid, toRevisionId)}`,
+          "GET",
+          undefined,
+          AuthoringRevisionComparison,
+          input,
+        ),
+      /**
+       * Restores one compatible revision as a new draft revision. The server answers
+       * `REVISION_INCOMPATIBLE` when the revision uses another schema contract.
+       * Requires `authoring:draft:write` or the `content.write` management scope.
+       */
+      restoreRevision: (
+        collectionKey: string,
+        locale: string,
+        entryId: string,
+        revisionId: string,
+        body: AuthoringRestoreRevisionRequest,
+        input: ClientRequestOptions = {},
+      ) =>
+        request(
+          `${entryPath(collectionKey, locale, entryId)}/revisions/${pathValue(Uuid, revisionId)}/restore`,
+          "POST",
+          requestBody(AuthoringRestoreRevisionRequest, body),
+          AuthoringDraftMutationResult,
+          input,
+        ),
       pages: async function* (
         collectionKey: string,
         locale: string,
@@ -1055,6 +1261,52 @@ export function authoringV1Effect(options: AuthoringClientOptions) {
         body: AuthoringUnpublishRequest,
         input?: ClientRequestOptions,
       ) => wrap(() => client.entries.unpublish(collection, locale, entryId, body, input)),
+      /** Effect form of {@link authoringV1} `entries.listRevisions`. */
+      listRevisions: (
+        collection: string,
+        locale: string,
+        entryId: string,
+        input: AuthoringListRevisionsOptions,
+      ) => wrap(() => client.entries.listRevisions(collection, locale, entryId, input)),
+      /** Effect form of {@link authoringV1} `entries.getRevision`. */
+      getRevision: (
+        collection: string,
+        locale: string,
+        entryId: string,
+        revisionId: string,
+        input?: ClientRequestOptions,
+      ) => wrap(() => client.entries.getRevision(collection, locale, entryId, revisionId, input)),
+      /** Effect form of {@link authoringV1} `entries.compareRevisions`. */
+      compareRevisions: (
+        collection: string,
+        locale: string,
+        entryId: string,
+        fromRevisionId: string,
+        toRevisionId: string,
+        input?: ClientRequestOptions,
+      ) =>
+        wrap(() =>
+          client.entries.compareRevisions(
+            collection,
+            locale,
+            entryId,
+            fromRevisionId,
+            toRevisionId,
+            input,
+          ),
+        ),
+      /** Effect form of {@link authoringV1} `entries.restoreRevision`. */
+      restoreRevision: (
+        collection: string,
+        locale: string,
+        entryId: string,
+        revisionId: string,
+        body: AuthoringRestoreRevisionRequest,
+        input?: ClientRequestOptions,
+      ) =>
+        wrap(() =>
+          client.entries.restoreRevision(collection, locale, entryId, revisionId, body, input),
+        ),
       pages: (
         collection: string,
         locale: string,

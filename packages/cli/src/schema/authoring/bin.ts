@@ -40,12 +40,9 @@ function prepareConfig(rawArguments: ReadonlyArray<string>) {
   return Effect.gen(function* () {
     const arguments_ = yield* parseSchemaArguments(rawArguments);
     const loaded = yield* loadCliConfig(process.cwd());
-    if (loaded.config.schemaVersion !== 2 || loaded.schemaPath === null) {
-      return yield* Effect.fail(new Error("CLI_CONFIG_V2_REQUIRED"));
-    }
     return {
       arguments_,
-      loaded: { ...loaded, config: loaded.config, schemaPath: loaded.schemaPath },
+      loaded,
     };
   }).pipe(Effect.provide(CliConfigFileSystemLive));
 }

@@ -101,7 +101,7 @@ const definition = Schema.decodeUnknownSync(GeneratedFormDefinition, { onExcessP
     source: "draft",
     collectionId: "019fae8b-1234-7000-8000-000000000040",
     revisionId: null,
-    formatVersion: 2,
+    formatVersion: 1,
     validationProfile: "ffd-fields@1",
     currencyRegistryProfile: "iso-4217@2026-01-01",
     contractHash: "c".repeat(64),

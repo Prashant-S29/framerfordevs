@@ -197,6 +197,35 @@
         },
         "type": "object"
       },
+      "EntryDeliveryReadBackEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "currentPublicationId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "verified",
+              "superseded"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "currentPublicationId"
+        ],
+        "type": "object"
+      },
       "EntryValidationIssueEncoded": {
         "additionalProperties": false,
         "properties": {
@@ -1028,6 +1057,9 @@
               "DRAFT_VERSION_CONFLICT",
               "NAME_VERSION_CONFLICT",
               "COMMAND_CONFLICT",
+              "REVISION_INCOMPATIBLE",
+              "PUBLICATION_INVALID",
+              "PUBLICATION_STATE_CONFLICT",
               "INVALID_CURSOR",
               "STALE_CURSOR",
               "REQUEST_TOO_LARGE",
@@ -1113,6 +1145,9 @@
           "canCreate": {
             "type": "boolean"
           },
+          "canPublish": {
+            "type": "boolean"
+          },
           "canRename": {
             "type": "boolean"
           },
@@ -1127,7 +1162,8 @@
           "canCreate",
           "canRename",
           "canSaveLocalized",
-          "canSaveShared"
+          "canSaveShared",
+          "canPublish"
         ],
         "type": "object"
       },
@@ -1217,6 +1253,9 @@
       "StudioContentLocaleEncoded": {
         "additionalProperties": false,
         "properties": {
+          "canPublish": {
+            "type": "boolean"
+          },
           "canRead": {
             "enum": [
               true
@@ -1243,7 +1282,8 @@
           "tag",
           "displayName",
           "canRead",
-          "canWrite"
+          "canWrite",
+          "canPublish"
         ],
         "type": "object"
       },
@@ -1690,6 +1730,9 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
             "type": "string"
+          },
+          "publication": {
+            "$ref": "#/components/schemas/StudioPublicationStatusEncoded"
           }
         },
         "required": [
@@ -1697,7 +1740,8 @@
           "locale",
           "form",
           "capabilities",
-          "draft"
+          "draft",
+          "publication"
         ],
         "type": "object"
       },
@@ -4291,6 +4335,513 @@
         ],
         "type": "object"
       },
+      "StudioPublicationEntryIssueEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StudioPublicationPageEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudioPublicationSummaryEncoded"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "StudioPublicationPageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudioPublicationPageEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StudioPublicationPlanEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "authorityHash": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 32,
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contractHash": {
+            "maxLength": 64,
+            "minLength": 32,
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "currentPublicationId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entryIssues": {
+            "items": {
+              "$ref": "#/components/schemas/StudioPublicationEntryIssueEncoded"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "localizedRevisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "localizedVersion": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "schemaRevisionId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "sharedRevisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sharedVersion": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "stateVersion": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/StudioEntryValidationEncoded"
+          },
+          "wouldCreatePublication": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "authorityHash",
+          "stateVersion",
+          "currentPublicationId",
+          "schemaRevisionId",
+          "contractHash",
+          "sharedVersion",
+          "sharedRevisionId",
+          "localizedVersion",
+          "localizedRevisionId",
+          "wouldCreatePublication",
+          "validation",
+          "entryIssues"
+        ],
+        "type": "object"
+      },
+      "StudioPublicationPlanResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudioPublicationPlanEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StudioPublicationStatusEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "changedSincePublication": {
+            "type": "boolean"
+          },
+          "currentPublication": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StudioPublicationSummaryEncoded"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "localizedChanged": {
+            "type": "boolean"
+          },
+          "schemaChanged": {
+            "type": "boolean"
+          },
+          "sharedChanged": {
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "published",
+              "unpublished",
+              "never_published"
+            ],
+            "type": "string"
+          },
+          "stateVersion": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "state",
+          "stateVersion",
+          "currentPublication",
+          "sharedChanged",
+          "localizedChanged",
+          "schemaChanged",
+          "changedSincePublication"
+        ],
+        "type": "object"
+      },
+      "StudioPublicationStatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudioPublicationStatusEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StudioPublicationSummaryEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "changedFieldIds": {
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "contractHash": {
+            "maxLength": 64,
+            "minLength": 32,
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "publishedAt": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+            "type": "string"
+          },
+          "schemaRevisionId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "sequence": {
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "sequence",
+          "schemaRevisionId",
+          "contractHash",
+          "changedFieldIds",
+          "publishedAt",
+          "current"
+        ],
+        "type": "object"
+      },
+      "StudioPublishEntryRequest": {
+        "$ref": "#/components/schemas/StudioPublishEntryRequestEncoded"
+      },
+      "StudioPublishEntryRequestEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "authorityHash": {
+            "maxLength": 64,
+            "minLength": 32,
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "commandId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "expectedContractHash": {
+            "maxLength": 64,
+            "minLength": 32,
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "expectedLocalizedRevisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expectedLocalizedVersion": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "expectedPublicationId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expectedSchemaRevisionId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "expectedSharedRevisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expectedSharedVersion": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "expectedStateVersion": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "commandId",
+          "authorityHash",
+          "expectedStateVersion",
+          "expectedPublicationId",
+          "expectedSchemaRevisionId",
+          "expectedContractHash",
+          "expectedSharedVersion",
+          "expectedSharedRevisionId",
+          "expectedLocalizedVersion",
+          "expectedLocalizedRevisionId"
+        ],
+        "type": "object"
+      },
+      "StudioPublishResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudioPublishResultEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StudioPublishResultEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/EntryDeliveryReadBackEncoded"
+          },
+          "publication": {
+            "$ref": "#/components/schemas/StudioPublicationSummaryEncoded"
+          },
+          "resultKind": {
+            "enum": [
+              "changed",
+              "no_op"
+            ],
+            "type": "string"
+          },
+          "stateVersion": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "commandId",
+          "resultKind",
+          "stateVersion",
+          "publication",
+          "delivery"
+        ],
+        "type": "object"
+      },
       "StudioRenameEntryRequest": {
         "$ref": "#/components/schemas/StudioRenameEntryRequestEncoded"
       },
@@ -4338,6 +4889,475 @@
           "data",
           "error",
           "message"
+        ],
+        "type": "object"
+      },
+      "StudioResolvedEntryLabelEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "displayName"
+        ],
+        "type": "object"
+      },
+      "StudioResolvedEntryLabelsEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudioResolvedEntryLabelEncoded"
+            },
+            "maxItems": 100,
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "StudioResolveEntriesRequest": {
+        "$ref": "#/components/schemas/StudioResolveEntriesRequestEncoded"
+      },
+      "StudioResolveEntriesRequestEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "entryIds": {
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "entryIds"
+        ],
+        "type": "object"
+      },
+      "StudioResolveEntriesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudioResolvedEntryLabelsEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StudioRestoreRevisionRequest": {
+        "$ref": "#/components/schemas/StudioRestoreRevisionRequestEncoded"
+      },
+      "StudioRestoreRevisionRequestEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "contractHash": {
+            "maxLength": 64,
+            "minLength": 32,
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "expectedVersion": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "schemaRevisionId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "shared",
+              "localized"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "schemaRevisionId",
+          "contractHash",
+          "expectedVersion",
+          "commandId"
+        ],
+        "type": "object"
+      },
+      "StudioRestoreRevisionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudioMutationReceiptEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StudioRevisionComparisonEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/StudioRevisionSummaryEncoded"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudioRevisionComparisonItemEncoded"
+            },
+            "maxItems": 200,
+            "type": "array"
+          },
+          "restrictedChanges": {
+            "type": "boolean"
+          },
+          "schemaDiffers": {
+            "type": "boolean"
+          },
+          "to": {
+            "$ref": "#/components/schemas/StudioRevisionSummaryEncoded"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "items",
+          "restrictedChanges",
+          "schemaDiffers"
+        ],
+        "type": "object"
+      },
+      "StudioRevisionComparisonItemEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {},
+          "before": {},
+          "change": {
+            "enum": [
+              "added",
+              "removed",
+              "changed"
+            ],
+            "type": "string"
+          },
+          "fieldId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "inCurrentSchema": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "fieldId",
+          "change",
+          "inCurrentSchema"
+        ],
+        "type": "object"
+      },
+      "StudioRevisionComparisonResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudioRevisionComparisonEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StudioRevisionEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "$ref": "#/components/schemas/StudioRevisionSummaryEncoded"
+          },
+          "values": {
+            "propertyNames": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "revision",
+          "values"
+        ],
+        "type": "object"
+      },
+      "StudioRevisionPageEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudioRevisionSummaryEncoded"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "StudioRevisionPageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudioRevisionPageEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StudioRevisionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudioRevisionEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StudioRevisionSummaryEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "authoredAt": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+            "type": "string"
+          },
+          "authoredByCredentialId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "authoredByUserId": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changedFieldIds": {
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "compatible": {
+            "type": "boolean"
+          },
+          "contractHash": {
+            "maxLength": 64,
+            "minLength": 32,
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "previousRevisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "restoredFromRevisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schemaRevisionId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "shared",
+              "localized"
+            ],
+            "type": "string"
+          },
+          "sequence": {
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "scope",
+          "sequence",
+          "previousRevisionId",
+          "schemaRevisionId",
+          "contractHash",
+          "changedFieldIds",
+          "restoredFromRevisionId",
+          "authoredByUserId",
+          "authoredByCredentialId",
+          "authoredAt",
+          "compatible"
         ],
         "type": "object"
       },
@@ -4494,6 +5514,125 @@
         ],
         "type": "object"
       },
+      "StudioUnpublishEntryRequest": {
+        "$ref": "#/components/schemas/StudioUnpublishEntryRequestEncoded"
+      },
+      "StudioUnpublishEntryRequestEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "expectedPublicationId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expectedStateVersion": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "commandId",
+          "expectedStateVersion",
+          "expectedPublicationId"
+        ],
+        "type": "object"
+      },
+      "StudioUnpublishResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudioUnpublishResultEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StudioUnpublishResultEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/EntryDeliveryReadBackEncoded"
+          },
+          "resultKind": {
+            "enum": [
+              "changed",
+              "no_op"
+            ],
+            "type": "string"
+          },
+          "stateVersion": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "unpublishedAt": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+            "type": "string"
+          },
+          "unpublishedPublicationId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "commandId",
+          "resultKind",
+          "stateVersion",
+          "unpublishedPublicationId",
+          "unpublishedAt",
+          "delivery"
+        ],
+        "type": "object"
+      },
+      "StudioValidatePublicationRequest": {
+        "$ref": "#/components/schemas/StudioValidatePublicationRequestEncoded"
+      },
+      "StudioValidatePublicationRequestEncoded": {},
       "UnsetEntryValueMutationEncoded": {
         "additionalProperties": false,
         "properties": {
@@ -4793,7 +5932,7 @@
                 }
               }
             },
-            "description": "Current schema, configuration, name, draft, or command authority conflicts.",
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -5184,7 +6323,7 @@
                 }
               }
             },
-            "description": "Current schema, configuration, name, draft, or command authority conflicts.",
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -5575,7 +6714,7 @@
                 }
               }
             },
-            "description": "Current schema, configuration, name, draft, or command authority conflicts.",
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -5977,7 +7116,7 @@
                 }
               }
             },
-            "description": "Current schema, configuration, name, draft, or command authority conflicts.",
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -6379,7 +7518,7 @@
                 }
               }
             },
-            "description": "Current schema, configuration, name, draft, or command authority conflicts.",
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -6543,6 +7682,3692 @@
           }
         ],
         "summary": "Optimistically rename locale-neutral entry metadata"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/{entryId}/publication": {
+      "get": {
+        "operationId": "getStudioEntryPublication",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPublicationStatusResponse"
+                }
+              }
+            },
+            "description": "The current publication status.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The strict path, query, cursor, or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A current Studio bearer token is required.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The current Studio user is not allowed to perform this operation.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The exact authorized Studio Content scope is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The request or projected response exceeds its fixed bound.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The Studio request quota is exhausted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "studioBearer": []
+          }
+        ],
+        "summary": "Read the exact-locale publication state and value-based change flags"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/{entryId}/publication/publish": {
+      "post": {
+        "operationId": "publishStudioEntry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioPublishEntryRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-maximum-bytes": 4096
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPublishResponse"
+                }
+              }
+            },
+            "description": "The immutable publication and the Delivery origin read-back.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The strict path, query, cursor, or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A current Studio bearer token is required.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The current Studio user is not allowed to perform this operation.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The exact authorized Studio Content scope is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The request or projected response exceeds its fixed bound.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Publication authority fails validation (PUBLICATION_INVALID). Details name only role-visible fields.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The Studio request quota is exhausted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "studioBearer": []
+          }
+        ],
+        "summary": "Publish the exact-locale draft named by a current plan"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/{entryId}/publication/unpublish": {
+      "post": {
+        "operationId": "unpublishStudioEntry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioUnpublishEntryRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-maximum-bytes": 4096
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioUnpublishResponse"
+                }
+              }
+            },
+            "description": "The unpublish result and the Delivery origin read-back.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The strict path, query, cursor, or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A current Studio bearer token is required.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The current Studio user is not allowed to perform this operation.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The exact authorized Studio Content scope is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The request or projected response exceeds its fixed bound.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The Studio request quota is exhausted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "studioBearer": []
+          }
+        ],
+        "summary": "Unpublish the current exact-locale publication"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/{entryId}/publication/validate": {
+      "post": {
+        "operationId": "validateStudioEntryPublication",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioValidatePublicationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-maximum-bytes": 4096
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPublicationPlanResponse"
+                }
+              }
+            },
+            "description": "The publication plan with role-projected validation.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The strict path, query, cursor, or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A current Studio bearer token is required.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The current Studio user is not allowed to perform this operation.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The exact authorized Studio Content scope is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The request or projected response exceeds its fixed bound.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The Studio request quota is exhausted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "studioBearer": []
+          }
+        ],
+        "summary": "Validate the current draft and return the publish authority plan"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/{entryId}/publications": {
+      "get": {
+        "operationId": "listStudioEntryPublications",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 50,
+              "minimum": 10,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPublicationPageResponse"
+                }
+              }
+            },
+            "description": "A bounded page of publication summaries, newest first.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The strict path, query, cursor, or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A current Studio bearer token is required.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The current Studio user is not allowed to perform this operation.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The exact authorized Studio Content scope is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The request or projected response exceeds its fixed bound.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The Studio request quota is exhausted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "studioBearer": []
+          }
+        ],
+        "summary": "List one bounded page of immutable exact-locale publications"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/{entryId}/revisions": {
+      "get": {
+        "operationId": "listStudioEntryRevisions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "enum": [
+                "shared",
+                "localized"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 50,
+              "minimum": 10,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioRevisionPageResponse"
+                }
+              }
+            },
+            "description": "A bounded page of role-projected revision summaries, newest first.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The strict path, query, cursor, or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A current Studio bearer token is required.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The current Studio user is not allowed to perform this operation.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The exact authorized Studio Content scope is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The request or projected response exceeds its fixed bound.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The Studio request quota is exhausted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "studioBearer": []
+          }
+        ],
+        "summary": "List one bounded page of shared or exact-locale revision summaries"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/{entryId}/revisions/{fromRevisionId}/compare/{toRevisionId}": {
+      "get": {
+        "operationId": "compareStudioEntryRevisions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fromRevisionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "toRevisionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioRevisionComparisonResponse"
+                }
+              }
+            },
+            "description": "Role-visible field differences. Hidden differences only set restrictedChanges.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The strict path, query, cursor, or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A current Studio bearer token is required.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The current Studio user is not allowed to perform this operation.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The exact authorized Studio Content scope is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The request or projected response exceeds its fixed bound.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The Studio request quota is exhausted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "studioBearer": []
+          }
+        ],
+        "summary": "Compare two revisions of the same entry and scope by stable field ID"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/{entryId}/revisions/{revisionId}": {
+      "get": {
+        "operationId": "getStudioEntryRevision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revisionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioRevisionResponse"
+                }
+              }
+            },
+            "description": "The revision summary and projected values.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The strict path, query, cursor, or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A current Studio bearer token is required.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The current Studio user is not allowed to perform this operation.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The exact authorized Studio Content scope is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The request or projected response exceeds its fixed bound.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The Studio request quota is exhausted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "studioBearer": []
+          }
+        ],
+        "summary": "Read one immutable revision with role-visible values"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/{entryId}/revisions/{revisionId}/restore": {
+      "post": {
+        "operationId": "restoreStudioEntryRevision",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "revisionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioRestoreRevisionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-maximum-bytes": 4096
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioRestoreRevisionResponse"
+                }
+              }
+            },
+            "description": "The receipt-backed restore result.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The strict path, query, cursor, or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A current Studio bearer token is required.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The current Studio user is not allowed to perform this operation.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The exact authorized Studio Content scope is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The request or projected response exceeds its fixed bound.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The Studio request quota is exhausted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "studioBearer": []
+          }
+        ],
+        "summary": "Restore one compatible revision as a new draft revision of its scope"
       }
     },
     "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/new": {
@@ -6761,7 +11586,7 @@
                 }
               }
             },
-            "description": "Current schema, configuration, name, draft, or command authority conflicts.",
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -6925,6 +11750,399 @@
           }
         ],
         "summary": "Load the current role-projected create workspace"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/resolve": {
+      "post": {
+        "operationId": "resolveStudioEntryLabels",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioResolveEntriesRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-maximum-bytes": 8192
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioResolveEntriesResponse"
+                }
+              }
+            },
+            "description": "Requested available labels in first-requested order.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The strict path, query, cursor, or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A current Studio bearer token is required.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The current Studio user is not allowed to perform this operation.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The exact authorized Studio Content scope is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The request or projected response exceeds its fixed bound.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The Studio request quota is exhausted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "studioBearer": []
+          }
+        ],
+        "summary": "Resolve requested authorized entry IDs to safe display names"
       }
     },
     "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/search": {
@@ -7154,7 +12372,7 @@
                 }
               }
             },
-            "description": "Current schema, configuration, name, draft, or command authority conflicts.",
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -7517,7 +12735,7 @@
                 }
               }
             },
-            "description": "Current schema, configuration, name, draft, or command authority conflicts.",
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"

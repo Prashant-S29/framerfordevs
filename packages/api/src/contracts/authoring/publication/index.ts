@@ -5,6 +5,7 @@ import { EntryCommandId, EntryDraftVersion, EntryId, EntryRevisionId } from "../
 import { LocaleTag } from "../../locale";
 import { IsoDateTime } from "../../platform";
 import {
+  EntryDeliveryReadBack,
   EntryPublicationHash,
   EntryPublicationId,
   EntryPublicationSequence,
@@ -138,6 +139,7 @@ export class AuthoringPublishEntryResult extends Schema.Class<AuthoringPublishEn
   stateVersion: EntryPublicationStateVersion,
   resultKind: Schema.Literals(["changed", "no_op"]),
   publication: AuthoringPublicationSummary,
+  delivery: EntryDeliveryReadBack,
 }) {}
 
 export class AuthoringUnpublishEntryResult extends Schema.Class<AuthoringUnpublishEntryResult>(
@@ -151,6 +153,7 @@ export class AuthoringUnpublishEntryResult extends Schema.Class<AuthoringUnpubli
   unpublishedPublicationId: Schema.NullOr(EntryPublicationId),
   unpublishedPublicationSequence: Schema.NullOr(EntryPublicationSequence),
   unpublishedAt: IsoDateTime,
+  delivery: EntryDeliveryReadBack,
 }) {}
 
 export const AuthoringPublicationStatusResponse = ApiSuccessSchema(AuthoringPublicationStatus);

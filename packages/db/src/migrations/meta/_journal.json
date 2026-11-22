@@ -162,6 +162,13 @@
       "when": 1794476176426,
       "tag": "0022_remove_account_issuer",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795371873168,
+      "tag": "0023_entry_revision_immutability",
+      "breakpoints": true
     }
   ]
 }

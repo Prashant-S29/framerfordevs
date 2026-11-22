@@ -48,6 +48,7 @@ import {
   PreviewRepository,
   PreviewRepositoryLive,
 } from "../../../src/services/preview/repository";
+import { assertIndexDefinitions, assertIndexedQuery } from "../../support/query-plan";
 
 const suffix = randomUUID();
 const ids = {
@@ -119,14 +120,14 @@ const localizedField = Schema.decodeUnknownSync(CollectionFieldDefinition, {
   children: [],
 });
 const contractOne = hashSchemaContract({
-  formatVersion: 2,
+  formatVersion: 1,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
   collectionApiKey: "articles",
   fields: [sharedV1, localizedField],
 });
 const contractTwo = hashSchemaContract({
-  formatVersion: 2,
+  formatVersion: 1,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
   collectionApiKey: "articles",
@@ -399,7 +400,7 @@ beforeAll(async () => {
       collectionApiKey: "articles",
       collectionDisplayName: "Articles",
       collectionDescription: null,
-      formatVersion: 2,
+      formatVersion: 1,
       validationProfile: "ffd-fields@1",
       currencyRegistryProfile: null,
       editorLayout: null,
@@ -421,7 +422,7 @@ beforeAll(async () => {
       collectionApiKey: "articles",
       collectionDisplayName: "Articles",
       collectionDescription: null,
-      formatVersion: 2,
+      formatVersion: 1,
       validationProfile: "ffd-fields@1",
       currencyRegistryProfile: null,
       editorLayout: null,
@@ -1304,50 +1305,81 @@ describe("Preview repository PostgreSQL integration", () => {
   );
 
   it("uses direct current-head, revision, schema-field, and audit indexes", async () => {
-    const plans = await db.transaction(async (transaction) => {
+    await db.transaction(async (transaction) => {
       await transaction.execute(sql`set local enable_seqscan = off`);
-      const sharedHead = await transaction.execute(
-        sql`explain (format json) select current_revision_id from cms_entry_shared_draft where entry_id = ${ids.entry}`,
+      await transaction.execute(sql`set local enable_sort = off`);
+      await assertIndexedQuery(
+        transaction,
+        sql`select current_revision_id from cms_entry_shared_draft where entry_id = ${ids.entry}`,
+        { table: "cms_entry_shared_draft", allowBitmap: true },
       );
-      const localizedHead = await transaction.execute(
-        sql`explain (format json) select current_revision_id from cms_entry_locale_draft where entry_id = ${ids.entry} and locale_id = ${ids.locale}`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select current_revision_id from cms_entry_locale_draft where entry_id = ${ids.entry} and locale_id = ${ids.locale}`,
+        { table: "cms_entry_locale_draft", allowBitmap: true },
       );
-      const sharedRevision = await transaction.execute(
-        sql`explain (format json) select values from cms_entry_shared_revision where id = ${ids.sharedRevision} and entry_id = ${ids.entry} and collection_id = ${ids.collection} and environment_id = ${ids.environment} and project_id = ${ids.project} and workspace_id = ${ids.workspace}`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select values from cms_entry_shared_revision where id = ${ids.sharedRevision} and entry_id = ${ids.entry} and collection_id = ${ids.collection} and environment_id = ${ids.environment} and project_id = ${ids.project} and workspace_id = ${ids.workspace}`,
+        { table: "cms_entry_shared_revision", allowBitmap: true },
       );
-      const localizedRevision = await transaction.execute(
-        sql`explain (format json) select values from cms_entry_locale_revision where id = ${ids.localizedRevisionTwo} and entry_id = ${ids.entry} and locale_id = ${ids.locale} and collection_id = ${ids.collection} and environment_id = ${ids.environment} and project_id = ${ids.project} and workspace_id = ${ids.workspace}`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select values from cms_entry_locale_revision where id = ${ids.localizedRevisionTwo} and entry_id = ${ids.entry} and locale_id = ${ids.locale} and collection_id = ${ids.collection} and environment_id = ${ids.environment} and project_id = ${ids.project} and workspace_id = ${ids.workspace}`,
+        { table: "cms_entry_locale_revision", allowBitmap: true },
       );
-      const schemaFields = await transaction.execute(
-        sql`explain (format json) select field_id from cms_schema_revision_field where revision_id = ${ids.schemaTwo} order by parent_field_id, position, field_id`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select field_id from cms_schema_revision_field where revision_id = ${ids.schemaTwo} order by parent_field_id, position, field_id`,
+        { table: "cms_schema_revision_field", allowBitmap: true, order: "index" },
       );
-      const audits = await transaction.execute(
-        sql`explain (format json) select id from audit_event where environment_id = ${ids.environment}`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select id from audit_event where environment_id = ${ids.environment}`,
+        { table: "audit_event", allowBitmap: true },
       );
-      return JSON.stringify([
-        sharedHead.rows,
-        localizedHead.rows,
-        sharedRevision.rows,
-        localizedRevision.rows,
-        schemaFields.rows,
-        audits.rows,
-      ]);
     });
-
-    assert.include(plans, "cms_entry_shared_draft_pkey");
-    assert.include(plans, "cms_entry_locale_draft_locale_entry_idx");
-    assert.match(
-      plans,
-      /cms_entry_shared_revision_(?:pkey|id_entry_scope_unique|id_entry_sequence_unique|entry_sequence_idx)/u,
-      "shared revision loading must use indexed ID or entry authority",
-    );
-    assert.include(plans, "cms_entry_locale_revision_locale_idx");
-    assert.match(
-      plans,
-      /cms_revision_field_(?:revision_field_pk|parent_position_idx)/u,
-      "schema field loading must use a revision-leading index",
-    );
-    assert.include(plans, "audit_event_environment_idx");
+    await assertIndexDefinitions(db, [
+      {
+        table: "cms_entry_shared_draft",
+        name: "cms_entry_shared_draft_pkey",
+        keys: "entry_id",
+        unique: true,
+      },
+      {
+        table: "cms_entry_locale_draft",
+        name: "cms_entry_locale_draft_locale_entry_idx",
+        keys: "locale_id, entry_id",
+      },
+      {
+        table: "cms_entry_shared_revision",
+        name: "cms_entry_shared_revision_pkey",
+        keys: "id",
+        unique: true,
+      },
+      {
+        table: "cms_entry_locale_revision",
+        name: "cms_entry_locale_revision_pkey",
+        keys: "id",
+        unique: true,
+      },
+      {
+        table: "cms_entry_locale_revision",
+        name: "cms_entry_locale_revision_locale_idx",
+        keys: "locale_id",
+      },
+      {
+        table: "cms_schema_revision_field",
+        name: "cms_revision_field_parent_position_idx",
+        keys: 'revision_id, parent_field_id, "position", field_id',
+      },
+      {
+        table: "audit_event",
+        name: "audit_event_environment_idx",
+        keys: "environment_id",
+        where: "(environment_id IS NOT NULL)",
+      },
+    ]);
   });
 
   it.effect("runs parallel same-entry reads with one independent audit per success", () =>

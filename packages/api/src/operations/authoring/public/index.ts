@@ -18,7 +18,13 @@ import {
   AuthoringEntryValidation,
   AuthoringEntryValidationIssue,
   AuthoringListEntriesQuery,
+  AuthoringListRevisionsQuery,
   AuthoringRenameEntryRequest,
+  AuthoringRestoreRevisionRequest,
+  AuthoringRevision,
+  AuthoringRevisionComparison,
+  AuthoringRevisionPage,
+  AuthoringRevisionSummary,
   AuthoringSaveEntryDraftRequest,
   AuthoringSaveEntryDraftResult,
 } from "../../../contracts/authoring/content";
@@ -45,6 +51,7 @@ import {
 } from "../../../contracts/authoring/schema";
 import {
   AuthoringCommandConflictFailure,
+  AuthoringRevisionIncompatibleFailure,
   AuthoringDraftConflictFailure,
   AuthoringPublicationConflictFailure,
   AuthoringPublicationInvalidFailure,
@@ -66,12 +73,20 @@ import {
 import { RateLimitCost } from "../../../contracts/rate-limit";
 import { AuthUserId } from "../../../contracts/platform";
 import {
+  CompareEntryRevisionsInput,
   CreateEntryWithDraftInput,
   GetEntryDraftInput,
+  GetEntryRevisionInput,
   ListEntriesInput,
+  ListEntryRevisionsInput,
   RenameEntryInput,
+  RestoreEntryRevisionInput,
   SaveEntryDraftInput,
+  type EntryRevisionSummary,
+  type SaveEntryDraftResult,
 } from "../../../contracts/entry";
+import type { LocaleTag } from "../../../contracts/locale";
+import type { CollectionFieldDefinition } from "../../../contracts/schema";
 import { RateLimitManager } from "../../../services/rate-limit/manager";
 import {
   ToolingPrincipalAuthenticator,
@@ -83,6 +98,8 @@ import { AuthoringPresentationRepository } from "../../../services/authoring/pre
 import {
   AuthoringContentRepository,
   authoringEntrySummary,
+  authoringFieldValue,
+  authoringRevisionValues,
 } from "../../../services/authoring/content-repository";
 import { EntryRepository } from "../../../services/entry/repository";
 import { PublicationRepository } from "../../../services/publication/repository";
@@ -173,6 +190,14 @@ export function decodeAuthoringPublishEntryRequest(body: unknown) {
 
 export function decodeAuthoringUnpublishEntryRequest(body: unknown) {
   return decodeInput(AuthoringUnpublishEntryRequest, body, "body");
+}
+
+export function decodeAuthoringListRevisionsQuery(value: unknown) {
+  return decodeInput(AuthoringListRevisionsQuery, value, "query");
+}
+
+export function decodeAuthoringRestoreRevisionRequest(body: unknown) {
+  return decodeInput(AuthoringRestoreRevisionRequest, body, "body");
 }
 
 export function decodeAuthoringSchemaPlanRequest(body: unknown) {
@@ -620,6 +645,282 @@ export const saveAuthoringEntryDraft = Effect.fn("authoring.public.entry.save")(
   });
 });
 
+function authoringDraftResult(result: SaveEntryDraftResult) {
+  return AuthoringSaveEntryDraftResult.make({
+    entryId: result.entryId,
+    commandId: result.commandId,
+    sharedChanged: result.sharedChanged,
+    sharedVersion: result.sharedVersion,
+    sharedRevisionId: result.sharedRevisionId,
+    localizedChanged: result.localizedChanged,
+    localizedVersion: result.localizedVersion,
+    localizedRevisionId: result.localizedRevisionId,
+    validation: AuthoringEntryValidation.make({
+      valid: result.validation.valid,
+      capped: result.validation.capped,
+      issues: result.validation.issues.map((issue) =>
+        AuthoringEntryValidationIssue.make({
+          path: issue.path,
+          scope: issue.scope,
+          locale: issue.locale,
+          code: issue.code,
+          message: issue.message,
+        }),
+      ),
+    }),
+  });
+}
+
+function authoringRevisionSummary(summary: EntryRevisionSummary, locale: LocaleTag) {
+  return AuthoringRevisionSummary.make({
+    id: summary.id,
+    entryId: summary.entryId,
+    scope: summary.scope,
+    locale: summary.scope === "localized" ? locale : null,
+    sequence: summary.sequence,
+    previousRevisionId: summary.previousRevisionId,
+    schemaRevisionId: summary.schemaRevisionId,
+    contractHash: summary.contractHash,
+    changedFieldIds: summary.changedFieldIds,
+    restoredFromRevisionId: summary.restoredFromRevisionId,
+    authoredByUserId: summary.authoredByUserId,
+    authoredByCredentialId: summary.authoredByCredentialId,
+    authoredAt: summary.authoredAt,
+  });
+}
+
+function rootFieldsById(
+  roots: ReadonlyArray<CollectionFieldDefinition> | undefined,
+): ReadonlyMap<string, CollectionFieldDefinition> {
+  return new Map((roots ?? []).map((field) => [field.id, field]));
+}
+
+function mergeRootFields(
+  primary: ReadonlyArray<CollectionFieldDefinition> | undefined,
+  secondary: ReadonlyArray<CollectionFieldDefinition> | undefined,
+): ReadonlyArray<CollectionFieldDefinition> {
+  const ids = new Set((primary ?? []).map((field) => field.id));
+  return [...(primary ?? []), ...(secondary ?? []).filter((field) => !ids.has(field.id))];
+}
+
+const resolveRevisionCollection = Effect.fn("authoring.public.revision.scope")(function* (
+  principal: ToolingPrincipal,
+  project: AuthoringProjectScope,
+  scope: AuthoringEntryScope,
+  entryId: string,
+  action: "content.read" | "content.write",
+) {
+  yield* annotateAuthoringAuthority(principal, project, { "authoring.entry_id": entryId });
+  const actor = authoringPrincipalActor(principal);
+  const collectionId = yield* (yield* AuthoringContentRepository).resolveCollection(actor, {
+    ...project,
+    collectionKey: scope.collectionKey,
+    locale: scope.locale,
+    action,
+  });
+  return { actor, collectionId };
+});
+
+export const listAuthoringEntryRevisions = Effect.fn("authoring.public.revision.list")(function* (
+  principal: ToolingPrincipal,
+  project: AuthoringProjectScope,
+  scope: AuthoringEntryScope,
+  entryId: string,
+  query: AuthoringListRevisionsQuery,
+) {
+  const resolved = yield* resolveRevisionCollection(
+    principal,
+    project,
+    scope,
+    entryId,
+    "content.read",
+  );
+  const input = yield* decodeInput(
+    ListEntryRevisionsInput,
+    {
+      ...project,
+      collectionId: resolved.collectionId,
+      locale: scope.locale,
+      entryId,
+      scope: query.scope,
+      cursor: query.cursor,
+      limit: query.limit,
+    },
+    "path",
+  );
+  const page = yield* (yield* EntryRepository).listRevisions(resolved.actor, input);
+  return AuthoringRevisionPage.make({
+    items: page.items.map((item) => authoringRevisionSummary(item, scope.locale)),
+    nextCursor: page.nextCursor,
+  });
+});
+
+export const getAuthoringEntryRevision = Effect.fn("authoring.public.revision.get")(function* (
+  principal: ToolingPrincipal,
+  project: AuthoringProjectScope,
+  scope: AuthoringEntryScope,
+  entryId: string,
+  revisionId: string,
+) {
+  const resolved = yield* resolveRevisionCollection(
+    principal,
+    project,
+    scope,
+    entryId,
+    "content.read",
+  );
+  const input = yield* decodeInput(
+    GetEntryRevisionInput,
+    { ...project, collectionId: resolved.collectionId, locale: scope.locale, entryId, revisionId },
+    "path",
+  );
+  const revision = yield* (yield* EntryRepository).getRevision(resolved.actor, input);
+  const trees = yield* (yield* AuthoringContentRepository).loadRevisionFieldTrees(revision.entry, [
+    revision.revision.schemaRevisionId,
+    revision.currentSchemaRevisionId,
+  ]);
+  return AuthoringRevision.make({
+    revision: authoringRevisionSummary(revision.revision, revision.locale),
+    values: authoringRevisionValues(
+      revision.values,
+      mergeRootFields(
+        trees.get(revision.revision.schemaRevisionId),
+        trees.get(revision.currentSchemaRevisionId),
+      ),
+    ),
+    compatible: revision.compatible,
+    currentSchemaRevisionId: revision.currentSchemaRevisionId,
+    currentContractHash: revision.currentContractHash,
+  });
+});
+
+export const compareAuthoringEntryRevisions = Effect.fn("authoring.public.revision.compare")(
+  function* (
+    principal: ToolingPrincipal,
+    project: AuthoringProjectScope,
+    scope: AuthoringEntryScope,
+    entryId: string,
+    fromRevisionId: string,
+    toRevisionId: string,
+  ) {
+    const resolved = yield* resolveRevisionCollection(
+      principal,
+      project,
+      scope,
+      entryId,
+      "content.read",
+    );
+    const input = yield* decodeInput(
+      CompareEntryRevisionsInput,
+      {
+        ...project,
+        collectionId: resolved.collectionId,
+        locale: scope.locale,
+        entryId,
+        fromRevisionId,
+        toRevisionId,
+      },
+      "path",
+    );
+    const comparison = yield* (yield* EntryRepository).compareRevisions(resolved.actor, input);
+    const trees = yield* (yield* AuthoringContentRepository).loadRevisionFieldTrees(
+      comparison.entry,
+      [
+        comparison.from.schemaRevisionId,
+        comparison.to.schemaRevisionId,
+        comparison.currentSchemaRevisionId,
+      ],
+    );
+    const current = rootFieldsById(trees.get(comparison.currentSchemaRevisionId));
+    const from = rootFieldsById(trees.get(comparison.from.schemaRevisionId));
+    const to = rootFieldsById(trees.get(comparison.to.schemaRevisionId));
+    return Schema.decodeUnknownSync(AuthoringRevisionComparison, { onExcessProperty: "error" })({
+      entryId: comparison.entry.id,
+      scope: comparison.scope,
+      from: authoringRevisionSummary(comparison.from, comparison.locale),
+      to: authoringRevisionSummary(comparison.to, comparison.locale),
+      items: comparison.items.map((item) => {
+        const fromField = from.get(item.fieldId) ?? current.get(item.fieldId);
+        const toField = to.get(item.fieldId) ?? current.get(item.fieldId);
+        const keyField = current.get(item.fieldId) ?? toField ?? fromField;
+        return {
+          fieldId: item.fieldId,
+          apiKey: keyField?.apiKey ?? null,
+          change: item.change,
+          ...(item.before === undefined
+            ? {}
+            : {
+                before:
+                  fromField === undefined
+                    ? item.before
+                    : authoringFieldValue(fromField, item.before),
+              }),
+          ...(item.after === undefined
+            ? {}
+            : {
+                after:
+                  toField === undefined ? item.after : authoringFieldValue(toField, item.after),
+              }),
+          inCurrentSchema: item.inCurrentSchema,
+        };
+      }),
+      restrictedChanges: comparison.restrictedChanges,
+      schemaDiffers: comparison.schemaDiffers,
+    });
+  },
+);
+
+export const restoreAuthoringEntryRevision = Effect.fn("authoring.public.revision.restore")(
+  function* (
+    principal: ToolingPrincipal,
+    project: AuthoringProjectScope,
+    scope: AuthoringEntryScope,
+    entryId: string,
+    revisionId: string,
+    request: AuthoringRestoreRevisionRequest,
+    requestId: string,
+  ) {
+    const resolved = yield* resolveRevisionCollection(
+      principal,
+      project,
+      scope,
+      entryId,
+      "content.write",
+    );
+    const input = yield* decodeInput(
+      RestoreEntryRevisionInput,
+      {
+        ...project,
+        collectionId: resolved.collectionId,
+        locale: scope.locale,
+        entryId,
+        revisionId,
+        scope: request.scope,
+        schemaRevisionId: request.schemaRevisionId,
+        contractHash: request.contractHash,
+        expectedVersion: request.expectedVersion,
+        commandId: request.commandId,
+      },
+      "body",
+    );
+    const restored = yield* (yield* EntryRepository)
+      .restoreRevision(resolved.actor, input, new Date(yield* Clock.currentTimeMillis), requestId)
+      .pipe(
+        Effect.mapError((error) => {
+          if (error._tag === "ConflictFailure") return AuthoringStaleSchemaFailure.make();
+          if (error._tag === "EntryCommandConflictFailure")
+            return AuthoringCommandConflictFailure.make();
+          if (error._tag === "EntryDraftConflictFailure")
+            return AuthoringDraftConflictFailure.make({ details: error.details });
+          if (error._tag === "EntryRevisionIncompatibleFailure")
+            return AuthoringRevisionIncompatibleFailure.make();
+          return error;
+        }),
+      );
+    return authoringDraftResult(restored);
+  },
+);
+
 function authoringPublicationSummary(summary: EntryPublicationSummary) {
   return AuthoringPublicationSummary.make({
     id: summary.id,
@@ -797,6 +1098,7 @@ export const publishAuthoringEntry = Effect.fn("authoring.public.publication.pub
     stateVersion: result.stateVersion,
     resultKind: result.resultKind,
     publication: authoringPublicationSummary(result.publication),
+    delivery: result.delivery,
   });
 });
 
@@ -841,6 +1143,7 @@ export const unpublishAuthoringEntry = Effect.fn("authoring.public.publication.u
       unpublishedPublicationId: result.unpublishedPublicationId,
       unpublishedPublicationSequence: result.unpublishedPublicationSequence,
       unpublishedAt: result.unpublishedAt,
+      delivery: result.delivery,
     });
   },
 );

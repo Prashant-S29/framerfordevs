@@ -141,7 +141,7 @@ export const CollectionFieldPosition = Schema.Number.check(
 );
 export type CollectionFieldPosition = typeof CollectionFieldPosition.Type;
 
-export const SchemaFormatVersion = Schema.Literals([1, 2]);
+export const SchemaFormatVersion = Schema.Literal(1);
 export type SchemaFormatVersion = typeof SchemaFormatVersion.Type;
 
 export const SchemaValidationProfile = Schema.String.check(
@@ -227,7 +227,6 @@ export type SchemaChangeClassification = typeof SchemaChangeClassification.Type;
 export const schemaChangeCodeValues = [
   "collection.metadata.updated",
   "collection.api_key.updated",
-  "schema.format.upgraded",
   "schema.currency_profile.updated",
   "editor_layout.updated",
   "field.added.optional",
@@ -535,7 +534,7 @@ export class CmsCollection extends Schema.Class<CmsCollection>("CmsCollection")(
 export class CollectionDraftSchema extends Schema.Class<CollectionDraftSchema>(
   "CollectionDraftSchema",
 )({
-  formatVersion: Schema.Literal(2),
+  formatVersion: SchemaFormatVersion,
   validationProfile: Schema.Literal(fieldSystemValidationProfile),
   currencyRegistryProfile: Schema.NullOr(CurrencyRegistryProfile),
   collection: CmsCollection,

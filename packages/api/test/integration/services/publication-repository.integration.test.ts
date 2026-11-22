@@ -85,6 +85,7 @@ import {
   type PublicationFailureStage,
 } from "../../../src/services/publication/repository";
 import { makeSchemaRepository } from "../../../src/services/schema/repository";
+import { assertIndexDefinitions, assertIndexedQuery } from "../../support/query-plan";
 
 const suffix = randomUUID();
 const ownerId = `m8-publication-owner-${suffix}`;
@@ -1681,50 +1682,97 @@ describe("publication repository PostgreSQL integration", () => {
       .limit(1);
     if (!english) throw new Error("English locale fixture is unavailable.");
     const targetPublicationId = randomUUID();
-    const plans = await db.transaction(async (transaction) => {
+    await db.transaction(async (transaction) => {
       await transaction.execute(sql`set local enable_seqscan = off`);
-      const exactHead = await transaction.execute(
-        sql`explain (format json) select entry_id from cms_entry_locale_publication_head where entry_id = ${currentEntryId} and locale_id = ${english.id}`,
+      await transaction.execute(sql`set local enable_sort = off`);
+      await assertIndexedQuery(
+        transaction,
+        sql`select entry_id from cms_entry_locale_publication_head where entry_id = ${currentEntryId} and locale_id = ${english.id}`,
+        { table: "cms_entry_locale_publication_head", allowBitmap: true },
       );
-      const localeCurrent = await transaction.execute(
-        sql`explain (format json) select entry_id from cms_entry_locale_publication_head where locale_id = ${english.id} and collection_id = ${currentCollection.id} and current_publication_id is not null order by entry_id`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select entry_id from cms_entry_locale_publication_head where locale_id = ${english.id} and collection_id = ${currentCollection.id} and current_publication_id is not null order by entry_id`,
+        { table: "cms_entry_locale_publication_head", allowBitmap: true, order: "index" },
       );
-      const history = await transaction.execute(
-        sql`explain (format json) select id from cms_entry_locale_publication where entry_id = ${currentEntryId} and locale_id = ${english.id} order by publication_sequence desc, id desc limit 25`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select id from cms_entry_locale_publication where entry_id = ${currentEntryId} and locale_id = ${english.id} order by publication_sequence desc nulls last, id desc nulls last limit 25`,
+        { table: "cms_entry_locale_publication", allowBitmap: true, order: "index" },
       );
-      const receipt = await transaction.execute(
-        sql`explain (format json) select entry_id from cms_entry_publication_command where entry_id = ${currentEntryId} and command_id = ${randomUUID()}`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select entry_id from cms_entry_publication_command where entry_id = ${currentEntryId} and command_id = ${randomUUID()}`,
+        { table: "cms_entry_publication_command", allowBitmap: true },
       );
-      const reverseReference = await transaction.execute(
-        sql`explain (format json) select source_publication_id from cms_entry_locale_publication_reference where target_publication_id = ${targetPublicationId}`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select source_publication_id from cms_entry_locale_publication_reference where target_publication_id = ${targetPublicationId}`,
+        { table: "cms_entry_locale_publication_reference", allowBitmap: true },
       );
-      const publicationCredential = await transaction.execute(
-        sql`explain (format json) select id from cms_entry_locale_publication where published_by_credential_id = ${managementCredentialId} limit 20`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select id from cms_entry_locale_publication where published_by_credential_id = ${managementCredentialId} limit 20`,
+        { table: "cms_entry_locale_publication", allowBitmap: true },
       );
-      const headCredential = await transaction.execute(
-        sql`explain (format json) select entry_id from cms_entry_locale_publication_head where changed_by_credential_id = ${managementCredentialId} limit 20`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select entry_id from cms_entry_locale_publication_head where changed_by_credential_id = ${managementCredentialId} limit 20`,
+        { table: "cms_entry_locale_publication_head", allowBitmap: true },
       );
-      const commandCredential = await transaction.execute(
-        sql`explain (format json) select command_id from cms_entry_publication_command where completed_by_credential_id = ${managementCredentialId} limit 20`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select command_id from cms_entry_publication_command where completed_by_credential_id = ${managementCredentialId} limit 20`,
+        { table: "cms_entry_publication_command", allowBitmap: true },
       );
-      return JSON.stringify([
-        exactHead.rows,
-        localeCurrent.rows,
-        history.rows,
-        receipt.rows,
-        reverseReference.rows,
-        publicationCredential.rows,
-        headCredential.rows,
-        commandCredential.rows,
-      ]);
     });
-    assert.include(plans, "cms_entry_pub_head_entry_locale_pk");
-    assert.include(plans, "cms_entry_pub_head_locale_collection_current_idx");
-    assert.match(plans, /cms_entry_pub_(history_idx|entry_locale_sequence_unique)/u);
-    assert.include(plans, "cms_entry_pub_command_entry_command_pk");
-    assert.include(plans, "cms_entry_pub_ref_target_publication_idx");
-    assert.include(plans, "cms_entry_pub_publisher_credential_idx");
-    assert.include(plans, "cms_entry_pub_head_changed_by_credential_idx");
-    assert.include(plans, "cms_entry_pub_command_completed_by_credential_idx");
+    await assertIndexDefinitions(db, [
+      {
+        table: "cms_entry_locale_publication_head",
+        name: "cms_entry_pub_head_entry_locale_pk",
+        keys: "entry_id, locale_id",
+        unique: true,
+      },
+      {
+        table: "cms_entry_locale_publication_head",
+        name: "cms_entry_pub_head_locale_collection_current_idx",
+        keys: "locale_id, collection_id, entry_id",
+        where: "(current_publication_id IS NOT NULL)",
+      },
+      {
+        table: "cms_entry_locale_publication",
+        name: "cms_entry_pub_history_idx",
+        keys: "entry_id, locale_id, publication_sequence DESC NULLS LAST, id DESC NULLS LAST",
+      },
+      {
+        table: "cms_entry_publication_command",
+        name: "cms_entry_pub_command_entry_command_pk",
+        keys: "entry_id, command_id",
+        unique: true,
+      },
+      {
+        table: "cms_entry_locale_publication_reference",
+        name: "cms_entry_pub_ref_target_publication_idx",
+        keys: "target_publication_id",
+      },
+      {
+        table: "cms_entry_locale_publication",
+        name: "cms_entry_pub_publisher_credential_idx",
+        keys: "published_by_credential_id",
+        where: "(published_by_credential_id IS NOT NULL)",
+      },
+      {
+        table: "cms_entry_locale_publication_head",
+        name: "cms_entry_pub_head_changed_by_credential_idx",
+        keys: "changed_by_credential_id",
+        where: "(changed_by_credential_id IS NOT NULL)",
+      },
+      {
+        table: "cms_entry_publication_command",
+        name: "cms_entry_pub_command_completed_by_credential_idx",
+        keys: "completed_by_credential_id",
+        where: "(completed_by_credential_id IS NOT NULL)",
+      },
+    ]);
   });
 });

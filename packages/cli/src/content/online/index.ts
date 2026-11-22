@@ -179,7 +179,111 @@ const contentOnline = Effect.fn("cli.authoring.content.command")(function* (
     yield* clearContentCommand(input.projectRoot, journal.commandId);
     const validation = yield* responseData(result.validation);
     const published = yield* responseData(result.publication);
-    return { command: input.command, accepted: true, environmentId, validation, published };
+    return {
+      command: input.command,
+      accepted: true,
+      environmentId,
+      validation,
+      published,
+      delivery: published.delivery,
+    };
+  }
+
+  if (input.command === "entry validate") {
+    const response = yield* request(() =>
+      client.entries.validatePublication(input.collection, input.locale, input.entryId ?? ""),
+    );
+    const validation = yield* responseData(response);
+    return { command: input.command, accepted: validation.valid, environmentId, validation };
+  }
+
+  if (input.command === "entry revisions") {
+    const scope = input.revision.scope;
+    if (scope === undefined) return yield* Effect.fail(new Error("CLI_CONTENT_FLAGS_INVALID"));
+    const response = yield* request(() =>
+      client.entries.listRevisions(input.collection, input.locale, input.entryId ?? "", {
+        scope,
+        ...(input.revision.cursor === undefined ? {} : { cursor: input.revision.cursor }),
+        ...(input.revision.limit === undefined ? {} : { limit: input.revision.limit }),
+      }),
+    );
+    const page = yield* responseData(response);
+    return {
+      command: input.command,
+      accepted: true,
+      environmentId,
+      items: page.items,
+      nextCursor: page.nextCursor,
+    };
+  }
+
+  if (input.command === "entry revision") {
+    const response = yield* request(() =>
+      client.entries.getRevision(
+        input.collection,
+        input.locale,
+        input.entryId ?? "",
+        input.revision.revisionId ?? "",
+      ),
+    );
+    const revision = yield* responseData(response);
+    return { command: input.command, accepted: true, environmentId, revision };
+  }
+
+  if (input.command === "entry diff") {
+    const response = yield* request(() =>
+      client.entries.compareRevisions(
+        input.collection,
+        input.locale,
+        input.entryId ?? "",
+        input.revision.fromRevisionId ?? "",
+        input.revision.toRevisionId ?? "",
+      ),
+    );
+    const comparison = yield* responseData(response);
+    return {
+      command: input.command,
+      accepted: true,
+      environmentId,
+      different: comparison.items.length > 0 || comparison.restrictedChanges,
+      comparison,
+    };
+  }
+
+  if (input.command === "entry restore") {
+    const scope = input.revision.scope;
+    const revisionId = input.revision.revisionId;
+    if (scope === undefined || revisionId === undefined) {
+      return yield* Effect.fail(new Error("CLI_CONTENT_FLAGS_INVALID"));
+    }
+    const operation: ContentMutationOperation = "entry.restore";
+    const journal = yield* acquireContentCommand(
+      input.projectRoot,
+      operation,
+      fingerprint(input, environmentId, operation, { scope, revisionId }),
+    );
+    const draftResponse = yield* request(() =>
+      client.entries.getDraft(input.collection, input.locale, input.entryId ?? ""),
+    );
+    const draft = yield* responseData(draftResponse);
+    const response = yield* request(() =>
+      client.entries.restoreRevision(
+        input.collection,
+        input.locale,
+        input.entryId ?? "",
+        revisionId,
+        {
+          scope,
+          schemaRevisionId: draft.schemaRevisionId,
+          contractHash: draft.contractHash,
+          expectedVersion: scope === "shared" ? draft.sharedVersion : draft.localizedVersion,
+          commandId: journal.commandId,
+        },
+      ),
+    );
+    yield* clearContentCommand(input.projectRoot, journal.commandId);
+    const restored = yield* responseData(response);
+    return { command: input.command, accepted: true, environmentId, restored };
   }
 
   const operation: ContentMutationOperation = "entry.unpublish";
@@ -201,7 +305,13 @@ const contentOnline = Effect.fn("cli.authoring.content.command")(function* (
   );
   yield* clearContentCommand(input.projectRoot, journal.commandId);
   const unpublished = yield* responseData(response);
-  return { command: input.command, accepted: true, environmentId, unpublished };
+  return {
+    command: input.command,
+    accepted: true,
+    environmentId,
+    unpublished,
+    delivery: unpublished.delivery,
+  };
 });
 
 export async function runContentOnline(input: PreparedContentCommand) {

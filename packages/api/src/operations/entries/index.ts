@@ -1,8 +1,10 @@
 import { Clock, Effect, Schema } from "effect";
 
 import type {
+  CompareEntryRevisionsInput,
   CreateEntryInput,
   GetEntryDraftInput,
+  GetEntryRevisionInput,
   ListEntriesInput,
   ListEntryRevisionsInput,
   RenameEntryInput,
@@ -127,4 +129,32 @@ export const restoreEntryRevision = Effect.fn("entry.revision.restore")(function
     yield* currentDate,
     requestId,
   );
+});
+
+export const getEntryRevision = Effect.fn("entry.revision.get")(function* (
+  actorUserId: string,
+  input: GetEntryRevisionInput,
+) {
+  const actorId = yield* decodeActorId(actorUserId);
+  yield* Effect.annotateCurrentSpan({
+    projectId: input.projectId,
+    environmentId: input.environmentId,
+    collectionId: input.collectionId,
+    entryId: input.entryId,
+  });
+  return yield* (yield* EntryRepository).getRevision(actorId, input);
+});
+
+export const compareEntryRevisions = Effect.fn("entry.revision.compare")(function* (
+  actorUserId: string,
+  input: CompareEntryRevisionsInput,
+) {
+  const actorId = yield* decodeActorId(actorUserId);
+  yield* Effect.annotateCurrentSpan({
+    projectId: input.projectId,
+    environmentId: input.environmentId,
+    collectionId: input.collectionId,
+    entryId: input.entryId,
+  });
+  return yield* (yield* EntryRepository).compareRevisions(actorId, input);
 });

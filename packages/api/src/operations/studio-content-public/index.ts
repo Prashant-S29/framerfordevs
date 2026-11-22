@@ -1,8 +1,24 @@
 import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
 import { Effect, Schema } from "effect";
 
-import { EntryId, type EntryValidation, EntryValidationIssue } from "../../contracts/entry";
-import { AuthUserId } from "../../contracts/platform";
+import {
+  CompareEntryRevisionsInput,
+  EntryId,
+  EntryRevisionId,
+  GetEntryRevisionInput,
+  ListEntryRevisionsInput,
+  RestoreEntryRevisionInput,
+  type EntryValidation,
+  EntryValidationIssue,
+} from "../../contracts/entry";
+import { AuthUserId, Cursor, PageLimit } from "../../contracts/platform";
+import {
+  GetEntryPublicationStatusInput,
+  ListEntryPublicationsInput,
+  PublishEntryInput,
+  UnpublishEntryInput,
+  ValidateEntryPublicationInput,
+} from "../../contracts/publication";
 import { ApiErrorDetail } from "../../contracts/response/api";
 import {
   type ApplicationError,
@@ -14,6 +30,8 @@ import {
 import { StudioBootstrapScope } from "../../contracts/studio";
 import {
   StudioCommandConflictFailure,
+  StudioContentCursor as StudioContentCursorSchema,
+  StudioContentCursorInvalidFailure,
   StudioCreateEntryRequest,
   StudioCreateEntryResult,
   type StudioContentCursor,
@@ -28,24 +46,51 @@ import {
   StudioEntryValidation,
   StudioEntryWorkspace,
   StudioListEntriesQuery,
+  StudioListPublicationsQuery,
+  StudioListRevisionsQuery,
   StudioMutationReceipt,
   StudioNameVersionConflictFailure,
   StudioNewEntryWorkspace,
+  StudioPublicationInvalidFailure,
+  StudioPublicationPage,
+  StudioPublicationStateConflictFailure,
+  StudioPublishEntryRequest,
+  StudioPublishResult,
   StudioRenameEntryRequest,
   StudioResolveEntriesRequest,
   StudioResolvedEntryLabels,
+  StudioRestoreRevisionRequest,
+  StudioRevision,
+  StudioRevisionIncompatibleFailure,
+  StudioRevisionPage,
   StudioSaveEntryDraftRequest,
   StudioSearchEntriesRequest,
+  StudioUnpublishEntryRequest,
+  StudioUnpublishResult,
+  StudioValidatePublicationRequest,
+  type StudioFormProjection,
 } from "../../contracts/studio-content";
 import { evaluateStudioUserRateLimit } from "../studio-public";
 import { projectStudioForm, projectStudioValues } from "../../lib/studio-content/form-projection";
 import { studioMutationsUseProjectedAuthority } from "../../lib/studio-content/mutation-authority";
 import { studioSearchAuthority } from "../../lib/studio-content/search";
+import {
+  projectStudioPublicationFailureDetails,
+  projectStudioPublicationPlan,
+  projectStudioPublicationStatus,
+  projectStudioPublicationSummary,
+  projectStudioRevisionComparison,
+  projectStudioRevisionSummary,
+} from "../../lib/studio-content/revision-projection";
 import { ApplicationLogger } from "../../observability/logger";
 import { EntryRepository } from "../../services/entry/repository";
+import { PublicationRepository } from "../../services/publication/repository";
 import { SchemaRepository } from "../../services/schema/repository";
 import { StudioContentCursorSigner } from "../../services/studio-content/cursor-signer";
-import { StudioContentRepository } from "../../services/studio-content/repository";
+import {
+  type StudioCollectionAuthority,
+  StudioContentRepository,
+} from "../../services/studio-content/repository";
 import { StudioRepository } from "../../services/studio/repository";
 
 function invalidPath() {
@@ -87,6 +132,58 @@ export function adaptStudioSaveError(error: ApplicationError): ApplicationError 
     return StudioDraftVersionConflictFailure.make({ details: error.details });
   }
   return error._tag === "EntryCommandConflictFailure" ? StudioCommandConflictFailure.make() : error;
+}
+
+export function adaptStudioRestoreError(error: ApplicationError): ApplicationError {
+  if (error._tag === "ValidationFailure") return closedStudioValidationFailure();
+  if (error._tag === "ConflictFailure") return AuthoringStaleSchemaFailure.make();
+  if (error._tag === "EntryRevisionIncompatibleFailure")
+    return StudioRevisionIncompatibleFailure.make();
+  if (error._tag === "EntryDraftConflictFailure") {
+    return StudioDraftVersionConflictFailure.make({ details: error.details });
+  }
+  return error._tag === "EntryCommandConflictFailure" ? StudioCommandConflictFailure.make() : error;
+}
+
+export function adaptStudioPublicationError(
+  error: ApplicationError,
+  form: StudioFormProjection,
+  authority: Pick<StudioCollectionAuthority, "localeId" | "locale">,
+): ApplicationError {
+  if (error._tag === "EntryPublicationInvalidFailure") {
+    return StudioPublicationInvalidFailure.make({
+      details: projectStudioPublicationFailureDetails(error.issues, form, {
+        localeId: authority.localeId,
+        locale: authority.locale,
+      }),
+    });
+  }
+  if (error._tag === "EntryPublicationConflictFailure") {
+    return StudioPublicationStateConflictFailure.make({
+      details: error.details.slice(0, 20),
+    });
+  }
+  return error._tag === "EntryCommandConflictFailure" ? StudioCommandConflictFailure.make() : error;
+}
+
+function adaptStudioCursorError(error: ApplicationError): ApplicationError {
+  return error._tag === "ValidationFailure" &&
+    error.details.some((detail) => detail.path === "cursor")
+    ? StudioContentCursorInvalidFailure.make()
+    : error;
+}
+
+function domainCursor(cursor: StudioContentCursor | null) {
+  if (cursor === null) return Effect.succeed(null);
+  return Schema.decodeUnknownEffect(Cursor, { onExcessProperty: "error" })(cursor).pipe(
+    Effect.mapError(() => StudioContentCursorInvalidFailure.make()),
+  );
+}
+
+function studioCursor(cursor: Cursor | null): StudioContentCursor | null {
+  return cursor === null
+    ? null
+    : Schema.decodeUnknownSync(StudioContentCursorSchema, { onExcessProperty: "error" })(cursor);
 }
 
 function unavailableMutation() {
@@ -164,6 +261,48 @@ export function decodeStudioRenameEntryRequest(value: unknown) {
   ).pipe(Effect.mapError(() => invalidPath()));
 }
 
+export function decodeStudioListRevisionsQuery(value: unknown) {
+  return Schema.decodeUnknownEffect(StudioListRevisionsQuery, { onExcessProperty: "error" })(
+    value,
+  ).pipe(Effect.mapError(() => invalidPath()));
+}
+
+export function decodeStudioListPublicationsQuery(value: unknown) {
+  return Schema.decodeUnknownEffect(StudioListPublicationsQuery, { onExcessProperty: "error" })(
+    value,
+  ).pipe(Effect.mapError(() => invalidPath()));
+}
+
+export function decodeStudioRevisionId(value: string) {
+  return Schema.decodeUnknownEffect(EntryRevisionId, { onExcessProperty: "error" })(value).pipe(
+    Effect.mapError(() => invalidPath()),
+  );
+}
+
+export function decodeStudioRestoreRevisionRequest(value: unknown) {
+  return Schema.decodeUnknownEffect(StudioRestoreRevisionRequest, { onExcessProperty: "error" })(
+    value,
+  ).pipe(Effect.mapError(() => invalidPath()));
+}
+
+export function decodeStudioValidatePublicationRequest(value: unknown) {
+  return Schema.decodeUnknownEffect(StudioValidatePublicationRequest, {
+    onExcessProperty: "error",
+  })(value).pipe(Effect.mapError(() => invalidPath()));
+}
+
+export function decodeStudioPublishEntryRequest(value: unknown) {
+  return Schema.decodeUnknownEffect(StudioPublishEntryRequest, { onExcessProperty: "error" })(
+    value,
+  ).pipe(Effect.mapError(() => invalidPath()));
+}
+
+export function decodeStudioUnpublishEntryRequest(value: unknown) {
+  return Schema.decodeUnknownEffect(StudioUnpublishEntryRequest, { onExcessProperty: "error" })(
+    value,
+  ).pipe(Effect.mapError(() => invalidPath()));
+}
+
 export function decodeStudioSaveEntryDraftRequest(value: unknown) {
   return Schema.decodeUnknownEffect(StudioSaveEntryDraftRequest, { onExcessProperty: "error" })(
     value,
@@ -192,8 +331,37 @@ export const studioNestedCollectionOperations = [
   "create",
   "rename",
   "save",
+  "revisions",
+  "revision",
+  "compare",
+  "restore",
+  "publication",
+  "publications",
+  "validate",
+  "publish",
+  "unpublish",
 ] as const;
 export type StudioNestedCollectionOperation = (typeof studioNestedCollectionOperations)[number];
+
+const studioOperationCost = {
+  browse: 1,
+  search: 1,
+  resolve: 1,
+  new_workspace: 2,
+  entry_workspace: 3,
+  create: 5,
+  rename: 5,
+  save: 5,
+  revisions: 1,
+  revision: 1,
+  compare: 2,
+  restore: 5,
+  publication: 1,
+  publications: 1,
+  validate: 3,
+  publish: 5,
+  unpublish: 5,
+} as const satisfies Readonly<Record<StudioNestedCollectionOperation, number>>;
 
 function decodeActorId(principal: StudioOAuthPrincipal) {
   return Schema.decodeUnknownEffect(AuthUserId, { onExcessProperty: "error" })(
@@ -228,15 +396,7 @@ export const authorizeStudioCollectionOperation = Effect.fn(
   operation: StudioNestedCollectionOperation,
   now: Date,
 ) {
-  const cost =
-    operation === "browse" || operation === "search" || operation === "resolve"
-      ? 1
-      : operation === "new_workspace"
-        ? 2
-        : operation === "entry_workspace"
-          ? 3
-          : 5;
-  yield* evaluateStudioUserRateLimit(principal, cost);
+  yield* evaluateStudioUserRateLimit(principal, studioOperationCost[operation]);
   yield* Effect.annotateCurrentSpan({
     "studio_content.operation": operation,
     projectId: scope.projectId,
@@ -405,6 +565,16 @@ function studioEntrySummary(entry: {
   });
 }
 
+function studioCapabilities(authority: StudioCollectionAuthority) {
+  return {
+    canCreate: authority.canCreate,
+    canRename: authority.canRename,
+    canSaveLocalized: authority.canWriteLocalized,
+    canSaveShared: authority.canWriteShared,
+    canPublish: authority.canPublish,
+  };
+}
+
 export function decodeStudioEntryId(value: string) {
   return Schema.decodeUnknownEffect(EntryId, { onExcessProperty: "error" })(value).pipe(
     Effect.mapError(() => invalidPath()),
@@ -445,12 +615,7 @@ export const getStudioNewEntryWorkspace = Effect.fn("studio_content.public.works
       localeId: authority.localeId,
       locale: authority.locale,
       form: projectStudioForm(form),
-      capabilities: {
-        canCreate: authority.canCreate,
-        canRename: authority.canRename,
-        canSaveLocalized: authority.canWriteLocalized,
-        canSaveShared: authority.canWriteShared,
-      },
+      capabilities: studioCapabilities(authority),
     });
   },
 );
@@ -502,16 +667,16 @@ export const getStudioEntryWorkspace = Effect.fn("studio_content.public.workspac
     const entry = studioEntrySummary(draft.entry);
     if (entry === null) return yield* NotFoundFailure.make({ resource: "entry" });
     const projectedForm = projectStudioForm(form);
+    const publication = yield* (yield* PublicationRepository).getStatus(
+      actorId,
+      GetEntryPublicationStatusInput.make({ ...scope, entryId }),
+    );
     return Schema.decodeUnknownSync(StudioEntryWorkspace, { onExcessProperty: "error" })({
       localeId: authority.localeId,
       locale: authority.locale,
       form: projectedForm,
-      capabilities: {
-        canCreate: authority.canCreate,
-        canRename: authority.canRename,
-        canSaveLocalized: authority.canWriteLocalized,
-        canSaveShared: authority.canWriteShared,
-      },
+      capabilities: studioCapabilities(authority),
+      publication: projectStudioPublicationStatus(publication, projectedForm),
       draft: StudioEntryDraftProjection.make({
         entry,
         schemaRevisionId: draft.schemaRevisionId,
@@ -679,3 +844,276 @@ export function studioBootstrapScope(scope: StudioContentScope): StudioBootstrap
     environmentId: scope.environmentId,
   });
 }
+
+const loadStudioForm = Effect.fn("studio_content.public.form.load")(function* (
+  actorId: typeof AuthUserId.Type,
+  scope: StudioCollectionLocaleScopeType,
+  authority: StudioCollectionAuthority,
+) {
+  const form = yield* (yield* SchemaRepository).getPublishedForm(actorId, {
+    projectId: scope.projectId,
+    environmentId: scope.environmentId,
+    collectionId: scope.collectionId,
+    revisionId: authority.schemaRevisionId,
+  });
+  return projectStudioForm(form);
+});
+
+export const listStudioEntryRevisions = Effect.fn("studio_content.public.revisions.list")(
+  function* (
+    principal: StudioOAuthPrincipal,
+    scope: StudioCollectionLocaleScopeType,
+    entryId: typeof EntryId.Type,
+    query: StudioListRevisionsQuery,
+    now: Date,
+  ) {
+    const authority = yield* authorizeStudioCollectionOperation(principal, scope, "revisions", now);
+    const actorId = yield* decodeActorId(principal);
+    const form = yield* loadStudioForm(actorId, scope, authority);
+    const cursor = yield* domainCursor(query.cursor);
+    const page = yield* (yield* EntryRepository)
+      .listRevisions(
+        actorId,
+        ListEntryRevisionsInput.make({
+          ...scope,
+          entryId,
+          scope: query.scope,
+          cursor,
+          limit: PageLimit.make(query.limit),
+        }),
+      )
+      .pipe(Effect.mapError(adaptStudioCursorError));
+    return StudioRevisionPage.make({
+      items: page.items.map((item) => projectStudioRevisionSummary(item, form)),
+      nextCursor: studioCursor(page.nextCursor),
+    });
+  },
+);
+
+export const getStudioEntryRevision = Effect.fn("studio_content.public.revisions.get")(function* (
+  principal: StudioOAuthPrincipal,
+  scope: StudioCollectionLocaleScopeType,
+  entryId: typeof EntryId.Type,
+  revisionId: typeof EntryRevisionId.Type,
+  now: Date,
+) {
+  const authority = yield* authorizeStudioCollectionOperation(principal, scope, "revision", now);
+  const actorId = yield* decodeActorId(principal);
+  const form = yield* loadStudioForm(actorId, scope, authority);
+  const revision = yield* (yield* EntryRepository).getRevision(
+    actorId,
+    GetEntryRevisionInput.make({ ...scope, entryId, revisionId }),
+  );
+  return StudioRevision.make({
+    revision: projectStudioRevisionSummary(revision.revision, form),
+    values: projectStudioValues(revision.values, form.fields),
+  });
+});
+
+export const compareStudioEntryRevisions = Effect.fn("studio_content.public.revisions.compare")(
+  function* (
+    principal: StudioOAuthPrincipal,
+    scope: StudioCollectionLocaleScopeType,
+    entryId: typeof EntryId.Type,
+    fromRevisionId: typeof EntryRevisionId.Type,
+    toRevisionId: typeof EntryRevisionId.Type,
+    now: Date,
+  ) {
+    const authority = yield* authorizeStudioCollectionOperation(principal, scope, "compare", now);
+    const actorId = yield* decodeActorId(principal);
+    const form = yield* loadStudioForm(actorId, scope, authority);
+    const comparison = yield* (yield* EntryRepository).compareRevisions(
+      actorId,
+      CompareEntryRevisionsInput.make({ ...scope, entryId, fromRevisionId, toRevisionId }),
+    );
+    return projectStudioRevisionComparison(comparison, form);
+  },
+);
+
+export const restoreStudioEntryRevision = Effect.fn("studio_content.public.revisions.restore")(
+  function* (
+    principal: StudioOAuthPrincipal,
+    scope: StudioCollectionLocaleScopeType,
+    entryId: typeof EntryId.Type,
+    revisionId: typeof EntryRevisionId.Type,
+    request: StudioRestoreRevisionRequest,
+    now: Date,
+    requestId: string,
+  ) {
+    const authority = yield* authorizeStudioCollectionOperation(principal, scope, "restore", now);
+    if (request.scope === "shared" ? !authority.canWriteShared : !authority.canWriteLocalized) {
+      return yield* ForbiddenFailure.make();
+    }
+    const actorId = yield* decodeActorId(principal);
+    const form = yield* loadStudioForm(actorId, scope, authority);
+    if (
+      request.schemaRevisionId !== form.schemaRevisionId ||
+      request.contractHash !== form.contractHash
+    ) {
+      return yield* AuthoringStaleSchemaFailure.make();
+    }
+    const result = yield* (yield* EntryRepository)
+      .restoreRevision(
+        actorId,
+        RestoreEntryRevisionInput.make({
+          ...scope,
+          entryId,
+          revisionId,
+          scope: request.scope,
+          schemaRevisionId: request.schemaRevisionId,
+          contractHash: request.contractHash,
+          expectedVersion: request.expectedVersion,
+          commandId: request.commandId,
+        }),
+        now,
+        requestId,
+      )
+      .pipe(Effect.mapError(adaptStudioRestoreError));
+    return Schema.decodeUnknownSync(StudioMutationReceipt, { onExcessProperty: "error" })({
+      entryId: result.entryId,
+      commandId: result.commandId,
+      sharedChanged: result.sharedChanged,
+      sharedVersion: result.sharedVersion,
+      sharedRevisionId: result.sharedRevisionId,
+      localizedChanged: result.localizedChanged,
+      localizedVersion: result.localizedVersion,
+      localizedRevisionId: result.localizedRevisionId,
+      validation: projectStudioValidation(result.validation, form),
+    });
+  },
+);
+
+export const getStudioEntryPublication = Effect.fn("studio_content.public.publication.get")(
+  function* (
+    principal: StudioOAuthPrincipal,
+    scope: StudioCollectionLocaleScopeType,
+    entryId: typeof EntryId.Type,
+    now: Date,
+  ) {
+    const authority = yield* authorizeStudioCollectionOperation(
+      principal,
+      scope,
+      "publication",
+      now,
+    );
+    const actorId = yield* decodeActorId(principal);
+    const form = yield* loadStudioForm(actorId, scope, authority);
+    const status = yield* (yield* PublicationRepository).getStatus(
+      actorId,
+      GetEntryPublicationStatusInput.make({ ...scope, entryId }),
+    );
+    return projectStudioPublicationStatus(status, form);
+  },
+);
+
+export const listStudioEntryPublications = Effect.fn("studio_content.public.publications.list")(
+  function* (
+    principal: StudioOAuthPrincipal,
+    scope: StudioCollectionLocaleScopeType,
+    entryId: typeof EntryId.Type,
+    query: StudioListPublicationsQuery,
+    now: Date,
+  ) {
+    const authority = yield* authorizeStudioCollectionOperation(
+      principal,
+      scope,
+      "publications",
+      now,
+    );
+    const actorId = yield* decodeActorId(principal);
+    const form = yield* loadStudioForm(actorId, scope, authority);
+    const cursor = yield* domainCursor(query.cursor);
+    const page = yield* (yield* PublicationRepository)
+      .list(
+        actorId,
+        ListEntryPublicationsInput.make({
+          ...scope,
+          entryId,
+          cursor,
+          limit: PageLimit.make(query.limit),
+        }),
+      )
+      .pipe(Effect.mapError(adaptStudioCursorError));
+    return StudioPublicationPage.make({
+      items: page.items.map((item) => projectStudioPublicationSummary(item, form)),
+      nextCursor: studioCursor(page.nextCursor),
+    });
+  },
+);
+
+export const validateStudioEntryPublication = Effect.fn(
+  "studio_content.public.publication.validate",
+)(function* (
+  principal: StudioOAuthPrincipal,
+  scope: StudioCollectionLocaleScopeType,
+  entryId: typeof EntryId.Type,
+  _request: StudioValidatePublicationRequest,
+  now: Date,
+) {
+  const authority = yield* authorizeStudioCollectionOperation(principal, scope, "validate", now);
+  if (!authority.canPublish) return yield* ForbiddenFailure.make();
+  const actorId = yield* decodeActorId(principal);
+  const form = yield* loadStudioForm(actorId, scope, authority);
+  const plan = yield* (yield* PublicationRepository).validate(
+    actorId,
+    ValidateEntryPublicationInput.make({ ...scope, entryId }),
+    now,
+  );
+  return projectStudioPublicationPlan(plan, form);
+});
+
+export const publishStudioEntry = Effect.fn("studio_content.public.publication.publish")(function* (
+  principal: StudioOAuthPrincipal,
+  scope: StudioCollectionLocaleScopeType,
+  entryId: typeof EntryId.Type,
+  request: StudioPublishEntryRequest,
+  now: Date,
+  requestId: string,
+) {
+  const authority = yield* authorizeStudioCollectionOperation(principal, scope, "publish", now);
+  if (!authority.canPublish) return yield* ForbiddenFailure.make();
+  const actorId = yield* decodeActorId(principal);
+  const form = yield* loadStudioForm(actorId, scope, authority);
+  const result = yield* (yield* PublicationRepository)
+    .publish(actorId, PublishEntryInput.make({ ...scope, entryId, ...request }), now, requestId)
+    .pipe(Effect.mapError((error) => adaptStudioPublicationError(error, form, authority)));
+  return StudioPublishResult.make({
+    commandId: result.commandId,
+    resultKind: result.resultKind,
+    stateVersion: result.stateVersion,
+    publication: projectStudioPublicationSummary(result.publication, form),
+    delivery: result.delivery,
+  });
+});
+
+export const unpublishStudioEntry = Effect.fn("studio_content.public.publication.unpublish")(
+  function* (
+    principal: StudioOAuthPrincipal,
+    scope: StudioCollectionLocaleScopeType,
+    entryId: typeof EntryId.Type,
+    request: StudioUnpublishEntryRequest,
+    now: Date,
+    requestId: string,
+  ) {
+    const authority = yield* authorizeStudioCollectionOperation(principal, scope, "unpublish", now);
+    if (!authority.canPublish) return yield* ForbiddenFailure.make();
+    const actorId = yield* decodeActorId(principal);
+    const form = yield* loadStudioForm(actorId, scope, authority);
+    const result = yield* (yield* PublicationRepository)
+      .unpublish(
+        actorId,
+        UnpublishEntryInput.make({ ...scope, entryId, ...request }),
+        now,
+        requestId,
+      )
+      .pipe(Effect.mapError((error) => adaptStudioPublicationError(error, form, authority)));
+    return StudioUnpublishResult.make({
+      commandId: result.commandId,
+      resultKind: result.resultKind,
+      stateVersion: result.stateVersion,
+      unpublishedPublicationId: result.unpublishedPublicationId,
+      unpublishedAt: result.unpublishedAt,
+      delivery: result.delivery,
+    });
+  },
+);

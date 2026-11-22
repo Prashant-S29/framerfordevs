@@ -19,21 +19,17 @@ Scope per milestone. Status is in `progress.md`. A pending entry is context, not
 - 12–13: Tooling v1, OAuth CLI, SDK, public contracts, developer portal. Code-first authoring, Authoring v1, local editor.
 - 14–17: Control Plane v1 bootstrap and CLI parity. Governance and operational administration with recovery. Separate marketing, docs, and dashboard hosts.
 - 18A–18B: Studio registration authority, OAuth, mounted Studio runtime, encrypted sessions, framework adapters.
-- 19A–19B: Studio Content v1 and v2 protocols and the mounted browse, search, edit, and recovery experience.
+- 19A–19B: Studio Content protocol and the mounted browse, search, edit, and recovery experience.
 
 ## Pending
 
 ### Milestone 20 — Studio editorial lifecycle
 
-Complete Studio revision, Presentation, Preview, and publication authority before client handover.
+Bring revision, publication, Preview, and Presentation authority into the Studio before client handover, in three parts. Exclude review approval, scheduling, visual editing, and schema mutation.
 
-- Add shared/localized revision history, comparison, restore, and changed-since-publish state while preserving immutable history and optimistic authority.
-- Add editorial Presentation viewing/editing/publication for form labels/layout only; code remains the sole schema-structure authority.
-- Integrate current/historical Preview with exact role/locale/source selection, no draft leakage, safe renderer boundaries, and clear stale/conflict states.
-- Add permission-aware exact-locale validate/publish/unpublish workflows with immutable publications, audits, outbox events, replay/no-op semantics, and Delivery verification.
-- Converge hosted Studio and `ffd editor` on shared contracts/components while preserving local loopback deployment and credential isolation.
-- Prove parity before retiring duplicate hosted dashboard editorial routes; retain hosted control-plane read-only structure and administration.
-- Exclude review submission/approval, client handover polish, scheduled publishing, visual page editing, and schema mutation.
+- 20A: Studio revision list, read, compare, and restore, value-based changed-since-publish, and exact-locale validate, publish, and unpublish with Delivery read-back. Add Authoring HTTP and CLI parity for revision read, compare, and restore.
+- 20B: Studio current and historical Preview in a sandboxed iframe with a per-environment preview origin and a short-lived token handoff. A `presentation.publish` action lets content_admin edit labels, order, tabs, and groups. Role visibility stays with owner and developer.
+- 20C: Host the Studio workspace in `ffd editor` over its loopback transport without exposing the token. Retire dashboard editorial and preview routes after parity browser specs pass, and keep hosted structure and administration.
 
 ### Milestone 21 — Client handover and editorial safety
 
@@ -42,7 +38,7 @@ Make the completed CMS safe, understandable, accessible, and recoverable for non
 - Deliver client-focused Studio navigation, authenticated direct handover links, permission-filtered ordered activity, and project/collection/locale context understandable without implementation knowledge.
 - Enforce collection/field/locale restrictions in payloads, counts, search, direct routes, and direct APIs; clients never receive credentials, keys, internal IDs, schema controls, or protected fields.
 - Let users without publish authority save drafts and submit review while preventing UI/API publication; approval/rejection must preserve exact locale and role permissions.
-- Provide accurate shared/localized revision comparison and restore, translation completeness after required-field changes, and textual draft/publication/pending status beyond color.
+- Provide translation completeness after required-field changes, and textual draft/publication/pending status beyond color.
 - Preserve work across unsaved navigation, network interruption, retries, and duplicate submissions with deterministic conflict/recovery UX.
 - Require accessible summaries, field associations, focus/announcement, keyboard locale tabs, and developer-approved large-form/list responsiveness.
 - Retain the original manual test: hand a project to a non-technical user and observe the complete edit/review/publish path without exposing implementation authority.

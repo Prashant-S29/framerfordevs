@@ -11,6 +11,9 @@ import type {
   StudioContentCursorStaleFailure,
   StudioDraftVersionConflictFailure,
   StudioNameVersionConflictFailure,
+  StudioPublicationInvalidFailure,
+  StudioPublicationStateConflictFailure,
+  StudioRevisionIncompatibleFailure,
 } from "../../studio-content";
 
 const ValidationDetailsSchema = Schema.Array(ApiErrorDetail).check(
@@ -232,6 +235,10 @@ export class AuthoringCommandConflictFailure extends Schema.TaggedError<Authorin
   "AuthoringCommandConflictFailure",
 )("AuthoringCommandConflictFailure", {}) {}
 
+export class AuthoringRevisionIncompatibleFailure extends Schema.TaggedError<AuthoringRevisionIncompatibleFailure>(
+  "AuthoringRevisionIncompatibleFailure",
+)("AuthoringRevisionIncompatibleFailure", {}) {}
+
 export class AuthoringRiskyAcknowledgementRequiredFailure extends Schema.TaggedError<AuthoringRiskyAcknowledgementRequiredFailure>(
   "AuthoringRiskyAcknowledgementRequiredFailure",
 )("AuthoringRiskyAcknowledgementRequiredFailure", {}) {}
@@ -355,6 +362,9 @@ export type ApplicationError =
   | StudioDraftVersionConflictFailure
   | StudioNameVersionConflictFailure
   | StudioCommandConflictFailure
+  | StudioRevisionIncompatibleFailure
+  | StudioPublicationInvalidFailure
+  | StudioPublicationStateConflictFailure
   | ControlPlaneCommandConflictFailure
   | ControlPlaneCursorInvalidFailure
   | ControlPlaneRequestTooLargeFailure
@@ -364,6 +374,7 @@ export type ApplicationError =
   | AuthoringPublicationConflictFailure
   | AuthoringPublicationInvalidFailure
   | AuthoringCommandConflictFailure
+  | AuthoringRevisionIncompatibleFailure
   | AuthoringRiskyAcknowledgementRequiredFailure
   | AuthoringSourceIdentityConflictFailure
   | AuthoringResponseTooLargeFailure
@@ -430,6 +441,8 @@ export const apiErrorHttpStatus = {
   DRAFT_CONFLICT: 409,
   PUBLICATION_CONFLICT: 409,
   PUBLICATION_INVALID: 422,
+  PUBLICATION_STATE_CONFLICT: 409,
+  REVISION_INCOMPATIBLE: 409,
   COMMAND_CONFLICT: 409,
   RISKY_ACKNOWLEDGEMENT_REQUIRED: 409,
   SOURCE_IDENTITY_CONFLICT: 409,
@@ -803,6 +816,27 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
         message: "The Studio command identifier was already used for different input.",
         retryable: false,
       };
+    case "StudioRevisionIncompatibleFailure":
+      return {
+        code: "REVISION_INCOMPATIBLE",
+        message: "This revision uses another schema contract and cannot be restored.",
+        retryable: false,
+      };
+    case "StudioPublicationInvalidFailure":
+      return {
+        code: "PUBLICATION_INVALID",
+        message:
+          "The selected locale cannot be published until its publication issues are resolved.",
+        retryable: false,
+        details: error.details,
+      };
+    case "StudioPublicationStateConflictFailure":
+      return {
+        code: "PUBLICATION_STATE_CONFLICT",
+        message: "Publication state changed. Validate the selected locale again.",
+        retryable: false,
+        details: error.details,
+      };
     case "ControlPlaneCommandConflictFailure":
       return {
         code: "COMMAND_CONFLICT",
@@ -859,6 +893,12 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
       return {
         code: "COMMAND_CONFLICT",
         message: "The command identifier was already used for a different schema apply.",
+        retryable: false,
+      };
+    case "AuthoringRevisionIncompatibleFailure":
+      return {
+        code: "REVISION_INCOMPATIBLE",
+        message: "This revision uses another schema contract and cannot be restored.",
         retryable: false,
       };
     case "AuthoringRiskyAcknowledgementRequiredFailure":

@@ -54,6 +54,12 @@ import {
 import { makeAuthoringPresentationRepository } from "../../../src/services/authoring/presentation-repository";
 import { makeAuthoringSchemaRepository } from "../../../src/services/authoring/schema/repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
+import {
+  assertIndexDefinitions,
+  assertIndexedAccess,
+  assertIndexedQuery,
+  explainPlan,
+} from "../../support/query-plan";
 
 const suffix = randomUUID();
 const ownerId = `m13-apply-owner-${suffix}`;
@@ -666,68 +672,138 @@ describe("Authoring schema repository PostgreSQL integration", () => {
     );
     assert.deepStrictEqual(events, [{ revisionId: published.revision.revisionId }]);
 
-    const plans = await db.transaction(async (transaction) => {
+    await db.transaction(async (transaction) => {
       await transaction.execute(sql`set local enable_seqscan = off`);
-      const collectionPlan = await transaction.execute(
-        sql`explain (format json) select id from cms_collection where workspace_id = ${required(workspaceModel, "workspace").id} and project_id = ${currentProject.id} and environment_id = ${currentProject.environment.id} and api_key = 'posts' limit 1`,
+      const indexed = { allowBitmap: true };
+      await assertIndexedQuery(
+        transaction,
+        sql`select id from cms_collection where workspace_id = ${required(workspaceModel, "workspace").id} and project_id = ${currentProject.id} and environment_id = ${currentProject.environment.id} and api_key = 'posts' limit 1`,
+        { ...indexed, table: "cms_collection" },
       );
-      const revisionPlan = await transaction.execute(
-        sql`explain (format json) select id from cms_schema_revision where collection_id = ${published.revision.collectionId} and command_id = ${commandId} limit 1`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select id from cms_schema_revision where collection_id = ${published.revision.collectionId} and command_id = ${commandId} limit 1`,
+        { ...indexed, table: "cms_schema_revision" },
       );
-      const fieldsPlan = await transaction.execute(
-        sql`explain (format json) select field_id from cms_schema_revision_field where revision_id = ${published.revision.revisionId} order by position, field_id`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select field_id from cms_schema_revision_field where revision_id = ${published.revision.revisionId} order by position, field_id`,
+        { ...indexed, table: "cms_schema_revision_field" },
       );
-      const collectionSourcePlan = await transaction.execute(
-        sql`explain (format json) select id from cms_collection where environment_id = ${currentProject.environment.id} and source_key = 'posts' limit 1`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select id from cms_collection where environment_id = ${currentProject.environment.id} and source_key = 'posts' limit 1`,
+        { ...indexed, table: "cms_collection" },
       );
-      const fieldSourcePlan = await transaction.execute(
-        sql`explain (format json) select id from cms_collection_field where collection_id = ${published.revision.collectionId} and source_key = 'status' order by source_key limit 1`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select id from cms_collection_field where collection_id = ${published.revision.collectionId} and source_key = 'status' order by source_key limit 1`,
+        { ...indexed, table: "cms_collection_field", order: "index" },
       );
-      const enumSourcePlan = await transaction.execute(
-        sql`explain (format json) select id from cms_enum_option_source_identity where field_id = (select id from cms_collection_field where collection_id = ${published.revision.collectionId} and source_key = 'status' order by source_key limit 1) and source_key = 'draft' order by source_key limit 1`,
+      const enumSourcePlan = await explainPlan(
+        transaction,
+        sql`select id from cms_enum_option_source_identity where field_id = (select id from cms_collection_field where collection_id = ${published.revision.collectionId} and source_key = 'status' order by source_key limit 1) and source_key = 'draft' order by source_key limit 1`,
       );
-      const currentAuthorityPlan = await transaction.execute(
-        sql`explain (format json) select current_published_revision_id from cms_collection_schema_head where collection_id = ${published.revision.collectionId} limit 1`,
+      assertIndexedAccess(enumSourcePlan, {
+        ...indexed,
+        table: "cms_enum_option_source_identity",
+        order: "index",
+      });
+      assertIndexedAccess(enumSourcePlan, { ...indexed, table: "cms_collection_field" });
+      await assertIndexedQuery(
+        transaction,
+        sql`select current_published_revision_id from cms_collection_schema_head where collection_id = ${published.revision.collectionId} limit 1`,
+        { ...indexed, table: "cms_collection_schema_head" },
       );
-      const applyReplayPlan = await transaction.execute(
-        sql`explain (format json) select result from cms_project_schema_apply_command where environment_id = ${currentProject.environment.id} and command_id = ${randomUUID()} limit 1`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select result from cms_project_schema_apply_command where environment_id = ${currentProject.environment.id} and command_id = ${randomUUID()} limit 1`,
+        { ...indexed, table: "cms_project_schema_apply_command" },
       );
-      const revisionCredentialPlan = await transaction.execute(
-        sql`explain (format json) select id from cms_schema_revision where published_by_credential_id = ${managementCredentialId} limit 20`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select id from cms_schema_revision where published_by_credential_id = ${managementCredentialId} limit 20`,
+        { ...indexed, table: "cms_schema_revision" },
       );
-      const headCredentialPlan = await transaction.execute(
-        sql`explain (format json) select collection_id from cms_collection_schema_head where changed_by_credential_id = ${managementCredentialId} limit 20`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select collection_id from cms_collection_schema_head where changed_by_credential_id = ${managementCredentialId} limit 20`,
+        { ...indexed, table: "cms_collection_schema_head" },
       );
-      const applyCredentialPlan = await transaction.execute(
-        sql`explain (format json) select command_id from cms_project_schema_apply_command where completed_by_credential_id = ${managementCredentialId} limit 20`,
+      await assertIndexedQuery(
+        transaction,
+        sql`select command_id from cms_project_schema_apply_command where completed_by_credential_id = ${managementCredentialId} limit 20`,
+        { ...indexed, table: "cms_project_schema_apply_command" },
       );
-      return JSON.stringify([
-        collectionPlan.rows,
-        revisionPlan.rows,
-        fieldsPlan.rows,
-        collectionSourcePlan.rows,
-        fieldSourcePlan.rows,
-        enumSourcePlan.rows,
-        currentAuthorityPlan.rows,
-        applyReplayPlan.rows,
-        revisionCredentialPlan.rows,
-        headCredentialPlan.rows,
-        applyCredentialPlan.rows,
-      ]);
     });
-    assert.match(plans, /cms_collection_environment_(?:key|source_key)_unique/u);
-    assert.match(plans, /cms_field_collection_(?:source_key_unique|idx)/u);
-    assert.match(plans, /cms_enum_option_(?:field_source_key_unique|collection_field_idx)/u);
-    assert.match(
-      plans,
-      /cms_revision_collection_(?:command_unique|sequence_unique|sequence_desc_idx)/u,
-    );
-    assert.match(plans, /cms_revision_field_(?:revision_field_pk|parent_position_idx)/u);
-    assert.match(plans, /cms_collection_schema_head_pkey/u);
-    assert.match(plans, /cms_project_schema_apply_(?:command_pk|completed_idx)/u);
-    assert.match(plans, /cms_revision_published_by_credential_idx/u);
-    assert.match(plans, /cms_head_changed_by_credential_idx/u);
-    assert.match(plans, /cms_project_schema_apply_completed_by_credential_idx/u);
+    await assertIndexDefinitions(db, [
+      {
+        table: "cms_collection",
+        name: "cms_collection_environment_key_unique",
+        keys: "environment_id, api_key",
+        unique: true,
+      },
+      {
+        table: "cms_collection",
+        name: "cms_collection_environment_source_key_unique",
+        keys: "environment_id, source_key",
+        unique: true,
+      },
+      {
+        table: "cms_collection_field",
+        name: "cms_field_collection_source_key_unique",
+        keys: "collection_id, source_key",
+        unique: true,
+      },
+      {
+        table: "cms_enum_option_source_identity",
+        name: "cms_enum_option_field_source_key_unique",
+        keys: "field_id, source_key",
+        unique: true,
+      },
+      {
+        table: "cms_schema_revision",
+        name: "cms_revision_collection_command_unique",
+        keys: "collection_id, command_id",
+        unique: true,
+      },
+      {
+        table: "cms_schema_revision_field",
+        name: "cms_revision_field_revision_field_pk",
+        keys: "revision_id, field_id",
+        unique: true,
+      },
+      {
+        table: "cms_collection_schema_head",
+        name: "cms_collection_schema_head_pkey",
+        keys: "collection_id",
+        unique: true,
+      },
+      {
+        table: "cms_project_schema_apply_command",
+        name: "cms_project_schema_apply_command_pk",
+        keys: "environment_id, command_id",
+        unique: true,
+      },
+      {
+        table: "cms_schema_revision",
+        name: "cms_revision_published_by_credential_idx",
+        keys: "published_by_credential_id",
+        where: "(published_by_credential_id IS NOT NULL)",
+      },
+      {
+        table: "cms_collection_schema_head",
+        name: "cms_head_changed_by_credential_idx",
+        keys: "changed_by_credential_id",
+        where: "(changed_by_credential_id IS NOT NULL)",
+      },
+      {
+        table: "cms_project_schema_apply_command",
+        name: "cms_project_schema_apply_completed_by_credential_idx",
+        keys: "completed_by_credential_id",
+        where: "(completed_by_credential_id IS NOT NULL)",
+      },
+    ]);
   });
 
   it("rolls every presentation publication stage back atomically", async () => {

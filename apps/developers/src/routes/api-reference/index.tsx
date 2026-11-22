@@ -38,14 +38,10 @@ const families = [
     title: "Studio v1",
   },
   {
-    description: "Role-projected exact-locale Studio content browsing and draft mutation.",
+    description:
+      "Role-projected exact-locale Studio content browsing, reference-label resolution, and draft mutation.",
     family: "studio-content/v1",
     title: "Studio Content v1",
-  },
-  {
-    description: "Studio Content v1 plus bounded, omission-only reference-label resolution.",
-    family: "studio-content/v2",
-    title: "Studio Content v2",
   },
   {
     description: "CLI project discovery and immutable published-schema retrieval.",

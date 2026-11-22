@@ -27,6 +27,7 @@ const maximumBootstrapResponseBytes = 64 * 1_024;
 const maximumContentRequestBytes = 1 * 1_024 * 1_024;
 const maximumContentSearchRequestBytes = 2 * 1_024;
 const maximumContentResolveRequestBytes = 8 * 1_024;
+const maximumContentCommandRequestBytes = 4 * 1_024;
 const maximumContentResponseBytes = 4 * 1_024 * 1_024;
 const maximumCookieHeaderBytes = 4 * 1_024;
 const csp =
@@ -299,7 +300,7 @@ function validateConfig(input: StudioServerConfig): ValidatedConfig {
     revocationUrl: `${platformOrigin}/api/auth/oauth2/revoke`,
     resource: `${platformOrigin}/api/studio/v1`,
     bootstrapUrl: `${platformOrigin}/api/studio/v1/projects/${input.projectId}/environments/${input.environmentId}/bootstrap`,
-    studioContentBaseUrl: `${platformOrigin}/api/studio-content/v2/projects/${input.projectId}/environments/${input.environmentId}`,
+    studioContentBaseUrl: `${platformOrigin}/api/studio-content/v1/projects/${input.projectId}/environments/${input.environmentId}`,
     redirectUri: `${applicationOrigin}${input.mountPath}/auth/callback`,
     clientId: `ffd-studio-v1-${input.registrationId}`,
     registrationDigest,
@@ -1613,7 +1614,11 @@ function studioContentErrorStatus(code: unknown): number | null {
     case "NAME_VERSION_CONFLICT":
     case "COMMAND_CONFLICT":
     case "STALE_CURSOR":
+    case "REVISION_INCOMPATIBLE":
+    case "PUBLICATION_STATE_CONFLICT":
       return 409;
+    case "PUBLICATION_INVALID":
+      return 422;
     case "REQUEST_TOO_LARGE":
     case "STUDIO_RESPONSE_TOO_LARGE":
       return 413;
@@ -1690,6 +1695,7 @@ function validStudioContentCapabilities(value: unknown): boolean {
       "canRename",
       "canSaveLocalized",
       "canSaveShared",
+      "canPublish",
     ]) &&
     Object.values(value).every((entry) => typeof entry === "boolean")
   );
@@ -2235,7 +2241,267 @@ type StudioContentSuccessKind =
   | "entry_workspace"
   | "create"
   | "rename"
-  | "save";
+  | "save"
+  | "revision_page"
+  | "revision"
+  | "revision_comparison"
+  | "restore"
+  | "publication_status"
+  | "publication_page"
+  | "publication_plan"
+  | "publish"
+  | "unpublish";
+
+function studioUuidOrNull(value: unknown): boolean {
+  return value === null || (typeof value === "string" && uuid.test(value));
+}
+
+function studioUuid(value: unknown): boolean {
+  return typeof value === "string" && uuid.test(value);
+}
+
+function studioHash(value: unknown): boolean {
+  return typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
+}
+
+function studioCount(value: unknown, minimum: number): boolean {
+  return Number.isSafeInteger(value) && Number(value) >= minimum;
+}
+
+function studioFieldIds(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length <= 100 &&
+    value.every(studioUuid) &&
+    new Set(value).size === value.length
+  );
+}
+
+function validStudioRevisionSummary(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, [
+      "id",
+      "scope",
+      "sequence",
+      "previousRevisionId",
+      "schemaRevisionId",
+      "contractHash",
+      "changedFieldIds",
+      "restoredFromRevisionId",
+      "authoredByUserId",
+      "authoredByCredentialId",
+      "authoredAt",
+      "compatible",
+    ]) &&
+    studioUuid(value.id) &&
+    (value.scope === "shared" || value.scope === "localized") &&
+    studioCount(value.sequence, 1) &&
+    studioUuidOrNull(value.previousRevisionId) &&
+    studioUuid(value.schemaRevisionId) &&
+    studioHash(value.contractHash) &&
+    studioFieldIds(value.changedFieldIds) &&
+    studioUuidOrNull(value.restoredFromRevisionId) &&
+    (value.authoredByUserId === null ||
+      boundedStudioContentString(value.authoredByUserId, 1, 255)) &&
+    studioUuidOrNull(value.authoredByCredentialId) &&
+    validStudioContentIsoDateTime(value.authoredAt) &&
+    typeof value.compatible === "boolean"
+  );
+}
+
+function validStudioPublicationSummary(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, [
+      "id",
+      "sequence",
+      "schemaRevisionId",
+      "contractHash",
+      "changedFieldIds",
+      "publishedAt",
+      "current",
+    ]) &&
+    studioUuid(value.id) &&
+    studioCount(value.sequence, 1) &&
+    studioUuid(value.schemaRevisionId) &&
+    studioHash(value.contractHash) &&
+    studioFieldIds(value.changedFieldIds) &&
+    validStudioContentIsoDateTime(value.publishedAt) &&
+    typeof value.current === "boolean"
+  );
+}
+
+function validStudioPublicationStatus(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, [
+      "state",
+      "stateVersion",
+      "currentPublication",
+      "sharedChanged",
+      "localizedChanged",
+      "schemaChanged",
+      "changedSincePublication",
+    ]) &&
+    (value.state === "published" ||
+      value.state === "unpublished" ||
+      value.state === "never_published") &&
+    studioCount(value.stateVersion, 0) &&
+    (value.currentPublication === null ||
+      validStudioPublicationSummary(value.currentPublication)) &&
+    (value.state === "published") === (value.currentPublication !== null) &&
+    typeof value.sharedChanged === "boolean" &&
+    typeof value.localizedChanged === "boolean" &&
+    typeof value.schemaChanged === "boolean" &&
+    typeof value.changedSincePublication === "boolean"
+  );
+}
+
+function validStudioDeliveryReadBack(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, ["status", "currentPublicationId"]) &&
+    (value.status === "verified" || value.status === "superseded") &&
+    studioUuidOrNull(value.currentPublicationId)
+  );
+}
+
+function validStudioCursorPage(
+  value: Readonly<Record<string, unknown>>,
+  item: (value: unknown) => boolean,
+): boolean {
+  return (
+    exactStudioContentKeys(value, ["items", "nextCursor"]) &&
+    Array.isArray(value.items) &&
+    value.items.length <= 50 &&
+    value.items.every(item) &&
+    (value.nextCursor === null ||
+      (typeof value.nextCursor === "string" && /^[A-Za-z0-9_-]{1,1024}$/u.test(value.nextCursor)))
+  );
+}
+
+function validStudioHistorySuccessData(
+  kind: StudioContentSuccessKind,
+  value: Readonly<Record<string, unknown>>,
+): boolean | null {
+  switch (kind) {
+    case "revision_page":
+      return validStudioCursorPage(value, validStudioRevisionSummary);
+    case "publication_page":
+      return validStudioCursorPage(value, validStudioPublicationSummary);
+    case "revision":
+      return (
+        exactStudioContentKeys(value, ["revision", "values"]) &&
+        validStudioRevisionSummary(value.revision) &&
+        validStudioContentEntryValues(value.values)
+      );
+    case "revision_comparison":
+      return (
+        exactStudioContentKeys(value, [
+          "from",
+          "to",
+          "items",
+          "restrictedChanges",
+          "schemaDiffers",
+        ]) &&
+        validStudioRevisionSummary(value.from) &&
+        validStudioRevisionSummary(value.to) &&
+        Array.isArray(value.items) &&
+        value.items.length <= 200 &&
+        value.items.every(
+          (item) =>
+            isRecord(item) &&
+            onlyStudioContentKeys(item, [
+              "fieldId",
+              "change",
+              "before",
+              "after",
+              "inCurrentSchema",
+            ]) &&
+            studioUuid(item.fieldId) &&
+            (item.change === "added" || item.change === "removed" || item.change === "changed") &&
+            typeof item.inCurrentSchema === "boolean",
+        ) &&
+        typeof value.restrictedChanges === "boolean" &&
+        typeof value.schemaDiffers === "boolean"
+      );
+    case "publication_status":
+      return validStudioPublicationStatus(value);
+    case "publication_plan":
+      return (
+        exactStudioContentKeys(value, [
+          "authorityHash",
+          "stateVersion",
+          "currentPublicationId",
+          "schemaRevisionId",
+          "contractHash",
+          "sharedVersion",
+          "sharedRevisionId",
+          "localizedVersion",
+          "localizedRevisionId",
+          "wouldCreatePublication",
+          "validation",
+          "entryIssues",
+        ]) &&
+        (value.authorityHash === null || studioHash(value.authorityHash)) &&
+        studioCount(value.stateVersion, 0) &&
+        studioUuidOrNull(value.currentPublicationId) &&
+        studioUuid(value.schemaRevisionId) &&
+        studioHash(value.contractHash) &&
+        studioCount(value.sharedVersion, 0) &&
+        studioUuidOrNull(value.sharedRevisionId) &&
+        studioCount(value.localizedVersion, 0) &&
+        studioUuidOrNull(value.localizedRevisionId) &&
+        typeof value.wouldCreatePublication === "boolean" &&
+        validStudioContentValidation(value.validation) &&
+        Array.isArray(value.entryIssues) &&
+        value.entryIssues.length <= 50 &&
+        value.entryIssues.every(
+          (issue) =>
+            isRecord(issue) &&
+            exactStudioContentKeys(issue, ["code", "message"]) &&
+            typeof issue.code === "string" &&
+            /^[a-z][a-z0-9_]{0,63}$/u.test(issue.code) &&
+            boundedStudioContentString(issue.message, 1, 512),
+        )
+      );
+    case "publish":
+      return (
+        exactStudioContentKeys(value, [
+          "commandId",
+          "resultKind",
+          "stateVersion",
+          "publication",
+          "delivery",
+        ]) &&
+        studioUuid(value.commandId) &&
+        (value.resultKind === "changed" || value.resultKind === "no_op") &&
+        studioCount(value.stateVersion, 0) &&
+        validStudioPublicationSummary(value.publication) &&
+        validStudioDeliveryReadBack(value.delivery)
+      );
+    case "unpublish":
+      return (
+        exactStudioContentKeys(value, [
+          "commandId",
+          "resultKind",
+          "stateVersion",
+          "unpublishedPublicationId",
+          "unpublishedAt",
+          "delivery",
+        ]) &&
+        studioUuid(value.commandId) &&
+        (value.resultKind === "changed" || value.resultKind === "no_op") &&
+        studioCount(value.stateVersion, 0) &&
+        studioUuidOrNull(value.unpublishedPublicationId) &&
+        validStudioContentIsoDateTime(value.unpublishedAt) &&
+        validStudioDeliveryReadBack(value.delivery)
+      );
+    default:
+      return null;
+  }
+}
 
 function validStudioContentEntryValues(value: unknown): boolean {
   return isRecord(value) && Object.keys(value).every((key) => uuid.test(key));
@@ -2247,6 +2513,8 @@ function validStudioContentSuccessData(
   requestedResolutionIds?: ReadonlyArray<string>,
 ): boolean {
   if (!isRecord(value)) return false;
+  const history = validStudioHistorySuccessData(kind, value);
+  if (history !== null) return history;
   if (kind === "page") return validStudioContentPage(value);
   if (kind === "resolve") {
     if (
@@ -2285,13 +2553,21 @@ function validStudioContentSuccessData(
       value.locales.every(
         (locale) =>
           isRecord(locale) &&
-          exactStudioContentKeys(locale, ["id", "tag", "displayName", "canRead", "canWrite"]) &&
+          exactStudioContentKeys(locale, [
+            "id",
+            "tag",
+            "displayName",
+            "canRead",
+            "canWrite",
+            "canPublish",
+          ]) &&
           typeof locale.id === "string" &&
           uuid.test(locale.id) &&
           boundedStudioContentString(locale.tag, 2, 35) &&
           boundedStudioContentString(locale.displayName, 1, 100) &&
           locale.canRead === true &&
-          typeof locale.canWrite === "boolean",
+          typeof locale.canWrite === "boolean" &&
+          typeof locale.canPublish === "boolean",
       ) &&
       Array.isArray(value.collections) &&
       value.collections.length <= 50 &&
@@ -2321,7 +2597,7 @@ function validStudioContentSuccessData(
     const expected =
       kind === "new_workspace"
         ? ["localeId", "locale", "form", "capabilities"]
-        : ["localeId", "locale", "form", "capabilities", "draft"];
+        : ["localeId", "locale", "form", "capabilities", "draft", "publication"];
     if (
       !exactStudioContentKeys(value, expected) ||
       typeof value.localeId !== "string" ||
@@ -2335,6 +2611,7 @@ function validStudioContentSuccessData(
     if (kind === "new_workspace") return true;
     const draft = value.draft;
     return (
+      validStudioPublicationStatus(value.publication) &&
       isRecord(draft) &&
       exactStudioContentKeys(draft, [
         "entry",
@@ -2559,6 +2836,8 @@ function studioContentTarget(
       successKind: "page",
     };
   }
+  const history = studioHistoryTarget(base, suffix ?? "", query, method);
+  if (history !== undefined) return history;
   if (query !== "") return null;
   if (suffix === "search" && method === "POST") {
     return { upstreamPath: `${base}/search`, bodyAllowed: true, successKind: "page" };
@@ -2592,6 +2871,80 @@ function studioContentTarget(
     };
   }
   return null;
+}
+
+function studioPageQuery(query: string, scopeRequired: boolean): boolean {
+  const parameters = new URLSearchParams(query);
+  const keys = [...parameters.keys()];
+  const allowed = scopeRequired ? ["scope", "cursor", "limit"] : ["cursor", "limit"];
+  if (keys.some((key) => !allowed.includes(key)) || new Set(keys).size !== keys.length) {
+    return false;
+  }
+  const scope = parameters.get("scope");
+  const cursor = parameters.get("cursor");
+  const limit = parameters.get("limit");
+  return (
+    (!scopeRequired || scope === "shared" || scope === "localized") &&
+    (cursor === null || /^[A-Za-z0-9_-]{1,1024}$/u.test(cursor)) &&
+    (limit === null || /^(?:[1-4][0-9]|50)$/u.test(limit))
+  );
+}
+
+function studioHistoryTarget(
+  base: string,
+  suffix: string,
+  query: string,
+  method: string,
+): StudioContentTarget | null | undefined {
+  const match =
+    /^([0-9a-f-]{36})\/(revisions|publications|publication)(?:\/(validate|publish|unpublish)|\/([0-9a-f-]{36})(?:\/(restore)|\/compare\/([0-9a-f-]{36}))?)?$/iu.exec(
+      suffix,
+    );
+  if (match === null) return undefined;
+  const [, entryId = "", family, action, revisionId, restore, toRevisionId] = match;
+  if (
+    !uuid.test(entryId) ||
+    (revisionId !== undefined && !uuid.test(revisionId)) ||
+    (toRevisionId !== undefined && !uuid.test(toRevisionId))
+  ) {
+    return null;
+  }
+  const entry = `${base}/${entryId}`;
+  const canonicalQuery = new URLSearchParams(query).toString();
+  const read = (upstreamPath: string, successKind: StudioContentSuccessKind) =>
+    method === "GET" ? { upstreamPath, bodyAllowed: false, successKind } : null;
+  const command = (upstreamPath: string, successKind: StudioContentSuccessKind) =>
+    method === "POST" && query === "" ? { upstreamPath, bodyAllowed: true, successKind } : null;
+  if (family === "revisions" && revisionId === undefined) {
+    if (action !== undefined || !studioPageQuery(query, true)) return null;
+    return read(`${entry}/revisions?${canonicalQuery}`, "revision_page");
+  }
+  if (family === "publications") {
+    if (action !== undefined || revisionId !== undefined || !studioPageQuery(query, false)) {
+      return null;
+    }
+    return read(
+      `${entry}/publications${canonicalQuery === "" ? "" : `?${canonicalQuery}`}`,
+      "publication_page",
+    );
+  }
+  if (query !== "") return null;
+  if (family === "revisions" && revisionId !== undefined) {
+    if (action !== undefined) return null;
+    if (toRevisionId !== undefined) {
+      return read(
+        `${entry}/revisions/${revisionId}/compare/${toRevisionId}`,
+        "revision_comparison",
+      );
+    }
+    if (restore !== undefined)
+      return command(`${entry}/revisions/${revisionId}/restore`, "restore");
+    return read(`${entry}/revisions/${revisionId}`, "revision");
+  }
+  if (family !== "publication" || revisionId !== undefined) return null;
+  if (action === undefined) return read(`${entry}/publication`, "publication_status");
+  if (action === "validate") return command(`${entry}/publication/validate`, "publication_plan");
+  return command(`${entry}/publication/${action}`, action === "publish" ? "publish" : "unpublish");
 }
 
 function boundedStudioMutationValue(value: unknown): boolean {
@@ -2664,8 +3017,75 @@ function validStudioMutations(value: unknown): boolean {
   return Array.isArray(value) && value.length <= 500 && value.every(validStudioMutation);
 }
 
+function studioContentCommandRoute(route: string): boolean {
+  return /\/entries\/[^/]+\/(?:revisions\/[^/]+\/restore|publication\/(?:validate|publish|unpublish))$/u.test(
+    route,
+  );
+}
+
+function studioVersion(value: unknown): boolean {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function validStudioHistoryBody(route: string, value: Readonly<Record<string, unknown>>): boolean {
+  if (route.endsWith("/restore")) {
+    return (
+      exactStudioContentKeys(value, [
+        "scope",
+        "schemaRevisionId",
+        "contractHash",
+        "expectedVersion",
+        "commandId",
+      ]) &&
+      (value.scope === "shared" || value.scope === "localized") &&
+      studioUuid(value.schemaRevisionId) &&
+      studioHash(value.contractHash) &&
+      studioVersion(value.expectedVersion) &&
+      studioUuid(value.commandId)
+    );
+  }
+  if (route.endsWith("/validate")) return Object.keys(value).length === 0;
+  if (route.endsWith("/unpublish")) {
+    return (
+      exactStudioContentKeys(value, [
+        "commandId",
+        "expectedStateVersion",
+        "expectedPublicationId",
+      ]) &&
+      studioUuid(value.commandId) &&
+      studioVersion(value.expectedStateVersion) &&
+      studioUuidOrNull(value.expectedPublicationId)
+    );
+  }
+  return (
+    exactStudioContentKeys(value, [
+      "commandId",
+      "authorityHash",
+      "expectedStateVersion",
+      "expectedPublicationId",
+      "expectedSchemaRevisionId",
+      "expectedContractHash",
+      "expectedSharedVersion",
+      "expectedSharedRevisionId",
+      "expectedLocalizedVersion",
+      "expectedLocalizedRevisionId",
+    ]) &&
+    studioUuid(value.commandId) &&
+    studioHash(value.authorityHash) &&
+    studioVersion(value.expectedStateVersion) &&
+    studioUuidOrNull(value.expectedPublicationId) &&
+    studioUuid(value.expectedSchemaRevisionId) &&
+    studioHash(value.expectedContractHash) &&
+    studioVersion(value.expectedSharedVersion) &&
+    studioUuidOrNull(value.expectedSharedRevisionId) &&
+    studioVersion(value.expectedLocalizedVersion) &&
+    studioUuidOrNull(value.expectedLocalizedRevisionId)
+  );
+}
+
 function validStudioContentBody(route: string, value: unknown): boolean {
   if (!isRecord(value)) return false;
+  if (studioContentCommandRoute(route)) return validStudioHistoryBody(route, value);
   if (route.endsWith("/search")) {
     return (
       Object.keys(value).sort().join(",") === "cursor,limit,query" &&
@@ -2849,7 +3269,9 @@ function routeRequest(
           ? maximumContentSearchRequestBytes
           : parsed.route.endsWith("/resolve")
             ? maximumContentResolveRequestBytes
-            : maximumContentRequestBytes;
+            : studioContentCommandRoute(parsed.route)
+              ? maximumContentCommandRequestBytes
+              : maximumContentRequestBytes;
         requestBody = yield* Effect.tryPromise({
           try: () => boundedRequestText(request, maximumRequestBytes),
           catch: () =>

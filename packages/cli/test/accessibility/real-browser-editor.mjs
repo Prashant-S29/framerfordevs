@@ -48,7 +48,7 @@ const generatedForm = {
   source: "published",
   collectionId: fieldId,
   revisionId: fieldId,
-  formatVersion: 2,
+  formatVersion: 1,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
   contractHash: digest,
@@ -290,6 +290,7 @@ async function startFixtureServer() {
             stateVersion: publicationStateVersion,
             resultKind: "changed",
             publication,
+            delivery: { status: "verified", currentPublicationId: publication.id },
           });
           return;
         case "publication.unpublish":
@@ -304,6 +305,7 @@ async function startFixtureServer() {
             unpublishedPublicationId: publication.id,
             unpublishedPublicationSequence: publication.sequence,
             unpublishedAt: timestamp,
+            delivery: { status: "verified", currentPublicationId: null },
           });
           return;
         default:

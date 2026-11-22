@@ -11,11 +11,15 @@ import {
   type ApiData,
   type ApiResponse,
 } from "@framerfordevs/api/contracts/response/api";
-import { DatabaseFailure } from "@framerfordevs/api/contracts/response/errors";
+import {
+  type ApplicationError,
+  DatabaseFailure,
+} from "@framerfordevs/api/contracts/response/errors";
 import { authoringLimits } from "@framerfordevs/api/contracts/authoring";
 import type {
   AuthoringCreateEntryRequest,
   AuthoringRenameEntryRequest,
+  AuthoringRestoreRevisionRequest,
   AuthoringSaveEntryDraftRequest,
 } from "@framerfordevs/api/contracts/authoring/content";
 import type {
@@ -32,7 +36,6 @@ import { toolingLimits } from "@framerfordevs/api/contracts/tooling";
 import { studioLimits } from "@framerfordevs/api/contracts/studio";
 import { studioContentLimits } from "@framerfordevs/api/contracts/studio-content";
 import { studioContentOpenApiJson } from "@framerfordevs/api/contracts/studio-content/openapi";
-import { studioContentV2OpenApiJson } from "@framerfordevs/api/contracts/studio-content/openapi/v2";
 import { studioOpenApiJson } from "@framerfordevs/api/contracts/studio/openapi";
 import {
   generatePublicArtifacts,
@@ -43,6 +46,7 @@ import { selectCanonicalNetworkSource } from "@framerfordevs/api/lib/network-sou
 import {
   applyAuthoringProjectSchema,
   authenticateAuthoringRequest,
+  compareAuthoringEntryRevisions,
   authoringContentPublishBearerRequirement,
   authoringContentReadBearerRequirement,
   authoringDraftWriteBearerRequirement,
@@ -54,9 +58,11 @@ import {
   decodeAuthoringCreateEntryRequest,
   decodeAuthoringEntryScope,
   decodeAuthoringListEntriesQuery,
+  decodeAuthoringListRevisionsQuery,
   decodeAuthoringProjectScope,
   decodeAuthoringRenameEntryRequest,
   decodeAuthoringPublishEntryRequest,
+  decodeAuthoringRestoreRevisionRequest,
   decodeAuthoringSaveEntryDraftRequest,
   decodeAuthoringUnpublishEntryRequest,
   decodeAuthoringValidatePublicationRequest,
@@ -68,37 +74,56 @@ import {
   evaluateAuthoringPrincipalRateLimit,
   exportAuthoringProjectSchema,
   getAuthoringEntryDraft,
+  getAuthoringEntryRevision,
   getAuthoringGeneratedForm,
   getAuthoringPresentation,
   getAuthoringPublicationStatus,
   listAuthoringEntries,
+  listAuthoringEntryRevisions,
   planAuthoringProjectSchema,
   publishAuthoringEntry,
   publishAuthoringPresentation,
   renameAuthoringEntry,
+  restoreAuthoringEntryRevision,
   saveAuthoringEntryDraft,
   unpublishAuthoringEntry,
   validateAuthoringPublication,
 } from "@framerfordevs/api/operations/authoring/public";
 import {
   browseStudioEntries,
+  compareStudioEntryRevisions,
   createStudioEntry,
   decodeStudioCollectionLocaleScope,
   decodeStudioContentScope,
   decodeStudioCreateEntryRequest,
   decodeStudioEntryId,
   decodeStudioListEntriesQuery,
+  decodeStudioListPublicationsQuery,
+  decodeStudioListRevisionsQuery,
+  decodeStudioPublishEntryRequest,
   decodeStudioRenameEntryRequest,
   decodeStudioResolveEntriesRequest,
+  decodeStudioRestoreRevisionRequest,
+  decodeStudioRevisionId,
   decodeStudioSaveEntryDraftRequest,
   decodeStudioSearchEntriesRequest,
+  decodeStudioUnpublishEntryRequest,
+  decodeStudioValidatePublicationRequest,
   getStudioContentContext,
+  getStudioEntryPublication,
+  getStudioEntryRevision,
   getStudioEntryWorkspace,
   getStudioNewEntryWorkspace,
+  listStudioEntryPublications,
+  listStudioEntryRevisions,
+  publishStudioEntry,
   renameStudioEntry,
   resolveStudioEntryLabels,
+  restoreStudioEntryRevision,
   saveStudioEntryDraft,
   searchStudioEntries,
+  unpublishStudioEntry,
+  validateStudioEntryPublication,
 } from "@framerfordevs/api/operations/studio-content-public";
 import {
   authenticateStudioRequest,
@@ -164,6 +189,7 @@ import {
   type ToolingSubject,
 } from "@framerfordevs/api/observability/telemetry";
 import {
+  type ApplicationServices,
   observeAuthoringAuthentication,
   observeAuthoringRequest,
   observeHttpRequest,
@@ -1307,6 +1333,15 @@ function createStudioRouter(transformEffect?: ApplicationEffectTransform): Route
   return router;
 }
 
+function studioPageQuery(req: Request): Readonly<Record<string, unknown>> {
+  const query = new Map<string, unknown>();
+  for (const [key, value] of new URLSearchParams(req.originalUrl.split("?", 2)[1] ?? "")) {
+    const decoded = key === "limit" && /^[0-9]{1,3}$/u.test(value) ? Number(value) : value;
+    query.set(key, query.has(key) ? [query.get(key), decoded] : decoded);
+  }
+  return Object.fromEntries(query);
+}
+
 export function encodeStudioContentResponse(response: unknown): Buffer | null {
   const body = Buffer.from(JSON.stringify(response), "utf8");
   return body.byteLength <= studioContentLimits.responseBytes ? body : null;
@@ -1337,10 +1372,7 @@ function sendStudioContentSuccess(
   res.end(body);
 }
 
-function createStudioContentRouter(
-  major: "v1" | "v2",
-  transformEffect?: ApplicationEffectTransform,
-): Router {
+function createStudioContentRouter(transformEffect?: ApplicationEffectTransform): Router {
   const router = express.Router({ caseSensitive: true, strict: true });
   router.use((req, res, next) => {
     setStudioHeaders(res);
@@ -1374,7 +1406,7 @@ function createStudioContentRouter(
     const rawQuery = req.originalUrl.split("?", 2)[1] ?? "";
     const browseQueryRoute =
       req.method === "GET" &&
-      /^\/projects\/[^/]+\/environments\/[^/]+\/collections\/[^/]+\/locales\/[^/]+\/entries$/u.test(
+      /^\/projects\/[^/]+\/environments\/[^/]+\/collections\/[^/]+\/locales\/[^/]+\/entries(?:\/[^/]+\/(?:revisions|publications))?$/u.test(
         req.path,
       );
     if (rawQuery !== "" && !browseQueryRoute) {
@@ -1413,7 +1445,11 @@ function createStudioContentRouter(
       ? studioContentLimits.searchRequestBytes
       : req.path.endsWith("/entries/resolve")
         ? studioContentLimits.resolveRequestBytes
-        : studioContentLimits.requestBytes;
+        : /\/entries\/[^/]+\/(?:revisions\/[^/]+\/restore|publication\/(?:validate|publish|unpublish))$/u.test(
+              req.path,
+            )
+          ? studioContentLimits.commandRequestBytes
+          : studioContentLimits.requestBytes;
     if (
       req.headers["transfer-encoding"] !== undefined ||
       (typeof contentLength === "string" &&
@@ -1455,9 +1491,7 @@ function createStudioContentRouter(
 
   router.get("/openapi.json", (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=300");
-    res
-      .type("application/json")
-      .send(major === "v1" ? studioContentOpenApiJson : studioContentV2OpenApiJson);
+    res.type("application/json").send(studioContentOpenApiJson);
   });
   router.get(
     "/docs",
@@ -1467,7 +1501,7 @@ function createStudioContentRouter(
     },
     apiReference({
       pageTitle: "Framer for Devs Studio Content API",
-      url: `/api/studio-content/${major}/openapi.json`,
+      url: "/api/studio-content/v1/openapi.json",
     }),
   );
 
@@ -1573,7 +1607,7 @@ function createStudioContentRouter(
     if (scope === null) return;
     const query = await context.execute(
       "api.studio_content.entries.query",
-      decodeStudioListEntriesQuery(req.query),
+      decodeStudioListEntriesQuery(studioPageQuery(req)),
       "Studio Content entry query decoded.",
     );
     if (!query.response.ok) {
@@ -1621,39 +1655,37 @@ function createStudioContentRouter(
     },
   );
 
-  if (major === "v2") {
-    router.post(
-      `${entriesPath}/resolve`,
-      express.json({
-        limit: studioContentLimits.resolveRequestBytes,
-        strict: true,
-        type: "application/json",
-      }),
-      async (req, res) => {
-        const context = makeContext(req);
-        const principal = await authenticate(req, res, context);
-        if (principal === null) return;
-        const scope = await decodeScope(req, res, context);
-        if (scope === null) return;
-        const request = await context.execute(
-          "api.studio_content.entries.resolve.request",
-          decodeStudioResolveEntriesRequest(req.body),
-          "Studio Content resolution request decoded.",
-        );
-        if (!request.response.ok) {
-          sendStudioResponse(req, res, request.status, request.response);
-          return;
-        }
-        const result = await context.execute(
-          "api.studio_content.entries.resolve",
-          resolveStudioEntryLabels(principal, scope, request.response.data, new Date()),
-          "Studio Content entry labels resolved.",
-        );
-        if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
-        else sendStudioContentSuccess(req, res, result.response);
-      },
-    );
-  }
+  router.post(
+    `${entriesPath}/resolve`,
+    express.json({
+      limit: studioContentLimits.resolveRequestBytes,
+      strict: true,
+      type: "application/json",
+    }),
+    async (req, res) => {
+      const context = makeContext(req);
+      const principal = await authenticate(req, res, context);
+      if (principal === null) return;
+      const scope = await decodeScope(req, res, context);
+      if (scope === null) return;
+      const request = await context.execute(
+        "api.studio_content.entries.resolve.request",
+        decodeStudioResolveEntriesRequest(req.body),
+        "Studio Content resolution request decoded.",
+      );
+      if (!request.response.ok) {
+        sendStudioResponse(req, res, request.status, request.response);
+        return;
+      }
+      const result = await context.execute(
+        "api.studio_content.entries.resolve",
+        resolveStudioEntryLabels(principal, scope, request.response.data, new Date()),
+        "Studio Content entry labels resolved.",
+      );
+      if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+      else sendStudioContentSuccess(req, res, result.response);
+    },
+  );
 
   router.get(`${entriesPath}/new`, async (req, res) => {
     const context = makeContext(req);
@@ -1799,6 +1831,285 @@ function createStudioContentRouter(
         context.request.requestId,
       ),
       "Studio Content entry draft saved.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  const commandBody = express.json({
+    limit: studioContentLimits.commandRequestBytes,
+    strict: true,
+    type: "application/json",
+  });
+  const decodeEntry = async (req: Request, res: Response, context: Context) => {
+    const result = await context.execute(
+      "api.studio_content.entry.id",
+      decodeStudioEntryId(routeParameter(req, "entryId")),
+      "Studio Content entry ID decoded.",
+    );
+    if (!result.response.ok) {
+      sendStudioResponse(req, res, result.status, result.response);
+      return null;
+    }
+    return result.response.data;
+  };
+  const decodeRevision = async (
+    req: Request,
+    res: Response,
+    context: Context,
+    parameter: "revisionId" | "fromRevisionId" | "toRevisionId",
+  ) => {
+    const result = await context.execute(
+      "api.studio_content.revision.id",
+      decodeStudioRevisionId(routeParameter(req, parameter)),
+      "Studio Content revision ID decoded.",
+    );
+    if (!result.response.ok) {
+      sendStudioResponse(req, res, result.status, result.response);
+      return null;
+    }
+    return result.response.data;
+  };
+  const authorizedEntry = async (req: Request, res: Response, context: Context) => {
+    const principal = await authenticate(req, res, context);
+    if (principal === null) return null;
+    const scope = await decodeScope(req, res, context);
+    if (scope === null) return null;
+    const entryId = await decodeEntry(req, res, context);
+    if (entryId === null) return null;
+    return { principal, scope, entryId };
+  };
+  const decodeBody = async <A extends ApiData>(
+    req: Request,
+    res: Response,
+    context: Context,
+    span: string,
+    effect: Effect.Effect<A, ApplicationError, ApplicationServices>,
+  ) => {
+    const result = await context.execute(span, effect, "Studio Content request decoded.");
+    if (!result.response.ok) {
+      sendStudioResponse(req, res, result.status, result.response);
+      return null;
+    }
+    return result.response.data;
+  };
+  const entryPath = `${entriesPath}/:entryId`;
+
+  router.get(`${entryPath}/revisions`, async (req, res) => {
+    const context = makeContext(req);
+    const target = await authorizedEntry(req, res, context);
+    if (target === null) return;
+    const query = await decodeBody(
+      req,
+      res,
+      context,
+      "api.studio_content.revisions.query",
+      decodeStudioListRevisionsQuery(studioPageQuery(req)),
+    );
+    if (query === null) return;
+    const result = await context.execute(
+      "api.studio_content.revisions.list",
+      listStudioEntryRevisions(target.principal, target.scope, target.entryId, query, new Date()),
+      "Studio Content revisions listed.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.get(`${entryPath}/revisions/:fromRevisionId/compare/:toRevisionId`, async (req, res) => {
+    const context = makeContext(req);
+    const target = await authorizedEntry(req, res, context);
+    if (target === null) return;
+    const fromRevisionId = await decodeRevision(req, res, context, "fromRevisionId");
+    if (fromRevisionId === null) return;
+    const toRevisionId = await decodeRevision(req, res, context, "toRevisionId");
+    if (toRevisionId === null) return;
+    const result = await context.execute(
+      "api.studio_content.revisions.compare",
+      compareStudioEntryRevisions(
+        target.principal,
+        target.scope,
+        target.entryId,
+        fromRevisionId,
+        toRevisionId,
+        new Date(),
+      ),
+      "Studio Content revisions compared.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.get(`${entryPath}/revisions/:revisionId`, async (req, res) => {
+    const context = makeContext(req);
+    const target = await authorizedEntry(req, res, context);
+    if (target === null) return;
+    const revisionId = await decodeRevision(req, res, context, "revisionId");
+    if (revisionId === null) return;
+    const result = await context.execute(
+      "api.studio_content.revisions.get",
+      getStudioEntryRevision(
+        target.principal,
+        target.scope,
+        target.entryId,
+        revisionId,
+        new Date(),
+      ),
+      "Studio Content revision loaded.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.post(`${entryPath}/revisions/:revisionId/restore`, commandBody, async (req, res) => {
+    const context = makeContext(req);
+    const target = await authorizedEntry(req, res, context);
+    if (target === null) return;
+    const revisionId = await decodeRevision(req, res, context, "revisionId");
+    if (revisionId === null) return;
+    const request = await decodeBody(
+      req,
+      res,
+      context,
+      "api.studio_content.revisions.restore.request",
+      decodeStudioRestoreRevisionRequest(req.body),
+    );
+    if (request === null) return;
+    const result = await context.execute(
+      "api.studio_content.revisions.restore",
+      restoreStudioEntryRevision(
+        target.principal,
+        target.scope,
+        target.entryId,
+        revisionId,
+        request,
+        new Date(),
+        context.request.requestId,
+      ),
+      "Studio Content revision restored.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.get(`${entryPath}/publication`, async (req, res) => {
+    const context = makeContext(req);
+    const target = await authorizedEntry(req, res, context);
+    if (target === null) return;
+    const result = await context.execute(
+      "api.studio_content.publication.get",
+      getStudioEntryPublication(target.principal, target.scope, target.entryId, new Date()),
+      "Studio Content publication status loaded.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.get(`${entryPath}/publications`, async (req, res) => {
+    const context = makeContext(req);
+    const target = await authorizedEntry(req, res, context);
+    if (target === null) return;
+    const query = await decodeBody(
+      req,
+      res,
+      context,
+      "api.studio_content.publications.query",
+      decodeStudioListPublicationsQuery(studioPageQuery(req)),
+    );
+    if (query === null) return;
+    const result = await context.execute(
+      "api.studio_content.publications.list",
+      listStudioEntryPublications(
+        target.principal,
+        target.scope,
+        target.entryId,
+        query,
+        new Date(),
+      ),
+      "Studio Content publications listed.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.post(`${entryPath}/publication/validate`, commandBody, async (req, res) => {
+    const context = makeContext(req);
+    const target = await authorizedEntry(req, res, context);
+    if (target === null) return;
+    const request = await decodeBody(
+      req,
+      res,
+      context,
+      "api.studio_content.publication.validate.request",
+      decodeStudioValidatePublicationRequest(req.body),
+    );
+    if (request === null) return;
+    const result = await context.execute(
+      "api.studio_content.publication.validate",
+      validateStudioEntryPublication(
+        target.principal,
+        target.scope,
+        target.entryId,
+        request,
+        new Date(),
+      ),
+      "Studio Content publication validated.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.post(`${entryPath}/publication/publish`, commandBody, async (req, res) => {
+    const context = makeContext(req);
+    const target = await authorizedEntry(req, res, context);
+    if (target === null) return;
+    const request = await decodeBody(
+      req,
+      res,
+      context,
+      "api.studio_content.publication.publish.request",
+      decodeStudioPublishEntryRequest(req.body),
+    );
+    if (request === null) return;
+    const result = await context.execute(
+      "api.studio_content.publication.publish",
+      publishStudioEntry(
+        target.principal,
+        target.scope,
+        target.entryId,
+        request,
+        new Date(),
+        context.request.requestId,
+      ),
+      "Studio Content entry published.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.post(`${entryPath}/publication/unpublish`, commandBody, async (req, res) => {
+    const context = makeContext(req);
+    const target = await authorizedEntry(req, res, context);
+    if (target === null) return;
+    const request = await decodeBody(
+      req,
+      res,
+      context,
+      "api.studio_content.publication.unpublish.request",
+      decodeStudioUnpublishEntryRequest(req.body),
+    );
+    if (request === null) return;
+    const result = await context.execute(
+      "api.studio_content.publication.unpublish",
+      unpublishStudioEntry(
+        target.principal,
+        target.scope,
+        target.entryId,
+        request,
+        new Date(),
+        context.request.requestId,
+      ),
+      "Studio Content entry unpublished.",
     );
     if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
     else sendStudioContentSuccess(req, res, result.response);
@@ -2327,6 +2638,12 @@ export function classifyAuthoringEndpoint(method: string, path: string): Authori
   if (/\/entries\/[^/]+\/publication\/unpublish$/u.test(path) && method === "POST")
     return "publication_unpublish";
   if (/\/entries\/[^/]+\/publication$/u.test(path) && method === "GET") return "publication_status";
+  if (/\/entries\/[^/]+\/revisions$/u.test(path) && method === "GET") return "revision_list";
+  if (/\/entries\/[^/]+\/revisions\/[^/]+$/u.test(path) && method === "GET") return "revision_get";
+  if (/\/entries\/[^/]+\/revisions\/[^/]+\/compare\/[^/]+$/u.test(path) && method === "GET")
+    return "revision_compare";
+  if (/\/entries\/[^/]+\/revisions\/[^/]+\/restore$/u.test(path) && method === "POST")
+    return "revision_restore";
   if (/\/entries\/[^/]+$/u.test(path) && method === "PATCH") return "entry_rename";
   return null;
 }
@@ -2477,7 +2794,10 @@ function createAuthoringRouter(transformEffect?: ApplicationEffectTransform): Ro
       );
       return;
     }
-    if (rawQuery !== "" && !(req.method === "GET" && req.path.endsWith("/entries"))) {
+    if (
+      rawQuery !== "" &&
+      !(req.method === "GET" && (req.path.endsWith("/entries") || req.path.endsWith("/revisions")))
+    ) {
       sendAuthoringResponse(
         req,
         res,
@@ -3017,6 +3337,146 @@ function createAuthoringRouter(transformEffect?: ApplicationEffectTransform): Ro
     sendAuthoringResponse(req, res, result.status, result.response);
   });
 
+  const revisionsPath = `${entryPath}/revisions`;
+  router.get(revisionsPath, async (req, res) => {
+    const context = createContext({ req });
+    const parameters = new URLSearchParams(req.originalUrl.split("?", 2)[1] ?? "");
+    if (
+      [...parameters.keys()].some(
+        (key) => key !== "scope" && key !== "cursor" && key !== "limit",
+      ) ||
+      parameters.getAll("scope").length > 1 ||
+      parameters.getAll("cursor").length > 1 ||
+      parameters.getAll("limit").length > 1
+    ) {
+      sendAuthoringResponse(
+        req,
+        res,
+        400,
+        apiFailure({
+          code: "VALIDATION_ERROR",
+          message: "The Authoring query is invalid.",
+          requestId: context.request.requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    const queryResult = await context.execute(
+      "api.authoring.revision.list.query",
+      decodeAuthoringListRevisionsQuery({
+        scope: parameters.get("scope"),
+        cursor: parameters.get("cursor"),
+        limit: Number(parameters.get("limit") ?? "20"),
+      }),
+      "Authoring revision query decoded.",
+    );
+    const query = stepData(req, res, queryResult);
+    if (query === null) return;
+    const prepared = await prepareEntryScope(
+      req,
+      res,
+      context,
+      1 + Math.ceil(query.limit / 10),
+      authoringContentReadBearerRequirement,
+    );
+    if (prepared === undefined) return;
+    const result = await context.execute(
+      "api.authoring.revision.list",
+      listAuthoringEntryRevisions(
+        prepared.principal,
+        prepared.project,
+        prepared.scope,
+        routeParameter(req, "entryId"),
+        query,
+      ),
+      "Authoring entry revisions loaded.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  router.get(`${revisionsPath}/:revisionId`, async (req, res) => {
+    const context = createContext({ req });
+    const prepared = await prepareEntryScope(
+      req,
+      res,
+      context,
+      2,
+      authoringContentReadBearerRequirement,
+    );
+    if (prepared === undefined) return;
+    const result = await context.execute(
+      "api.authoring.revision.get",
+      getAuthoringEntryRevision(
+        prepared.principal,
+        prepared.project,
+        prepared.scope,
+        routeParameter(req, "entryId"),
+        routeParameter(req, "revisionId"),
+      ),
+      "Authoring entry revision loaded.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  router.get(`${revisionsPath}/:fromRevisionId/compare/:toRevisionId`, async (req, res) => {
+    const context = createContext({ req });
+    const prepared = await prepareEntryScope(
+      req,
+      res,
+      context,
+      3,
+      authoringContentReadBearerRequirement,
+    );
+    if (prepared === undefined) return;
+    const result = await context.execute(
+      "api.authoring.revision.compare",
+      compareAuthoringEntryRevisions(
+        prepared.principal,
+        prepared.project,
+        prepared.scope,
+        routeParameter(req, "entryId"),
+        routeParameter(req, "fromRevisionId"),
+        routeParameter(req, "toRevisionId"),
+      ),
+      "Authoring entry revisions compared.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  router.post(`${revisionsPath}/:revisionId/restore`, async (req, res) => {
+    const context = createContext({ req });
+    const prepared = await prepareEntryScope(
+      req,
+      res,
+      context,
+      3,
+      authoringDraftWriteBearerRequirement,
+    );
+    if (prepared === undefined) return;
+    const bodyResult = await context.execute(
+      "api.authoring.revision.restore.body",
+      decodeAuthoringRestoreRevisionRequest(req.body),
+      "Authoring restore body decoded.",
+    );
+    const body = stepData(req, res, bodyResult) as AuthoringRestoreRevisionRequest | null;
+    if (body === null) return;
+    const result = await context.execute(
+      "api.authoring.revision.restore",
+      restoreAuthoringEntryRevision(
+        prepared.principal,
+        prepared.project,
+        prepared.scope,
+        routeParameter(req, "entryId"),
+        routeParameter(req, "revisionId"),
+        body,
+        context.request.requestId,
+      ),
+      "Authoring entry revision restored.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
   const exportPath = "/projects/:projectId/environments/:environmentId/schema/export";
   router.get(exportPath, async (req, res) => {
     const context = createContext({ req });
@@ -3276,8 +3736,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use("/api/preview/v1", createPreviewRouter(previewApiEnabled));
   app.use("/api/tooling/v1", createToolingRouter());
   app.use("/api/studio/v1", createStudioRouter(options.studioEffectTransform));
-  app.use("/api/studio-content/v1", createStudioContentRouter("v1", options.studioEffectTransform));
-  app.use("/api/studio-content/v2", createStudioContentRouter("v2", options.studioEffectTransform));
+  app.use("/api/studio-content/v1", createStudioContentRouter(options.studioEffectTransform));
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;

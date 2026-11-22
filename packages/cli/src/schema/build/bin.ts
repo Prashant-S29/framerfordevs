@@ -25,11 +25,7 @@ function schemaBuildEffect(rawArguments: ReadonlyArray<string>) {
       catch: () => new Error("CLI_FLAG_INVALID"),
     });
     const loaded = yield* loadCliConfig(process.cwd());
-    if (
-      loaded.config.schemaVersion !== 2 ||
-      loaded.config.schemaBuild === undefined ||
-      loaded.schemaPath === null
-    ) {
+    if (loaded.config.schemaBuild === undefined) {
       return yield* CliSchemaBuildNotConfiguredError.make();
     }
     return yield* runSchemaBuildCommand({

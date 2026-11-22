@@ -22,6 +22,22 @@ import {
   StudioResolveEntriesResponse,
   StudioSaveEntryDraftResponse,
   StudioSearchEntriesRequest,
+  StudioContentApiErrorCode,
+  StudioListPublicationsQuery,
+  StudioListRevisionsQuery,
+  StudioPublicationPageResponse,
+  StudioPublicationPlanResponse,
+  StudioPublicationStatusResponse,
+  StudioPublishEntryRequest,
+  StudioPublishResponse,
+  StudioRestoreRevisionRequest,
+  StudioRestoreRevisionResponse,
+  StudioRevisionComparisonResponse,
+  StudioRevisionPageResponse,
+  StudioRevisionResponse,
+  StudioUnpublishEntryRequest,
+  StudioUnpublishResponse,
+  StudioValidatePublicationRequest,
   studioContentLimits,
 } from "./index";
 
@@ -89,6 +105,7 @@ describe("Studio Content contracts", () => {
       canRename: true,
       canSaveLocalized: true,
       canSaveShared: true,
+      canPublish: true,
     };
     const form = {
       collectionId: ids.collection,
@@ -170,7 +187,14 @@ describe("Studio Content contracts", () => {
         Schema.decodeUnknownSync(StudioContentContextResponse, { onExcessProperty: "error" })(
           success({
             locales: [
-              { id: ids.locale, tag: "en", displayName: "English", canRead: true, canWrite: true },
+              {
+                id: ids.locale,
+                tag: "en",
+                displayName: "English",
+                canRead: true,
+                canWrite: true,
+                canPublish: true,
+              },
             ],
             collections: [{ id: ids.collection, displayName: "Entries", capabilities }],
             configurationNotices: [],
@@ -190,7 +214,22 @@ describe("Studio Content contracts", () => {
         ),
       () =>
         Schema.decodeUnknownSync(StudioEntryWorkspaceResponse, { onExcessProperty: "error" })(
-          success({ localeId: ids.locale, locale: "en", form, capabilities, draft }),
+          success({
+            localeId: ids.locale,
+            locale: "en",
+            form,
+            capabilities,
+            draft,
+            publication: {
+              state: "never_published",
+              stateVersion: 0,
+              currentPublication: null,
+              sharedChanged: false,
+              localizedChanged: false,
+              schemaChanged: false,
+              changedSincePublication: false,
+            },
+          }),
         ),
       () =>
         Schema.decodeUnknownSync(StudioCreateEntryResponse, { onExcessProperty: "error" })(
@@ -328,12 +367,14 @@ describe("Studio Content contracts", () => {
       displayName: "English",
       canRead: true,
       canWrite: true,
+      canPublish: true,
     };
     const capabilities = {
       canCreate: true,
       canRename: true,
       canSaveLocalized: true,
       canSaveShared: true,
+      canPublish: true,
     };
     const collection = { id: ids.collection, displayName: "Entries", capabilities };
     const notice = {
@@ -468,6 +509,7 @@ describe("Studio Content contracts", () => {
           displayName: "English",
           canRead: true,
           canWrite: true,
+          canPublish: false,
         },
       ],
       collections: [],
@@ -497,5 +539,257 @@ describe("Studio Content contracts", () => {
       Schema.decodeUnknownSync(StudioContentSearchText, { onExcessProperty: "error" })("  posts  "),
       "posts",
     );
+  });
+});
+
+describe("Studio Content revision and publication contracts", () => {
+  const id = (suffix: string) => `019fae8b-1234-7000-8000-0000000001${suffix}`;
+  const hash = "a".repeat(64);
+  const success = (data: unknown) => ({
+    ok: true,
+    data,
+    error: null,
+    message: "Studio Content operation completed.",
+  });
+  const revision = {
+    id: id("01"),
+    scope: "localized",
+    sequence: 2,
+    previousRevisionId: id("02"),
+    schemaRevisionId: id("03"),
+    contractHash: hash,
+    changedFieldIds: [id("04")],
+    restoredFromRevisionId: null,
+    authoredByUserId: "user-1",
+    authoredByCredentialId: null,
+    authoredAt: "2026-11-01T00:00:00.000Z",
+    compatible: true,
+  };
+  const publication = {
+    id: id("05"),
+    sequence: 1,
+    schemaRevisionId: id("03"),
+    contractHash: hash,
+    changedFieldIds: [],
+    publishedAt: "2026-11-01T00:00:00.000Z",
+    current: true,
+  };
+  const validation = { status: "valid", issues: [], capped: false };
+
+  it("decodes every revision and publication DTO strictly", () => {
+    const decoders: ReadonlyArray<readonly [Schema.Codec<unknown, unknown>, unknown]> = [
+      [StudioRevisionPageResponse, { items: [revision], nextCursor: "abc_DEF-1" }],
+      [StudioRevisionResponse, { revision, values: { [id("04")]: "Title" } }],
+      [
+        StudioRevisionComparisonResponse,
+        {
+          from: revision,
+          to: { ...revision, compatible: false },
+          items: [
+            {
+              fieldId: id("04"),
+              change: "changed",
+              before: "a",
+              after: "b",
+              inCurrentSchema: true,
+            },
+          ],
+          restrictedChanges: true,
+          schemaDiffers: true,
+        },
+      ],
+      [
+        StudioRestoreRevisionResponse,
+        {
+          entryId: id("06"),
+          commandId: id("07"),
+          sharedChanged: false,
+          sharedVersion: 1,
+          sharedRevisionId: null,
+          localizedChanged: true,
+          localizedVersion: 3,
+          localizedRevisionId: id("08"),
+          validation,
+        },
+      ],
+      [
+        StudioPublicationStatusResponse,
+        {
+          state: "published",
+          stateVersion: 1,
+          currentPublication: publication,
+          sharedChanged: false,
+          localizedChanged: true,
+          schemaChanged: false,
+          changedSincePublication: true,
+        },
+      ],
+      [StudioPublicationPageResponse, { items: [publication], nextCursor: null }],
+      [
+        StudioPublicationPlanResponse,
+        {
+          authorityHash: hash,
+          stateVersion: 0,
+          currentPublicationId: null,
+          schemaRevisionId: id("03"),
+          contractHash: hash,
+          sharedVersion: 0,
+          sharedRevisionId: null,
+          localizedVersion: 1,
+          localizedRevisionId: id("08"),
+          wouldCreatePublication: true,
+          validation,
+          entryIssues: [{ code: "publication_snapshot_too_large", message: "Too large." }],
+        },
+      ],
+      [
+        StudioPublishResponse,
+        {
+          commandId: id("07"),
+          resultKind: "changed",
+          stateVersion: 1,
+          publication,
+          delivery: { status: "verified", currentPublicationId: id("05") },
+        },
+      ],
+      [
+        StudioUnpublishResponse,
+        {
+          commandId: id("07"),
+          resultKind: "no_op",
+          stateVersion: 0,
+          unpublishedPublicationId: null,
+          unpublishedAt: "2026-11-01T00:00:00.000Z",
+          delivery: { status: "superseded", currentPublicationId: id("05") },
+        },
+      ],
+    ];
+    for (const [schema, data] of decoders) {
+      const decode = Schema.decodeUnknownExit(schema, { onExcessProperty: "error" });
+      assert.isTrue(Exit.isSuccess(decode(success(data))));
+      assert.isTrue(
+        Exit.isFailure(decode(success({ ...(typeof data === "object" ? data : {}), extra: 1 }))),
+      );
+    }
+  });
+
+  it("rejects unknown publication states and unbounded revision pages", () => {
+    const status = Schema.decodeUnknownExit(StudioPublicationStatusResponse, {
+      onExcessProperty: "error",
+    });
+    assert.isTrue(
+      Exit.isFailure(
+        status(
+          success({
+            state: "draft",
+            stateVersion: 0,
+            currentPublication: null,
+            sharedChanged: false,
+            localizedChanged: false,
+            schemaChanged: false,
+            changedSincePublication: false,
+          }),
+        ),
+      ),
+    );
+    const page = Schema.decodeUnknownExit(StudioRevisionPageResponse, {
+      onExcessProperty: "error",
+    });
+    assert.isTrue(
+      Exit.isFailure(
+        page(success({ items: Array.from({ length: 51 }, () => revision), nextCursor: null })),
+      ),
+    );
+  });
+
+  it("decodes request bodies and queries strictly with bounded defaults", () => {
+    const listRevisions = Schema.decodeUnknownSync(StudioListRevisionsQuery, {
+      onExcessProperty: "error",
+    })({ scope: "shared" });
+    assert.strictEqual(Number(listRevisions.limit), studioContentLimits.pageLimitDefault);
+    assert.strictEqual(listRevisions.cursor, null);
+    assert.isTrue(
+      Exit.isFailure(
+        Schema.decodeUnknownExit(StudioListRevisionsQuery, { onExcessProperty: "error" })({
+          scope: "both",
+        }),
+      ),
+    );
+    assert.isTrue(
+      Exit.isFailure(
+        Schema.decodeUnknownExit(StudioListPublicationsQuery, { onExcessProperty: "error" })({
+          limit: 51,
+        }),
+      ),
+    );
+    const validate = Schema.decodeUnknownExit(StudioValidatePublicationRequest, {
+      onExcessProperty: "error",
+    });
+    assert.isTrue(Exit.isSuccess(validate({})));
+    assert.isTrue(Exit.isFailure(validate({ force: true })));
+    assert.isTrue(Exit.isFailure(validate([])));
+    assert.isTrue(Exit.isFailure(validate(null)));
+    const restore = {
+      scope: "localized",
+      schemaRevisionId: id("03"),
+      contractHash: hash,
+      expectedVersion: 2,
+      commandId: id("07"),
+    };
+    assert.isTrue(
+      Exit.isSuccess(
+        Schema.decodeUnknownExit(StudioRestoreRevisionRequest, { onExcessProperty: "error" })(
+          restore,
+        ),
+      ),
+    );
+    assert.isTrue(
+      Exit.isFailure(
+        Schema.decodeUnknownExit(StudioRestoreRevisionRequest, { onExcessProperty: "error" })({
+          ...restore,
+          revisionId: id("01"),
+        }),
+      ),
+    );
+    const publish = {
+      commandId: id("07"),
+      authorityHash: hash,
+      expectedStateVersion: 0,
+      expectedPublicationId: null,
+      expectedSchemaRevisionId: id("03"),
+      expectedContractHash: hash,
+      expectedSharedVersion: 0,
+      expectedSharedRevisionId: null,
+      expectedLocalizedVersion: 1,
+      expectedLocalizedRevisionId: id("08"),
+    };
+    const decodePublish = Schema.decodeUnknownExit(StudioPublishEntryRequest, {
+      onExcessProperty: "error",
+    });
+    assert.isTrue(Exit.isSuccess(decodePublish(publish)));
+    assert.isTrue(Exit.isFailure(decodePublish({ ...publish, authorityHash: "short" })));
+    const decodeUnpublish = Schema.decodeUnknownExit(StudioUnpublishEntryRequest, {
+      onExcessProperty: "error",
+    });
+    assert.isTrue(
+      Exit.isSuccess(
+        decodeUnpublish({
+          commandId: id("07"),
+          expectedStateVersion: 1,
+          expectedPublicationId: null,
+        }),
+      ),
+    );
+    assert.isTrue(Exit.isFailure(decodeUnpublish({ commandId: id("07") })));
+  });
+
+  it("registers the revision and publication error codes", () => {
+    for (const code of [
+      "REVISION_INCOMPATIBLE",
+      "PUBLICATION_INVALID",
+      "PUBLICATION_STATE_CONFLICT",
+    ]) {
+      assert.isTrue(Exit.isSuccess(Schema.decodeUnknownExit(StudioContentApiErrorCode)(code)));
+    }
   });
 });

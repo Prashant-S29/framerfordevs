@@ -14,7 +14,7 @@ function sha256(bytes: string): string {
 }
 
 describe("closed public contract registry", () => {
-  it("contains the eight approved v1 families and Studio Content v2 successor", () => {
+  it("contains the eight approved v1 families", () => {
     expect(publicContractRegistryKeys).toEqual([
       "authoring/v1",
       "control-plane/v1",
@@ -22,7 +22,6 @@ describe("closed public contract registry", () => {
       "preview/v1",
       "studio/v1",
       "studio-content/v1",
-      "studio-content/v2",
       "tooling/v1",
       "webhooks/v1",
     ]);
@@ -45,12 +44,11 @@ describe("closed public contract registry", () => {
       "openapi",
       "openapi",
       "openapi",
-      "openapi",
       "json-schema",
     ]);
   });
 
-  it("generates byte-stable artifacts with the declared baseline digests", () => {
+  it("generates byte-stable artifacts", () => {
     const first = generatePublicArtifacts();
     const second = generatePublicArtifacts();
 
@@ -58,7 +56,6 @@ describe("closed public contract registry", () => {
     for (const artifact of first) {
       expect(artifact.bytes.endsWith("\n")).toBe(true);
       expect(sha256(artifact.bytes)).toBe(artifact.digest);
-      expect(publicContractRegistry[artifact.key].baselineDigest).toBe(artifact.digest);
     }
   });
 

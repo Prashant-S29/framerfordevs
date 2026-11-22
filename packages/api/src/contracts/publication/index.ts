@@ -207,6 +207,16 @@ export class ListEntryPublicationsInput extends Schema.Class<ListEntryPublicatio
   limit: PageLimit,
 }) {}
 
+export const EntryDeliveryReadBackStatus = Schema.Literals(["verified", "superseded"]);
+export type EntryDeliveryReadBackStatus = typeof EntryDeliveryReadBackStatus.Type;
+
+export class EntryDeliveryReadBack extends Schema.Class<EntryDeliveryReadBack>(
+  "EntryDeliveryReadBack",
+)({
+  status: EntryDeliveryReadBackStatus,
+  currentPublicationId: Schema.NullOr(EntryPublicationId),
+}) {}
+
 export class PublishEntryResult extends Schema.Class<PublishEntryResult>("PublishEntryResult")({
   entryId: EntryId,
   localeId: ProjectLocaleId,
@@ -215,6 +225,7 @@ export class PublishEntryResult extends Schema.Class<PublishEntryResult>("Publis
   stateVersion: EntryPublicationStateVersion,
   resultKind: Schema.Literals(["changed", "no_op"]),
   publication: EntryPublicationSummary,
+  delivery: EntryDeliveryReadBack,
 }) {}
 
 export class UnpublishEntryResult extends Schema.Class<UnpublishEntryResult>(
@@ -229,6 +240,7 @@ export class UnpublishEntryResult extends Schema.Class<UnpublishEntryResult>(
   unpublishedPublicationId: Schema.NullOr(EntryPublicationId),
   unpublishedPublicationSequence: Schema.NullOr(EntryPublicationSequence),
   unpublishedAt: IsoDateTime,
+  delivery: EntryDeliveryReadBack,
 }) {}
 
 export const GetEntryPublicationStatusInputSchema = Schema.toStandardSchemaV1(

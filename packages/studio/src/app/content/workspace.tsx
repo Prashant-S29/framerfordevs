@@ -51,6 +51,9 @@ import {
   type StudioUnresolvedChange,
 } from "./rebase";
 import { StudioReferencePicker, StudioReferenceResolutionProvider } from "./reference-picker";
+import { StudioHistoryPanel } from "./history/panel";
+import { StudioPublicationBadge } from "./publication/badge";
+import { StudioPublicationPanel } from "./publication/panel";
 
 type WorkspaceMode = "new" | "entry";
 
@@ -283,6 +286,8 @@ interface WorkspaceEditorProps {
     readonly displayName: string;
   }>;
   readonly reload: () => Promise<unknown>;
+  readonly notice: string | null;
+  readonly onNotice: (notice: string | null) => void;
 }
 
 function WorkspaceEditor({
@@ -292,12 +297,15 @@ function WorkspaceEditor({
   data,
   locales,
   reload,
+  notice,
+  onNotice,
 }: WorkspaceEditorProps) {
   const client = useStudioContentClient();
   const queryClient = useQueryClient();
   const workspaceHeading = useRef<HTMLHeadingElement>(null);
   const navigate = useNavigate();
   const {
+    bootstrap,
     setWorkspaceDirty,
     allowWorkspaceNavigation,
     disallowWorkspaceNavigation,
@@ -327,6 +335,32 @@ function WorkspaceEditor({
   const [nameVersion, setNameVersion] = useState(existing?.draft.entry.nameVersion ?? 1);
   const [sharedVersion, setSharedVersion] = useState(existing?.draft.sharedVersion ?? 0);
   const [localizedVersion, setLocalizedVersion] = useState(existing?.draft.localizedVersion ?? 0);
+  const [headRevisionIds, setHeadRevisionIds] = useState({
+    shared: existing?.draft.sharedRevisionId ?? null,
+    localized: existing?.draft.localizedRevisionId ?? null,
+  });
+  const definitionFieldIds = useMemo(() => visibleFieldIds(definition), [definition]);
+  const entryScope =
+    existing === undefined ? null : { collectionId, locale, entryId: existing.draft.entry.id };
+  const publication = useQuery({
+    queryKey: contentQueryKeys.publication(collectionId, locale, entryScope?.entryId ?? ""),
+    queryFn: ({ signal }) =>
+      entryScope === null
+        ? Promise.reject(new Error("STUDIO_ENTRY_SCOPE_MISSING"))
+        : client.publication(entryScope, definitionFieldIds, signal),
+    enabled: entryScope !== null,
+    initialData: existing?.publication,
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: retryContentQuery,
+    retryDelay: contentRetryDelay,
+  });
+  useEffect(() => {
+    if (existing === undefined) return;
+    queryClient.setQueryData(
+      contentQueryKeys.publication(collectionId, locale, existing.draft.entry.id),
+      existing.publication,
+    );
+  }, [collectionId, existing, locale, queryClient]);
   const [validation, setValidation] = useState<StudioValidationDto | undefined>(
     existing?.draft.validation,
   );
@@ -424,10 +458,27 @@ function WorkspaceEditor({
       } else {
         setSharedVersion(result.sharedVersion);
         setLocalizedVersion(result.localizedVersion);
+        setHeadRevisionIds({
+          shared: result.sharedRevisionId,
+          localized: result.localizedRevisionId,
+        });
+        onNotice(null);
         void queryClient.invalidateQueries({
           queryKey: ["studio", "content", "entries", collectionId, locale],
         });
         if (existing !== undefined) {
+          if (publication.data?.state !== "never_published") {
+            void queryClient.invalidateQueries({
+              queryKey: contentQueryKeys.publication(collectionId, locale, existing.draft.entry.id),
+            });
+          }
+          void queryClient.invalidateQueries({
+            queryKey: contentQueryKeys.entryRevisions(
+              collectionId,
+              locale,
+              existing.draft.entry.id,
+            ),
+          });
           void queryClient.invalidateQueries({
             queryKey: contentQueryKeys.entryWorkspace(
               collectionId,
@@ -577,6 +628,7 @@ function WorkspaceEditor({
     }
     adoptAuthority(recovery.latest, recovery.latestValues, adopted);
   };
+  const localeLabel = locales.find((candidate) => candidate.tag === locale)?.displayName ?? locale;
   const mutationConflict =
     contentMutation.error instanceof StudioContentClientError &&
     (contentMutation.error.code === "DRAFT_VERSION_CONFLICT" ||
@@ -597,7 +649,15 @@ function WorkspaceEditor({
           <h2 ref={workspaceHeading} id="workspace-heading" tabIndex={-1}>
             {mode === "new" ? "Create entry" : "Edit entry"}
           </h2>
+          {publication.data !== undefined ? (
+            <StudioPublicationBadge status={publication.data} />
+          ) : null}
         </div>
+        {notice !== null ? (
+          <p className="studio-panel" role="status">
+            {notice}
+          </p>
+        ) : null}
         <LocaleTabs
           mode={mode}
           collectionId={collectionId}
@@ -719,9 +779,7 @@ function WorkspaceEditor({
           {localizedDefinition.fields.length > 0 ? (
             <section className="studio-form-section" aria-labelledby="localized-fields-heading">
               <div>
-                <h3 id="localized-fields-heading">
-                  {locales.find((candidate) => candidate.tag === locale)?.displayName ?? locale}
-                </h3>
+                <h3 id="localized-fields-heading">{localeLabel}</h3>
                 <p className="studio-muted">These values apply only to {locale}.</p>
               </div>
               <ContentForm
@@ -751,6 +809,44 @@ function WorkspaceEditor({
             </section>
           ) : null}
         </StudioReferenceResolutionProvider>
+        {existing !== undefined &&
+        publication.data !== undefined &&
+        authority.capabilities.canPublish ? (
+          <StudioPublicationPanel
+            collectionId={collectionId}
+            locale={locale}
+            localeLabel={localeLabel}
+            entryId={existing.draft.entry.id}
+            form={authority.form}
+            visibleFieldIds={definitionFieldIds}
+            status={publication.data}
+            dirty={dirty}
+            onReloadLatest={reloadLatest}
+          />
+        ) : null}
+        {existing !== undefined ? (
+          <StudioHistoryPanel
+            collectionId={collectionId}
+            locale={locale}
+            localeLabel={localeLabel}
+            entryId={existing.draft.entry.id}
+            currentUserId={bootstrap.user.id}
+            form={authority.form}
+            visibleFieldIds={definitionFieldIds}
+            headRevisionIds={headRevisionIds}
+            versions={{ shared: sharedVersion, localized: localizedVersion }}
+            canRestore={{
+              shared: authority.capabilities.canSaveShared,
+              localized: authority.capabilities.canSaveLocalized,
+            }}
+            dirty={dirty}
+            onRestored={async (message) => {
+              onNotice(message);
+              await reload();
+            }}
+            onReloadLatest={reloadLatest}
+          />
+        ) : null}
         <div className="studio-save-bar">
           <Button
             type="button"
@@ -877,6 +973,7 @@ function WorkspaceRoute({ mode }: { readonly mode: WorkspaceMode }) {
   const entryId = params.entryId ?? "";
   const context = useStudioContentContext();
   const client = useStudioContentClient();
+  const [notice, setNotice] = useState<string | null>(null);
   const routeAvailable =
     context.data?.collections.some((collection) => collection.id === collectionId) === true &&
     context.data.locales.some((candidate) => candidate.tag === locale);
@@ -922,6 +1019,8 @@ function WorkspaceRoute({ mode }: { readonly mode: WorkspaceMode }) {
       data={workspace.data}
       locales={context.data.locales}
       reload={workspace.refetch}
+      notice={notice}
+      onNotice={setNotice}
     />
   );
 }

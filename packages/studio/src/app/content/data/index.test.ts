@@ -38,6 +38,15 @@ describe("Studio content data policy", () => {
     expect(contentErrorMessage(failure("STALE_SCHEMA", 409))).toContain("content model changed");
     expect(contentErrorMessage(failure("RATE_LIMITED", 429))).toContain("temporarily busy");
     expect(contentErrorMessage(failure("NOT_FOUND", 404))).not.toContain("not found");
+    expect(contentErrorMessage(failure("REVISION_INCOMPATIBLE", 409))).toContain(
+      "different content model",
+    );
+    expect(contentErrorMessage(failure("PUBLICATION_INVALID", 422))).toContain(
+      "Check publication again",
+    );
+    expect(contentErrorMessage(failure("PUBLICATION_STATE_CONFLICT", 409))).toContain(
+      "changed since you checked",
+    );
     expect(contentErrorMessage(failure("INTERNAL_ERROR", 500))).toBe(
       "Studio could not load content. Try again.",
     );

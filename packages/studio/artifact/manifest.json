@@ -18,19 +18,19 @@
       "_react-dom-iITjFaYY.js"
     ]
   },
-  "_data-gaCHnyhs.js": {
-    "file": "assets/chunk/data-gaCHnyhs.js",
+  "_data-BPgRzqbm.js": {
+    "file": "assets/chunk/data-BPgRzqbm.js",
     "name": "data",
     "imports": [
       "_rolldown-runtime-XKyaHtl9.js",
       "_react-dom-iITjFaYY.js",
-      "_shell-DRdwJ8qG.js",
+      "_shell-CPPKkvrf.js",
       "_button-CxET-oXT.js",
       "_useBaseUiId-MvB3LQIh.js"
     ]
   },
-  "_dialog-DduVHQJa.js": {
-    "file": "assets/chunk/dialog-DduVHQJa.js",
+  "_dialog-BYmiECiQ.js": {
+    "file": "assets/chunk/dialog-BYmiECiQ.js",
     "name": "dialog",
     "imports": [
       "_rolldown-runtime-XKyaHtl9.js",
@@ -50,8 +50,8 @@
     "file": "assets/chunk/rolldown-runtime-XKyaHtl9.js",
     "name": "rolldown-runtime"
   },
-  "_shell-DRdwJ8qG.js": {
-    "file": "assets/chunk/shell-DRdwJ8qG.js",
+  "_shell-CPPKkvrf.js": {
+    "file": "assets/chunk/shell-CPPKkvrf.js",
     "name": "shell",
     "imports": [
       "_rolldown-runtime-XKyaHtl9.js",
@@ -72,41 +72,41 @@
     ]
   },
   "src/app/content/dirty-sign-out-dialog.tsx": {
-    "file": "assets/chunk/dirty-sign-out-dialog-Utppg-gr.js",
+    "file": "assets/chunk/dirty-sign-out-dialog-BsyGPdvY.js",
     "name": "dirty-sign-out-dialog",
     "src": "src/app/content/dirty-sign-out-dialog.tsx",
     "isDynamicEntry": true,
     "imports": [
-      "_dialog-DduVHQJa.js",
+      "_dialog-BYmiECiQ.js",
       "_react-dom-iITjFaYY.js"
     ]
   },
   "src/app/content/navigation.tsx": {
-    "file": "assets/chunk/navigation-Bi1bYcvg.js",
+    "file": "assets/chunk/navigation-CQs5YIEK.js",
     "name": "navigation",
     "src": "src/app/content/navigation.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-XKyaHtl9.js",
       "_react-dom-iITjFaYY.js",
-      "_shell-DRdwJ8qG.js",
+      "_shell-CPPKkvrf.js",
       "_button-CxET-oXT.js",
-      "_data-gaCHnyhs.js"
+      "_data-BPgRzqbm.js"
     ]
   },
   "src/app/content/workspace.tsx": {
-    "file": "assets/chunk/workspace-DjPGAumj.js",
+    "file": "assets/chunk/workspace-D3z7CUVc.js",
     "name": "workspace",
     "src": "src/app/content/workspace.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-XKyaHtl9.js",
       "_react-dom-iITjFaYY.js",
-      "_shell-DRdwJ8qG.js",
+      "_shell-CPPKkvrf.js",
       "src/app/index.tsx",
       "_button-CxET-oXT.js",
-      "_data-gaCHnyhs.js",
-      "_dialog-DduVHQJa.js",
+      "_data-BPgRzqbm.js",
+      "_dialog-BYmiECiQ.js",
       "_useBaseUiId-MvB3LQIh.js"
     ],
     "dynamicImports": [
@@ -114,21 +114,21 @@
     ]
   },
   "src/app/index.tsx": {
-    "file": "assets/studio-DXcaR1uV.js",
+    "file": "assets/studio-C_LHGUVq.js",
     "name": "index",
     "src": "src/app/index.tsx",
     "isEntry": true,
     "imports": [
       "_rolldown-runtime-XKyaHtl9.js",
       "_react-dom-iITjFaYY.js",
-      "_shell-DRdwJ8qG.js"
+      "_shell-CPPKkvrf.js"
     ],
     "dynamicImports": [
       "src/app/content/navigation.tsx",
       "src/app/content/workspace.tsx"
     ],
     "css": [
-      "assets/studio-HKX1H9-4.css"
+      "assets/studio-BEN-Olqe.css"
     ]
   }
 }

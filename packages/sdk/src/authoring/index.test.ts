@@ -27,7 +27,7 @@ const generatedForm = {
   source: "published" as const,
   collectionId: id,
   revisionId: id,
-  formatVersion: 2 as const,
+  formatVersion: 1 as const,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
   contractHash: "a".repeat(64),
@@ -296,6 +296,7 @@ describe("Authoring v1 client", () => {
               stateVersion: 1,
               resultKind: "changed",
               publication,
+              delivery: { status: "verified", currentPublicationId: id },
             }),
           );
         if (url.endsWith("/publication/unpublish"))
@@ -309,6 +310,7 @@ describe("Authoring v1 client", () => {
               unpublishedPublicationId: id,
               unpublishedPublicationSequence: 1,
               unpublishedAt: "2026-08-24T00:00:00.000Z",
+              delivery: { status: "superseded", currentPublicationId: id },
             }),
           );
         return Promise.resolve(success());
@@ -373,6 +375,241 @@ describe("Authoring v1 client", () => {
     }
     assert.include(requests[2]?.url ?? "", "limit=20");
     assert.strictEqual(requests[8]?.init?.body, "{}");
+  });
+
+  it("lists, reads, compares, and restores revisions with strict decoding", async () => {
+    const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
+    const otherId = "019fae8b-1234-7000-8000-000000000003";
+    const revision = {
+      id,
+      entryId: id,
+      scope: "shared" as const,
+      locale: null,
+      sequence: 1,
+      previousRevisionId: null,
+      schemaRevisionId: id,
+      contractHash: "a".repeat(64),
+      changedFieldIds: [id],
+      restoredFromRevisionId: null,
+      authoredByUserId: "user_1",
+      authoredByCredentialId: null,
+      authoredAt: "2026-08-24T00:00:00.000Z",
+    };
+    const restoreResult = {
+      entryId: id,
+      commandId: id,
+      sharedChanged: true,
+      sharedVersion: 3,
+      sharedRevisionId: otherId,
+      localizedChanged: false,
+      localizedVersion: 1,
+      localizedRevisionId: null,
+      validation,
+    };
+    let comparison: object = {
+      entryId: id,
+      scope: "shared",
+      from: revision,
+      to: { ...revision, id: otherId, sequence: 2, previousRevisionId: id },
+      items: [
+        {
+          fieldId: id,
+          apiKey: "title",
+          change: "changed",
+          before: "Old",
+          after: null,
+          inCurrentSchema: true,
+        },
+        { fieldId: otherId, apiKey: null, change: "removed", before: 1, inCurrentSchema: false },
+      ],
+      restrictedChanges: false,
+      schemaDiffers: false,
+    };
+    const client = authoringV1({
+      baseUrl: "https://api.example.test",
+      projectId: id,
+      environmentId,
+      token: "secret-token",
+      fetch: (input, init) => {
+        const url = String(input);
+        requests.push({ url, init });
+        if (url.includes("/revisions?"))
+          return Promise.resolve(success({ items: [revision], nextCursor: "next_1" }));
+        if (url.includes("/compare/")) return Promise.resolve(success(comparison));
+        if (url.endsWith("/restore")) return Promise.resolve(success(restoreResult));
+        return Promise.resolve(
+          success({
+            revision,
+            values: { title: "Old" },
+            compatible: false,
+            currentSchemaRevisionId: otherId,
+            currentContractHash: "b".repeat(64),
+          }),
+        );
+      },
+    });
+
+    const page = await client.entries.listRevisions("articles", "en-US", id, {
+      scope: "localized",
+      limit: 10,
+      cursor: "abc",
+    });
+    nodeAssert(page.body?.ok);
+    assert.strictEqual(page.body.data.items[0]?.authoredByUserId, "user_1");
+    assert.strictEqual(page.body.data.nextCursor, "next_1");
+    const read = await client.entries.getRevision("articles", "en-US", id, id);
+    nodeAssert(read.body?.ok);
+    assert.strictEqual(read.body.data.compatible, false);
+    assert.deepStrictEqual(read.body.data.values, { title: "Old" });
+    const compared = await client.entries.compareRevisions("articles", "en-US", id, id, otherId);
+    nodeAssert(compared.body?.ok);
+    assert.strictEqual(compared.body.data.items[0]?.after, null);
+    assert.notProperty(compared.body.data.items[1] ?? {}, "after");
+    const restored = await client.entries.restoreRevision("articles", "en-US", id, id, {
+      scope: "shared",
+      schemaRevisionId: id,
+      contractHash: "a".repeat(64),
+      expectedVersion: 2,
+      commandId: id,
+    });
+    nodeAssert(restored.body?.ok);
+    assert.strictEqual(restored.body.data.sharedVersion, 3);
+
+    const entry = `https://api.example.test/api/authoring/v1/projects/${id}/environments/${environmentId}/collections/articles/locales/en-US/entries/${id}`;
+    assert.deepStrictEqual(
+      requests.map((request) => [request.init?.method, request.url]),
+      [
+        ["GET", `${entry}/revisions?scope=localized&limit=10&cursor=abc`],
+        ["GET", `${entry}/revisions/${id}`],
+        ["GET", `${entry}/revisions/${id}/compare/${otherId}`],
+        ["POST", `${entry}/revisions/${id}/restore`],
+      ],
+    );
+    assert.deepStrictEqual(JSON.parse(String(requests[3]?.init?.body)), {
+      scope: "shared",
+      schemaRevisionId: id,
+      contractHash: "a".repeat(64),
+      expectedVersion: 2,
+      commandId: id,
+    });
+
+    assert.throws(() =>
+      client.entries.listRevisions("articles", "en-US", id, {
+        scope: "draft" as "shared",
+      }),
+    );
+    assert.throws(() =>
+      client.entries.listRevisions("articles", "en-US", id, { scope: "shared", limit: 51 }),
+    );
+    assert.throws(() => client.entries.getRevision("articles", "en-US", id, "../draft"));
+    assert.throws(() =>
+      client.entries.restoreRevision("articles", "en-US", id, id, {
+        scope: "shared",
+        schemaRevisionId: id,
+        contractHash: "a".repeat(64),
+        expectedVersion: 2,
+        commandId: id,
+        values: {},
+      } as never),
+    );
+    comparison = { ...comparison, unexpected: true };
+    await nodeAssert.rejects(() =>
+      client.entries.compareRevisions("articles", "en-US", id, id, otherId),
+    );
+    comparison = {
+      entryId: id,
+      scope: "shared",
+      from: revision,
+      to: revision,
+      items: [{ fieldId: id, apiKey: null, change: "moved", inCurrentSchema: true }],
+      restrictedChanges: false,
+      schemaDiffers: false,
+    };
+    await nodeAssert.rejects(() =>
+      client.entries.compareRevisions("articles", "en-US", id, id, otherId),
+    );
+
+    const effectClient = authoringV1Effect({
+      baseUrl: "https://api.example.test",
+      projectId: id,
+      environmentId,
+      token: "token",
+      fetch: () => Promise.resolve(success(restoreResult)),
+    });
+    const effectRestore = await Effect.runPromise(
+      effectClient.entries.restoreRevision("articles", "en-US", id, id, {
+        scope: "localized",
+        schemaRevisionId: id,
+        contractHash: "a".repeat(64),
+        expectedVersion: 1,
+        commandId: id,
+      }),
+    );
+    nodeAssert(effectRestore.body?.ok);
+    assert.strictEqual(effectRestore.body.data.commandId, id);
+  });
+
+  it("decodes the REVISION_INCOMPATIBLE failure and requires the Delivery read-back", async () => {
+    const failure = new Response(
+      JSON.stringify({
+        ok: false,
+        data: null,
+        error: {
+          code: "REVISION_INCOMPATIBLE",
+          message: "This revision uses another schema contract and cannot be restored.",
+          retryable: false,
+          requestId: "request-1",
+        },
+        message: "This revision uses another schema contract and cannot be restored.",
+      }),
+      { status: 409 },
+    );
+    const client = authoringV1({
+      baseUrl: "https://api.example.test",
+      projectId: id,
+      environmentId,
+      token: "token",
+      fetch: () => Promise.resolve(failure),
+    });
+    const restored = await client.entries.restoreRevision("articles", "en-US", id, id, {
+      scope: "shared",
+      schemaRevisionId: id,
+      contractHash: "a".repeat(64),
+      expectedVersion: 2,
+      commandId: id,
+    });
+    assert.strictEqual(restored.status, 409);
+    nodeAssert(restored.body !== null && !restored.body.ok);
+    assert.strictEqual(restored.body.error.code, "REVISION_INCOMPATIBLE");
+
+    const withoutDelivery = authoringV1({
+      baseUrl: "https://api.example.test",
+      projectId: id,
+      environmentId,
+      token: "token",
+      fetch: () =>
+        Promise.resolve(
+          success({
+            entryId: id,
+            locale: "en-US",
+            commandId: id,
+            stateVersion: 2,
+            resultKind: "no_op",
+            unpublishedPublicationId: null,
+            unpublishedPublicationSequence: null,
+            unpublishedAt: "2026-08-24T00:00:00.000Z",
+          }),
+        ),
+    });
+    await nodeAssert.rejects(
+      () =>
+        withoutDelivery.entries.unpublish("articles", "en-US", id, {
+          commandId: id,
+          expectedStateVersion: 2,
+          expectedPublicationId: null,
+        }),
+      /delivery/u,
+    );
   });
 
   it("exposes only content/runtime Authoring methods", () => {
@@ -511,6 +748,7 @@ describe("Authoring v1 client", () => {
               publishedAt: "2026-08-24T00:00:00.000Z",
               current: true,
             },
+            delivery: { status: "verified", currentPublicationId: id },
           }),
         );
       },

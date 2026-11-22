@@ -27,6 +27,7 @@ import { listProjectAuditEvents } from "../../../src/operations/audit/index";
 import { AuditRepositoryLive } from "../../../src/services/audit/repository";
 import { makeControlPlaneCursorSignerLive } from "../../../src/services/control-plane/cursor-signer";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
+import { assertIndexDefinitions, assertIndexedAccess, explainPlan } from "../../support/query-plan";
 
 const suffix = randomUUID();
 const ownerId = `m16-audit-owner-${suffix}`;
@@ -240,30 +241,58 @@ describe("audit repository PostgreSQL integration", () => {
             await transaction.execute(sql`set local enable_seqscan = off`);
             await transaction.execute(sql`set local enable_bitmapscan = off`);
             await transaction.execute(sql`set local enable_sort = off`);
-            const timeline = await transaction.execute(
-              sql`explain (format json) select id from audit_event where project_id = ${current.id} and occurred_at between now() - interval '31 days' and now() order by occurred_at desc, id desc limit 50`,
-            );
-            const environmentPlan = await transaction.execute(
-              sql`explain (format json) select id from audit_event where project_id = ${current.id} and environment_id = ${current.environment.id} and occurred_at between now() - interval '31 days' and now() order by occurred_at desc, id desc limit 50`,
-            );
-            const actorPlan = await transaction.execute(
-              sql`explain (format json) select id from audit_event where project_id = ${current.id} and actor_type = 'user' and actor_id = ${ownerId} and occurred_at between now() - interval '31 days' and now() order by occurred_at desc, id desc limit 50`,
-            );
-            const actionPlan = await transaction.execute(
-              sql`explain (format json) select id from audit_event where project_id = ${current.id} and action = 'project.audit.read' and occurred_at between now() - interval '31 days' and now() order by occurred_at desc, id desc limit 50`,
-            );
-            return JSON.stringify([
-              timeline.rows,
-              environmentPlan.rows,
-              actorPlan.rows,
-              actionPlan.rows,
-            ]);
+            const window = sql`occurred_at between now() - interval '31 days' and now() order by occurred_at desc nulls last, id desc nulls last limit 50`;
+            return [
+              await explainPlan(
+                transaction,
+                sql`select id from audit_event where project_id = ${current.id} and ${window}`,
+              ),
+              await explainPlan(
+                transaction,
+                sql`select id from audit_event where project_id = ${current.id} and environment_id = ${current.environment.id} and ${window}`,
+              ),
+              await explainPlan(
+                transaction,
+                sql`select id from audit_event where project_id = ${current.id} and actor_type = 'user' and actor_id = ${ownerId} and ${window}`,
+              ),
+              await explainPlan(
+                transaction,
+                sql`select id from audit_event where project_id = ${current.id} and action = 'project.audit.read' and ${window}`,
+              ),
+            ];
           }),
         );
-        assert.include(plans, "audit_event_project_occurred_id_idx");
-        assert.include(plans, "audit_event_project_environment_occurred_id_idx");
-        assert.include(plans, "audit_event_project_actor_occurred_id_idx");
-        assert.include(plans, "audit_event_project_action_occurred_id_idx");
+        for (const plan of plans) {
+          assertIndexedAccess(plan, { table: "audit_event", order: "index" });
+        }
+        yield* Effect.promise(() =>
+          assertIndexDefinitions(db, [
+            {
+              table: "audit_event",
+              name: "audit_event_project_occurred_id_idx",
+              keys: "project_id, occurred_at DESC NULLS LAST, id DESC NULLS LAST",
+              where: "(project_id IS NOT NULL)",
+            },
+            {
+              table: "audit_event",
+              name: "audit_event_project_environment_occurred_id_idx",
+              keys: "project_id, environment_id, occurred_at DESC NULLS LAST, id DESC NULLS LAST",
+              where: "((project_id IS NOT NULL) AND (environment_id IS NOT NULL))",
+            },
+            {
+              table: "audit_event",
+              name: "audit_event_project_actor_occurred_id_idx",
+              keys: "project_id, actor_type, actor_id, occurred_at DESC NULLS LAST, id DESC NULLS LAST",
+              where: "(project_id IS NOT NULL)",
+            },
+            {
+              table: "audit_event",
+              name: "audit_event_project_action_occurred_id_idx",
+              keys: "project_id, action, occurred_at DESC NULLS LAST, id DESC NULLS LAST",
+              where: "(project_id IS NOT NULL)",
+            },
+          ]),
+        );
       }),
     );
 

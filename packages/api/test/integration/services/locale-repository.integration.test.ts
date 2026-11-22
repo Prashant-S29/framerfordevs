@@ -45,6 +45,7 @@ import {
 import { makeAccessRepository } from "../../../src/services/access-repository";
 import { makeLocaleRepository } from "../../../src/services/locale/repository";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
+import { assertIndexDefinitions, assertIndexedQuery } from "../../support/query-plan";
 
 const suffix = randomUUID();
 const ownerId = `m4-locale-owner-${suffix}`;
@@ -773,20 +774,38 @@ describe("locale repository PostgreSQL integration", () => {
         1,
       );
 
-      const plans = yield* Effect.promise(() =>
+      yield* Effect.promise(() =>
         db.transaction(async (transaction) => {
           await transaction.execute(sql`set local enable_seqscan = off`);
-          const orderedPlan = await transaction.execute(
-            sql`explain (format json) select id, tag from project_locale where project_id = ${currentProject.id} and status <> 'removed' order by position, id`,
+          await transaction.execute(sql`set local enable_sort = off`);
+          await assertIndexedQuery(
+            transaction,
+            sql`select id, tag from project_locale where project_id = ${currentProject.id} and status <> 'removed' order by position, id`,
+            { table: "project_locale", allowBitmap: true, order: "index" },
           );
-          const exactPlan = await transaction.execute(
-            sql`explain (format json) select id from project_locale where project_id = ${currentProject.id} and lower(tag) = lower('hi')`,
+          await assertIndexedQuery(
+            transaction,
+            sql`select id from project_locale where project_id = ${currentProject.id} and lower(tag) = lower('hi')`,
+            { table: "project_locale", allowBitmap: true },
           );
-          return JSON.stringify([orderedPlan.rows, exactPlan.rows]);
         }),
       );
-      assert.include(plans, "project_locale_project_active_position_id_idx");
-      assert.include(plans, "project_locale_project_tag_ci_unique");
+      yield* Effect.promise(() =>
+        assertIndexDefinitions(db, [
+          {
+            table: "project_locale",
+            name: "project_locale_project_active_position_id_idx",
+            keys: 'project_id, "position", id',
+            where: "((status)::text <> 'removed'::text)",
+          },
+          {
+            table: "project_locale",
+            name: "project_locale_project_tag_ci_unique",
+            keys: "project_id, lower((tag)::text)",
+            unique: true,
+          },
+        ]),
+      );
     }),
   );
 

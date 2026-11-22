@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { db } from "@framerfordevs/db";
-import { and, desc, eq, inArray, lt, or, sql } from "@framerfordevs/db/query";
+import { and, eq, inArray, lt, or, sql } from "@framerfordevs/db/query";
 import {
   cmsCollectionDeliveryField,
   cmsCollectionLocaleDeliveryState,
@@ -45,6 +45,7 @@ import {
   encodePublicationCursor,
 } from "../../contracts/publication/cursor";
 import {
+  EntryDeliveryReadBack,
   EntryPublicationPage,
   EntryPublicationPlan,
   EntryPublicationStatus,
@@ -65,6 +66,7 @@ import {
   CollectionFieldId,
   defaultFieldEditorMetadata,
   type CollectionFieldDefinition as CollectionField,
+  SchemaFormatVersion,
 } from "../../contracts/schema";
 import { reconstructFieldTree } from "../../lib/field/tree";
 import {
@@ -338,7 +340,7 @@ async function loadPublishedContract(
     revision,
     fields: tree.roots,
     contractHash: hashSchemaContract({
-      formatVersion: revision.formatVersion,
+      formatVersion: Schema.decodeUnknownSync(SchemaFormatVersion)(revision.formatVersion),
       validationProfile: revision.validationProfile,
       currencyRegistryProfile: revision.currencyRegistryProfile,
       collectionApiKey: revision.collectionApiKey,
@@ -556,15 +558,139 @@ async function loadSources(
     sharedVersion: sharedHead?.version ?? 0,
     sharedRevisionId: sharedRevision?.id ?? null,
     sharedValues: entryValues(sharedRevision?.values ?? {}),
+    sharedValuesHash: sharedRevision?.valuesHash ?? emptyValuesHash,
     localizedVersion: localeHead?.version ?? 0,
     localizedRevisionId: localeRevision?.id ?? null,
     localizedValues: entryValues(localeRevision?.values ?? {}),
+    localizedValuesHash: localeRevision?.valuesHash ?? emptyValuesHash,
   };
+}
+
+async function loadPublicationSourceHashes(
+  executor: ApplicationExecutor,
+  publication: typeof cmsEntryLocalePublication.$inferSelect,
+) {
+  const [row] = await executor
+    .select({
+      sharedValuesHash: cmsEntrySharedRevision.valuesHash,
+      localizedValuesHash: cmsEntryLocaleRevision.valuesHash,
+    })
+    .from(cmsEntryLocalePublication)
+    .leftJoin(
+      cmsEntrySharedRevision,
+      and(
+        eq(cmsEntrySharedRevision.id, cmsEntryLocalePublication.sharedSourceRevisionId),
+        eq(cmsEntrySharedRevision.entryId, cmsEntryLocalePublication.entryId),
+        eq(cmsEntrySharedRevision.workspaceId, cmsEntryLocalePublication.workspaceId),
+        eq(cmsEntrySharedRevision.projectId, cmsEntryLocalePublication.projectId),
+        eq(cmsEntrySharedRevision.environmentId, cmsEntryLocalePublication.environmentId),
+        eq(cmsEntrySharedRevision.collectionId, cmsEntryLocalePublication.collectionId),
+      ),
+    )
+    .leftJoin(
+      cmsEntryLocaleRevision,
+      and(
+        eq(cmsEntryLocaleRevision.id, cmsEntryLocalePublication.localeSourceRevisionId),
+        eq(cmsEntryLocaleRevision.entryId, cmsEntryLocalePublication.entryId),
+        eq(cmsEntryLocaleRevision.localeId, cmsEntryLocalePublication.localeId),
+        eq(cmsEntryLocaleRevision.workspaceId, cmsEntryLocalePublication.workspaceId),
+        eq(cmsEntryLocaleRevision.projectId, cmsEntryLocalePublication.projectId),
+        eq(cmsEntryLocaleRevision.environmentId, cmsEntryLocalePublication.environmentId),
+        eq(cmsEntryLocaleRevision.collectionId, cmsEntryLocalePublication.collectionId),
+      ),
+    )
+    .where(
+      and(
+        eq(cmsEntryLocalePublication.id, publication.id),
+        eq(cmsEntryLocalePublication.entryId, publication.entryId),
+        eq(cmsEntryLocalePublication.localeId, publication.localeId),
+        eq(cmsEntryLocalePublication.workspaceId, publication.workspaceId),
+        eq(cmsEntryLocalePublication.projectId, publication.projectId),
+        eq(cmsEntryLocalePublication.environmentId, publication.environmentId),
+        eq(cmsEntryLocalePublication.collectionId, publication.collectionId),
+      ),
+    )
+    .limit(1);
+  if (!row) throw new Error("Current publication does not resolve for its source hashes.");
+  if (
+    (publication.sharedSourceRevisionId !== null && row.sharedValuesHash === null) ||
+    (publication.localeSourceRevisionId !== null && row.localizedValuesHash === null)
+  )
+    throw new Error("Current publication source revision does not resolve.");
+  return {
+    sharedValuesHash: row.sharedValuesHash ?? emptyValuesHash,
+    localizedValuesHash: row.localizedValuesHash ?? emptyValuesHash,
+  };
+}
+
+async function readDeliveryHead(
+  executor: ApplicationExecutor,
+  access: ScopeAccess,
+  input: {
+    readonly projectId: string;
+    readonly environmentId: string;
+    readonly collectionId: string;
+    readonly entryId: string;
+  },
+) {
+  const [row] = await executor
+    .select({
+      currentPublicationId: cmsEntryLocalePublicationHead.currentPublicationId,
+      snapshotPublicationId: cmsEntryLocaleDeliverySnapshot.publicationId,
+    })
+    .from(cmsEntryLocalePublicationHead)
+    .leftJoin(
+      cmsEntryLocaleDeliverySnapshot,
+      and(
+        eq(
+          cmsEntryLocaleDeliverySnapshot.publicationId,
+          cmsEntryLocalePublicationHead.currentPublicationId,
+        ),
+        eq(cmsEntryLocaleDeliverySnapshot.entryId, cmsEntryLocalePublicationHead.entryId),
+        eq(cmsEntryLocaleDeliverySnapshot.localeId, cmsEntryLocalePublicationHead.localeId),
+        eq(cmsEntryLocaleDeliverySnapshot.workspaceId, cmsEntryLocalePublicationHead.workspaceId),
+      ),
+    )
+    .where(
+      and(
+        eq(cmsEntryLocalePublicationHead.entryId, input.entryId),
+        eq(cmsEntryLocalePublicationHead.localeId, access.locale.id),
+        eq(cmsEntryLocalePublicationHead.workspaceId, access.workspaceId),
+        eq(cmsEntryLocalePublicationHead.projectId, input.projectId),
+        eq(cmsEntryLocalePublicationHead.environmentId, input.environmentId),
+        eq(cmsEntryLocalePublicationHead.collectionId, input.collectionId),
+      ),
+    )
+    .limit(1);
+  return {
+    currentPublicationId: row?.currentPublicationId ?? null,
+    snapshotPublicationId: row?.snapshotPublicationId ?? null,
+  };
+}
+
+export function deliveryReadBack(
+  head: {
+    readonly currentPublicationId: string | null;
+    readonly snapshotPublicationId: string | null;
+  },
+  expectedPublicationId: string | null,
+): EntryDeliveryReadBack {
+  const verified =
+    expectedPublicationId === null
+      ? head.currentPublicationId === null
+      : head.currentPublicationId === expectedPublicationId &&
+        head.snapshotPublicationId === expectedPublicationId;
+  return Schema.decodeUnknownSync(EntryDeliveryReadBack)({
+    status: verified ? "verified" : "superseded",
+    currentPublicationId: head.currentPublicationId,
+  });
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+const emptyValuesHash = digest({});
 
 function collectReferenceUses(
   fields: ReadonlyArray<CollectionField>,
@@ -1227,7 +1353,10 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
           const state = await loadAuthority(executor, scope.access, input, false, false);
           if ("missing" in state)
             return outcome(state.missing === "schema" ? "published_required" : "not_found");
-          return withValue("success", { state, access: scope.access });
+          const publishedHashes = state.current
+            ? await loadPublicationSourceHashes(executor, state.current.publication)
+            : null;
+          return withValue("success", { state, access: scope.access, publishedHashes });
         },
         catch: (cause) => databaseFailure("publication.status", cause),
       });
@@ -1236,16 +1365,14 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
           return yield* PublishedSchemaRequiredFailure.make();
         return yield* mapScopeFailure(result.kind);
       }
-      const { state, access } = result;
+      const { state, access, publishedHashes } = result;
       const current = state.current ? publicationSummary(state.current, access.locale, true) : null;
       const sharedChanged =
-        current !== null &&
-        (current.sharedVersion !== state.sources.sharedVersion ||
-          current.sharedRevisionId !== state.sources.sharedRevisionId);
+        publishedHashes !== null &&
+        publishedHashes.sharedValuesHash !== state.sources.sharedValuesHash;
       const localizedChanged =
-        current !== null &&
-        (current.localizedVersion !== state.sources.localizedVersion ||
-          current.localizedRevisionId !== state.sources.localizedRevisionId);
+        publishedHashes !== null &&
+        publishedHashes.localizedValuesHash !== state.sources.localizedValuesHash;
       const schemaChanged =
         current !== null &&
         (current.schemaRevisionId !== state.contract.revision.id ||
@@ -1754,6 +1881,11 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
       const stateVersion =
         result.kind === "replay" ? result.receipt.resultHeadVersion : result.stateVersion;
       const resultKind = result.kind === "replay" ? result.receipt.resultKind : result.resultKind;
+      const access = result.access;
+      const deliveryHead = yield* Effect.tryPromise({
+        try: () => readDeliveryHead(executor, access, input),
+        catch: (cause) => databaseFailure("publication.publish.read_back", cause),
+      });
       return Schema.decodeUnknownSync(PublishEntryResult)({
         entryId: result.artifact.publication.entryId,
         localeId: result.access.locale.id,
@@ -1761,7 +1893,12 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
         commandId: input.commandId,
         stateVersion,
         resultKind,
-        publication: publicationSummary(result.artifact, result.access.locale, true),
+        publication: publicationSummary(
+          result.artifact,
+          result.access.locale,
+          deliveryHead.currentPublicationId === result.artifact.publication.id,
+        ),
+        delivery: deliveryReadBack(deliveryHead, result.artifact.publication.id),
       });
     }),
 
@@ -2051,6 +2188,11 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
         result.kind === "replay" ? result.receipt.resultHeadVersion : result.stateVersion;
       const finalResultKind =
         result.kind === "replay" ? result.receipt.resultKind : result.resultKind;
+      const access = result.access;
+      const deliveryHead = yield* Effect.tryPromise({
+        try: () => readDeliveryHead(executor, access, input),
+        catch: (cause) => databaseFailure("publication.unpublish.read_back", cause),
+      });
       return Schema.decodeUnknownSync(UnpublishEntryResult)({
         entryId: input.entryId,
         localeId: result.access.locale.id,
@@ -2061,6 +2203,7 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
         unpublishedPublicationId: publication?.id ?? null,
         unpublishedPublicationSequence: publication?.publicationSequence ?? null,
         unpublishedAt: toIso(receipt?.completedAt ?? now),
+        delivery: deliveryReadBack(deliveryHead, null),
       });
     }),
 
@@ -2107,8 +2250,8 @@ export function makePublicationRepository(options: RepositoryOptions = {}) {
               ),
             )
             .orderBy(
-              desc(cmsEntryLocalePublication.publicationSequence),
-              desc(cmsEntryLocalePublication.id),
+              sql`${cmsEntryLocalePublication.publicationSequence} desc nulls last`,
+              sql`${cmsEntryLocalePublication.id} desc nulls last`,
             )
             .limit(input.limit + 1);
           return withValue("success", { rows, head, access: scope.access });

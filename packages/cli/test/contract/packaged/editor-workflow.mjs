@@ -40,7 +40,7 @@ const form = {
   source: "published",
   collectionId,
   revisionId,
-  formatVersion: 2,
+  formatVersion: 1,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
   contractHash: digest,
@@ -200,7 +200,7 @@ try {
   await writeFile(
     join(root, "framerfordevs.config.json"),
     JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 1,
       apiBaseUrl: apiOrigin,
       projectId,
       environment: "main",

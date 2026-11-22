@@ -24,7 +24,7 @@ ffd link \
   --schema framerfordevs.schema.ts
 ```
 
-This writes non-executable `framerfordevs.config.json` version 2. OAuth authority stays in the native credential store; configuration and locks contain no credentials. Code-first authority lives in `.framerfordevs/schema.lock.json` v2, while optional generated-consumer ownership remains separate in `.framerfordevs/generated.lock.json`.
+This writes non-executable `framerfordevs.config.json` version 1. OAuth authority stays in the native credential store; configuration and locks contain no credentials. Code-first authority lives in `.framerfordevs/schema.lock.json`, while optional generated-consumer ownership remains separate in `.framerfordevs/generated.lock.json`.
 
 For an existing hosted schema, bootstrap stable source identities before editing:
 

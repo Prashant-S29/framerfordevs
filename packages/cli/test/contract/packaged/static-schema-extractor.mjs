@@ -136,7 +136,7 @@ try {
   await writeFile(
     join(root, "framerfordevs.config.json"),
     JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 1,
       apiBaseUrl: `http://127.0.0.1:${address.port}`,
       projectId: "019fae8b-1234-7000-8000-000000000001",
       environment: "main",

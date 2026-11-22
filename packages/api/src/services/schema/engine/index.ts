@@ -22,6 +22,7 @@ import {
   type SchemaChangeClassification,
   type SchemaChangeCode,
   type SchemaChanges,
+  type SchemaFormatVersion,
   SchemaHash,
   SchemaPublicationFingerprint,
   SchemaValidationIssue,
@@ -42,7 +43,7 @@ import {
 export type SchemaValidationPurpose = "draft" | "publication";
 
 export interface SchemaDraftState {
-  readonly formatVersion: 2;
+  readonly formatVersion: SchemaFormatVersion;
   readonly validationProfile: typeof fieldSystemValidationProfile;
   readonly currencyRegistryProfile: CurrencyRegistryProfile | null;
   readonly collection: CmsCollection;
@@ -51,7 +52,7 @@ export interface SchemaDraftState {
 }
 
 export interface PublishedSchemaHashState {
-  readonly formatVersion: number;
+  readonly formatVersion: SchemaFormatVersion;
   readonly validationProfile: string;
   readonly currencyRegistryProfile: CurrencyRegistryProfile | null;
   readonly collectionApiKey: string;
@@ -97,32 +98,9 @@ function plainJsonData(value: unknown): unknown {
   return output;
 }
 
-function canonicalLegacyManagementDocument(state: PublishedSchemaHashState): object {
-  return {
-    formatVersion: 1,
-    collection: {
-      apiKey: state.collectionApiKey,
-      displayName: state.collectionDisplayName,
-      description: state.collectionDescription,
-    },
-    fields: [...state.fields].sort(compareFields).map((field) => ({
-      id: field.id,
-      apiKey: field.apiKey,
-      displayLabel: field.displayLabel,
-      kind: field.kind,
-      required: field.required,
-      localization: field.localization,
-      deprecated: field.deprecated,
-      position: field.position,
-      configuration: plainJsonData(field.configuration),
-    })),
-  };
-}
-
 function canonicalManagementDocument(state: PublishedSchemaHashState): object {
-  if (state.formatVersion === 1) return canonicalLegacyManagementDocument(state);
   return {
-    formatVersion: 2,
+    formatVersion: state.formatVersion,
     validationProfile: state.validationProfile,
     currencyRegistryProfile: state.currencyRegistryProfile,
     collection: {
@@ -195,7 +173,7 @@ function contractField(
 }
 
 export interface SchemaContractState {
-  readonly formatVersion: number;
+  readonly formatVersion: SchemaFormatVersion;
   readonly validationProfile: string;
   readonly currencyRegistryProfile: string | null;
   readonly collectionApiKey: string;
@@ -337,7 +315,7 @@ export function fingerprintSchemaPublication(
   return SchemaPublicationFingerprint.make(
     sha256(
       canonicalStringify({
-        formatVersion: 2,
+        formatVersion: 1,
         projectId: input.projectId,
         environmentId: input.environmentId,
         collectionId: input.collectionId,
@@ -363,7 +341,7 @@ function makeChange(options: {
   const changeId = SchemaChangeId.make(
     sha256(
       canonicalStringify({
-        formatVersion: 2,
+        formatVersion: 1,
         code: options.code,
         fieldId: options.fieldId,
         before: options.before,
@@ -697,18 +675,6 @@ export function classifyCollectionSchemaChanges(
   draft: SchemaDraftState,
 ): SchemaChangeSet {
   const pending: Array<PendingChange> = [];
-  if (published?.formatVersion === 1)
-    pending.push(
-      makeChange({
-        code: "schema.format.upgraded",
-        classification: "non_breaking",
-        fieldId: null,
-        summary: "The schema document format upgraded to version 2.",
-        position: -3,
-        before: 1,
-        after: 2,
-      }),
-    );
   if (published && published.currencyRegistryProfile !== draft.currencyRegistryProfile)
     pending.push(
       makeChange({

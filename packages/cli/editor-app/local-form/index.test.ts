@@ -98,7 +98,7 @@ const hostedForm = Schema.decodeUnknownSync(AuthoringGeneratedForm, { onExcessPr
   source: "published",
   collectionId: layoutId,
   revisionId: layoutId,
-  formatVersion: 2,
+  formatVersion: 1,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
   contractHash: "a".repeat(64),

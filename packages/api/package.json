@@ -33,7 +33,6 @@
     "./contracts/studio": "./src/contracts/studio/index.ts",
     "./contracts/studio-content": "./src/contracts/studio-content/index.ts",
     "./contracts/studio-content/openapi": "./src/contracts/studio-content/openapi/index.ts",
-    "./contracts/studio-content/openapi/v2": "./src/contracts/studio-content/openapi/v2.ts",
     "./contracts/studio/openapi": "./src/contracts/studio/openapi/index.ts",
     "./contracts/tooling": "./src/contracts/tooling/index.ts",
     "./contracts/tooling/openapi": "./src/contracts/tooling/openapi/index.ts",

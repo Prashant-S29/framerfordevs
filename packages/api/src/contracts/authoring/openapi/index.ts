@@ -11,6 +11,11 @@ import {
   AuthoringGeneratedFormResponse,
   AuthoringRenameEntryRequest,
   AuthoringRenameEntryResponse,
+  AuthoringRestoreRevisionRequest,
+  AuthoringRestoreRevisionResponse,
+  AuthoringRevisionComparisonResponse,
+  AuthoringRevisionPageResponse,
+  AuthoringRevisionResponse,
   AuthoringSaveEntryDraftRequest,
   AuthoringSaveEntryDraftResponse,
 } from "../content";
@@ -352,6 +357,15 @@ function schemaComponents() {
   addEffectSchema(components, "AuthoringRenameEntryResponse", AuthoringRenameEntryResponse);
   addEffectSchema(components, "AuthoringSaveEntryDraftRequest", AuthoringSaveEntryDraftRequest);
   addEffectSchema(components, "AuthoringSaveEntryDraftResponse", AuthoringSaveEntryDraftResponse);
+  addEffectSchema(components, "AuthoringRevisionPageResponse", AuthoringRevisionPageResponse);
+  addEffectSchema(components, "AuthoringRevisionResponse", AuthoringRevisionResponse);
+  addEffectSchema(
+    components,
+    "AuthoringRevisionComparisonResponse",
+    AuthoringRevisionComparisonResponse,
+  );
+  addEffectSchema(components, "AuthoringRestoreRevisionRequest", AuthoringRestoreRevisionRequest);
+  addEffectSchema(components, "AuthoringRestoreRevisionResponse", AuthoringRestoreRevisionResponse);
   addEffectSchema(
     components,
     "AuthoringPublicationStatusResponse",
@@ -402,7 +416,9 @@ const commonFailures = {
   "401": failure("Bearer authentication is missing or invalid."),
   "403": failure("The principal lacks the required grant or current project policy."),
   "404": failure("The tenant-scoped project or environment is unavailable."),
-  "409": failure("Current schema, command, acknowledgement, or source authority conflicts."),
+  "409": failure(
+    "Current schema, command, acknowledgement, revision, or source authority conflicts.",
+  ),
   "413": failure("The bounded request or response limit was exceeded."),
   "429": failure("The request exceeded an Authoring rate policy."),
   "500": failure("A sanitized internal contract defect occurred."),
@@ -504,6 +520,59 @@ function publicationOperation(options: {
         schema: { type: "string", format: "uuid" },
       },
     ],
+    ...(options.request === undefined
+      ? {}
+      : {
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { $ref: `#/components/schemas/${options.request}` },
+              },
+            },
+          },
+        }),
+    responses: { "200": response(options.result, options.summary), ...commonFailures },
+    "x-required-oauth-scope": options.oauthScope,
+    "x-required-management-scopes": [options.managementScope],
+  };
+  const preflight = {
+    operationId: `deny${options.operationId}BrowserPreflight`,
+    summary: "Authoring data routes do not support browser CORS",
+    security: [],
+    responses: { "403": failure("Browser-origin Authoring requests are not allowed.") },
+  };
+  return options.method === "GET"
+    ? { get: operation, options: preflight }
+    : { post: operation, options: preflight };
+}
+
+const entryIdParameter = {
+  name: "entryId",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+} as const;
+
+function revisionIdParameter(name: string) {
+  return { name, in: "path", required: true, schema: { type: "string", format: "uuid" } } as const;
+}
+
+function revisionOperation(options: {
+  readonly operationId: string;
+  readonly summary: string;
+  readonly method: "GET" | "POST";
+  readonly parameters: ReadonlyArray<unknown>;
+  readonly request?: string;
+  readonly result: string;
+  readonly oauthScope: "authoring:read" | "authoring:draft:write";
+  readonly managementScope: "content.read" | "content.write";
+}) {
+  const operation = {
+    operationId: options.operationId,
+    summary: options.summary,
+    security: [{ AuthoringOAuth: [options.oauthScope] }, { AuthoringManagementCredential: [] }],
+    parameters: [...entryPathParameters, entryIdParameter, ...options.parameters],
     ...(options.request === undefined
       ? {}
       : {
@@ -769,6 +838,66 @@ export const authoringOpenApiDocument = {
           responses: { "403": failure("Browser-origin Authoring requests are not allowed.") },
         },
       },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionKey}/locales/{locale}/entries/{entryId}/revisions":
+      revisionOperation({
+        operationId: "listAuthoringEntryRevisions",
+        summary: "List one scope of immutable entry revisions with bounded keyset pagination",
+        method: "GET",
+        parameters: [
+          {
+            name: "scope",
+            in: "query",
+            required: true,
+            schema: { type: "string", enum: ["shared", "localized"] },
+          },
+          {
+            name: "cursor",
+            in: "query",
+            required: false,
+            schema: { type: "string", maxLength: 512 },
+          },
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+          },
+        ],
+        result: "AuthoringRevisionPageResponse",
+        oauthScope: "authoring:read",
+        managementScope: "content.read",
+      }),
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionKey}/locales/{locale}/entries/{entryId}/revisions/{revisionId}":
+      revisionOperation({
+        operationId: "getAuthoringEntryRevision",
+        summary: "Get one immutable entry revision with its stored values",
+        method: "GET",
+        parameters: [revisionIdParameter("revisionId")],
+        result: "AuthoringRevisionResponse",
+        oauthScope: "authoring:read",
+        managementScope: "content.read",
+      }),
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionKey}/locales/{locale}/entries/{entryId}/revisions/{fromRevisionId}/compare/{toRevisionId}":
+      revisionOperation({
+        operationId: "compareAuthoringEntryRevisions",
+        summary: "Compare two revisions of the same entry scope by stable field ID",
+        method: "GET",
+        parameters: [revisionIdParameter("fromRevisionId"), revisionIdParameter("toRevisionId")],
+        result: "AuthoringRevisionComparisonResponse",
+        oauthScope: "authoring:read",
+        managementScope: "content.read",
+      }),
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionKey}/locales/{locale}/entries/{entryId}/revisions/{revisionId}/restore":
+      revisionOperation({
+        operationId: "restoreAuthoringEntryRevision",
+        summary: "Restore one compatible revision as a new draft revision of its scope",
+        method: "POST",
+        parameters: [revisionIdParameter("revisionId")],
+        request: "AuthoringRestoreRevisionRequest",
+        result: "AuthoringRestoreRevisionResponse",
+        oauthScope: "authoring:draft:write",
+        managementScope: "content.write",
+      }),
     "/projects/{projectId}/environments/{environmentId}/collections/{collectionKey}/locales/{locale}/entries/{entryId}/publication":
       publicationOperation({
         operationId: "getAuthoringPublicationStatus",

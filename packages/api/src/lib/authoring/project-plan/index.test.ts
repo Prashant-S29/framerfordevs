@@ -113,7 +113,7 @@ const published = PublishedSchemaRevision.make({
   collectionId: postsId,
   sequence: 1,
   previousRevisionId: null,
-  formatVersion: 2,
+  formatVersion: 1,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
   collectionApiKey: CollectionApiKey.make("posts"),

@@ -184,12 +184,14 @@ a {
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
 }
-.studio-locale-tabs a {
+.studio-locale-tabs a,
+.studio-locale-tabs button {
   flex: none;
   padding: 0.5rem 0.75rem;
   color: var(--muted-foreground);
 }
-.studio-locale-tabs a[aria-selected="true"] {
+.studio-locale-tabs a[aria-selected="true"],
+.studio-locale-tabs button[aria-selected="true"] {
   border-bottom: 2px solid var(--foreground);
   color: var(--foreground);
   font-weight: 650;
@@ -322,4 +324,46 @@ a {
   .studio-name-editor button {
     width: 100%;
   }
+}
+
+.studio-history-list,
+.studio-history-values {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.studio-history-item,
+.studio-history-values > li,
+.studio-history-values > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.studio-history-item > div:first-child,
+.studio-history-values > li {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.studio-history-values dt {
+  font-weight: 600;
+}
+
+.studio-history-values dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.studio-history-dialog {
+  max-height: min(80vh, 48rem);
+  overflow-y: auto;
+}
+
+.studio-publication-plan ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
 }

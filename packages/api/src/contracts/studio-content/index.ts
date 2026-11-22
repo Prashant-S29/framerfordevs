@@ -1,15 +1,21 @@
 import { Schema, SchemaTransformation, Effect } from "effect";
 
+import { ApiCredentialId } from "../access";
 import {
+  ChangedEntryFieldIds,
   EntryCommandId,
   EntryDisplayName,
   EntryDraftVersion,
   EntryId,
   EntryNameVersion,
+  EntryRevisionComparisonChange,
   EntryRevisionId,
+  EntryRevisionScope,
+  EntryRevisionSequence,
   EntryValidationIssue,
   EntryValueMutations,
   EntryValues,
+  entryRevisionComparisonLimits,
 } from "../entry";
 import {
   EditorLayoutNodeId,
@@ -18,7 +24,14 @@ import {
   fieldConfigurationSchemas,
 } from "../field";
 import { LocaleDisplayName, LocaleTag, ProjectLocaleId } from "../locale";
-import { Cursor, EnvironmentId, IsoDateTime, ProjectId } from "../platform";
+import { AuthUserId, Cursor, EnvironmentId, IsoDateTime, ProjectId } from "../platform";
+import {
+  EntryDeliveryReadBack,
+  EntryPublicationHash,
+  EntryPublicationId,
+  EntryPublicationSequence,
+  EntryPublicationStateVersion,
+} from "../publication";
 import { ApiErrorDetail, type ApiData, ApiSuccessSchema, RequestIdSchema } from "../response/api";
 import {
   CollectionDisplayName,
@@ -35,6 +48,7 @@ export const studioContentLimits = {
   requestBytes: 1_048_576,
   responseBytes: 4_194_304,
   searchRequestBytes: 2_048,
+  commandRequestBytes: 4_096,
   pageLimitDefault: 25,
   pageLimitMinimum: 10,
   pageLimitMaximum: 50,
@@ -121,6 +135,7 @@ export class StudioContentLocale extends Schema.Class<StudioContentLocale>("Stud
     displayName: LocaleDisplayName,
     canRead: Schema.Literal(true),
     canWrite: Schema.Boolean,
+    canPublish: Schema.Boolean,
   }),
 ) {}
 
@@ -132,6 +147,7 @@ export class StudioContentCollectionCapabilities extends Schema.Class<StudioCont
     canRename: Schema.Boolean,
     canSaveLocalized: Schema.Boolean,
     canSaveShared: Schema.Boolean,
+    canPublish: Schema.Boolean,
   }),
 ) {}
 
@@ -178,6 +194,28 @@ export class StudioNameVersionConflictFailure extends Schema.TaggedError<StudioN
 export class StudioCommandConflictFailure extends Schema.TaggedError<StudioCommandConflictFailure>(
   "StudioCommandConflictFailure",
 )("StudioCommandConflictFailure", {}) {}
+
+export class StudioRevisionIncompatibleFailure extends Schema.TaggedError<StudioRevisionIncompatibleFailure>(
+  "StudioRevisionIncompatibleFailure",
+)("StudioRevisionIncompatibleFailure", {}) {}
+
+export class StudioPublicationInvalidFailure extends Schema.TaggedError<StudioPublicationInvalidFailure>(
+  "StudioPublicationInvalidFailure",
+)("StudioPublicationInvalidFailure", {
+  details: Schema.Array(ApiErrorDetail).check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(studioContentLimits.maximumErrorDetails),
+  ),
+}) {}
+
+export class StudioPublicationStateConflictFailure extends Schema.TaggedError<StudioPublicationStateConflictFailure>(
+  "StudioPublicationStateConflictFailure",
+)("StudioPublicationStateConflictFailure", {
+  details: Schema.Array(ApiErrorDetail).check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(studioContentLimits.maximumErrorDetails),
+  ),
+}) {}
 
 export class StudioCollectionConfigurationNotice extends Schema.Class<StudioCollectionConfigurationNotice>(
   "StudioCollectionConfigurationNotice",
@@ -485,6 +523,41 @@ export class StudioEntryDraftProjection extends Schema.Class<StudioEntryDraftPro
   }),
 ) {}
 
+export class StudioPublicationSummary extends Schema.Class<StudioPublicationSummary>(
+  "StudioPublicationSummary",
+)(
+  Schema.Struct({
+    id: EntryPublicationId,
+    sequence: EntryPublicationSequence,
+    schemaRevisionId: SchemaRevisionId,
+    contractHash: ContractHash,
+    changedFieldIds: ChangedEntryFieldIds,
+    publishedAt: IsoDateTime,
+    current: Schema.Boolean,
+  }),
+) {}
+
+export const StudioPublicationState = Schema.Literals([
+  "published",
+  "unpublished",
+  "never_published",
+]);
+export type StudioPublicationState = typeof StudioPublicationState.Type;
+
+export class StudioPublicationStatus extends Schema.Class<StudioPublicationStatus>(
+  "StudioPublicationStatus",
+)(
+  Schema.Struct({
+    state: StudioPublicationState,
+    stateVersion: EntryPublicationStateVersion,
+    currentPublication: Schema.NullOr(StudioPublicationSummary),
+    sharedChanged: Schema.Boolean,
+    localizedChanged: Schema.Boolean,
+    schemaChanged: Schema.Boolean,
+    changedSincePublication: Schema.Boolean,
+  }),
+) {}
+
 export class StudioEntryWorkspace extends Schema.Class<StudioEntryWorkspace>(
   "StudioEntryWorkspace",
 )(
@@ -494,6 +567,217 @@ export class StudioEntryWorkspace extends Schema.Class<StudioEntryWorkspace>(
     form: StudioFormProjection,
     capabilities: StudioContentCollectionCapabilities,
     draft: StudioEntryDraftProjection,
+    publication: StudioPublicationStatus,
+  }),
+) {}
+
+export class StudioRevisionSummary extends Schema.Class<StudioRevisionSummary>(
+  "StudioRevisionSummary",
+)(
+  Schema.Struct({
+    id: EntryRevisionId,
+    scope: EntryRevisionScope,
+    sequence: EntryRevisionSequence,
+    previousRevisionId: Schema.NullOr(EntryRevisionId),
+    schemaRevisionId: SchemaRevisionId,
+    contractHash: ContractHash,
+    changedFieldIds: ChangedEntryFieldIds,
+    restoredFromRevisionId: Schema.NullOr(EntryRevisionId),
+    authoredByUserId: Schema.NullOr(AuthUserId),
+    authoredByCredentialId: Schema.NullOr(ApiCredentialId),
+    authoredAt: IsoDateTime,
+    compatible: Schema.Boolean,
+  }),
+) {}
+
+export class StudioRevisionPage extends Schema.Class<StudioRevisionPage>("StudioRevisionPage")(
+  Schema.Struct({
+    items: Schema.Array(StudioRevisionSummary).check(
+      Schema.isMaxLength(studioContentLimits.pageLimitMaximum),
+    ),
+    nextCursor: Schema.NullOr(StudioContentCursor),
+  }),
+) {}
+
+export class StudioRevision extends Schema.Class<StudioRevision>("StudioRevision")(
+  Schema.Struct({
+    revision: StudioRevisionSummary,
+    values: EntryValues,
+  }),
+) {}
+
+export class StudioRevisionComparisonItem extends Schema.Class<StudioRevisionComparisonItem>(
+  "StudioRevisionComparisonItem",
+)(
+  Schema.Struct({
+    fieldId: CollectionFieldId,
+    change: EntryRevisionComparisonChange,
+    before: Schema.optionalKey(Schema.Unknown),
+    after: Schema.optionalKey(Schema.Unknown),
+    inCurrentSchema: Schema.Boolean,
+  }),
+) {}
+
+export class StudioRevisionComparison extends Schema.Class<StudioRevisionComparison>(
+  "StudioRevisionComparison",
+)(
+  Schema.Struct({
+    from: StudioRevisionSummary,
+    to: StudioRevisionSummary,
+    items: Schema.Array(StudioRevisionComparisonItem).check(
+      Schema.isMaxLength(entryRevisionComparisonLimits.maximumItems),
+    ),
+    restrictedChanges: Schema.Boolean,
+    schemaDiffers: Schema.Boolean,
+  }),
+) {}
+
+export class StudioPublicationPage extends Schema.Class<StudioPublicationPage>(
+  "StudioPublicationPage",
+)(
+  Schema.Struct({
+    items: Schema.Array(StudioPublicationSummary).check(
+      Schema.isMaxLength(studioContentLimits.pageLimitMaximum),
+    ),
+    nextCursor: Schema.NullOr(StudioContentCursor),
+  }),
+) {}
+
+export class StudioPublicationEntryIssue extends Schema.Class<StudioPublicationEntryIssue>(
+  "StudioPublicationEntryIssue",
+)(
+  Schema.Struct({
+    code: Schema.String.check(
+      Schema.isMinLength(1),
+      Schema.isMaxLength(64),
+      Schema.isPattern(/^[a-z][a-z0-9_]{0,63}$/u),
+    ),
+    message: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  }),
+) {}
+
+export class StudioPublicationPlan extends Schema.Class<StudioPublicationPlan>(
+  "StudioPublicationPlan",
+)(
+  Schema.Struct({
+    authorityHash: Schema.NullOr(EntryPublicationHash),
+    stateVersion: EntryPublicationStateVersion,
+    currentPublicationId: Schema.NullOr(EntryPublicationId),
+    schemaRevisionId: SchemaRevisionId,
+    contractHash: ContractHash,
+    sharedVersion: EntryDraftVersion,
+    sharedRevisionId: Schema.NullOr(EntryRevisionId),
+    localizedVersion: EntryDraftVersion,
+    localizedRevisionId: Schema.NullOr(EntryRevisionId),
+    wouldCreatePublication: Schema.Boolean,
+    validation: StudioEntryValidation,
+    entryIssues: Schema.Array(StudioPublicationEntryIssue).check(Schema.isMaxLength(50)),
+  }),
+) {}
+
+export class StudioPublishResult extends Schema.Class<StudioPublishResult>("StudioPublishResult")(
+  Schema.Struct({
+    commandId: EntryCommandId,
+    resultKind: Schema.Literals(["changed", "no_op"]),
+    stateVersion: EntryPublicationStateVersion,
+    publication: StudioPublicationSummary,
+    delivery: EntryDeliveryReadBack,
+  }),
+) {}
+
+export class StudioUnpublishResult extends Schema.Class<StudioUnpublishResult>(
+  "StudioUnpublishResult",
+)(
+  Schema.Struct({
+    commandId: EntryCommandId,
+    resultKind: Schema.Literals(["changed", "no_op"]),
+    stateVersion: EntryPublicationStateVersion,
+    unpublishedPublicationId: Schema.NullOr(EntryPublicationId),
+    unpublishedAt: IsoDateTime,
+    delivery: EntryDeliveryReadBack,
+  }),
+) {}
+
+export const StudioListRevisionsQuery = Schema.Struct({
+  scope: EntryRevisionScope,
+  cursor: Schema.NullOr(StudioContentCursor).pipe(
+    Schema.withDecodingDefaultType(Effect.sync(() => null)),
+  ),
+  limit: StudioContentPageLimit.pipe(
+    Schema.withDecodingDefaultType(
+      Effect.sync(() => StudioContentPageLimit.make(studioContentLimits.pageLimitDefault)),
+    ),
+  ),
+}).annotate({ identifier: "StudioListRevisionsQuery" });
+export type StudioListRevisionsQuery = typeof StudioListRevisionsQuery.Type;
+
+export const StudioListPublicationsQuery = Schema.Struct({
+  cursor: Schema.NullOr(StudioContentCursor).pipe(
+    Schema.withDecodingDefaultType(Effect.sync(() => null)),
+  ),
+  limit: StudioContentPageLimit.pipe(
+    Schema.withDecodingDefaultType(
+      Effect.sync(() => StudioContentPageLimit.make(studioContentLimits.pageLimitDefault)),
+    ),
+  ),
+}).annotate({ identifier: "StudioListPublicationsQuery" });
+export type StudioListPublicationsQuery = typeof StudioListPublicationsQuery.Type;
+
+export class StudioRestoreRevisionRequest extends Schema.Class<StudioRestoreRevisionRequest>(
+  "StudioRestoreRevisionRequest",
+)(
+  Schema.Struct({
+    scope: EntryRevisionScope,
+    schemaRevisionId: SchemaRevisionId,
+    contractHash: ContractHash,
+    expectedVersion: EntryDraftVersion,
+    commandId: EntryCommandId,
+  }),
+) {}
+
+export type StudioValidatePublicationRequest = Readonly<Record<string, never>>;
+
+function isEmptyStudioRequest(input: unknown): input is StudioValidatePublicationRequest {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    !Array.isArray(input) &&
+    Object.keys(input).length === 0
+  );
+}
+
+export const StudioValidatePublicationRequest = Schema.declare<StudioValidatePublicationRequest>(
+  isEmptyStudioRequest,
+  {
+    identifier: "StudioValidatePublicationRequest",
+    jsonSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+);
+
+export class StudioPublishEntryRequest extends Schema.Class<StudioPublishEntryRequest>(
+  "StudioPublishEntryRequest",
+)(
+  Schema.Struct({
+    commandId: EntryCommandId,
+    authorityHash: EntryPublicationHash,
+    expectedStateVersion: EntryPublicationStateVersion,
+    expectedPublicationId: Schema.NullOr(EntryPublicationId),
+    expectedSchemaRevisionId: SchemaRevisionId,
+    expectedContractHash: ContractHash,
+    expectedSharedVersion: EntryDraftVersion,
+    expectedSharedRevisionId: Schema.NullOr(EntryRevisionId),
+    expectedLocalizedVersion: EntryDraftVersion,
+    expectedLocalizedRevisionId: Schema.NullOr(EntryRevisionId),
+  }),
+) {}
+
+export class StudioUnpublishEntryRequest extends Schema.Class<StudioUnpublishEntryRequest>(
+  "StudioUnpublishEntryRequest",
+)(
+  Schema.Struct({
+    commandId: EntryCommandId,
+    expectedStateVersion: EntryPublicationStateVersion,
+    expectedPublicationId: Schema.NullOr(EntryPublicationId),
   }),
 ) {}
 
@@ -578,6 +862,9 @@ export const StudioContentApiErrorCode = Schema.Literals([
   "DRAFT_VERSION_CONFLICT",
   "NAME_VERSION_CONFLICT",
   "COMMAND_CONFLICT",
+  "REVISION_INCOMPATIBLE",
+  "PUBLICATION_INVALID",
+  "PUBLICATION_STATE_CONFLICT",
   "INVALID_CURSOR",
   "STALE_CURSOR",
   "REQUEST_TOO_LARGE",
@@ -631,6 +918,16 @@ export const StudioEntryWorkspaceResponse = studioContentSuccessSchema(StudioEnt
 export const StudioCreateEntryResponse = studioContentSuccessSchema(StudioCreateEntryResult);
 export const StudioRenameEntryResponse = studioContentSuccessSchema(StudioEntrySummary);
 export const StudioSaveEntryDraftResponse = studioContentSuccessSchema(StudioMutationReceipt);
+export const StudioRevisionPageResponse = studioContentSuccessSchema(StudioRevisionPage);
+export const StudioRevisionResponse = studioContentSuccessSchema(StudioRevision);
+export const StudioRevisionComparisonResponse =
+  studioContentSuccessSchema(StudioRevisionComparison);
+export const StudioRestoreRevisionResponse = studioContentSuccessSchema(StudioMutationReceipt);
+export const StudioPublicationStatusResponse = studioContentSuccessSchema(StudioPublicationStatus);
+export const StudioPublicationPageResponse = studioContentSuccessSchema(StudioPublicationPage);
+export const StudioPublicationPlanResponse = studioContentSuccessSchema(StudioPublicationPlan);
+export const StudioPublishResponse = studioContentSuccessSchema(StudioPublishResult);
+export const StudioUnpublishResponse = studioContentSuccessSchema(StudioUnpublishResult);
 
 // Retained only for adapters that accept the shared cursor contract at an internal boundary.
 export const StudioSharedCursor = Cursor;

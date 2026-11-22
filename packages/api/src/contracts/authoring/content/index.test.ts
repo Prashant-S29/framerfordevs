@@ -78,7 +78,7 @@ describe("authoring content contracts", () => {
         source: "published",
         collectionId: "019fae8b-1234-7000-8000-000000000001",
         revisionId: "019fae8b-1234-7000-8000-000000000002",
-        formatVersion: 2,
+        formatVersion: 1,
         validationProfile: "ffd-fields@1",
         currencyRegistryProfile: null,
         contractHash: "a".repeat(64),

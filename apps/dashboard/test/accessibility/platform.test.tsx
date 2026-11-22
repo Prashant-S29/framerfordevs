@@ -149,7 +149,7 @@ const webhookEndpoint = Schema.decodeUnknownSync(WebhookEndpoint, { onExcessProp
 const collectionDraft = Schema.decodeUnknownSync(CollectionDraftSchema, {
   onExcessProperty: "error",
 })({
-  formatVersion: 2,
+  formatVersion: 1,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
   contractHash: "b".repeat(64),

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { db } from "@framerfordevs/db";
-import { and, desc, eq, inArray, lt, or, sql } from "@framerfordevs/db/query";
+import { and, eq, inArray, lt, or, sql } from "@framerfordevs/db/query";
 import {
   cmsCollectionSchemaHead,
   cmsEntry,
@@ -22,7 +22,9 @@ import { ApiErrorDetail } from "../../contracts/response/api";
 import {
   CmsEntry,
   CmsEntryDraft,
+  CmsEntryRevision,
   CreateEntryWithDraftResult,
+  EntryRevisionComparison,
   EntryId,
   CmsEntryPage,
   EntryRevisionPage,
@@ -30,11 +32,13 @@ import {
   EntryValidation,
   EntryValidationIssue,
   SaveEntryDraftResult,
+  type CompareEntryRevisionsInput,
   type CreateEntryInput,
   type CreateEntryWithDraftInput,
   type EntryValueMutation,
   type EntryValues,
   type GetEntryDraftInput,
+  type GetEntryRevisionInput,
   type ListEntriesInput,
   type ListEntryRevisionsInput,
   type RenameEntryInput,
@@ -67,10 +71,17 @@ import {
   ContractHash,
   defaultFieldEditorMetadata,
   type CollectionFieldDefinition as CollectionField,
+  SchemaFormatVersion,
 } from "../../contracts/schema";
 import { flattenFieldTree, reconstructFieldTree } from "../../lib/field/tree";
 import { validateFieldValue } from "../../lib/field/validation";
 import { applyEntryMutations, canonicalizeEntryValue } from "../../lib/entry/values";
+import {
+  projectChangedFieldIds,
+  projectRevisionComparison,
+  projectRevisionValues,
+  visibleFieldIds,
+} from "../../lib/entry/revision-comparison";
 import {
   cmsActorFingerprintValue,
   cmsActorMatches,
@@ -226,7 +237,7 @@ async function loadPublishedContract(
     revision,
     fields: tree.roots,
     contractHash: hashSchemaContract({
-      formatVersion: revision.formatVersion,
+      formatVersion: Schema.decodeUnknownSync(SchemaFormatVersion)(revision.formatVersion),
       validationProfile: revision.validationProfile,
       currencyRegistryProfile: revision.currencyRegistryProfile,
       collectionApiKey: revision.collectionApiKey,
@@ -399,6 +410,133 @@ function indexFields(fields: ReadonlyArray<CollectionField>): ReadonlyMap<string
       stack.push({ field: child, inherited, parent: current.field });
   }
   return index;
+}
+
+type StoredRevision =
+  | { readonly scope: "shared"; readonly row: typeof cmsEntrySharedRevision.$inferSelect }
+  | { readonly scope: "localized"; readonly row: typeof cmsEntryLocaleRevision.$inferSelect };
+
+async function loadStoredRevisions(
+  executor: ApplicationExecutor,
+  entry: typeof cmsEntry.$inferSelect,
+  localeId: string,
+  revisionIds: ReadonlyArray<string>,
+): Promise<ReadonlyArray<StoredRevision>> {
+  const ids = [...new Set(revisionIds)];
+  const shared = await executor
+    .select()
+    .from(cmsEntrySharedRevision)
+    .where(
+      and(
+        inArray(cmsEntrySharedRevision.id, ids),
+        eq(cmsEntrySharedRevision.entryId, entry.id),
+        eq(cmsEntrySharedRevision.workspaceId, entry.workspaceId),
+        eq(cmsEntrySharedRevision.projectId, entry.projectId),
+        eq(cmsEntrySharedRevision.environmentId, entry.environmentId),
+        eq(cmsEntrySharedRevision.collectionId, entry.collectionId),
+      ),
+    )
+    .limit(ids.length);
+  const found = new Set(shared.map((row) => row.id));
+  const remaining = ids.filter((id) => !found.has(id));
+  const localized =
+    remaining.length === 0
+      ? []
+      : await executor
+          .select()
+          .from(cmsEntryLocaleRevision)
+          .where(
+            and(
+              inArray(cmsEntryLocaleRevision.id, remaining),
+              eq(cmsEntryLocaleRevision.entryId, entry.id),
+              eq(cmsEntryLocaleRevision.localeId, localeId),
+              eq(cmsEntryLocaleRevision.workspaceId, entry.workspaceId),
+              eq(cmsEntryLocaleRevision.projectId, entry.projectId),
+              eq(cmsEntryLocaleRevision.environmentId, entry.environmentId),
+              eq(cmsEntryLocaleRevision.collectionId, entry.collectionId),
+            ),
+          )
+          .limit(remaining.length);
+  return [
+    ...shared.map((row) => ({ scope: "shared" as const, row })),
+    ...localized.map((row) => ({ scope: "localized" as const, row })),
+  ];
+}
+
+async function loadLegacyRootFields(
+  executor: ApplicationExecutor,
+  entry: typeof cmsEntry.$inferSelect,
+  contract: PublishedContract,
+  revisions: ReadonlyArray<StoredRevision>,
+): Promise<ReadonlyArray<CollectionField>> {
+  const currentIds = new Set<string>(contract.fields.map((field) => field.id));
+  const missing = new Set(
+    revisions.flatMap(({ row }) => Object.keys(row.values)).filter((id) => !currentIds.has(id)),
+  );
+  const schemaRevisionIds = [
+    ...new Set([...revisions].reverse().map(({ row }) => row.schemaRevisionId)),
+  ].filter((id) => id !== contract.revision.id);
+  if (missing.size === 0 || schemaRevisionIds.length === 0) return [];
+  const rows = await executor
+    .select()
+    .from(cmsSchemaRevisionField)
+    .where(
+      and(
+        inArray(cmsSchemaRevisionField.revisionId, schemaRevisionIds),
+        eq(cmsSchemaRevisionField.workspaceId, entry.workspaceId),
+        eq(cmsSchemaRevisionField.projectId, entry.projectId),
+        eq(cmsSchemaRevisionField.environmentId, entry.environmentId),
+        eq(cmsSchemaRevisionField.collectionId, entry.collectionId),
+      ),
+    )
+    .orderBy(
+      cmsSchemaRevisionField.revisionId,
+      cmsSchemaRevisionField.parentFieldId,
+      cmsSchemaRevisionField.position,
+      cmsSchemaRevisionField.fieldId,
+    );
+  const legacy = new Map<string, CollectionField>();
+  for (const schemaRevisionId of schemaRevisionIds) {
+    const tree = reconstructFieldTree(
+      rows.filter((row) => row.revisionId === schemaRevisionId).map(fieldValue),
+    );
+    if (!tree.valid) continue;
+    for (const root of tree.roots) {
+      if (missing.has(root.id) && !legacy.has(root.id)) legacy.set(root.id, root);
+    }
+  }
+  return [...legacy.values()];
+}
+
+function storedRevisionSummary(revision: StoredRevision, visibleIds: ReadonlySet<string>) {
+  const { row } = revision;
+  return Schema.decodeUnknownSync(EntryRevisionSummary)({
+    id: row.id,
+    entryId: row.entryId,
+    localeId: revision.scope === "localized" ? revision.row.localeId : null,
+    scope: revision.scope,
+    sequence: row.sequence,
+    previousRevisionId: row.previousRevisionId,
+    schemaRevisionId: row.schemaRevisionId,
+    contractHash: row.contractHash,
+    changedFieldIds: projectChangedFieldIds(row.changedFieldIds, visibleIds),
+    restoredFromRevisionId: row.restoredFromRevisionId,
+    authoredByUserId: row.authoredByUserId,
+    authoredByCredentialId: row.authoredByCredentialId,
+    authoredAt: toIso(row.authoredAt),
+  });
+}
+
+function revisionScopeMismatch() {
+  return ValidationFailure.make({
+    details: [
+      ApiErrorDetail.make({
+        path: "toRevisionId",
+        code: "entry_revision_scope_mismatch",
+        message: "Both revisions must belong to the same draft scope.",
+      }),
+    ],
+  });
 }
 
 function mutationRootIds(mutations: ReadonlyArray<EntryValueMutation>): Array<string> {
@@ -1402,7 +1540,10 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                     ),
               ),
             )
-            .orderBy(desc(cmsEntry.createdAt), desc(cmsEntry.id))
+            .orderBy(
+              sql`${cmsEntry.createdAt} desc nulls last`,
+              sql`${cmsEntry.id} desc nulls last`,
+            )
             .limit(input.limit + 1);
           return outcomeWith("success", { rows });
         },
@@ -2200,7 +2341,10 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                       ),
                 ),
               )
-              .orderBy(desc(cmsEntrySharedRevision.sequence), desc(cmsEntrySharedRevision.id))
+              .orderBy(
+                sql`${cmsEntrySharedRevision.sequence} desc nulls last`,
+                sql`${cmsEntrySharedRevision.id} desc nulls last`,
+              )
               .limit(input.limit + 1);
             return outcomeWith("success", { rows, visibleIds });
           }
@@ -2226,7 +2370,10 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
                     ),
               ),
             )
-            .orderBy(desc(cmsEntryLocaleRevision.sequence), desc(cmsEntryLocaleRevision.id))
+            .orderBy(
+              sql`${cmsEntryLocaleRevision.sequence} desc nulls last`,
+              sql`${cmsEntryLocaleRevision.id} desc nulls last`,
+            )
             .limit(input.limit + 1);
           return outcomeWith("success", { rows, visibleIds });
         },
@@ -2274,6 +2421,146 @@ export function makeEntryRepository(options: RepositoryOptions = {}) {
             })
           : null;
       return EntryRevisionPage.make({ items, nextCursor });
+    }),
+
+    getRevision: Effect.fn("EntryRepository.getRevision")(function* (
+      actorId: CmsActorInput,
+      input: GetEntryRevisionInput,
+    ) {
+      const result = yield* Effect.tryPromise({
+        try: async () => {
+          const scope = await authorizeScope(database, actorId, input, "content.read");
+          if (scope.kind !== "success") return scope;
+          const contract = await loadPublishedContract(database, input);
+          if (contract === undefined) return outcome("not_found");
+          if (contract === null) return outcome("published_required");
+          if (contract.revision.workspaceId !== scope.access.workspaceId)
+            return outcome("not_found");
+          const [row] = await database
+            .select()
+            .from(cmsEntry)
+            .where(
+              and(
+                eq(cmsEntry.id, input.entryId),
+                eq(cmsEntry.workspaceId, scope.access.workspaceId),
+                eq(cmsEntry.projectId, input.projectId),
+                eq(cmsEntry.environmentId, input.environmentId),
+                eq(cmsEntry.collectionId, input.collectionId),
+              ),
+            )
+            .limit(1);
+          if (!row) return outcome("entry_not_found");
+          const [revision] = await loadStoredRevisions(database, row, scope.access.locale.id, [
+            input.revisionId,
+          ]);
+          if (!revision) return outcome("revision_not_found");
+          const legacyRoots = await loadLegacyRootFields(database, row, contract, [revision]);
+          return outcomeWith("success", { row, scope, contract, revision, legacyRoots });
+        },
+        catch: (cause) => databaseFailure("entry.revisions.get", cause),
+      });
+      if (result.kind === "not_found")
+        return yield* NotFoundFailure.make({ resource: "collection" });
+      if (result.kind === "entry_not_found")
+        return yield* NotFoundFailure.make({ resource: "entry" });
+      if (result.kind === "revision_not_found")
+        return yield* NotFoundFailure.make({ resource: "entry_revision" });
+      if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
+      if (result.kind === "locale_unavailable") return yield* LocaleUnavailableFailure.make();
+      if (result.kind === "cms_required") return yield* CmsCapabilityRequiredFailure.make();
+      if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
+      if (result.kind === "published_required") return yield* PublishedSchemaRequiredFailure.make();
+      const role = result.scope.access.role;
+      const isVisible = (field: CollectionField) => visible(field, role);
+      const roots = [...result.contract.fields, ...result.legacyRoots];
+      return Schema.decodeUnknownSync(CmsEntryRevision)({
+        entry: entryValue(result.row),
+        localeId: result.scope.access.locale.id,
+        locale: result.scope.access.locale.tag,
+        revision: storedRevisionSummary(result.revision, visibleFieldIds(roots, isVisible)),
+        values: projectRevisionValues(entryValues(result.revision.row.values), roots, isVisible),
+        compatible: result.revision.row.contractHash === result.contract.contractHash,
+        currentSchemaRevisionId: result.contract.revision.id,
+        currentContractHash: result.contract.contractHash,
+      });
+    }),
+
+    compareRevisions: Effect.fn("EntryRepository.compareRevisions")(function* (
+      actorId: CmsActorInput,
+      input: CompareEntryRevisionsInput,
+    ) {
+      const result = yield* Effect.tryPromise({
+        try: async () => {
+          const scope = await authorizeScope(database, actorId, input, "content.read");
+          if (scope.kind !== "success") return scope;
+          const contract = await loadPublishedContract(database, input);
+          if (contract === undefined) return outcome("not_found");
+          if (contract === null) return outcome("published_required");
+          if (contract.revision.workspaceId !== scope.access.workspaceId)
+            return outcome("not_found");
+          const [row] = await database
+            .select()
+            .from(cmsEntry)
+            .where(
+              and(
+                eq(cmsEntry.id, input.entryId),
+                eq(cmsEntry.workspaceId, scope.access.workspaceId),
+                eq(cmsEntry.projectId, input.projectId),
+                eq(cmsEntry.environmentId, input.environmentId),
+                eq(cmsEntry.collectionId, input.collectionId),
+              ),
+            )
+            .limit(1);
+          if (!row) return outcome("entry_not_found");
+          const revisions = await loadStoredRevisions(database, row, scope.access.locale.id, [
+            input.fromRevisionId,
+            input.toRevisionId,
+          ]);
+          const from = revisions.find((revision) => revision.row.id === input.fromRevisionId);
+          const to = revisions.find((revision) => revision.row.id === input.toRevisionId);
+          if (!from || !to) return outcome("revision_not_found");
+          if (from.scope !== to.scope) return outcome("scope_mismatch");
+          const legacyRoots = await loadLegacyRootFields(database, row, contract, [from, to]);
+          return outcomeWith("success", { row, scope, contract, from, to, legacyRoots });
+        },
+        catch: (cause) => databaseFailure("entry.revisions.compare", cause),
+      });
+      if (result.kind === "not_found")
+        return yield* NotFoundFailure.make({ resource: "collection" });
+      if (result.kind === "entry_not_found")
+        return yield* NotFoundFailure.make({ resource: "entry" });
+      if (result.kind === "revision_not_found")
+        return yield* NotFoundFailure.make({ resource: "entry_revision" });
+      if (result.kind === "scope_mismatch") return yield* revisionScopeMismatch();
+      if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
+      if (result.kind === "locale_unavailable") return yield* LocaleUnavailableFailure.make();
+      if (result.kind === "cms_required") return yield* CmsCapabilityRequiredFailure.make();
+      if (result.kind === "invalid_state") return yield* InvalidStateTransitionFailure.make();
+      if (result.kind === "published_required") return yield* PublishedSchemaRequiredFailure.make();
+      const role = result.scope.access.role;
+      const isVisible = (field: CollectionField) => visible(field, role);
+      const roots = [...result.contract.fields, ...result.legacyRoots];
+      const visibleIds = visibleFieldIds(roots, isVisible);
+      const comparison = projectRevisionComparison({
+        before: entryValues(result.from.row.values),
+        after: entryValues(result.to.row.values),
+        roots,
+        currentRootIds: result.contract.fields.map((field) => field.id),
+        visible: isVisible,
+      });
+      return Schema.decodeUnknownSync(EntryRevisionComparison)({
+        entry: entryValue(result.row),
+        localeId: result.scope.access.locale.id,
+        locale: result.scope.access.locale.tag,
+        scope: result.from.scope,
+        from: storedRevisionSummary(result.from, visibleIds),
+        to: storedRevisionSummary(result.to, visibleIds),
+        items: comparison.items,
+        restrictedChanges: comparison.restrictedChanges,
+        schemaDiffers: result.from.row.contractHash !== result.to.row.contractHash,
+        currentSchemaRevisionId: result.contract.revision.id,
+        currentContractHash: result.contract.contractHash,
+      });
     }),
 
     restoreRevision: Effect.fn("EntryRepository.restoreRevision")(function* (

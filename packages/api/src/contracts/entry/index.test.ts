@@ -4,6 +4,13 @@ import { Effect, Exit, Schema } from "effect";
 import { ApiErrorDetail } from "../response/api";
 import { EffectSchemaToJsonSchemaConverter } from "../response/effect-schema-converter";
 import {
+  CmsEntryRevisionOutputSchema,
+  CompareEntryRevisionsInput,
+  CompareEntryRevisionsInputSchema,
+  EntryRevisionComparisonItem,
+  EntryRevisionComparisonOutputSchema,
+  GetEntryRevisionInput,
+  GetEntryRevisionInputSchema,
   CmsEntryDraftOutputSchema,
   CmsEntryOutputSchema,
   CmsEntryPageOutputSchema,
@@ -226,6 +233,57 @@ describe("entry contracts", () => {
       assert.doesNotThrow(() => converter.convert(schema, { strategy: "input" }));
     }
     for (const schema of outputSchemas) {
+      assert.doesNotThrow(() => converter.convert(schema, { strategy: "output" }));
+    }
+  });
+});
+
+describe("entry revision read contracts", () => {
+  const revisionScope = {
+    projectId: "019fae8b-1234-7000-8000-000000000001",
+    environmentId: "019fae8b-1234-7000-8000-000000000002",
+    collectionId: "019fae8b-1234-7000-8000-000000000003",
+    locale: "en",
+    entryId: "019fae8b-1234-7000-8000-000000000004",
+  };
+
+  it("decodes revision read and compare inputs strictly", () => {
+    const get = Schema.decodeUnknownExit(GetEntryRevisionInput, { onExcessProperty: "error" });
+    const compare = Schema.decodeUnknownExit(CompareEntryRevisionsInput, {
+      onExcessProperty: "error",
+    });
+    const revisionId = "019fae8b-1234-7000-8000-000000000005";
+    assert.isTrue(Exit.isSuccess(get({ ...revisionScope, revisionId })));
+    assert.isTrue(Exit.isFailure(get({ ...revisionScope, revisionId, scope: "shared" })));
+    assert.isTrue(Exit.isFailure(get({ ...revisionScope, revisionId: "not-a-uuid" })));
+    assert.isTrue(
+      Exit.isSuccess(
+        compare({ ...revisionScope, fromRevisionId: revisionId, toRevisionId: revisionId }),
+      ),
+    );
+    assert.isTrue(Exit.isFailure(compare({ ...revisionScope, fromRevisionId: revisionId })));
+  });
+
+  it("accepts only closed comparison changes with optional before and after values", () => {
+    const decode = Schema.decodeUnknownExit(EntryRevisionComparisonItem, {
+      onExcessProperty: "error",
+    });
+    const fieldId = "019fae8b-1234-7000-8000-000000000006";
+    assert.isTrue(
+      Exit.isSuccess(decode({ fieldId, change: "added", after: { a: 1 }, inCurrentSchema: true })),
+    );
+    assert.isTrue(
+      Exit.isSuccess(decode({ fieldId, change: "removed", before: "x", inCurrentSchema: false })),
+    );
+    assert.isTrue(Exit.isFailure(decode({ fieldId, change: "moved", inCurrentSchema: true })));
+  });
+
+  it("converts revision read contracts for OpenAPI", () => {
+    const converter = new EffectSchemaToJsonSchemaConverter();
+    for (const schema of [GetEntryRevisionInputSchema, CompareEntryRevisionsInputSchema]) {
+      assert.doesNotThrow(() => converter.convert(schema, { strategy: "input" }));
+    }
+    for (const schema of [CmsEntryRevisionOutputSchema, EntryRevisionComparisonOutputSchema]) {
       assert.doesNotThrow(() => converter.convert(schema, { strategy: "output" }));
     }
   });

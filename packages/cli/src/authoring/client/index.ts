@@ -138,7 +138,6 @@ export class AuthoringSchemaValidationIssue extends Schema.Class<AuthoringSchema
 const SchemaChangeCode = Schema.Literals([
   "collection.metadata.updated",
   "collection.api_key.updated",
-  "schema.format.upgraded",
   "schema.currency_profile.updated",
   "editor_layout.updated",
   "field.added.optional",

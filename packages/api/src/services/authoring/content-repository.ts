@@ -1,5 +1,5 @@
 import { db } from "@framerfordevs/db";
-import { and, eq } from "@framerfordevs/db/query";
+import { and, eq, inArray } from "@framerfordevs/db/query";
 import {
   cmsCollection,
   cmsCollectionSchemaHead,
@@ -33,6 +33,7 @@ import {
   CollectionId,
   defaultFieldEditorMetadata,
   type CollectionFieldDefinition as CollectionField,
+  SchemaFormatVersion,
 } from "../../contracts/schema";
 import { reconstructFieldTree } from "../../lib/field/tree";
 import { generatedFormDefinition, syntheticEditorLayout } from "../../lib/field/form-definition";
@@ -169,6 +170,17 @@ function mutationAuthorities(
   };
   for (const field of fields) visit(field, [], [], null);
   return authorities;
+}
+
+export function authoringFieldValue(field: CollectionField, value: unknown): unknown {
+  return projectFieldValue(field, value);
+}
+
+export function authoringRevisionValues(
+  values: EntryValues,
+  fields: ReadonlyArray<CollectionField>,
+) {
+  return projectValues(values, fields);
 }
 
 function projectValues(values: EntryValues, fields: ReadonlyArray<CollectionField>) {
@@ -342,11 +354,15 @@ export function makeAuthoringContentRepository(database: ApplicationDb = db) {
                 source: "published",
                 collectionId: collection.id,
                 revisionId: revision.id,
-                formatVersion: revision.formatVersion,
+                formatVersion: Schema.decodeUnknownSync(SchemaFormatVersion)(
+                  revision.formatVersion,
+                ),
                 validationProfile: revision.validationProfile,
                 currencyRegistryProfile: revision.currencyRegistryProfile,
                 contractHash: hashSchemaContract({
-                  formatVersion: revision.formatVersion,
+                  formatVersion: Schema.decodeUnknownSync(SchemaFormatVersion)(
+                    revision.formatVersion,
+                  ),
                   validationProfile: revision.validationProfile,
                   currencyRegistryProfile: revision.currencyRegistryProfile,
                   collectionApiKey: revision.collectionApiKey,
@@ -455,7 +471,9 @@ export function makeAuthoringContentRepository(database: ApplicationDb = db) {
               collectionId: collection.id,
               revisionId: revision.id,
               contractHash: hashSchemaContract({
-                formatVersion: revision.formatVersion,
+                formatVersion: Schema.decodeUnknownSync(SchemaFormatVersion)(
+                  revision.formatVersion,
+                ),
                 validationProfile: revision.validationProfile,
                 currencyRegistryProfile: revision.currencyRegistryProfile,
                 collectionApiKey: revision.collectionApiKey,
@@ -479,6 +497,45 @@ export function makeAuthoringContentRepository(database: ApplicationDb = db) {
           contractHash: result.contractHash,
           fields: result.fields,
         };
+      },
+    ),
+
+    loadRevisionFieldTrees: Effect.fn("AuthoringContentRepository.loadRevisionFieldTrees")(
+      function* (entry: CmsEntry, schemaRevisionIds: ReadonlyArray<string>) {
+        const revisionIds = [...new Set(schemaRevisionIds)];
+        const rows = yield* Effect.tryPromise({
+          try: () =>
+            database
+              .select()
+              .from(cmsSchemaRevisionField)
+              .where(
+                and(
+                  inArray(cmsSchemaRevisionField.revisionId, revisionIds),
+                  eq(cmsSchemaRevisionField.workspaceId, entry.workspaceId),
+                  eq(cmsSchemaRevisionField.projectId, entry.projectId),
+                  eq(cmsSchemaRevisionField.environmentId, entry.environmentId),
+                  eq(cmsSchemaRevisionField.collectionId, entry.collectionId),
+                ),
+              )
+              .orderBy(
+                cmsSchemaRevisionField.revisionId,
+                cmsSchemaRevisionField.parentFieldId,
+                cmsSchemaRevisionField.position,
+                cmsSchemaRevisionField.fieldId,
+              ),
+          catch: (cause) =>
+            DatabaseFailure.make({ operation: "authoring.content.revision_fields", cause }),
+        });
+        const trees = new Map<string, ReadonlyArray<CollectionField>>();
+        for (const revisionId of revisionIds) {
+          const tree = reconstructFieldTree(
+            rows.filter((row) => row.revisionId === revisionId).map(fieldValue),
+          );
+          if (!tree.valid)
+            return yield* Effect.die(new Error("Authoring revision field tree is invalid."));
+          trees.set(revisionId, tree.roots);
+        }
+        return trees;
       },
     ),
 

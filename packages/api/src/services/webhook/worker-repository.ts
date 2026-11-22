@@ -2,11 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { db } from "@framerfordevs/db";
 import { and, eq, gt, inArray, isNull, lt, lte, or, sql } from "@framerfordevs/db/query";
-import {
-  cmsSchemaRevision,
-  cmsSchemaRevisionField,
-  outboxEvent,
-} from "@framerfordevs/db/schema/cms";
+import { outboxEvent } from "@framerfordevs/db/schema/cms";
 import { project } from "@framerfordevs/db/schema/platform";
 import {
   publicationEvent,
@@ -17,7 +13,7 @@ import {
   webhookEndpointSecret,
   webhookEndpointSubscription,
 } from "@framerfordevs/db/schema/webhooks";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import { DatabaseFailure, WebhookEventInvalidFailure } from "../../contracts/response/errors";
 import type { WebhookAttemptOutcome } from "../../lib/webhook/retry";
@@ -25,9 +21,6 @@ import {
   projectPublicationEvent,
   type ProjectedPublicationEvent,
 } from "../../lib/publication/event";
-import { reconstructFieldTree } from "../../lib/field/tree";
-import { CollectionFieldDefinition, defaultFieldEditorMetadata } from "../../contracts/schema";
-import { hashSchemaContract } from "../schema/engine";
 import type { ApplicationDb } from "../project-access";
 
 const externalTypes = [
@@ -40,87 +33,6 @@ const knownTypes = [...externalTypes, ...internalTypes];
 const knownTypeSet = new Set<string>(knownTypes);
 const externalTypeSet = new Set<string>(externalTypes);
 const internalTypeSet = new Set<string>(internalTypes);
-
-function revisionFieldValue(row: typeof cmsSchemaRevisionField.$inferSelect) {
-  return Schema.decodeUnknownSync(CollectionFieldDefinition)({
-    id: row.fieldId,
-    parentFieldId: row.parentFieldId,
-    nodeRole: row.nodeRole,
-    apiKey: row.apiKey,
-    displayLabel: row.displayLabel,
-    kind: row.kind,
-    required: row.required,
-    localization: row.localization,
-    deprecated: row.deprecated,
-    position: row.position,
-    editor:
-      Object.keys(row.editorMetadata).length === 0
-        ? defaultFieldEditorMetadata
-        : row.editorMetadata,
-    configuration: row.configuration,
-    children: [],
-  });
-}
-
-async function withLegacySchemaContract(
-  transaction: Parameters<Parameters<ApplicationDb["transaction"]>[0]>[0],
-  row: typeof outboxEvent.$inferSelect,
-) {
-  if (
-    row.eventType !== "cms.schema.published" ||
-    typeof row.payload.contractHash === "string" ||
-    row.schemaRevisionId === null
-  ) {
-    return row;
-  }
-  const [revision] = await transaction
-    .select()
-    .from(cmsSchemaRevision)
-    .where(
-      and(
-        eq(cmsSchemaRevision.id, row.schemaRevisionId),
-        eq(cmsSchemaRevision.workspaceId, row.workspaceId),
-        eq(cmsSchemaRevision.projectId, row.projectId),
-        eq(cmsSchemaRevision.environmentId, row.environmentId),
-        eq(cmsSchemaRevision.collectionId, row.subjectId),
-      ),
-    )
-    .limit(1);
-  if (!revision) return row;
-  const fieldRows = await transaction
-    .select()
-    .from(cmsSchemaRevisionField)
-    .where(
-      and(
-        eq(cmsSchemaRevisionField.revisionId, revision.id),
-        eq(cmsSchemaRevisionField.workspaceId, row.workspaceId),
-        eq(cmsSchemaRevisionField.projectId, row.projectId),
-        eq(cmsSchemaRevisionField.environmentId, row.environmentId),
-        eq(cmsSchemaRevisionField.collectionId, row.subjectId),
-      ),
-    )
-    .orderBy(
-      cmsSchemaRevisionField.parentFieldId,
-      cmsSchemaRevisionField.position,
-      cmsSchemaRevisionField.fieldId,
-    );
-  const tree = reconstructFieldTree(fieldRows.map(revisionFieldValue));
-  if (!tree.valid) return row;
-  return {
-    ...row,
-    payload: {
-      ...row.payload,
-      schemaHash: revision.schemaHash,
-      contractHash: hashSchemaContract({
-        formatVersion: revision.formatVersion,
-        validationProfile: revision.validationProfile,
-        currencyRegistryProfile: revision.currencyRegistryProfile,
-        collectionApiKey: revision.collectionApiKey,
-        fields: tree.roots,
-      }),
-    },
-  };
-}
 
 function databaseFailure(operation: string, cause: unknown) {
   return DatabaseFailure.make({ operation, cause });
@@ -201,9 +113,7 @@ export function makeWebhookWorkerRepository(database: ApplicationDb = db) {
                 continue;
               }
               if (!externalTypeSet.has(row.eventType)) throw WebhookEventInvalidFailure.make();
-              const result = projectPublicationEvent(
-                await withLegacySchemaContract(transaction, row),
-              );
+              const result = projectPublicationEvent(row);
               if (!result.ok) {
                 invalid += 1;
                 invalidIds.add(row.id);

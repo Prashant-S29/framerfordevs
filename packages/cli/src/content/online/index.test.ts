@@ -6,15 +6,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PreparedContentCommand } from "../bin";
 import { runContentOnline } from "./index";
-import type { CliConfigV2 } from "../../schema";
+import type { CliConfig } from "../../schema";
 
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const entryId = "019fae8b-1234-7000-8000-000000000003";
 const revisionId = "019fae8b-1234-7000-8000-000000000004";
 const digest = "a".repeat(64);
-const config: CliConfigV2 = {
-  schemaVersion: 2,
+const config: CliConfig = {
+  schemaVersion: 1,
   apiBaseUrl: "https://api.example.test",
   projectId,
   environment: "main",
@@ -55,8 +55,67 @@ function command(
         ? [{ operation: "unset", scope: "localized", path: ["title"] }]
         : [],
     createAuthority: name === "entry create" ? { revisionId, contractHash: digest } : null,
+    revision: {
+      scope: name === "entry revisions" || name === "entry restore" ? "localized" : undefined,
+      revisionId: name === "entry revision" || name === "entry restore" ? revisionId : undefined,
+      fromRevisionId: name === "entry diff" ? revisionId : undefined,
+      toRevisionId: name === "entry diff" ? otherRevisionId : undefined,
+      cursor: name === "entry revisions" ? "cursor_1" : undefined,
+      limit: name === "entry revisions" ? 10 : undefined,
+    },
   };
 }
+
+const otherRevisionId = "019fae8b-1234-7000-8000-000000000005";
+const revisionSummary = {
+  id: revisionId,
+  entryId,
+  scope: "localized",
+  locale: "en-US",
+  sequence: 1,
+  previousRevisionId: null,
+  schemaRevisionId: revisionId,
+  contractHash: digest,
+  changedFieldIds: [],
+  restoredFromRevisionId: null,
+  authoredByUserId: null,
+  authoredByCredentialId: projectId,
+  authoredAt: "2026-08-24T00:00:00.000Z",
+};
+const draftResponse = {
+  entry: summary,
+  locale: "en-US",
+  schemaRevisionId: revisionId,
+  contractHash: digest,
+  sharedVersion: 4,
+  sharedRevisionId: null,
+  sharedValues: {},
+  localizedVersion: 7,
+  localizedRevisionId: otherRevisionId,
+  localizedValues: {},
+  canEditShared: true,
+  validation,
+};
+const plan = {
+  entryId,
+  locale: "en-US",
+  stateVersion: 0,
+  currentPublicationId: null,
+  schemaRevisionId: revisionId,
+  contractHash: digest,
+  sharedRevisionId: null,
+  sharedVersion: 0,
+  localizedRevisionId: null,
+  localizedVersion: 0,
+  valid: true,
+  issues: [],
+  capped: false,
+  contentHash: "b".repeat(64),
+  authorityHash: "c".repeat(64),
+  size: null,
+  referencesWouldRefresh: false,
+  wouldCreatePublication: true,
+};
 
 function requestBody(request: RequestInit | undefined) {
   const value: unknown = JSON.parse(String(request?.body));
@@ -212,6 +271,7 @@ describe("content CLI online orchestration", () => {
           stateVersion: 1,
           resultKind: "changed",
           publication,
+          delivery: { status: "verified", currentPublicationId: entryId },
         });
       }
       if (url.endsWith("/publication") && request?.method === "GET") {
@@ -244,6 +304,7 @@ describe("content CLI online orchestration", () => {
           unpublishedPublicationId: entryId,
           unpublishedPublicationSequence: 1,
           unpublishedAt: "2026-08-24T00:00:00.000Z",
+          delivery: { status: "superseded", currentPublicationId: revisionId },
         });
       }
       throw new Error(`Unexpected URL ${url}`);
@@ -262,8 +323,16 @@ describe("content CLI online orchestration", () => {
       expect(draft).toMatchObject({ accepted: true, draft: { entry: summary } });
       expect(created).toMatchObject({ accepted: true, created: { entry: summary } });
       expect(updated).toMatchObject({ accepted: true, updated: { localizedVersion: 1 } });
-      expect(published).toMatchObject({ accepted: true, published: { stateVersion: 1 } });
-      expect(unpublished).toMatchObject({ accepted: true, unpublished: { stateVersion: 2 } });
+      expect(published).toMatchObject({
+        accepted: true,
+        published: { stateVersion: 1 },
+        delivery: { status: "verified", currentPublicationId: entryId },
+      });
+      expect(unpublished).toMatchObject({
+        accepted: true,
+        unpublished: { stateVersion: 2 },
+        delivery: { status: "superseded", currentPublicationId: revisionId },
+      });
       await expect(
         readFile(join(root, ".framerfordevs/retry/content-command.json"), "utf8"),
       ).rejects.toMatchObject({ code: "ENOENT" });
@@ -274,6 +343,165 @@ describe("content CLI online orchestration", () => {
           .filter((item) => item.request?.body !== undefined)
           .every((item) => !String(item.request?.body).includes("management-token")),
       ).toBe(true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("reads revisions, compares them, validates, and restores with a journaled command", async () => {
+    process.env.FFD_MANAGEMENT_TOKEN = "management-token";
+    const root = await mkdtemp(join(tmpdir(), "ffd-content-revisions-"));
+    const requests: Array<{ url: string; request: RequestInit | undefined }> = [];
+    let comparisonItems: ReadonlyArray<object> = [
+      {
+        fieldId: revisionId,
+        apiKey: "title",
+        change: "changed",
+        before: "Old",
+        after: "New",
+        inCurrentSchema: true,
+      },
+    ];
+    let planValid = true;
+    let restoreFailure: "transport" | "incompatible" | null = "transport";
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input, request) => {
+      const url = String(input);
+      requests.push({ url, request });
+      if (url.includes("/revisions?")) {
+        return success({ items: [revisionSummary], nextCursor: null });
+      }
+      if (url.includes("/compare/")) {
+        return success({
+          entryId,
+          scope: "localized",
+          from: revisionSummary,
+          to: { ...revisionSummary, id: otherRevisionId, sequence: 2 },
+          items: comparisonItems,
+          restrictedChanges: false,
+          schemaDiffers: false,
+        });
+      }
+      if (url.endsWith("/restore")) {
+        if (restoreFailure === "transport") throw new Error("socket closed");
+        if (restoreFailure === "incompatible") {
+          return new Response(
+            JSON.stringify({
+              ok: false,
+              data: null,
+              error: {
+                code: "REVISION_INCOMPATIBLE",
+                message: "This revision uses another schema contract and cannot be restored.",
+                retryable: false,
+                requestId: "request-1",
+              },
+              message: "This revision uses another schema contract and cannot be restored.",
+            }),
+            { status: 409 },
+          );
+        }
+        const body = requestBody(request);
+        return success({
+          entryId,
+          commandId: Reflect.get(body, "commandId"),
+          sharedChanged: false,
+          sharedVersion: 4,
+          sharedRevisionId: null,
+          localizedChanged: true,
+          localizedVersion: 8,
+          localizedRevisionId: revisionId,
+          validation,
+        });
+      }
+      if (url.includes(`/revisions/${revisionId}`)) {
+        return success({
+          revision: revisionSummary,
+          values: { title: "Old" },
+          compatible: true,
+          currentSchemaRevisionId: revisionId,
+          currentContractHash: digest,
+        });
+      }
+      if (url.endsWith("/draft")) return success(draftResponse);
+      if (url.endsWith("/publication/validate")) {
+        return success({
+          ...plan,
+          valid: planValid,
+          issues: planValid ? [] : [{ path: "title", code: "required", message: "Required." }],
+          authorityHash: planValid ? plan.authorityHash : null,
+        });
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    });
+    vi.stubGlobal("fetch", fetch);
+    const journalPath = join(root, ".framerfordevs/retry/content-command.json");
+
+    try {
+      const listed = await runContentOnline(command(root, "entry revisions"));
+      expect(listed).toEqual({
+        command: "entry revisions",
+        accepted: true,
+        environmentId,
+        items: [revisionSummary],
+        nextCursor: null,
+      });
+      expect(requests.at(-1)?.url).toContain(
+        `/entries/${entryId}/revisions?scope=localized&limit=10&cursor=cursor_1`,
+      );
+
+      const read = await runContentOnline(command(root, "entry revision"));
+      expect(read).toMatchObject({ accepted: true, revision: { values: { title: "Old" } } });
+
+      const different = await runContentOnline(command(root, "entry diff"));
+      expect(different).toMatchObject({ accepted: true, different: true });
+      expect(requests.at(-1)?.url).toContain(`/revisions/${revisionId}/compare/${otherRevisionId}`);
+      comparisonItems = [];
+      const equal = await runContentOnline(command(root, "entry diff"));
+      expect(equal).toMatchObject({ accepted: true, different: false });
+
+      const valid = await runContentOnline(command(root, "entry validate"));
+      expect(valid).toMatchObject({ accepted: true, validation: { valid: true } });
+      planValid = false;
+      const invalid = await runContentOnline(command(root, "entry validate"));
+      expect(invalid).toMatchObject({ accepted: false, validation: { valid: false } });
+
+      await expect(runContentOnline(command(root, "entry restore"))).rejects.toThrow(
+        "CLI_AUTHORING_TRANSPORT",
+      );
+      const journal: unknown = JSON.parse(await readFile(journalPath, "utf8"));
+      expect(journal).toMatchObject({ operation: "entry.restore" });
+      const journaledCommandId = Reflect.get(journal as object, "commandId");
+
+      restoreFailure = null;
+      const restored = await runContentOnline(command(root, "entry restore"));
+      expect(restored).toMatchObject({
+        accepted: true,
+        restored: { commandId: journaledCommandId, localizedVersion: 8 },
+      });
+      const restoreRequests = requests.filter((item) => item.url.endsWith("/restore"));
+      expect(restoreRequests).toHaveLength(2);
+      expect(restoreRequests.map((item) => requestBody(item.request))).toEqual([
+        {
+          scope: "localized",
+          schemaRevisionId: revisionId,
+          contractHash: digest,
+          expectedVersion: 7,
+          commandId: journaledCommandId,
+        },
+        {
+          scope: "localized",
+          schemaRevisionId: revisionId,
+          contractHash: digest,
+          expectedVersion: 7,
+          commandId: journaledCommandId,
+        },
+      ]);
+      await expect(readFile(journalPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+
+      restoreFailure = "incompatible";
+      await expect(runContentOnline(command(root, "entry restore"))).rejects.toThrow(
+        "CLI_AUTHORING_HTTP_REVISION_INCOMPATIBLE",
+      );
+      await expect(readFile(journalPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
     } finally {
       await rm(root, { recursive: true, force: true });
     }

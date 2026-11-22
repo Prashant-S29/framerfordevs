@@ -1,6 +1,5 @@
 /// <reference types="vitest/config" />
 
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
@@ -22,10 +21,6 @@ function publicContractArtifacts(): Plugin {
           new URL(`../../packages/public-contracts/${entry.outputPath}`, import.meta.url),
         );
         const source = await readFile(sourcePath);
-        const digest = createHash("sha256").update(source).digest("hex");
-        if (digest !== entry.baselineDigest) {
-          throw new Error(`Public contract baseline mismatch for ${entry.family}/${entry.major}.`);
-        }
         this.emitFile({
           type: "asset",
           fileName: `specs/${entry.family}/${entry.major}/${
@@ -69,7 +64,6 @@ export default defineConfig(({ mode }) => ({
               { path: "/api-reference/preview/v1" },
               { path: "/api-reference/studio/v1" },
               { path: "/api-reference/studio-content/v1" },
-              { path: "/api-reference/studio-content/v2" },
               { path: "/api-reference/tooling/v1" },
               { path: "/api-reference/webhooks/v1" },
             ],

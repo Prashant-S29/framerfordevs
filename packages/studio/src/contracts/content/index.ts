@@ -82,6 +82,7 @@ export interface StudioContentCapabilities {
   readonly canRename: boolean;
   readonly canSaveLocalized: boolean;
   readonly canSaveShared: boolean;
+  readonly canPublish: boolean;
 }
 
 export interface StudioContentContextDto {
@@ -91,6 +92,7 @@ export interface StudioContentContextDto {
     readonly displayName: string;
     readonly canRead: true;
     readonly canWrite: boolean;
+    readonly canPublish: boolean;
   }>;
   readonly collections: ReadonlyArray<{
     readonly id: string;
@@ -207,6 +209,112 @@ export interface StudioEntryWorkspaceDto extends StudioNewEntryWorkspaceDto {
     readonly localizedValues: StudioJsonObject;
     readonly validation: StudioValidationDto;
   }>;
+  readonly publication: StudioPublicationStatusDto;
+}
+
+export type StudioRevisionScope = "shared" | "localized";
+
+export interface StudioRevisionSummaryDto {
+  readonly id: string;
+  readonly scope: StudioRevisionScope;
+  readonly sequence: number;
+  readonly previousRevisionId: string | null;
+  readonly schemaRevisionId: string;
+  readonly contractHash: string;
+  readonly changedFieldIds: ReadonlyArray<string>;
+  readonly restoredFromRevisionId: string | null;
+  readonly authoredByUserId: string | null;
+  readonly authoredByCredentialId: string | null;
+  readonly authoredAt: string;
+  readonly compatible: boolean;
+}
+
+export interface StudioRevisionPageDto {
+  readonly items: ReadonlyArray<StudioRevisionSummaryDto>;
+  readonly nextCursor: string | null;
+}
+
+export interface StudioRevisionDto {
+  readonly revision: StudioRevisionSummaryDto;
+  readonly values: StudioJsonObject;
+}
+
+export interface StudioRevisionComparisonItemDto {
+  readonly fieldId: string;
+  readonly change: "added" | "removed" | "changed";
+  readonly before?: StudioJsonValue;
+  readonly after?: StudioJsonValue;
+  readonly inCurrentSchema: boolean;
+}
+
+export interface StudioRevisionComparisonDto {
+  readonly from: StudioRevisionSummaryDto;
+  readonly to: StudioRevisionSummaryDto;
+  readonly items: ReadonlyArray<StudioRevisionComparisonItemDto>;
+  readonly restrictedChanges: boolean;
+  readonly schemaDiffers: boolean;
+}
+
+export interface StudioPublicationSummaryDto {
+  readonly id: string;
+  readonly sequence: number;
+  readonly schemaRevisionId: string;
+  readonly contractHash: string;
+  readonly changedFieldIds: ReadonlyArray<string>;
+  readonly publishedAt: string;
+  readonly current: boolean;
+}
+
+export interface StudioPublicationStatusDto {
+  readonly state: "published" | "unpublished" | "never_published";
+  readonly stateVersion: number;
+  readonly currentPublication: StudioPublicationSummaryDto | null;
+  readonly sharedChanged: boolean;
+  readonly localizedChanged: boolean;
+  readonly schemaChanged: boolean;
+  readonly changedSincePublication: boolean;
+}
+
+export interface StudioPublicationPageDto {
+  readonly items: ReadonlyArray<StudioPublicationSummaryDto>;
+  readonly nextCursor: string | null;
+}
+
+export interface StudioPublicationPlanDto {
+  readonly authorityHash: string | null;
+  readonly stateVersion: number;
+  readonly currentPublicationId: string | null;
+  readonly schemaRevisionId: string;
+  readonly contractHash: string;
+  readonly sharedVersion: number;
+  readonly sharedRevisionId: string | null;
+  readonly localizedVersion: number;
+  readonly localizedRevisionId: string | null;
+  readonly wouldCreatePublication: boolean;
+  readonly validation: StudioValidationDto;
+  readonly entryIssues: ReadonlyArray<{ readonly code: string; readonly message: string }>;
+}
+
+export interface StudioDeliveryReadBackDto {
+  readonly status: "verified" | "superseded";
+  readonly currentPublicationId: string | null;
+}
+
+export interface StudioPublishResultDto {
+  readonly commandId: string;
+  readonly resultKind: "changed" | "no_op";
+  readonly stateVersion: number;
+  readonly publication: StudioPublicationSummaryDto;
+  readonly delivery: StudioDeliveryReadBackDto;
+}
+
+export interface StudioUnpublishResultDto {
+  readonly commandId: string;
+  readonly resultKind: "changed" | "no_op";
+  readonly stateVersion: number;
+  readonly unpublishedPublicationId: string | null;
+  readonly unpublishedAt: string;
+  readonly delivery: StudioDeliveryReadBackDto;
 }
 
 export interface StudioCreateEntryResultDto {
@@ -246,6 +354,9 @@ export type StudioContentBrowserErrorCode =
   | "DRAFT_VERSION_CONFLICT"
   | "NAME_VERSION_CONFLICT"
   | "COMMAND_CONFLICT"
+  | "REVISION_INCOMPATIBLE"
+  | "PUBLICATION_INVALID"
+  | "PUBLICATION_STATE_CONFLICT"
   | "INVALID_CURSOR"
   | "STALE_CURSOR"
   | "REQUEST_TOO_LARGE"
@@ -342,11 +453,18 @@ function copyJsonObject(value: unknown): StudioJsonObject {
 function capabilities(value: unknown): StudioContentCapabilities {
   if (
     !isRecord(value) ||
-    !exactKeys(value, ["canCreate", "canRename", "canSaveLocalized", "canSaveShared"]) ||
+    !exactKeys(value, [
+      "canCreate",
+      "canRename",
+      "canSaveLocalized",
+      "canSaveShared",
+      "canPublish",
+    ]) ||
     typeof value.canCreate !== "boolean" ||
     typeof value.canRename !== "boolean" ||
     typeof value.canSaveLocalized !== "boolean" ||
-    typeof value.canSaveShared !== "boolean"
+    typeof value.canSaveShared !== "boolean" ||
+    typeof value.canPublish !== "boolean"
   ) {
     throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
   }
@@ -355,6 +473,7 @@ function capabilities(value: unknown): StudioContentCapabilities {
     canRename: value.canRename,
     canSaveLocalized: value.canSaveLocalized,
     canSaveShared: value.canSaveShared,
+    canPublish: value.canPublish,
   };
 }
 
@@ -960,7 +1079,7 @@ function workspace(
 ): StudioEntryWorkspaceDto {
   if (
     !isRecord(value) ||
-    !exactKeys(value, ["localeId", "locale", "form", "capabilities", "draft"])
+    !exactKeys(value, ["localeId", "locale", "form", "capabilities", "draft", "publication"])
   ) {
     throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
   }
@@ -1024,7 +1143,207 @@ function workspace(
       localizedValues: values(draft.localizedValues, visibleIds),
       validation: validation(draft.validation, visibleIds),
     },
+    publication: publicationStatus(value.publication, visibleIds),
   };
+}
+
+function nullableUuid(value: unknown): value is string | null {
+  return value === null || (typeof value === "string" && uuid.test(value));
+}
+
+function visibleFieldIdList(
+  value: unknown,
+  visibleIds: ReadonlySet<string>,
+): ReadonlyArray<string> {
+  if (
+    !Array.isArray(value) ||
+    value.length > 100 ||
+    value.some((id) => typeof id !== "string" || !visibleIds.has(id)) ||
+    new Set(value).size !== value.length
+  ) {
+    throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+  }
+  return value.flatMap((id) => (typeof id === "string" ? [id] : []));
+}
+
+function dateTime(value: unknown): value is string {
+  return (
+    boundedString(value, 20, 35) && isoDateTime.test(value) && Number.isFinite(Date.parse(value))
+  );
+}
+
+function revisionSummary(
+  value: unknown,
+  visibleIds: ReadonlySet<string>,
+): StudioRevisionSummaryDto {
+  if (
+    !isRecord(value) ||
+    !exactKeys(value, [
+      "id",
+      "scope",
+      "sequence",
+      "previousRevisionId",
+      "schemaRevisionId",
+      "contractHash",
+      "changedFieldIds",
+      "restoredFromRevisionId",
+      "authoredByUserId",
+      "authoredByCredentialId",
+      "authoredAt",
+      "compatible",
+    ]) ||
+    typeof value.id !== "string" ||
+    !uuid.test(value.id) ||
+    (value.scope !== "shared" && value.scope !== "localized") ||
+    !integer(value.sequence, 1) ||
+    !nullableUuid(value.previousRevisionId) ||
+    typeof value.schemaRevisionId !== "string" ||
+    !uuid.test(value.schemaRevisionId) ||
+    typeof value.contractHash !== "string" ||
+    !hash.test(value.contractHash) ||
+    !nullableUuid(value.restoredFromRevisionId) ||
+    !(value.authoredByUserId === null || boundedString(value.authoredByUserId, 1, 255)) ||
+    !nullableUuid(value.authoredByCredentialId) ||
+    !dateTime(value.authoredAt) ||
+    typeof value.compatible !== "boolean"
+  ) {
+    throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+  }
+  const scope: StudioRevisionScope = value.scope;
+  return {
+    id: value.id,
+    scope,
+    sequence: value.sequence,
+    previousRevisionId: value.previousRevisionId,
+    schemaRevisionId: value.schemaRevisionId,
+    contractHash: value.contractHash,
+    changedFieldIds: visibleFieldIdList(value.changedFieldIds, visibleIds),
+    restoredFromRevisionId: value.restoredFromRevisionId,
+    authoredByUserId: value.authoredByUserId,
+    authoredByCredentialId: value.authoredByCredentialId,
+    authoredAt: value.authoredAt,
+    compatible: value.compatible,
+  };
+}
+
+function publicationSummary(
+  value: unknown,
+  visibleIds: ReadonlySet<string>,
+): StudioPublicationSummaryDto {
+  if (
+    !isRecord(value) ||
+    !exactKeys(value, [
+      "id",
+      "sequence",
+      "schemaRevisionId",
+      "contractHash",
+      "changedFieldIds",
+      "publishedAt",
+      "current",
+    ]) ||
+    typeof value.id !== "string" ||
+    !uuid.test(value.id) ||
+    !integer(value.sequence, 1) ||
+    typeof value.schemaRevisionId !== "string" ||
+    !uuid.test(value.schemaRevisionId) ||
+    typeof value.contractHash !== "string" ||
+    !hash.test(value.contractHash) ||
+    !dateTime(value.publishedAt) ||
+    typeof value.current !== "boolean"
+  ) {
+    throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+  }
+  return {
+    id: value.id,
+    sequence: value.sequence,
+    schemaRevisionId: value.schemaRevisionId,
+    contractHash: value.contractHash,
+    changedFieldIds: visibleFieldIdList(value.changedFieldIds, visibleIds),
+    publishedAt: value.publishedAt,
+    current: value.current,
+  };
+}
+
+function publicationStatus(
+  value: unknown,
+  visibleIds: ReadonlySet<string>,
+): StudioPublicationStatusDto {
+  if (
+    !isRecord(value) ||
+    !exactKeys(value, [
+      "state",
+      "stateVersion",
+      "currentPublication",
+      "sharedChanged",
+      "localizedChanged",
+      "schemaChanged",
+      "changedSincePublication",
+    ]) ||
+    (value.state !== "published" &&
+      value.state !== "unpublished" &&
+      value.state !== "never_published") ||
+    !integer(value.stateVersion, 0) ||
+    (value.state === "published") !== (value.currentPublication !== null) ||
+    (value.state === "never_published" && value.stateVersion !== 0) ||
+    typeof value.sharedChanged !== "boolean" ||
+    typeof value.localizedChanged !== "boolean" ||
+    typeof value.schemaChanged !== "boolean" ||
+    typeof value.changedSincePublication !== "boolean"
+  ) {
+    throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+  }
+  return {
+    state: value.state,
+    stateVersion: value.stateVersion,
+    currentPublication:
+      value.currentPublication === null
+        ? null
+        : publicationSummary(value.currentPublication, visibleIds),
+    sharedChanged: value.sharedChanged,
+    localizedChanged: value.localizedChanged,
+    schemaChanged: value.schemaChanged,
+    changedSincePublication: value.changedSincePublication,
+  };
+}
+
+function cursorPage<T>(
+  value: unknown,
+  item: (value: unknown) => T & { readonly id: string },
+): { readonly items: ReadonlyArray<T>; readonly nextCursor: string | null } {
+  if (
+    !isRecord(value) ||
+    !exactKeys(value, ["items", "nextCursor"]) ||
+    !Array.isArray(value.items) ||
+    value.items.length > 50 ||
+    !(
+      value.nextCursor === null ||
+      (typeof value.nextCursor === "string" && cursor.test(value.nextCursor))
+    )
+  ) {
+    throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+  }
+  const items = value.items.map(item);
+  if (new Set(items.map((candidate) => candidate.id)).size !== items.length) {
+    throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+  }
+  return { items, nextCursor: value.nextCursor };
+}
+
+function deliveryReadBack(value: unknown): StudioDeliveryReadBackDto {
+  if (
+    !isRecord(value) ||
+    !exactKeys(value, ["status", "currentPublicationId"]) ||
+    (value.status !== "verified" && value.status !== "superseded") ||
+    !nullableUuid(value.currentPublicationId)
+  ) {
+    throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+  }
+  return { status: value.status, currentPublicationId: value.currentPublicationId };
+}
+
+function resultKind(value: unknown): "changed" | "no_op" {
+  if (value !== "changed" && value !== "no_op") throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+  return value;
 }
 
 const contentErrorCodes = new Set<string>([
@@ -1042,6 +1361,9 @@ const contentErrorCodes = new Set<string>([
   "DRAFT_VERSION_CONFLICT",
   "NAME_VERSION_CONFLICT",
   "COMMAND_CONFLICT",
+  "REVISION_INCOMPATIBLE",
+  "PUBLICATION_INVALID",
+  "PUBLICATION_STATE_CONFLICT",
   "INVALID_CURSOR",
   "STALE_CURSOR",
   "REQUEST_TOO_LARGE",
@@ -1082,6 +1404,9 @@ function validFailureStatus(code: StudioContentBrowserErrorCode, status: number)
     DRAFT_VERSION_CONFLICT: [409],
     NAME_VERSION_CONFLICT: [409],
     COMMAND_CONFLICT: [409],
+    REVISION_INCOMPATIBLE: [409],
+    PUBLICATION_INVALID: [422],
+    PUBLICATION_STATE_CONFLICT: [409],
     INVALID_CURSOR: [400],
     STALE_CURSOR: [409],
     REQUEST_TOO_LARGE: [413],
@@ -1104,6 +1429,9 @@ function validFailureStatus(code: StudioContentBrowserErrorCode, status: number)
   return statuses[code].includes(status);
 }
 
+const detailPath =
+  /^(?:path|entry|expected[A-Z][A-Za-z]{0,40}|field\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/iu;
+
 function errorDetail(value: unknown): StudioJsonObject {
   if (
     !isRecord(value) ||
@@ -1122,7 +1450,10 @@ function errorDetail(value: unknown): StudioJsonObject {
     !boundedString(value.code, 1, 64) ||
     !issueCode.test(value.code) ||
     !boundedString(value.message, 1, 512) ||
-    !(value.path === undefined || value.path === "path") ||
+    !(
+      value.path === undefined ||
+      (typeof value.path === "string" && detailPath.test(value.path))
+    ) ||
     !(value.scope === undefined || value.scope === "shared" || value.scope === "localized") ||
     !(value.expectedVersion === undefined || integer(value.expectedVersion, 0)) ||
     !(value.currentVersion === undefined || integer(value.currentVersion, 0)) ||
@@ -1237,14 +1568,15 @@ export function decodeStudioContentContextResponse(
     const locales: StudioContentContextDto["locales"] = data.locales.map((item) => {
       if (
         !isRecord(item) ||
-        !exactKeys(item, ["id", "tag", "displayName", "canRead", "canWrite"]) ||
+        !exactKeys(item, ["id", "tag", "displayName", "canRead", "canWrite", "canPublish"]) ||
         typeof item.id !== "string" ||
         !uuid.test(item.id) ||
         localeIds.has(item.id) ||
         !validLocale(item.tag) ||
         !boundedString(item.displayName, 1, 100) ||
         item.canRead !== true ||
-        typeof item.canWrite !== "boolean"
+        typeof item.canWrite !== "boolean" ||
+        typeof item.canPublish !== "boolean"
       )
         throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
       localeIds.add(item.id);
@@ -1254,6 +1586,7 @@ export function decodeStudioContentContextResponse(
         displayName: item.displayName,
         canRead: true,
         canWrite: item.canWrite,
+        canPublish: item.canPublish,
       };
     });
     const collectionIds = new Set<string>();
@@ -1497,10 +1830,257 @@ export function decodeStudioSaveEntryDraftResponse(
   });
 }
 
+export function decodeStudioRevisionPageResponse(
+  value: unknown,
+  status: number,
+  scope: StudioRevisionScope,
+  visibleFieldIds: ReadonlySet<string>,
+): StudioRevisionPageDto | StudioContentBrowserFailure {
+  return envelope(value, status, (data) => {
+    const page = cursorPage(data, (item) => revisionSummary(item, visibleFieldIds));
+    if (page.items.some((item) => item.scope !== scope)) {
+      throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+    }
+    return page;
+  });
+}
+
+export function decodeStudioRevisionResponse(
+  value: unknown,
+  status: number,
+  revisionId: string,
+  visibleFieldIds: ReadonlySet<string>,
+): StudioRevisionDto | StudioContentBrowserFailure {
+  return envelope(value, status, (data) => {
+    if (!isRecord(data) || !exactKeys(data, ["revision", "values"])) {
+      throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+    }
+    const revision = revisionSummary(data.revision, visibleFieldIds);
+    if (revision.id !== revisionId) throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+    return { revision, values: values(data.values, visibleFieldIds) };
+  });
+}
+
+function comparisonItem(
+  value: unknown,
+  visibleIds: ReadonlySet<string>,
+): StudioRevisionComparisonItemDto {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some(
+      (key) => !["fieldId", "change", "before", "after", "inCurrentSchema"].includes(key),
+    ) ||
+    typeof value.fieldId !== "string" ||
+    !uuid.test(value.fieldId) ||
+    typeof value.inCurrentSchema !== "boolean" ||
+    (value.inCurrentSchema && !visibleIds.has(value.fieldId)) ||
+    (value.change !== "added" && value.change !== "removed" && value.change !== "changed") ||
+    (value.change === "added") !== !("before" in value) ||
+    (value.change === "removed") !== !("after" in value)
+  ) {
+    throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+  }
+  return {
+    fieldId: value.fieldId,
+    change: value.change,
+    ...("before" in value ? { before: copyJson(value.before) } : {}),
+    ...("after" in value ? { after: copyJson(value.after) } : {}),
+    inCurrentSchema: value.inCurrentSchema,
+  };
+}
+
+export function decodeStudioRevisionComparisonResponse(
+  value: unknown,
+  status: number,
+  expected: { readonly fromRevisionId: string; readonly toRevisionId: string },
+  visibleFieldIds: ReadonlySet<string>,
+): StudioRevisionComparisonDto | StudioContentBrowserFailure {
+  return envelope(value, status, (data) => {
+    if (
+      !isRecord(data) ||
+      !exactKeys(data, ["from", "to", "items", "restrictedChanges", "schemaDiffers"]) ||
+      !Array.isArray(data.items) ||
+      data.items.length > 200 ||
+      typeof data.restrictedChanges !== "boolean" ||
+      typeof data.schemaDiffers !== "boolean"
+    ) {
+      throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+    }
+    const from = revisionSummary(data.from, visibleFieldIds);
+    const to = revisionSummary(data.to, visibleFieldIds);
+    const items = data.items.map((item) => comparisonItem(item, visibleFieldIds));
+    if (
+      from.id !== expected.fromRevisionId ||
+      to.id !== expected.toRevisionId ||
+      from.scope !== to.scope ||
+      new Set(items.map((item) => item.fieldId)).size !== items.length
+    ) {
+      throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+    }
+    return {
+      from,
+      to,
+      items,
+      restrictedChanges: data.restrictedChanges,
+      schemaDiffers: data.schemaDiffers,
+    };
+  });
+}
+
+export function decodeStudioPublicationStatusResponse(
+  value: unknown,
+  status: number,
+  visibleFieldIds: ReadonlySet<string>,
+): StudioPublicationStatusDto | StudioContentBrowserFailure {
+  return envelope(value, status, (data) => publicationStatus(data, visibleFieldIds));
+}
+
+export function decodeStudioPublicationPageResponse(
+  value: unknown,
+  status: number,
+  visibleFieldIds: ReadonlySet<string>,
+): StudioPublicationPageDto | StudioContentBrowserFailure {
+  return envelope(value, status, (data) =>
+    cursorPage(data, (item) => publicationSummary(item, visibleFieldIds)),
+  );
+}
+
+export function decodeStudioPublicationPlanResponse(
+  value: unknown,
+  status: number,
+  visibleFieldIds: ReadonlySet<string>,
+): StudioPublicationPlanDto | StudioContentBrowserFailure {
+  return envelope(value, status, (data) => {
+    if (
+      !isRecord(data) ||
+      !exactKeys(data, [
+        "authorityHash",
+        "stateVersion",
+        "currentPublicationId",
+        "schemaRevisionId",
+        "contractHash",
+        "sharedVersion",
+        "sharedRevisionId",
+        "localizedVersion",
+        "localizedRevisionId",
+        "wouldCreatePublication",
+        "validation",
+        "entryIssues",
+      ]) ||
+      !(
+        data.authorityHash === null ||
+        (typeof data.authorityHash === "string" && hash.test(data.authorityHash))
+      ) ||
+      !integer(data.stateVersion, 0) ||
+      !nullableUuid(data.currentPublicationId) ||
+      typeof data.schemaRevisionId !== "string" ||
+      !uuid.test(data.schemaRevisionId) ||
+      typeof data.contractHash !== "string" ||
+      !hash.test(data.contractHash) ||
+      !integer(data.sharedVersion, 0) ||
+      !nullableUuid(data.sharedRevisionId) ||
+      !integer(data.localizedVersion, 0) ||
+      !nullableUuid(data.localizedRevisionId) ||
+      typeof data.wouldCreatePublication !== "boolean" ||
+      !Array.isArray(data.entryIssues) ||
+      data.entryIssues.length > 50
+    ) {
+      throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+    }
+    const entryIssues = data.entryIssues.map((issue) => {
+      if (
+        !isRecord(issue) ||
+        !exactKeys(issue, ["code", "message"]) ||
+        !boundedString(issue.code, 1, 64) ||
+        !issueCode.test(issue.code) ||
+        !boundedString(issue.message, 1, 512)
+      ) {
+        throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+      }
+      return { code: issue.code, message: issue.message };
+    });
+    return {
+      authorityHash: data.authorityHash,
+      stateVersion: data.stateVersion,
+      currentPublicationId: data.currentPublicationId,
+      schemaRevisionId: data.schemaRevisionId,
+      contractHash: data.contractHash,
+      sharedVersion: data.sharedVersion,
+      sharedRevisionId: data.sharedRevisionId,
+      localizedVersion: data.localizedVersion,
+      localizedRevisionId: data.localizedRevisionId,
+      wouldCreatePublication: data.wouldCreatePublication,
+      validation: validation(data.validation, visibleFieldIds),
+      entryIssues,
+    };
+  });
+}
+
+export function decodeStudioPublishResponse(
+  value: unknown,
+  status: number,
+  visibleFieldIds: ReadonlySet<string>,
+): StudioPublishResultDto | StudioContentBrowserFailure {
+  return envelope(value, status, (data) => {
+    if (
+      !isRecord(data) ||
+      !exactKeys(data, ["commandId", "resultKind", "stateVersion", "publication", "delivery"]) ||
+      typeof data.commandId !== "string" ||
+      !uuid.test(data.commandId) ||
+      !integer(data.stateVersion, 0)
+    ) {
+      throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+    }
+    return {
+      commandId: data.commandId,
+      resultKind: resultKind(data.resultKind),
+      stateVersion: data.stateVersion,
+      publication: publicationSummary(data.publication, visibleFieldIds),
+      delivery: deliveryReadBack(data.delivery),
+    };
+  });
+}
+
+export function decodeStudioUnpublishResponse(
+  value: unknown,
+  status: number,
+): StudioUnpublishResultDto | StudioContentBrowserFailure {
+  return envelope(value, status, (data) => {
+    if (
+      !isRecord(data) ||
+      !exactKeys(data, [
+        "commandId",
+        "resultKind",
+        "stateVersion",
+        "unpublishedPublicationId",
+        "unpublishedAt",
+        "delivery",
+      ]) ||
+      typeof data.commandId !== "string" ||
+      !uuid.test(data.commandId) ||
+      !integer(data.stateVersion, 0) ||
+      !nullableUuid(data.unpublishedPublicationId) ||
+      !dateTime(data.unpublishedAt)
+    ) {
+      throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
+    }
+    return {
+      commandId: data.commandId,
+      resultKind: resultKind(data.resultKind),
+      stateVersion: data.stateVersion,
+      unpublishedPublicationId: data.unpublishedPublicationId,
+      unpublishedAt: data.unpublishedAt,
+      delivery: deliveryReadBack(data.delivery),
+    };
+  });
+}
+
 export const studioContentBrowserLimits = {
   responseBytes: maximumResponseBytes,
   searchRequestBytes: 2 * 1_024,
   resolveRequestBytes: 8 * 1_024,
   maximumResolvedEntries: 100,
   mutationRequestBytes: 1 * 1_024 * 1_024,
+  commandRequestBytes: 4 * 1_024,
+  historyPageLimit: 20,
 } as const;

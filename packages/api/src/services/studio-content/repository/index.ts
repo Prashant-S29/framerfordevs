@@ -62,6 +62,7 @@ export interface StudioCollectionAuthority {
   readonly canRename: boolean;
   readonly canWriteLocalized: boolean;
   readonly canWriteShared: boolean;
+  readonly canPublish: boolean;
 }
 
 export interface StudioEntryBrowseOrder {
@@ -264,6 +265,7 @@ async function selectCollectionAuthority(
       canRename: canWriteLocalized,
       canWriteLocalized,
       canWriteShared: canWriteLocalized && access.localeAccessMode === "all",
+      canPublish: isRoleAllowed(role, "content.publish"),
     } satisfies StudioCollectionAuthority,
   };
 }
@@ -547,6 +549,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
                 (access.localeAccessMode === "selected" && allowedLocaleIds.has(locale.id)),
             );
             const roleCanWrite = isRoleAllowed(role, "content.write");
+            const roleCanPublish = isRoleAllowed(role, "content.publish");
             const locales = effectiveLocales.map((locale) =>
               Schema.decodeUnknownSync(StudioContentLocale)({
                 id: locale.id,
@@ -554,6 +557,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
                 displayName: locale.displayName,
                 canRead: true,
                 canWrite: roleCanWrite,
+                canPublish: roleCanPublish,
               }),
             );
             if (locales.length === 0) {
@@ -699,6 +703,7 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
                     canRename: canMutate,
                     canSaveLocalized: canMutate,
                     canSaveShared: canMutate && access.localeAccessMode === "all",
+                    canPublish: roleCanPublish,
                   },
                 }),
               );

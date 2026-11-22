@@ -82,6 +82,27 @@ if (entry) {
 }
 ```
 
+Revision history uses the same exact-locale entry routes:
+
+```ts
+const history = await authoring.entries.listRevisions("articles", "en-US", entryId, {
+  scope: "localized",
+  limit: 20,
+});
+const [newest, previous] = history.body?.ok ? history.body.data.items : [];
+if (newest && previous) {
+  const diff = await authoring.entries.compareRevisions(
+    "articles",
+    "en-US",
+    entryId,
+    previous.id,
+    newest.id,
+  );
+}
+```
+
+`entries.getRevision` returns stored values and a `compatible` flag. `entries.restoreRevision` needs the current draft version of the scope and a command ID, and returns `REVISION_INCOMPATIBLE` for a revision from another schema contract. Publish and unpublish results include a `delivery` read-back with the status `verified` or `superseded`.
+
 The compiled [`examples/authoring.ts`](./examples/authoring.ts) file provides a complete environment-backed automation example.
 
 The Promise and Effect clients reject redirects, bound request/response bytes and timeouts, runtime-validate operation-specific requests, recursively decode exact Authoring responses/errors, keep bearer authority in headers, and expose read-only Presentation/form metadata plus optimistic exact-locale entry, draft, and content-publication operations. Safe helpers fetch current draft authority before saving, validate then publish from the exact returned authority, reject repeated pagination cursors, and process bounded imports with explicit concurrency and per-entry outcomes. Schema export/plan/push and Presentation mutation belong to the CLI, not this application SDK. The clients never force overwrite or hide conflicts. Never use Authoring credentials in browser code.

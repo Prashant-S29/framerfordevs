@@ -363,6 +363,7 @@ describe("Authoring HTTP isolation", () => {
   const entryPath = `${entriesPath}/019fae8b-1234-7000-8000-000000000003`;
   const draftPath = `${entryPath}/draft`;
   const publicationPath = `${entryPath}/publication`;
+  const revisionId = "019fae8b-1234-7000-8000-000000000004";
 
   it("classifies every Authoring operation into a closed metric endpoint", () => {
     expect([
@@ -381,6 +382,13 @@ describe("Authoring HTTP isolation", () => {
       classifyAuthoringEndpoint("POST", `${publicationPath}/validate`),
       classifyAuthoringEndpoint("POST", `${publicationPath}/publish`),
       classifyAuthoringEndpoint("POST", `${publicationPath}/unpublish`),
+      classifyAuthoringEndpoint("GET", `${entryPath}/revisions`),
+      classifyAuthoringEndpoint("GET", `${entryPath}/revisions/${revisionId}`),
+      classifyAuthoringEndpoint(
+        "GET",
+        `${entryPath}/revisions/${revisionId}/compare/${revisionId}`,
+      ),
+      classifyAuthoringEndpoint("POST", `${entryPath}/revisions/${revisionId}/restore`),
     ]).toEqual([
       "schema_export",
       "schema_plan",
@@ -397,7 +405,12 @@ describe("Authoring HTTP isolation", () => {
       "publication_validate",
       "publication_publish",
       "publication_unpublish",
+      "revision_list",
+      "revision_get",
+      "revision_compare",
+      "revision_restore",
     ]);
+    expect(classifyAuthoringEndpoint("POST", `${entryPath}/revisions`)).toBeNull();
     expect(classifyAuthoringEndpoint("DELETE", entryPath)).toBeNull();
     expect(classifyAuthoringEndpoint("GET", "/openapi.json")).toBeNull();
   });
@@ -414,7 +427,7 @@ describe("Authoring HTTP isolation", () => {
     expect(specification.headers["access-control-allow-credentials"]).toBeUndefined();
     expect(specification.headers["x-content-type-options"]).toBe("nosniff");
     expect(specification.body.info.title).toBe("Framer for Developers Authoring API");
-    expect(Object.keys(specification.body.paths)).toHaveLength(12);
+    expect(Object.keys(specification.body.paths)).toHaveLength(16);
     expect(JSON.stringify(specification.body)).not.toContain("workspaceId");
     expect(JSON.stringify(specification.body)).not.toContain("credentialId");
     expect(reference.status).toBe(200);

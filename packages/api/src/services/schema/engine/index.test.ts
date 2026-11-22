@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import { assert, describe, it, layer } from "@effect/vitest";
 import { Effect, Exit, Schema } from "effect";
 
@@ -161,7 +159,7 @@ function makeDraft(
   collection = makeCollection(),
 ): SchemaDraftState {
   return {
-    formatVersion: 2,
+    formatVersion: 1,
     validationProfile: "ffd-fields@1",
     currencyRegistryProfile: null,
     collection,
@@ -179,7 +177,7 @@ function makePublished(fields: ReadonlyArray<CollectionFieldDefinition>): Publis
     collectionId,
     sequence: 1,
     previousRevisionId: null,
-    formatVersion: 2,
+    formatVersion: 1,
     validationProfile: "ffd-fields@1",
     currencyRegistryProfile: null,
     collectionApiKey: CollectionApiKey.make("blog_posts"),
@@ -282,7 +280,7 @@ describe("schema draft validation", () => {
     assert.strictEqual(hashCollectionDraft(ordered), hashCollectionDraft(reversed));
   });
 
-  it("reconstructs current and legacy persisted schema-hash authority", () => {
+  it("reconstructs persisted schema-hash authority from published revision state", () => {
     const draft = makeDraft([optionalTitle]);
     const current = hashPublishedSchemaRevision({
       formatVersion: draft.formatVersion,
@@ -294,41 +292,7 @@ describe("schema draft validation", () => {
       fields: draft.fields,
       editorLayout: draft.editorLayout,
     });
-    const legacyDocument = JSON.stringify({
-      collection: {
-        apiKey: "blog_posts",
-        description: "Editorial posts",
-        displayName: "Blog posts",
-      },
-      fields: [
-        {
-          apiKey: "title",
-          configuration: {},
-          deprecated: false,
-          displayLabel: "Title",
-          id: firstFieldId,
-          kind: "short_text",
-          localization: "localized",
-          position: 0,
-          required: false,
-        },
-      ],
-      formatVersion: 1,
-    });
-    const expectedLegacy = createHash("sha256").update(legacyDocument, "utf8").digest("hex");
-    const legacy = hashPublishedSchemaRevision({
-      formatVersion: 1,
-      validationProfile: "legacy-m5",
-      currencyRegistryProfile: null,
-      collectionApiKey: draft.collection.apiKey,
-      collectionDisplayName: draft.collection.displayName,
-      collectionDescription: draft.collection.description,
-      fields: draft.fields,
-      editorLayout: draft.editorLayout,
-    });
-
     assert.strictEqual(current, hashCollectionDraft(draft));
-    assert.strictEqual(legacy, expectedLegacy);
   });
 
   it("keeps the contract hash stable for layout-only management changes", () => {
@@ -360,7 +324,7 @@ describe("schema draft validation", () => {
 
   it("projects optional contract configuration to recursively valid Tooling JSON", () => {
     const contract = compileCollectionContract({
-      formatVersion: 2,
+      formatVersion: 1,
       validationProfile: "m6-strict",
       currencyRegistryProfile: "iso-4217@2025-05-12",
       collectionApiKey: "articles",

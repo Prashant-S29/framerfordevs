@@ -73,7 +73,7 @@ function fixture() {
     field(17, "external_asset"),
   ];
   const contract = {
-    formatVersion: 2,
+    formatVersion: 1,
     validationProfile: "ffd-fields@1",
     currencyRegistryProfile: "iso-4217@2026-01-01",
     collectionApiKey: "blog_posts",

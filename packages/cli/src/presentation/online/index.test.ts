@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PresentationEditDocument } from "../document";
 import { runPresentationGetOnline, runPresentationPublishOnline } from "./index";
-import type { CliConfigV2 } from "../../schema";
+import type { CliConfig } from "../../schema";
 import { Schema } from "effect";
 
 const projectId = "019fae8b-1234-7000-8000-000000000001";
@@ -16,8 +16,8 @@ const fieldId = "019fae8b-1234-7000-8000-000000000004";
 const groupId = "019fae8b-1234-7000-8000-000000000005";
 const tabId = "019fae8b-1234-7000-8000-000000000006";
 const digest = "a".repeat(64);
-const config: CliConfigV2 = {
-  schemaVersion: 2,
+const config: CliConfig = {
+  schemaVersion: 1,
   apiBaseUrl: "https://api.example.test",
   projectId,
   environment: "main",

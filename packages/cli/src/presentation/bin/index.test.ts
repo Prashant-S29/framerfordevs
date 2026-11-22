@@ -79,7 +79,7 @@ async function fixture() {
   await writeFile(
     join(root, "framerfordevs.config.json"),
     JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 1,
       apiBaseUrl: "https://api.example.test",
       projectId,
       environment: "main",

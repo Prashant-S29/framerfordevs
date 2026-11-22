@@ -61,37 +61,21 @@ const ApiBaseUrl = Schema.String.check(
   }),
 );
 
-const CliConfigBase = {
-  apiBaseUrl: ApiBaseUrl,
-  projectId: Uuid,
-  environment: EnvironmentKey,
-  output: RelativeProjectPath,
-} as const;
-
-export class CliConfigV1 extends Schema.Class<CliConfigV1>("CliConfigV1")(
-  Schema.Struct({
-    schemaVersion: Schema.Literal(1),
-    ...CliConfigBase,
-  }),
-) {}
-
 export class CliSchemaBuildConfig extends Schema.Class<CliSchemaBuildConfig>(
   "CliSchemaBuildConfig",
 )(Schema.Struct({ entry: RelativeProjectPath })) {}
 
-export class CliConfigV2 extends Schema.Class<CliConfigV2>("CliConfigV2")(
+export class CliConfig extends Schema.Class<CliConfig>("CliConfig")(
   Schema.Struct({
-    schemaVersion: Schema.Literal(2),
-    ...CliConfigBase,
+    schemaVersion: Schema.Literal(1),
+    apiBaseUrl: ApiBaseUrl,
+    projectId: Uuid,
+    environment: EnvironmentKey,
+    output: RelativeProjectPath,
     schema: RelativeProjectPath,
     schemaBuild: Schema.optionalKey(CliSchemaBuildConfig),
   }),
 ) {}
-
-export const CliConfig = Schema.Union([CliConfigV1, CliConfigV2]).annotate({
-  identifier: "CliConfig",
-});
-export type CliConfig = typeof CliConfig.Type;
 
 export type JsonValue = null | boolean | number | string | ReadonlyArray<JsonValue> | JsonObject;
 export interface JsonObject {
@@ -156,7 +140,7 @@ export const NormalizedContractField: Schema.Codec<NormalizedContractFieldType> 
 export class NormalizedCollectionContract extends Schema.Class<NormalizedCollectionContract>(
   "NormalizedCollectionContract",
 )({
-  formatVersion: Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 2 })),
+  formatVersion: Schema.Literal(1),
   validationProfile: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
   currencyRegistryProfile: Schema.NullOr(
     Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)),
@@ -325,9 +309,9 @@ export class AuthoringLockedEnumOption extends Schema.Class<AuthoringLockedEnumO
   optionId: Uuid,
 }) {}
 
-export class AuthoringSchemaLock extends Schema.Class<AuthoringSchemaLock>("AuthoringSchemaLockV2")(
+export class AuthoringSchemaLock extends Schema.Class<AuthoringSchemaLock>("AuthoringSchemaLock")(
   Schema.Struct({
-    lockVersion: Schema.Literal(2),
+    lockVersion: Schema.Literal(1),
     authoringApi: Schema.Literal("authoring/v1"),
     projectId: Uuid,
     environmentId: Uuid,
@@ -349,6 +333,7 @@ export const ContentMutationOperation = Schema.Literals([
   "entry.update",
   "entry.publish",
   "entry.unpublish",
+  "entry.restore",
 ]);
 export type ContentMutationOperation = typeof ContentMutationOperation.Type;
 

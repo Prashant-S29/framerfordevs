@@ -24,13 +24,6 @@ const valid = JSON.stringify({
   projectId: "019fae8b-1234-7000-8000-000000000001",
   environment: "main",
   output: "src/framerfordevs",
-});
-const validV2 = JSON.stringify({
-  schemaVersion: 2,
-  apiBaseUrl: "https://api.example.com",
-  projectId: "019fae8b-1234-7000-8000-000000000001",
-  environment: "main",
-  output: "src/framerfordevs",
   schema: "framerfordevs.schema.ts",
   schemaBuild: { entry: "schema/compose.schema.ts" },
 });
@@ -61,28 +54,31 @@ describe("CLI config", () => {
     ),
   );
 
-  it.effect("loads v2 schema authority while retaining v1 compatibility", () =>
+  it.effect("resolves schema and build entry paths inside the project", () =>
     Effect.gen(function* () {
-      const v1 = yield* loadCliConfig("/workspace/v1").pipe(
-        Effect.provide(
-          fileSystem({
-            "/workspace/v1/framerfordevs.config.json": valid,
-          }),
-        ),
-      );
-      const v2 = yield* loadCliConfig("/workspace/v2").pipe(
-        Effect.provide(
-          fileSystem({
-            "/workspace/v2/framerfordevs.config.json": validV2,
-          }),
-        ),
+      const result = yield* loadCliConfig("/workspace/app").pipe(
+        Effect.provide(fileSystem({ "/workspace/app/framerfordevs.config.json": valid })),
       );
 
-      assert.isNull(v1.schemaPath);
-      assert.strictEqual(generationLockFileName(v1.config), "schema.lock.json");
-      assert.strictEqual(generationLockFileName(v2.config), "generated.lock.json");
-      assert.strictEqual(v2.schemaPath, "/workspace/v2/framerfordevs.schema.ts");
-      assert.strictEqual(v2.schemaBuildEntryPath, "/workspace/v2/schema/compose.schema.ts");
+      assert.strictEqual(generationLockFileName, "generated.lock.json");
+      assert.strictEqual(result.schemaPath, "/workspace/app/framerfordevs.schema.ts");
+      assert.strictEqual(result.schemaBuildEntryPath, "/workspace/app/schema/compose.schema.ts");
+    }),
+  );
+
+  it.effect("rejects any other config schema version and a missing schema path", () =>
+    Effect.gen(function* () {
+      const { schema: _schema, ...withoutSchema } = JSON.parse(valid);
+      for (const fixture of [{ ...JSON.parse(valid), schemaVersion: 2 }, withoutSchema]) {
+        const result = yield* Effect.exit(
+          loadCliConfig("/workspace").pipe(
+            Effect.provide(
+              fileSystem({ "/workspace/framerfordevs.config.json": JSON.stringify(fixture) }),
+            ),
+          ),
+        );
+        assert.strictEqual(result._tag, "Failure");
+      }
     }),
   );
 
@@ -113,9 +109,9 @@ describe("CLI config", () => {
         { ...JSON.parse(valid), token: "secret" },
         { ...JSON.parse(valid), output: "../outside" },
         { ...JSON.parse(valid), output: "/absolute" },
-        { ...JSON.parse(validV2), schema: "../outside.schema.ts" },
-        { ...JSON.parse(validV2), schema: "/absolute.schema.ts" },
-        { ...JSON.parse(validV2), schemaBuild: { entry: "../compose.schema.ts" } },
+        { ...JSON.parse(valid), schema: "../outside.schema.ts" },
+        { ...JSON.parse(valid), schema: "/absolute.schema.ts" },
+        { ...JSON.parse(valid), schemaBuild: { entry: "../compose.schema.ts" } },
         { ...JSON.parse(valid), apiBaseUrl: "http://api.example.com" },
         { ...JSON.parse(valid), apiBaseUrl: "https://user:pass@api.example.com" },
       ];

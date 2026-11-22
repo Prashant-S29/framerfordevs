@@ -24,6 +24,16 @@ export const contentQueryKeys = {
     ["studio", "content", "workspace", "new", collectionId, locale] as const,
   entryWorkspace: (collectionId: string, locale: string, entryId: string) =>
     ["studio", "content", "workspace", "entry", collectionId, locale, entryId] as const,
+  revisions: (
+    collectionId: string,
+    locale: string,
+    entryId: string,
+    scope: "shared" | "localized",
+  ) => ["studio", "content", "revisions", collectionId, locale, entryId, scope] as const,
+  entryRevisions: (collectionId: string, locale: string, entryId: string) =>
+    ["studio", "content", "revisions", collectionId, locale, entryId] as const,
+  publication: (collectionId: string, locale: string, entryId: string) =>
+    ["studio", "content", "publication", collectionId, locale, entryId] as const,
   references: (
     collectionId: string,
     locale: string,
@@ -124,6 +134,14 @@ export function contentErrorMessage(error: Error | null): string {
       case "DRAFT_VERSION_CONFLICT":
       case "NAME_VERSION_CONFLICT":
         return "This draft changed elsewhere. Reload it before continuing.";
+      case "REVISION_INCOMPATIBLE":
+        return "This revision uses a different content model and cannot be restored.";
+      case "PUBLICATION_INVALID":
+        return "The saved draft no longer passes publication checks. Check publication again to see the issues.";
+      case "PUBLICATION_STATE_CONFLICT":
+        return "The publication state or the saved draft changed since you checked it. Check publication again.";
+      case "COMMAND_CONFLICT":
+        return "Studio could not confirm this request. Check the latest state and try again.";
       case "VALIDATION_ERROR":
       case "INVALID_CURSOR":
       case "STUDIO_REQUEST_INVALID":

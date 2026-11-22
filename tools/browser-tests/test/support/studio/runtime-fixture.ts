@@ -20,7 +20,39 @@ const contentLocaleId = "66666666-6666-4666-8666-666666666666";
 const contentFrenchLocaleId = "66666666-6666-4666-8666-666666666667";
 const contentSchemaRevisionId = "77777777-7777-4777-8777-777777777777";
 const contentEntryId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const contentLocalizedRevisionId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const contentPublicationHash = "e".repeat(64);
+const blockingFieldId = "10000000-0000-4000-8000-000000000002";
+
+interface FixtureRevision {
+  readonly id: string;
+  readonly sequence: number;
+  readonly values: Readonly<Record<string, unknown>>;
+  readonly previousRevisionId: string | null;
+  readonly restoredFromRevisionId: string | null;
+  readonly changedFieldIds: ReadonlyArray<string>;
+  readonly authoredAt: string;
+}
+
+interface FixturePublication {
+  readonly id: string;
+  readonly sequence: number;
+  readonly values: Readonly<Record<string, unknown>>;
+  readonly changedFieldIds: ReadonlyArray<string>;
+  readonly publishedAt: string;
+}
+
+function fixtureId(prefix: string, sequence: number): string {
+  return `${prefix}0000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`;
+}
+
+function changedFields(
+  before: Readonly<Record<string, unknown>>,
+  after: Readonly<Record<string, unknown>>,
+): ReadonlyArray<string> {
+  return [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
+    (key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]),
+  );
+}
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -109,13 +141,85 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
     canRename: true,
     canSaveLocalized: true,
     canSaveShared: false,
+    canPublish: true,
   };
   const readOnlyCapabilities = {
     canCreate: false,
     canRename: false,
     canSaveLocalized: false,
     canSaveShared: false,
+    canPublish: false,
   };
+  const revisions: Array<FixtureRevision> = [];
+  const publications: Array<FixturePublication> = [];
+  let publicationStateVersion = 0;
+  let currentPublication: FixturePublication | null = null;
+  const headRevisionId = () => revisions.at(-1)?.id ?? null;
+  const recordRevision = (restoredFromRevisionId: string | null = null) => {
+    const previous = revisions.at(-1) ?? null;
+    const sequence = revisions.length + 1;
+    revisions.push({
+      id: fixtureId("d", sequence),
+      sequence,
+      values: localizedValues,
+      previousRevisionId: previous?.id ?? null,
+      restoredFromRevisionId,
+      changedFieldIds: changedFields(previous?.values ?? {}, localizedValues),
+      authoredAt: new Date(Date.parse(createdAt) + sequence * 60_000).toISOString(),
+    });
+  };
+  const revisionSummary = (revision: FixtureRevision) => ({
+    id: revision.id,
+    scope: "localized",
+    sequence: revision.sequence,
+    previousRevisionId: revision.previousRevisionId,
+    schemaRevisionId: contentSchemaRevisionId,
+    contractHash: "a".repeat(64),
+    changedFieldIds: revision.changedFieldIds,
+    restoredFromRevisionId: revision.restoredFromRevisionId,
+    authoredByUserId: "browser-user",
+    authoredByCredentialId: null,
+    authoredAt: revision.authoredAt,
+    compatible: true,
+  });
+  const publicationSummary = (publication: FixturePublication) => ({
+    id: publication.id,
+    sequence: publication.sequence,
+    schemaRevisionId: contentSchemaRevisionId,
+    contractHash: "a".repeat(64),
+    changedFieldIds: publication.changedFieldIds,
+    publishedAt: publication.publishedAt,
+    current: currentPublication?.id === publication.id,
+  });
+  const publicationStatus = () => {
+    const changed =
+      currentPublication !== null &&
+      JSON.stringify(currentPublication.values) !== JSON.stringify(localizedValues);
+    return {
+      state:
+        currentPublication !== null
+          ? "published"
+          : publicationStateVersion === 0
+            ? "never_published"
+            : "unpublished",
+      stateVersion: publicationStateVersion,
+      currentPublication:
+        currentPublication === null ? null : publicationSummary(currentPublication),
+      sharedChanged: false,
+      localizedChanged: changed,
+      schemaChanged: false,
+      changedSincePublication: changed,
+    };
+  };
+  const failure = (status: number, code: string, message: string) => ({
+    status,
+    body: {
+      ok: false,
+      data: null,
+      error: { code, message, retryable: false, requestId: "browser-fixture-request" },
+      message,
+    },
+  });
   const entry = () => ({
     id: contentEntryId,
     displayName: entryName,
@@ -198,9 +302,9 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
       }),
   );
   app.post("/api/auth/oauth2/revoke", (_request, response) => response.status(200).end());
-  app.use("/api/studio-content/v2", express.json({ limit: "1mb", strict: true }));
+  app.use("/api/studio-content/v1", express.json({ limit: "1mb", strict: true }));
   app.get(
-    "/api/studio-content/v2/projects/:projectId/environments/:environmentId/context",
+    "/api/studio-content/v1/projects/:projectId/environments/:environmentId/context",
     (_request, response) =>
       response.json(
         contentEnvelope({
@@ -211,6 +315,7 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
               displayName: "English",
               canRead: true,
               canWrite: true,
+              canPublish: true,
             },
             {
               id: contentFrenchLocaleId,
@@ -218,6 +323,7 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
               displayName: "French",
               canRead: true,
               canWrite: true,
+              canPublish: true,
             },
           ],
           collections: [
@@ -232,7 +338,7 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
       ),
   );
   app.get(
-    "/api/studio-content/v2/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries",
+    "/api/studio-content/v1/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries",
     (_request, response) => {
       const items = entryExists ? [entry()] : [];
       response.json(
@@ -246,7 +352,7 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
     },
   );
   app.get(
-    "/api/studio-content/v2/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/new",
+    "/api/studio-content/v1/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/new",
     (request, response) =>
       response.json(
         contentEnvelope({
@@ -258,7 +364,7 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
       ),
   );
   app.post(
-    "/api/studio-content/v2/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/search",
+    "/api/studio-content/v1/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/search",
     (_request, response) => {
       const items = entryExists ? [entry()] : [];
       response.json(
@@ -272,7 +378,7 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
     },
   );
   app.post(
-    "/api/studio-content/v2/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/resolve",
+    "/api/studio-content/v1/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/resolve",
     (request, response) => {
       const ids =
         isRecord(request.body) && Array.isArray(request.body.entryIds) ? request.body.entryIds : [];
@@ -287,7 +393,7 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
     },
   );
   app.post(
-    "/api/studio-content/v2/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries",
+    "/api/studio-content/v1/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries",
     (request, response) => {
       if (!isRecord(request.body)) {
         response.status(400).end();
@@ -296,6 +402,7 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
       if (typeof request.body.displayName === "string") entryName = request.body.displayName;
       applyMutations(request.body.localizedMutations);
       entryExists = true;
+      recordRevision();
       response.status(200).json(
         contentEnvelope({
           entry: entry(),
@@ -303,14 +410,14 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
           sharedVersion: 0,
           sharedRevisionId: null,
           localizedVersion,
-          localizedRevisionId: contentLocalizedRevisionId,
+          localizedRevisionId: headRevisionId(),
           validation,
         }),
       );
     },
   );
   app.get(
-    "/api/studio-content/v2/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/:entryId",
+    "/api/studio-content/v1/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/:entryId",
     (request, response) =>
       response.json(
         contentEnvelope({
@@ -326,15 +433,16 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
             sharedRevisionId: null,
             sharedValues: {},
             localizedVersion,
-            localizedRevisionId: contentLocalizedRevisionId,
+            localizedRevisionId: headRevisionId(),
             localizedValues,
             validation: request.params.locale === "fr" ? validation : currentValidation,
           },
+          publication: publicationStatus(),
         }),
       ),
   );
   app.patch(
-    "/api/studio-content/v2/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/:entryId/name",
+    "/api/studio-content/v1/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/:entryId/name",
     (request, response) => {
       if (isRecord(request.body) && typeof request.body.displayName === "string") {
         entryName = request.body.displayName;
@@ -344,7 +452,7 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
     },
   );
   app.patch(
-    "/api/studio-content/v2/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/:entryId/draft",
+    "/api/studio-content/v1/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/:entryId/draft",
     (request, response) => {
       if (!isRecord(request.body)) {
         response.status(400).end();
@@ -361,6 +469,7 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
           "10000000-0000-4000-8000-000000000014": "Remote value",
         };
         localizedVersion += 1;
+        recordRevision();
         conflictInjected = true;
         response.status(409).json({
           ok: false,
@@ -409,6 +518,7 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
       applyMutations(mutations);
       currentValidation = invalidValidation;
       localizedVersion += 1;
+      recordRevision();
       response.json(
         contentEnvelope({
           entryId: contentEntryId,
@@ -418,12 +528,190 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
           sharedRevisionId: null,
           localizedChanged: true,
           localizedVersion,
-          localizedRevisionId: contentLocalizedRevisionId,
+          localizedRevisionId: headRevisionId(),
           validation: invalidValidation,
         }),
       );
     },
   );
+  const entryRoute =
+    "/api/studio-content/v1/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/:entryId";
+  app.get(`${entryRoute}/revisions`, (request, response) => {
+    const items =
+      request.query.scope === "localized" ? revisions.toReversed().map(revisionSummary) : [];
+    response.json(contentEnvelope({ items, nextCursor: null }));
+  });
+  app.get(`${entryRoute}/revisions/:fromRevisionId/compare/:toRevisionId`, (request, response) => {
+    const from = revisions.find((revision) => revision.id === request.params.fromRevisionId);
+    const to = revisions.find((revision) => revision.id === request.params.toRevisionId);
+    if (from === undefined || to === undefined) {
+      const missing = failure(404, "NOT_FOUND", "The revision is unavailable.");
+      response.status(missing.status).json(missing.body);
+      return;
+    }
+    response.json(
+      contentEnvelope({
+        from: revisionSummary(from),
+        to: revisionSummary(to),
+        items: changedFields(from.values, to.values).map((fieldId) => ({
+          fieldId,
+          change:
+            from.values[fieldId] === undefined
+              ? "added"
+              : to.values[fieldId] === undefined
+                ? "removed"
+                : "changed",
+          ...(from.values[fieldId] === undefined ? {} : { before: from.values[fieldId] }),
+          ...(to.values[fieldId] === undefined ? {} : { after: to.values[fieldId] }),
+          inCurrentSchema: true,
+        })),
+        restrictedChanges: false,
+        schemaDiffers: false,
+      }),
+    );
+  });
+  app.get(`${entryRoute}/revisions/:revisionId`, (request, response) => {
+    const revision = revisions.find((candidate) => candidate.id === request.params.revisionId);
+    if (revision === undefined) {
+      const missing = failure(404, "NOT_FOUND", "The revision is unavailable.");
+      response.status(missing.status).json(missing.body);
+      return;
+    }
+    response.json(
+      contentEnvelope({ revision: revisionSummary(revision), values: revision.values }),
+    );
+  });
+  app.post(`${entryRoute}/revisions/:revisionId/restore`, (request, response) => {
+    const revision = revisions.find((candidate) => candidate.id === request.params.revisionId);
+    if (revision === undefined || !isRecord(request.body)) {
+      const missing = failure(404, "NOT_FOUND", "The revision is unavailable.");
+      response.status(missing.status).json(missing.body);
+      return;
+    }
+    if (request.body.expectedVersion !== localizedVersion) {
+      const conflict = failure(409, "DRAFT_VERSION_CONFLICT", "The draft changed elsewhere.");
+      response.status(conflict.status).json(conflict.body);
+      return;
+    }
+    localizedValues = revision.values;
+    localizedVersion += 1;
+    recordRevision(revision.id);
+    response.json(
+      contentEnvelope({
+        entryId: contentEntryId,
+        commandId: request.body.commandId,
+        sharedChanged: false,
+        sharedVersion: 0,
+        sharedRevisionId: null,
+        localizedChanged: true,
+        localizedVersion,
+        localizedRevisionId: headRevisionId(),
+        validation,
+      }),
+    );
+  });
+  app.get(`${entryRoute}/publication`, (_request, response) => {
+    response.json(contentEnvelope(publicationStatus()));
+  });
+  app.get(`${entryRoute}/publications`, (_request, response) => {
+    response.json(
+      contentEnvelope({
+        items: publications.toReversed().map(publicationSummary),
+        nextCursor: null,
+      }),
+    );
+  });
+  app.post(`${entryRoute}/publication/validate`, (_request, response) => {
+    const blocked = localizedValues[blockingFieldId] === "Block publication";
+    response.json(
+      contentEnvelope({
+        authorityHash: blocked ? null : contentPublicationHash,
+        stateVersion: publicationStateVersion,
+        currentPublicationId: currentPublication?.id ?? null,
+        schemaRevisionId: contentSchemaRevisionId,
+        contractHash: "a".repeat(64),
+        sharedVersion: 0,
+        sharedRevisionId: null,
+        localizedVersion,
+        localizedRevisionId: headRevisionId(),
+        wouldCreatePublication: !blocked,
+        validation: blocked
+          ? {
+              status: "invalid",
+              issues: [
+                {
+                  fieldId: blockingFieldId,
+                  path: `field/${blockingFieldId}`,
+                  scope: "localized",
+                  localeId: contentLocaleId,
+                  locale: "en",
+                  code: "invalid_value",
+                  message: "This field value is invalid.",
+                },
+              ],
+              capped: false,
+            }
+          : validation,
+        entryIssues: [],
+      }),
+    );
+  });
+  app.post(`${entryRoute}/publication/publish`, (request, response) => {
+    if (
+      !isRecord(request.body) ||
+      request.body.expectedStateVersion !== publicationStateVersion ||
+      request.body.expectedLocalizedVersion !== localizedVersion
+    ) {
+      const conflict = failure(409, "PUBLICATION_STATE_CONFLICT", "The publication state changed.");
+      response.status(conflict.status).json(conflict.body);
+      return;
+    }
+    const sequence = publications.length + 1;
+    const publication: FixturePublication = {
+      id: fixtureId("f", sequence),
+      sequence,
+      values: localizedValues,
+      changedFieldIds: changedFields(currentPublication?.values ?? {}, localizedValues),
+      publishedAt: new Date(Date.parse(createdAt) + sequence * 3_600_000).toISOString(),
+    };
+    publications.push(publication);
+    currentPublication = publication;
+    publicationStateVersion += 1;
+    response.json(
+      contentEnvelope({
+        commandId: request.body.commandId,
+        resultKind: "changed",
+        stateVersion: publicationStateVersion,
+        publication: publicationSummary(publication),
+        delivery: { status: "verified", currentPublicationId: publication.id },
+      }),
+    );
+  });
+  app.post(`${entryRoute}/publication/unpublish`, (request, response) => {
+    if (
+      !isRecord(request.body) ||
+      currentPublication === null ||
+      request.body.expectedStateVersion !== publicationStateVersion ||
+      request.body.expectedPublicationId !== currentPublication.id
+    ) {
+      const conflict = failure(409, "PUBLICATION_STATE_CONFLICT", "The publication state changed.");
+      response.status(conflict.status).json(conflict.body);
+      return;
+    }
+    const unpublishedPublicationId = currentPublication.id;
+    currentPublication = null;
+    publicationStateVersion += 1;
+    response.json(
+      contentEnvelope({
+        commandId: request.body.commandId,
+        resultKind: "changed",
+        stateVersion: publicationStateVersion,
+        unpublishedPublicationId,
+        unpublishedAt: new Date().toISOString(),
+        delivery: { status: "verified", currentPublicationId: null },
+      }),
+    );
+  });
 
   const server = createServer(app);
   await new Promise<void>((resolve, reject) => {

@@ -60,6 +60,7 @@ import {
 } from "../../../src/services/control-plane/command-receipt";
 import { studioClientId } from "../../../src/lib/studio/authority";
 import { makePlatformRepository } from "../../../src/services/platform-repository";
+import { assertIndexDefinitions, assertIndexedQuery } from "../../support/query-plan";
 
 const repository = makePlatformRepository();
 const suffix = randomUUID();
@@ -1949,21 +1950,38 @@ describe("platform repository PostgreSQL integration", () => {
   it.effect("uses the intended active and archived project list indexes", () =>
     Effect.gen(function* () {
       const ownerWorkspace = required(firstWorkspace, "first workspace");
-      const plans = yield* Effect.promise(() =>
+      yield* Effect.promise(() =>
         db.transaction(async (transaction) => {
           await transaction.execute(sql`set local enable_seqscan = off`);
-          const active = await transaction.execute(
-            sql`explain (format json) select id from project where workspace_id = ${ownerWorkspace.id} and archived_at is null order by created_at desc, id desc limit 20`,
+          await transaction.execute(sql`set local enable_sort = off`);
+          await assertIndexedQuery(
+            transaction,
+            sql`select id from project where workspace_id = ${ownerWorkspace.id} and archived_at is null order by created_at desc nulls last, id desc nulls last limit 20`,
+            { table: "project", allowBitmap: true, order: "index" },
           );
-          const archived = await transaction.execute(
-            sql`explain (format json) select id from project where workspace_id = ${ownerWorkspace.id} and archived_at is not null order by archived_at desc, id desc limit 20`,
+          await assertIndexedQuery(
+            transaction,
+            sql`select id from project where workspace_id = ${ownerWorkspace.id} and archived_at is not null order by archived_at desc nulls last, id desc nulls last limit 20`,
+            { table: "project", allowBitmap: true, order: "index" },
           );
-          return JSON.stringify([active.rows, archived.rows]);
         }),
       );
-
-      assert.include(plans, "project_workspace_active_created_id_idx");
-      assert.include(plans, "project_workspace_archived_at_id_idx");
+      yield* Effect.promise(() =>
+        assertIndexDefinitions(db, [
+          {
+            table: "project",
+            name: "project_workspace_active_created_id_idx",
+            keys: "workspace_id, created_at DESC NULLS LAST, id DESC NULLS LAST",
+            where: "(archived_at IS NULL)",
+          },
+          {
+            table: "project",
+            name: "project_workspace_archived_at_id_idx",
+            keys: "workspace_id, archived_at DESC NULLS LAST, id DESC NULLS LAST",
+            where: "(archived_at IS NOT NULL)",
+          },
+        ]),
+      );
     }),
   );
 });

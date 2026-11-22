@@ -11,7 +11,7 @@ const environmentId = "019fae8b-1234-7000-8000-000000000002";
 const collectionId = "019fae8b-1234-7000-8000-000000000003";
 const revisionId = "019fae8b-1234-7000-8000-000000000004";
 const contract = {
-  formatVersion: 2,
+  formatVersion: 1,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
   collectionApiKey: "blog_posts",

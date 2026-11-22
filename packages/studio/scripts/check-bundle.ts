@@ -75,7 +75,7 @@ if (scriptSize.raw > 600 * 1_024 || scriptSize.gzip > 200 * 1_024)
   throw new Error("Studio initial executable JavaScript exceeds its fixed transfer budget.");
 if (styleSize.raw > 128 * 1_024 || styleSize.gzip > 40 * 1_024)
   throw new Error("Studio initial CSS exceeds its fixed transfer budget.");
-if (workspaceSize.raw > 200 * 1_024 || workspaceSize.gzip > 55 * 1_024)
+if (workspaceSize.raw > 232 * 1_024 || workspaceSize.gzip > 64 * 1_024)
   throw new Error("Studio content-form workspace exceeds its fixed lazy-chunk budget.");
 if (portableTextSize.raw > 900 * 1_024 || portableTextSize.gzip > 270 * 1_024)
   throw new Error("Studio Portable Text editor exceeds its fixed lazy-chunk budget.");

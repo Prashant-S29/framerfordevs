@@ -91,9 +91,6 @@ export function preparePresentationCommand(
       catch: () => new Error("CLI_FLAG_INVALID"),
     });
     const loaded = yield* loadCliConfig(startDirectory);
-    if (loaded.config.schemaVersion !== 2) {
-      return yield* Effect.fail(new Error("CLI_CONFIG_V2_REQUIRED"));
-    }
     const collection = stringFlag(arguments_.parsed, "collection");
     if (
       collection === undefined ||

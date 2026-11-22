@@ -8,7 +8,7 @@ import {
   acquirePresentationPublishCommand,
   clearPresentationPublishCommand,
 } from "../../retry-journal";
-import type { CliConfigV2 } from "../../schema";
+import type { CliConfig } from "../../schema";
 import { makeToolingHttpClient } from "../../tooling-http-client";
 import { PresentationEditDocument } from "../document";
 
@@ -39,11 +39,7 @@ function responseData<A>(response: {
   return Effect.succeed(response.body.data);
 }
 
-function resolveEnvironmentId(
-  config: CliConfigV2,
-  token: string,
-  knownEnvironmentId: string | null,
-) {
+function resolveEnvironmentId(config: CliConfig, token: string, knownEnvironmentId: string | null) {
   if (knownEnvironmentId !== null) return Effect.succeed(knownEnvironmentId);
   const tooling = makeToolingHttpClient({ baseUrl: config.apiBaseUrl, token });
   return tooling
@@ -52,7 +48,7 @@ function resolveEnvironmentId(
 }
 
 const getPresentationOnline = Effect.fn("cli.authoring.presentation.get")(function* (input: {
-  readonly config: CliConfigV2;
+  readonly config: CliConfig;
   readonly collection: string;
   readonly environmentId: string | null;
 }) {
@@ -80,7 +76,7 @@ const getPresentationOnline = Effect.fn("cli.authoring.presentation.get")(functi
 
 const publishPresentationOnline = Effect.fn("cli.authoring.presentation.publish")(
   function* (input: {
-    readonly config: CliConfigV2;
+    readonly config: CliConfig;
     readonly projectRoot: string;
     readonly document: PresentationEditDocument;
   }) {
@@ -141,7 +137,7 @@ async function run<A, E>(effect: Effect.Effect<A, E, CredentialStore>) {
 }
 
 export function runPresentationGetOnline(input: {
-  readonly config: CliConfigV2;
+  readonly config: CliConfig;
   readonly collection: string;
   readonly environmentId: string | null;
 }) {
@@ -149,7 +145,7 @@ export function runPresentationGetOnline(input: {
 }
 
 export function runPresentationPublishOnline(input: {
-  readonly config: CliConfigV2;
+  readonly config: CliConfig;
   readonly projectRoot: string;
   readonly document: PresentationEditDocument;
 }) {

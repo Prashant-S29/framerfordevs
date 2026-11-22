@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import { afterAll, assert, beforeAll, describe, it } from "@effect/vitest";
 import { db } from "@framerfordevs/db";
-import { eq, inArray, sql } from "@framerfordevs/db/query";
+import { and, eq, inArray } from "@framerfordevs/db/query";
 import { apiCredential, apiCredentialScope } from "@framerfordevs/db/schema/access";
+import { outboxEvent } from "@framerfordevs/db/schema/cms";
 import { auditEvent } from "@framerfordevs/db/schema/platform";
 import {
   cmsInvalidationRouteMapping,
@@ -34,7 +35,13 @@ import {
   UpdateInvalidationRouteMappingInput,
   UpdateWebhookEndpointInput,
 } from "../../../../src/contracts/webhook";
+import { projectPublicationEvent } from "../../../../src/lib/publication/event";
 import { makeWebhookRepository } from "../../../../src/services/webhook/repository";
+import {
+  createPublishedCollectionFixture,
+  removePublishedCollectionFixture,
+  type PublishedCollectionFixture,
+} from "../../../support/published-collection";
 
 interface FixtureScope {
   readonly actorId: string;
@@ -44,6 +51,7 @@ interface FixtureScope {
   readonly collectionId: string;
 }
 
+let published: PublishedCollectionFixture | undefined;
 let scope: FixtureScope | undefined;
 const resourceIds: Array<string> = [];
 const endpointIds: Array<string> = [];
@@ -64,36 +72,45 @@ const ciphertext = {
 
 describe("Webhook repository PostgreSQL integration", () => {
   beforeAll(async () => {
-    const result = await db.execute(sql`select
-      pm.user_id as "actorId",
-      p.workspace_id as "workspaceId",
-      p.id as "projectId",
-      e.id as "environmentId",
-      c.id as "collectionId"
-      from project_membership pm
-      join project p on p.id = pm.project_id
-      join environment e on e.project_id = p.id and e.workspace_id = p.workspace_id
-      join cms_collection c on c.environment_id = e.id and c.project_id = p.id and c.workspace_id = p.workspace_id
-      where pm.role = 'owner' and pm.removed_at is null and p.archived_at is null
-      order by p.id, c.id
-      limit 1`);
-    const row = result.rows[0];
-    if (
-      row &&
-      typeof row.actorId === "string" &&
-      typeof row.workspaceId === "string" &&
-      typeof row.projectId === "string" &&
-      typeof row.environmentId === "string" &&
-      typeof row.collectionId === "string"
-    ) {
-      scope = {
-        actorId: row.actorId,
-        workspaceId: row.workspaceId,
-        projectId: row.projectId,
-        environmentId: row.environmentId,
-        collectionId: row.collectionId,
-      };
-    }
+    const publishedAt = new Date("2026-08-12T00:00:00.000Z");
+    published = await createPublishedCollectionFixture("webhook-management", publishedAt);
+    const [stored] = await db
+      .select()
+      .from(outboxEvent)
+      .where(
+        and(
+          eq(outboxEvent.subjectId, published.collectionId),
+          eq(outboxEvent.eventType, "cms.schema.published"),
+        ),
+      )
+      .limit(1);
+    if (!stored) throw new Error("Schema publication did not write a canonical outbox event.");
+    const projection = projectPublicationEvent(stored);
+    if (!projection.ok) throw new Error("Schema publication event could not be projected.");
+    await db.insert(publicationEvent).values({
+      eventId: stored.id,
+      workspaceId: stored.workspaceId,
+      projectId: stored.projectId,
+      environmentId: stored.environmentId,
+      eventType: stored.eventType,
+      envelopeVersion: 1,
+      canonicalBody: projection.value.canonicalBody,
+      bodyHash: projection.value.bodyHash,
+      bodyBytes: projection.value.bodyBytes,
+      occurredAt: stored.occurredAt,
+      projectedAt: publishedAt,
+    });
+    await db
+      .update(outboxEvent)
+      .set({ processedAt: publishedAt })
+      .where(eq(outboxEvent.id, stored.id));
+    scope = {
+      actorId: published.ownerId,
+      workspaceId: published.workspaceId,
+      projectId: published.projectId,
+      environmentId: published.environmentId,
+      collectionId: published.collectionId,
+    };
   });
 
   it("creates, updates, rotates, disables, and lists only masked endpoint authority", async () => {
@@ -829,5 +846,6 @@ describe("Webhook repository PostgreSQL integration", () => {
         .where(inArray(apiCredentialScope.credentialId, credentialIds));
       await db.delete(apiCredential).where(inArray(apiCredential.id, credentialIds));
     }
+    if (published) await removePublishedCollectionFixture(published);
   });
 });

@@ -124,6 +124,7 @@ const publishResult = Schema.decodeUnknownSync(PublishEntryResult, { onExcessPro
   stateVersion: 1,
   resultKind: "no_op",
   publication: summary,
+  delivery: { status: "verified", currentPublicationId: ids.publication },
 });
 const unpublishResult = Schema.decodeUnknownSync(UnpublishEntryResult, {
   onExcessProperty: "error",
@@ -137,6 +138,7 @@ const unpublishResult = Schema.decodeUnknownSync(UnpublishEntryResult, {
   unpublishedPublicationId: ids.publication,
   unpublishedPublicationSequence: 1,
   unpublishedAt: timestamp,
+  delivery: { status: "verified", currentPublicationId: null },
 });
 const calls: Array<string> = [];
 const metrics: Array<string> = [];

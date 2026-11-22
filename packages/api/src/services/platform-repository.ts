@@ -1,6 +1,6 @@
 import { db } from "@framerfordevs/db";
 import { env } from "@framerfordevs/env/server";
-import { and, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "@framerfordevs/db/query";
+import { and, eq, inArray, isNotNull, isNull, lt, or, sql } from "@framerfordevs/db/query";
 import { projectMembership } from "@framerfordevs/db/schema/access";
 import {
   oauthAccessToken,
@@ -908,7 +908,10 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                 cursorCondition,
               ),
             )
-            .orderBy(desc(workspaceMembership.createdAt), desc(workspaceMembership.id))
+            .orderBy(
+              sql`${workspaceMembership.createdAt} desc nulls last`,
+              sql`${workspaceMembership.id} desc nulls last`,
+            )
             .limit(input.limit + 1);
         },
         catch: (cause) => databaseFailure("platform.workspace.list", cause),
@@ -1115,7 +1118,7 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                         cursorCondition,
                       ),
                     )
-                    .orderBy(desc(sortColumn), desc(project.id))
+                    .orderBy(sql`${sortColumn} desc nulls last`, sql`${project.id} desc nulls last`)
                     .limit(input.limit + 1)
                 : (
                     await transaction
@@ -1137,7 +1140,10 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                           cursorCondition,
                         ),
                       )
-                      .orderBy(desc(sortColumn), desc(project.id))
+                      .orderBy(
+                        sql`${sortColumn} desc nulls last`,
+                        sql`${project.id} desc nulls last`,
+                      )
                       .limit(input.limit + 1)
                   ).map((row) => row.project);
             return outcomeWith("success", { rows });
@@ -1461,7 +1467,10 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                   cursorCondition,
                 ),
               )
-              .orderBy(desc(workspaceMembership.createdAt), desc(workspaceMembership.id))
+              .orderBy(
+                sql`${workspaceMembership.createdAt} desc nulls last`,
+                sql`${workspaceMembership.id} desc nulls last`,
+              )
               .limit(limit + 1);
           },
           catch: (cause) => databaseFailure("platform.control-plane.workspace.list", cause),
@@ -1563,7 +1572,7 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                     .where(
                       and(eq(project.workspaceId, workspaceId), archiveCondition, cursorCondition),
                     )
-                    .orderBy(desc(sortColumn), desc(project.id))
+                    .orderBy(sql`${sortColumn} desc nulls last`, sql`${project.id} desc nulls last`)
                     .limit(limit + 1)
                 : (
                     await transaction
@@ -1585,7 +1594,10 @@ export function makePlatformRepository(options: RepositoryOptions = {}) {
                           cursorCondition,
                         ),
                       )
-                      .orderBy(desc(sortColumn), desc(project.id))
+                      .orderBy(
+                        sql`${sortColumn} desc nulls last`,
+                        sql`${project.id} desc nulls last`,
+                      )
                       .limit(limit + 1)
                   ).map((row) => row.project);
             return outcomeWith("success", { rows });

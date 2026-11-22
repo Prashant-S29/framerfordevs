@@ -4,6 +4,7 @@ import { Effect, Schema } from "effect";
 import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
 
 import { CmsEntryDraft, EntryId, EntryValidation } from "../../contracts/entry";
+import { EntryPublicationStatus } from "../../contracts/publication";
 import { LocaleTag, ProjectLocaleId } from "../../contracts/locale";
 import { WorkspaceId } from "../../contracts/platform";
 import { RateLimitDecision, rateLimitPolicies } from "../../contracts/rate-limit";
@@ -22,13 +23,23 @@ import {
   StudioFormProjection,
 } from "../../contracts/studio-content";
 import {
+  ConflictFailure,
   EntryCommandConflictFailure,
   EntryDraftConflictFailure,
+  EntryPublicationConflictFailure,
+  EntryPublicationInvalidFailure,
+  EntryRevisionIncompatibleFailure,
   ForbiddenFailure,
+  ValidationFailure,
   VersionConflictFailure,
 } from "../../contracts/response/errors";
+import { EntryPublicationValidationIssue } from "../../contracts/publication";
 import { ApplicationLogger } from "../../observability/logger";
 import { makeEntryRepository, EntryRepository } from "../../services/entry/repository";
+import {
+  makePublicationRepository,
+  PublicationRepository,
+} from "../../services/publication/repository";
 import { RateLimitManager, type RateLimitManagerService } from "../../services/rate-limit/manager";
 import { makeSchemaRepository, SchemaRepository } from "../../services/schema/repository";
 import { makeStudioRepository, StudioRepository } from "../../services/studio/repository";
@@ -37,6 +48,14 @@ import {
   StudioContentRepository,
 } from "../../services/studio-content/repository";
 import {
+  adaptStudioPublicationError,
+  adaptStudioRestoreError,
+  decodeStudioListRevisionsQuery,
+  decodeStudioPublishEntryRequest,
+  decodeStudioRestoreRevisionRequest,
+  decodeStudioRevisionId,
+  decodeStudioUnpublishEntryRequest,
+  decodeStudioValidatePublicationRequest,
   adaptStudioCreateError,
   adaptStudioRenameError,
   adaptStudioSaveError,
@@ -62,8 +81,17 @@ describe("Studio Content nested collection gate", () => {
       "create",
       "rename",
       "save",
+      "revisions",
+      "revision",
+      "compare",
+      "restore",
+      "publication",
+      "publications",
+      "validate",
+      "publish",
+      "unpublish",
     ]);
-    assert.strictEqual(new Set(studioNestedCollectionOperations).size, 8);
+    assert.strictEqual(new Set(studioNestedCollectionOperations).size, 17);
   });
 
   it.effect("rejects excess properties on every mutation request", () =>
@@ -176,7 +204,7 @@ describe("Studio Content nested collection gate", () => {
           source: "published",
           collectionId: ids.collection,
           revisionId,
-          formatVersion: 2,
+          formatVersion: 1,
           validationProfile: "field-system@1",
           currencyRegistryProfile: "iso-4217@2026-01-01",
           contractHash: hash,
@@ -273,6 +301,7 @@ describe("Studio Content nested collection gate", () => {
         canRename: true,
         canWriteLocalized: true,
         canWriteShared: true,
+        canPublish: true,
       });
       let authorizationCalls = 0;
       let draftCalls = 0;
@@ -333,6 +362,30 @@ describe("Studio Content nested collection gate", () => {
         Effect.provideService(StudioContentRepository, contentRepository),
         Effect.provideService(SchemaRepository, schemaRepository),
         Effect.provideService(EntryRepository, entryRepository),
+        Effect.provideService(PublicationRepository, {
+          ...makePublicationRepository(),
+          getStatus: () =>
+            Effect.succeed(
+              Schema.decodeUnknownSync(EntryPublicationStatus, { onExcessProperty: "error" })({
+                entryId: ids.entry,
+                localeId: ids.locale,
+                locale: "en",
+                state: "unpublished",
+                stateVersion: 0,
+                currentPublication: null,
+                currentSchemaRevisionId: ids.currentRevision,
+                currentContractHash: hash,
+                currentSharedRevisionId: ids.sharedRevision,
+                currentSharedVersion: 1,
+                currentLocalizedRevisionId: ids.localizedRevision,
+                currentLocalizedVersion: 1,
+                sharedChanged: false,
+                localizedChanged: false,
+                schemaChanged: false,
+                changedSincePublication: false,
+              }),
+            ),
+        }),
         Effect.provideService(RateLimitManager, rateLimitManager),
         Effect.provideService(ApplicationLogger, {
           info: () => Effect.void,
@@ -342,6 +395,8 @@ describe("Studio Content nested collection gate", () => {
 
       assert.strictEqual(String(workspace.form.schemaRevisionId), ids.currentRevision);
       assert.strictEqual(String(workspace.draft.schemaRevisionId), ids.currentRevision);
+      assert.strictEqual(workspace.publication.state, "never_published");
+      assert.strictEqual(workspace.capabilities.canPublish, true);
       assert.strictEqual(authorizationCalls, 3);
       assert.strictEqual(draftCalls, 2);
       assert.deepStrictEqual(costs, [3]);
@@ -589,4 +644,137 @@ describe("Studio Content nested collection gate", () => {
     assert.strictEqual(saveCommand._tag, "StudioCommandConflictFailure");
     assert.strictEqual(adaptStudioSaveError(unchanged), unchanged);
   });
+
+  it("adapts restore failures to closed Studio codes", () => {
+    const details = [
+      ApiErrorDetail.make({
+        path: "expectedVersion",
+        code: "entry_draft_stale",
+        message: "Changed.",
+      }),
+    ];
+    assert.strictEqual(
+      adaptStudioRestoreError(EntryRevisionIncompatibleFailure.make())._tag,
+      "StudioRevisionIncompatibleFailure",
+    );
+    assert.strictEqual(
+      adaptStudioRestoreError(ConflictFailure.make())._tag,
+      "AuthoringStaleSchemaFailure",
+    );
+    assert.strictEqual(
+      adaptStudioRestoreError(EntryCommandConflictFailure.make())._tag,
+      "StudioCommandConflictFailure",
+    );
+    const draft = adaptStudioRestoreError(EntryDraftConflictFailure.make({ details }));
+    assert.strictEqual(draft._tag, "StudioDraftVersionConflictFailure");
+    const validation = adaptStudioRestoreError(
+      ValidationFailure.make({
+        details: [ApiErrorDetail.make({ path: "values.secret", code: "x", message: "Hidden." })],
+      }),
+    );
+    assert.strictEqual(validation._tag, "ValidationFailure");
+    assert.notInclude(JSON.stringify(validation), "secret");
+    const unchanged = ForbiddenFailure.make();
+    assert.strictEqual(adaptStudioRestoreError(unchanged), unchanged);
+  });
+
+  it("adapts publication failures and hides fields outside the Studio form", () => {
+    const form = Schema.decodeUnknownSync(StudioFormProjection, { onExcessProperty: "error" })({
+      collectionId: "019fae8b-1234-7000-8000-000000000050",
+      schemaRevisionId: "019fae8b-1234-7000-8000-000000000051",
+      contractHash: "a".repeat(64),
+      canEdit: true,
+      fields: [],
+      editableFieldIds: [],
+      tabs: [],
+      sidebarGroups: [],
+      currencyMinorUnits: {},
+    });
+    const authority = {
+      localeId: ProjectLocaleId.make("019fae8b-1234-7000-8000-000000000052"),
+      locale: LocaleTag.make("en"),
+    };
+    const invalid = adaptStudioPublicationError(
+      EntryPublicationInvalidFailure.make({
+        issues: [
+          EntryPublicationValidationIssue.make({
+            fieldId: null,
+            path: "data",
+            code: "hidden_field_blocks_publication",
+            message: "Hidden.",
+          }),
+        ],
+      }),
+      form,
+      authority,
+    );
+    assert.strictEqual(invalid._tag, "StudioPublicationInvalidFailure");
+    if (invalid._tag === "StudioPublicationInvalidFailure") {
+      assert.deepStrictEqual(
+        invalid.details.map((detail) => detail.code),
+        ["hidden_field_blocks_publication"],
+      );
+    }
+    const conflict = adaptStudioPublicationError(
+      EntryPublicationConflictFailure.make({
+        details: [
+          ApiErrorDetail.make({
+            path: "expectedStateVersion",
+            code: "publication_authority_changed",
+            message: "Changed.",
+          }),
+        ],
+      }),
+      form,
+      authority,
+    );
+    assert.strictEqual(conflict._tag, "StudioPublicationStateConflictFailure");
+    assert.strictEqual(
+      adaptStudioPublicationError(EntryCommandConflictFailure.make(), form, authority)._tag,
+      "StudioCommandConflictFailure",
+    );
+  });
+
+  it.effect("decodes revision and publication requests strictly", () =>
+    Effect.gen(function* () {
+      const id = "019fae8b-1234-7000-8000-000000000060";
+      const hash = "a".repeat(64);
+      const accepted = yield* Effect.all([
+        decodeStudioListRevisionsQuery({ scope: "localized" }),
+        decodeStudioRevisionId(id),
+        decodeStudioRestoreRevisionRequest({
+          scope: "shared",
+          schemaRevisionId: id,
+          contractHash: hash,
+          expectedVersion: 0,
+          commandId: id,
+        }),
+        decodeStudioValidatePublicationRequest({}),
+        decodeStudioUnpublishEntryRequest({
+          commandId: id,
+          expectedStateVersion: 0,
+          expectedPublicationId: null,
+        }),
+      ]);
+      assert.strictEqual(accepted.length, 5);
+      const exits = yield* Effect.all([
+        Effect.exit(decodeStudioListRevisionsQuery({ scope: "shared", unexpected: true })),
+        Effect.exit(decodeStudioRevisionId("not-a-revision")),
+        Effect.exit(decodeStudioValidatePublicationRequest({ unexpected: true })),
+        Effect.exit(decodeStudioPublishEntryRequest({ commandId: id })),
+        Effect.exit(
+          decodeStudioUnpublishEntryRequest({
+            commandId: id,
+            expectedStateVersion: 0,
+            expectedPublicationId: null,
+            unexpected: true,
+          }),
+        ),
+      ]);
+      assert.deepStrictEqual(
+        exits.map((exit) => exit._tag),
+        ["Failure", "Failure", "Failure", "Failure", "Failure"],
+      );
+    }),
+  );
 });

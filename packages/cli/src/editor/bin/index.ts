@@ -10,10 +10,10 @@ import {
   type ExtractedStaticProjectSchema,
   type StaticSchemaExtractionInput,
 } from "../../schema/extractor";
-import type { CliConfigV2, JsonValue } from "../../schema";
+import type { CliConfig, JsonValue } from "../../schema";
 
 export interface PreparedEditorCommand {
-  readonly config: CliConfigV2;
+  readonly config: CliConfig;
   readonly projectRoot: string;
   readonly schemaPath: string;
   readonly project: JsonValue;
@@ -69,9 +69,6 @@ export function prepareEditorCommand(
       catch: () => new Error("CLI_FLAG_INVALID"),
     });
     const loaded = yield* loadCliConfig(startDirectory);
-    if (loaded.config.schemaVersion !== 2 || loaded.schemaPath === null) {
-      return yield* Effect.fail(new Error("CLI_CONFIG_V2_REQUIRED"));
-    }
     if (loaded.config.schemaBuild !== undefined) {
       yield* checkSchemaBuildManifest({
         projectRoot: loaded.directory,

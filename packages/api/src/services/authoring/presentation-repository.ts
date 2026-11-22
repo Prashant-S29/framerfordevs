@@ -392,7 +392,7 @@ export function makeAuthoringPresentationRepository(options: RepositoryOptions =
                 collectionApiKey: current.collectionApiKey,
                 collectionDisplayName: candidate.draft.collection.displayName,
                 collectionDescription: candidate.draft.collection.description,
-                formatVersion: 2,
+                formatVersion: candidate.draft.formatVersion,
                 validationProfile: current.validationProfile,
                 currencyRegistryProfile: current.currencyRegistryProfile,
                 editorLayout: jsonObject(candidate.draft.editorLayout),

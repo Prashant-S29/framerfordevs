@@ -58,6 +58,7 @@ import {
   type Project as ProjectModel,
   type Workspace as WorkspaceModel,
 } from "../../../src/contracts/platform";
+import { assertIndexDefinitions, assertIndexedQuery } from "../../support/query-plan";
 
 const suffix = randomUUID();
 const ownerId = `m3-credential-owner-${suffix}`;
@@ -1132,26 +1133,34 @@ describe("credential repository PostgreSQL integration", () => {
       Effect.gen(function* () {
         const currentProject = required(projectModel, "project");
         const credential = required(managementCredential, "management").credential;
-        const plans = yield* Effect.promise(() =>
+        yield* Effect.promise(() =>
           db.transaction(async (transaction) => {
             await transaction.execute(sql`set local enable_seqscan = off`);
             await transaction.execute(sql`set local enable_bitmapscan = off`);
             await transaction.execute(sql`set local enable_sort = off`);
-            const verification = await transaction.execute(
-              sql`explain (format json) select id from api_credential where id = ${credential.id} limit 1`,
+            await assertIndexedQuery(
+              transaction,
+              sql`select id from api_credential where id = ${credential.id} limit 1`,
+              { table: "api_credential" },
             );
-            const activeList = await transaction.execute(
-              sql`explain (format json) select id from api_credential where project_id = ${currentProject.id} and environment_id = ${currentProject.environment.id} and family = 'management' and revoked_at is null order by created_at desc nulls last, id desc nulls last limit 20`,
+            await assertIndexedQuery(
+              transaction,
+              sql`select id from api_credential where project_id = ${currentProject.id} and environment_id = ${currentProject.environment.id} and family = 'management' and revoked_at is null order by created_at desc nulls last, id desc nulls last limit 20`,
+              { table: "api_credential", order: "index" },
             );
-            return JSON.stringify([verification.rows, activeList.rows]);
           }),
         );
-
-        assert.isTrue(
-          plans.includes("api_credential_pkey") ||
-            plans.includes("api_credential_id_tenant_unique"),
+        yield* Effect.promise(() =>
+          assertIndexDefinitions(db, [
+            { table: "api_credential", name: "api_credential_pkey", keys: "id", unique: true },
+            {
+              table: "api_credential",
+              name: "api_credential_project_environment_active_family_created_id_idx",
+              keys: "project_id, environment_id, family, created_at DESC NULLS LAST, id DESC NULLS LAST",
+              where: "(revoked_at IS NULL)",
+            },
+          ]),
         );
-        assert.include(plans, "api_credential_project_environment_active_family_created_id_idx");
       }),
     );
 

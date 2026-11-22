@@ -55,7 +55,7 @@ Start with [Bootstrap and govern a project with the CLI](/docs/control-plane-boo
 - Tier 1 schema entry
 - Optional explicit experimental composition entry
 
-The CLI searches parent directories for exactly one configuration, rejects unknown keys and unsafe paths, and never executes project configuration as code. Schema authoring and the local editor require configuration version 2.
+The CLI searches parent directories for exactly one configuration, rejects unknown keys and unsafe paths, and never executes project configuration as code.
 
 ## Pull and Reconciliation
 
@@ -76,7 +76,7 @@ metadata.json
 index.ts
 ```
 
-Config v1 records generated-file ownership at `.framerfordevs/schema.lock.json`. Config v2 records it at `.framerfordevs/generated.lock.json`, leaving `.framerfordevs/schema.lock.json` v2 exclusively owned by code-first source/revision authority. Outputs contain no credentials, actor identities, content entries, machine paths, or wall-clock timestamps.
+Generation records generated-file ownership at `.framerfordevs/generated.lock.json`, leaving `.framerfordevs/schema.lock.json` exclusively owned by code-first source/revision authority. Outputs contain no credentials, actor identities, content entries, machine paths, or wall-clock timestamps.
 
 Generation plans and validates every byte before replacing the owned directory. It refuses unsafe symlinks, unowned output, and unexpected modifications.
 
@@ -109,7 +109,7 @@ Get emits a credential-free versioned document with exact project, environment, 
 
 ## Content Automation
 
-`ffd entry` supports bounded list/get/create/update/publish/unpublish workflows. Mutation files are strict project-relative JSON and never enter retry journals. Exact draft and locale-publication authority is obtained before each write.
+`ffd entry` supports bounded list/get/create/update/publish/unpublish workflows and revision history: `revisions`, `revision`, `diff`, `restore`, and `validate`. `ffd entry diff` exits `1` when the revisions differ. `ffd entry validate` exits `2` when the publication plan is invalid. Publish and unpublish print the Delivery read-back. Mutation files are strict project-relative JSON and never enter retry journals. Exact draft and locale-publication authority is obtained before each write.
 
 See [Automate content workflows](/docs/authoring/automate-content).
 

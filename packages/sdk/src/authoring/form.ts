@@ -318,7 +318,7 @@ export class AuthoringGeneratedForm extends Schema.Class<AuthoringGeneratedForm>
   source: Schema.Literal("published"),
   collectionId: Uuid,
   revisionId: Uuid,
-  formatVersion: Schema.Literals([1, 2]),
+  formatVersion: Schema.Literal(1),
   validationProfile: Schema.String.check(
     Schema.isMinLength(1),
     Schema.isMaxLength(64),

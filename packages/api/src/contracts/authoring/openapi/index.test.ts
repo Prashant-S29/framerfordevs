@@ -30,12 +30,17 @@ describe("Authoring public contract", () => {
     const entryPath = `${entriesPath}/{entryId}` as const;
     const draftPath = `${entryPath}/draft` as const;
     const publicationPath = `${entriesPath}/{entryId}/publication` as const;
+    const revisionsPath = `${entryPath}/revisions` as const;
     expect(Object.keys(authoringOpenApiDocument.paths)).toEqual([
       presentationPath,
       formPath,
       entriesPath,
       entryPath,
       draftPath,
+      revisionsPath,
+      `${revisionsPath}/{revisionId}`,
+      `${revisionsPath}/{fromRevisionId}/compare/{toRevisionId}`,
+      `${revisionsPath}/{revisionId}/restore`,
       publicationPath,
       `${publicationPath}/validate`,
       `${publicationPath}/publish`,
@@ -102,6 +107,31 @@ describe("Authoring public contract", () => {
     expect(
       authoringOpenApiDocument.paths[`${publicationPath}/publish`].post?.["x-required-oauth-scope"],
     ).toBe("authoring:content:publish");
+    for (const path of [
+      revisionsPath,
+      `${revisionsPath}/{revisionId}`,
+      `${revisionsPath}/{fromRevisionId}/compare/{toRevisionId}`,
+    ] as const) {
+      expect(authoringOpenApiDocument.paths[path].get?.["x-required-oauth-scope"]).toBe(
+        "authoring:read",
+      );
+      expect(authoringOpenApiDocument.paths[path].get?.["x-required-management-scopes"]).toEqual([
+        "content.read",
+      ]);
+    }
+    const restore = authoringOpenApiDocument.paths[`${revisionsPath}/{revisionId}/restore`].post;
+    expect(restore?.["x-required-oauth-scope"]).toBe("authoring:draft:write");
+    expect(restore?.["x-required-management-scopes"]).toEqual(["content.write"]);
+    for (const result of [
+      "AuthoringPublishEntryResultEncoded",
+      "AuthoringUnpublishEntryResultEncoded",
+    ]) {
+      const schema: unknown = Reflect.get(authoringOpenApiDocument.components.schemas, result);
+      expect(schema).toMatchObject({
+        required: expect.arrayContaining(["delivery"]),
+        properties: { delivery: { $ref: "#/components/schemas/EntryDeliveryReadBackEncoded" } },
+      });
+    }
     expect(authoringSchemaExportBearerRequirement).toEqual({
       oauthScope: "authoring:read",
       managementScopes: ["schema.read"],

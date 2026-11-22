@@ -12,11 +12,27 @@ ffd entry create --collection articles --locale en-US --name "Launch" --mutation
 ffd entry update --collection articles --entry ENTRY_ID --locale en-US --mutations update.json
 ffd entry publish --collection articles --entry ENTRY_ID --locale en-US
 ffd entry unpublish --collection articles --entry ENTRY_ID --locale en-US
+ffd entry validate --collection articles --entry ENTRY_ID --locale en-US
 ```
 
 Mutation files are project-relative, non-symlinked JSON files no larger than 1 MiB. They contain at most 500 strictly decoded API-key-path mutations. Values never enter lock files, retry journals, or command output.
 
-Create requires current revision and contract authority from schema lock v2, so run `ffd schema export` or a successful `ffd schema push` first. Update reads exact draft versions before saving. Publish validates and then submits the returned exact publication authority.
+Create requires current revision and contract authority from the schema lock, so run `ffd schema export` or a successful `ffd schema push` first. Update reads exact draft versions before saving. Publish validates and then submits the returned exact publication authority.
+
+Publish and unpublish print a `delivery` read-back. `verified` means the origin Delivery head matches the command result. `superseded` means a later command already changed it. CDN and cache invalidation stay asynchronous. Validate prints the publication plan and exits `2` when the plan is invalid.
+
+## Review and restore revisions
+
+```bash
+ffd entry revisions --collection articles --entry ENTRY_ID --locale en-US --scope localized
+ffd entry revision --collection articles --entry ENTRY_ID --locale en-US --revision REVISION_ID
+ffd entry diff --collection articles --entry ENTRY_ID --locale en-US --from OLD_ID --to NEW_ID
+ffd entry restore --collection articles --entry ENTRY_ID --locale en-US --revision OLD_ID --scope localized
+```
+
+Each entry keeps shared revisions and one localized revision history for each locale. Revisions prints one page of summaries, newest first. Pass `nextCursor` back with `--cursor` to read the next page. Diff compares two revisions of the same entry and scope by stable field ID. It exits `1` when the revisions differ and `0` when they are equal.
+
+Restore reads the current draft version of the scope and creates a new draft revision with the old values. It does not change a publication. If the revision uses another schema contract, the server rejects the restore with `REVISION_INCOMPATIBLE`. Restore uses a journaled command ID, so you can run the same command again after a transport failure.
 
 ## Use the SDK
 
@@ -41,6 +57,8 @@ if (entry) {
 }
 ```
 
+The SDK exposes the same revision operations: `entries.listRevisions`, `entries.getRevision`, `entries.compareRevisions`, and `entries.restoreRevision`. Publish and unpublish results include the `delivery` read-back.
+
 Promise and Effect clients recursively validate requests and responses, reject redirects, bound payloads and timeouts, reject repeated pagination cursors, and expose draft/publication helpers that preserve exact server authority. They never force conflict resolution.
 
 ## Grant only required authority
@@ -48,8 +66,10 @@ Promise and Effect clients recursively validate requests and responses, reject r
 | Workflow                                       | OAuth grant                 | Management permission                               |
 | ---------------------------------------------- | --------------------------- | --------------------------------------------------- |
 | Read forms, Presentation metadata, and entries | `authoring:read`            | `schema.read` or `content.read`, by operation       |
+| List, read, or compare revisions               | `authoring:read`            | `content.read`                                      |
 | CLI schema plan/apply or Presentation publish  | `authoring:schema:push`     | `schema.read`, `schema.write`, and `schema.publish` |
 | Create, rename, or save drafts                 | `authoring:draft:write`     | `content.write`                                     |
+| Restore a revision                             | `authoring:draft:write`     | `content.write`                                     |
 | Publish or unpublish content                   | `authoring:content:publish` | `content.publish`                                   |
 
 Credential writes are audited as the credential, not as the user who issued it.

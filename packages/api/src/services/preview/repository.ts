@@ -51,6 +51,7 @@ import {
   CollectionFieldDefinition,
   defaultFieldEditorMetadata,
   type CollectionFieldDefinition as CollectionField,
+  SchemaFormatVersion,
 } from "../../contracts/schema";
 import { reconstructFieldTree } from "../../lib/field/tree";
 import {
@@ -364,6 +365,8 @@ async function loadContract(
     )
     .limit(1);
   if (!revision) return outcome("not_found");
+  const formatVersion = revision.formatVersion;
+  if (!Schema.is(SchemaFormatVersion)(formatVersion)) return outcome("corrupt");
   const rows = await executor
     .select()
     .from(cmsSchemaRevisionField)
@@ -390,7 +393,7 @@ async function loadContract(
   const tree = reconstructFieldTree(fields);
   if (!tree.valid) return outcome("corrupt");
   const contractHash = hashSchemaContract({
-    formatVersion: revision.formatVersion,
+    formatVersion,
     validationProfile: revision.validationProfile,
     currencyRegistryProfile: revision.currencyRegistryProfile,
     collectionApiKey: revision.collectionApiKey,

@@ -83,7 +83,7 @@ export function buildResolvedSchemaCandidate(options: {
   }
   const hasMoney = flattenFieldTree(compiled.fields).some((field) => field.kind === "money");
   const draft: SchemaDraftState = {
-    formatVersion: 2,
+    formatVersion: 1,
     validationProfile: "ffd-fields@1",
     currencyRegistryProfile: hasMoney ? currentCurrencyRegistryProfile : null,
     collection: {

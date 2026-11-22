@@ -20,7 +20,6 @@ const publicApiPrefixes = [
   "/api/tooling/v1",
   "/api/studio/v1",
   "/api/studio-content/v1",
-  "/api/studio-content/v2",
 ] as const;
 const oauthProtocolPrefixes = ["/api/auth/jwks", "/api/auth/oauth2"] as const;
 const dashboardOAuthPaths = [

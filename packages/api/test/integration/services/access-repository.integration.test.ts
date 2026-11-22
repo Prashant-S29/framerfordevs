@@ -49,6 +49,7 @@ import {
 import { makePlatformRepository } from "../../../src/services/platform-repository";
 import { makeAccessRepository } from "../../../src/services/access-repository";
 import { makeLocaleRepository } from "../../../src/services/locale/repository";
+import { assertIndexDefinitions, assertIndexedQuery } from "../../support/query-plan";
 
 const suffix = randomUUID();
 const ownerId = `m3-owner-${suffix}`;
@@ -1190,24 +1191,43 @@ describe("access repository PostgreSQL integration", () => {
   it.effect("uses the intended active member and invitation timeline indexes", () =>
     Effect.gen(function* () {
       const currentProject = required(projectModel, "project");
-      const plans = yield* Effect.promise(() =>
+      yield* Effect.promise(() =>
         db.transaction(async (transaction) => {
           await transaction.execute(sql`set local enable_seqscan = off`);
-          const members = await transaction.execute(
-            sql`explain (format json) select id from project_membership where project_id = ${currentProject.id} and removed_at is null order by created_at desc nulls last, id desc nulls last limit 20`,
+          await transaction.execute(sql`set local enable_sort = off`);
+          const ordered = { allowBitmap: true, order: "index" } as const;
+          await assertIndexedQuery(
+            transaction,
+            sql`select id from project_membership where project_id = ${currentProject.id} and removed_at is null order by created_at desc nulls last, id desc nulls last limit 20`,
+            { ...ordered, table: "project_membership" },
           );
-          const filteredMembers = await transaction.execute(
-            sql`explain (format json) select m.id from project_membership m join "user" u on u.id = m.user_id where m.project_id = ${currentProject.id} and m.removed_at is null and m.role = 'owner' and (left(lower(u.name), char_length('m3')) = 'm3' or left(lower(u.email), char_length('m3')) = 'm3') order by m.created_at desc nulls last, m.id desc nulls last limit 20`,
+          await assertIndexedQuery(
+            transaction,
+            sql`select m.id from project_membership m join "user" u on u.id = m.user_id where m.project_id = ${currentProject.id} and m.removed_at is null and m.role = 'owner' and (left(lower(u.name), char_length('m3')) = 'm3' or left(lower(u.email), char_length('m3')) = 'm3') order by m.created_at desc nulls last, m.id desc nulls last limit 20`,
+            { ...ordered, table: "project_membership" },
           );
-          const invitations = await transaction.execute(
-            sql`explain (format json) select id from project_invitation where project_id = ${currentProject.id} and status = 'accepted' and left(lower(email), char_length('m3')) = 'm3' order by created_at desc nulls last, id desc nulls last limit 20`,
+          await assertIndexedQuery(
+            transaction,
+            sql`select id from project_invitation where project_id = ${currentProject.id} and status = 'accepted' and left(lower(email), char_length('m3')) = 'm3' order by created_at desc nulls last, id desc nulls last limit 20`,
+            { ...ordered, table: "project_invitation" },
           );
-          return JSON.stringify([members.rows, filteredMembers.rows, invitations.rows]);
         }),
       );
-
-      assert.include(plans, "project_membership_project_active_created_id_idx");
-      assert.include(plans, "project_invitation_project_status_created_id_idx");
+      yield* Effect.promise(() =>
+        assertIndexDefinitions(db, [
+          {
+            table: "project_membership",
+            name: "project_membership_project_active_created_id_idx",
+            keys: "project_id, created_at DESC NULLS LAST, id DESC NULLS LAST",
+            where: "(removed_at IS NULL)",
+          },
+          {
+            table: "project_invitation",
+            name: "project_invitation_project_status_created_id_idx",
+            keys: "project_id, status, created_at DESC NULLS LAST, id DESC NULLS LAST",
+          },
+        ]),
+      );
     }),
   );
 

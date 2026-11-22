@@ -10,11 +10,26 @@ import {
   StudioEntryPageResponse,
   StudioEntryWorkspaceResponse,
   StudioNewEntryWorkspaceResponse,
+  StudioPublicationPageResponse,
+  StudioPublicationPlanResponse,
+  StudioPublicationStatusResponse,
+  StudioPublishEntryRequest,
+  StudioPublishResponse,
   StudioRenameEntryRequest,
   StudioRenameEntryResponse,
+  StudioResolveEntriesRequest,
+  StudioResolveEntriesResponse,
+  StudioRestoreRevisionRequest,
+  StudioRestoreRevisionResponse,
+  StudioRevisionComparisonResponse,
+  StudioRevisionPageResponse,
+  StudioRevisionResponse,
   StudioSaveEntryDraftRequest,
   StudioSaveEntryDraftResponse,
   StudioSearchEntriesRequest,
+  StudioUnpublishEntryRequest,
+  StudioUnpublishResponse,
+  StudioValidatePublicationRequest,
   studioContentLimits,
 } from "..";
 
@@ -64,6 +79,8 @@ function schemaComponents() {
     ["StudioContentContextResponse", StudioContentContextResponse],
     ["StudioEntryPageResponse", StudioEntryPageResponse],
     ["StudioSearchEntriesRequest", StudioSearchEntriesRequest],
+    ["StudioResolveEntriesRequest", StudioResolveEntriesRequest],
+    ["StudioResolveEntriesResponse", StudioResolveEntriesResponse],
     ["StudioNewEntryWorkspaceResponse", StudioNewEntryWorkspaceResponse],
     ["StudioEntryWorkspaceResponse", StudioEntryWorkspaceResponse],
     ["StudioCreateEntryRequest", StudioCreateEntryRequest],
@@ -72,6 +89,19 @@ function schemaComponents() {
     ["StudioRenameEntryResponse", StudioRenameEntryResponse],
     ["StudioSaveEntryDraftRequest", StudioSaveEntryDraftRequest],
     ["StudioSaveEntryDraftResponse", StudioSaveEntryDraftResponse],
+    ["StudioRevisionPageResponse", StudioRevisionPageResponse],
+    ["StudioRevisionResponse", StudioRevisionResponse],
+    ["StudioRevisionComparisonResponse", StudioRevisionComparisonResponse],
+    ["StudioRestoreRevisionRequest", StudioRestoreRevisionRequest],
+    ["StudioRestoreRevisionResponse", StudioRestoreRevisionResponse],
+    ["StudioPublicationStatusResponse", StudioPublicationStatusResponse],
+    ["StudioPublicationPageResponse", StudioPublicationPageResponse],
+    ["StudioValidatePublicationRequest", StudioValidatePublicationRequest],
+    ["StudioPublicationPlanResponse", StudioPublicationPlanResponse],
+    ["StudioPublishEntryRequest", StudioPublishEntryRequest],
+    ["StudioPublishResponse", StudioPublishResponse],
+    ["StudioUnpublishEntryRequest", StudioUnpublishEntryRequest],
+    ["StudioUnpublishResponse", StudioUnpublishResponse],
   ] as const) {
     addEffectSchema(components, name, schema);
   }
@@ -115,7 +145,9 @@ const commonFailures = {
   "401": failure("A current Studio bearer token is required."),
   "403": failure("The current Studio user is not allowed to perform this operation."),
   "404": failure("The exact authorized Studio Content scope is unavailable."),
-  "409": failure("Current schema, configuration, name, draft, or command authority conflicts."),
+  "409": failure(
+    "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+  ),
   "413": failure("The request or projected response exceeds its fixed bound."),
   "429": failure("The Studio request quota is exhausted."),
   "500": failure("An unexpected internal error occurred."),
@@ -172,6 +204,32 @@ function jsonBody(schema: string, maximumBytes: number = studioContentLimits.req
     "x-maximum-bytes": maximumBytes,
   };
 }
+
+const revisionParameter = {
+  name: "revisionId",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+} as const;
+const pageParameters = [
+  {
+    name: "cursor",
+    in: "query",
+    required: false,
+    schema: { type: "string", minLength: 1, maxLength: 1_024 },
+  },
+  {
+    name: "limit",
+    in: "query",
+    required: false,
+    schema: {
+      type: "integer",
+      minimum: studioContentLimits.pageLimitMinimum,
+      maximum: studioContentLimits.pageLimitMaximum,
+      default: studioContentLimits.pageLimitDefault,
+    },
+  },
+] as const;
 
 const root = "/projects/{projectId}/environments/{environmentId}";
 const entries = `${root}/collections/{collectionId}/locales/{locale}/entries`;
@@ -253,6 +311,25 @@ export const studioContentOpenApiDocument = {
         },
       },
     },
+    [`${entries}/resolve`]: {
+      post: {
+        operationId: "resolveStudioEntryLabels",
+        summary: "Resolve requested authorized entry IDs to safe display names",
+        security: [{ studioBearer: [] }],
+        parameters: collectionParameters,
+        requestBody: jsonBody(
+          "StudioResolveEntriesRequest",
+          studioContentLimits.resolveRequestBytes,
+        ),
+        responses: {
+          "200": success(
+            "StudioResolveEntriesResponse",
+            "Requested available labels in first-requested order.",
+          ),
+          ...commonFailures,
+        },
+      },
+    },
     [`${entries}/new`]: {
       get: {
         operationId: "getStudioNewEntryWorkspace",
@@ -305,6 +382,161 @@ export const studioContentOpenApiDocument = {
         requestBody: jsonBody("StudioSaveEntryDraftRequest"),
         responses: {
           "200": success("StudioSaveEntryDraftResponse", "The receipt-backed save result."),
+          ...commonFailures,
+        },
+      },
+    },
+    [`${entries}/{entryId}/revisions`]: {
+      get: {
+        operationId: "listStudioEntryRevisions",
+        summary: "List one bounded page of shared or exact-locale revision summaries",
+        security: [{ studioBearer: [] }],
+        parameters: [
+          ...entryParameters,
+          {
+            name: "scope",
+            in: "query",
+            required: true,
+            schema: { type: "string", enum: ["shared", "localized"] },
+          },
+          ...pageParameters,
+        ],
+        responses: {
+          "200": success(
+            "StudioRevisionPageResponse",
+            "A bounded page of role-projected revision summaries, newest first.",
+          ),
+          ...commonFailures,
+        },
+      },
+    },
+    [`${entries}/{entryId}/revisions/{revisionId}`]: {
+      get: {
+        operationId: "getStudioEntryRevision",
+        summary: "Read one immutable revision with role-visible values",
+        security: [{ studioBearer: [] }],
+        parameters: [...entryParameters, revisionParameter],
+        responses: {
+          "200": success("StudioRevisionResponse", "The revision summary and projected values."),
+          ...commonFailures,
+        },
+      },
+    },
+    [`${entries}/{entryId}/revisions/{fromRevisionId}/compare/{toRevisionId}`]: {
+      get: {
+        operationId: "compareStudioEntryRevisions",
+        summary: "Compare two revisions of the same entry and scope by stable field ID",
+        security: [{ studioBearer: [] }],
+        parameters: [
+          ...entryParameters,
+          { ...revisionParameter, name: "fromRevisionId" },
+          { ...revisionParameter, name: "toRevisionId" },
+        ],
+        responses: {
+          "200": success(
+            "StudioRevisionComparisonResponse",
+            "Role-visible field differences. Hidden differences only set restrictedChanges.",
+          ),
+          ...commonFailures,
+        },
+      },
+    },
+    [`${entries}/{entryId}/revisions/{revisionId}/restore`]: {
+      post: {
+        operationId: "restoreStudioEntryRevision",
+        summary: "Restore one compatible revision as a new draft revision of its scope",
+        security: [{ studioBearer: [] }],
+        parameters: [...entryParameters, revisionParameter],
+        requestBody: jsonBody(
+          "StudioRestoreRevisionRequest",
+          studioContentLimits.commandRequestBytes,
+        ),
+        responses: {
+          "200": success("StudioRestoreRevisionResponse", "The receipt-backed restore result."),
+          ...commonFailures,
+        },
+      },
+    },
+    [`${entries}/{entryId}/publication`]: {
+      get: {
+        operationId: "getStudioEntryPublication",
+        summary: "Read the exact-locale publication state and value-based change flags",
+        security: [{ studioBearer: [] }],
+        parameters: entryParameters,
+        responses: {
+          "200": success("StudioPublicationStatusResponse", "The current publication status."),
+          ...commonFailures,
+        },
+      },
+    },
+    [`${entries}/{entryId}/publications`]: {
+      get: {
+        operationId: "listStudioEntryPublications",
+        summary: "List one bounded page of immutable exact-locale publications",
+        security: [{ studioBearer: [] }],
+        parameters: [...entryParameters, ...pageParameters],
+        responses: {
+          "200": success(
+            "StudioPublicationPageResponse",
+            "A bounded page of publication summaries, newest first.",
+          ),
+          ...commonFailures,
+        },
+      },
+    },
+    [`${entries}/{entryId}/publication/validate`]: {
+      post: {
+        operationId: "validateStudioEntryPublication",
+        summary: "Validate the current draft and return the publish authority plan",
+        security: [{ studioBearer: [] }],
+        parameters: entryParameters,
+        requestBody: jsonBody(
+          "StudioValidatePublicationRequest",
+          studioContentLimits.commandRequestBytes,
+        ),
+        responses: {
+          "200": success(
+            "StudioPublicationPlanResponse",
+            "The publication plan with role-projected validation.",
+          ),
+          ...commonFailures,
+        },
+      },
+    },
+    [`${entries}/{entryId}/publication/publish`]: {
+      post: {
+        operationId: "publishStudioEntry",
+        summary: "Publish the exact-locale draft named by a current plan",
+        security: [{ studioBearer: [] }],
+        parameters: entryParameters,
+        requestBody: jsonBody("StudioPublishEntryRequest", studioContentLimits.commandRequestBytes),
+        responses: {
+          "200": success(
+            "StudioPublishResponse",
+            "The immutable publication and the Delivery origin read-back.",
+          ),
+          ...commonFailures,
+          "422": failure(
+            "Publication authority fails validation (PUBLICATION_INVALID). Details name only role-visible fields.",
+          ),
+        },
+      },
+    },
+    [`${entries}/{entryId}/publication/unpublish`]: {
+      post: {
+        operationId: "unpublishStudioEntry",
+        summary: "Unpublish the current exact-locale publication",
+        security: [{ studioBearer: [] }],
+        parameters: entryParameters,
+        requestBody: jsonBody(
+          "StudioUnpublishEntryRequest",
+          studioContentLimits.commandRequestBytes,
+        ),
+        responses: {
+          "200": success(
+            "StudioUnpublishResponse",
+            "The unpublish result and the Delivery origin read-back.",
+          ),
           ...commonFailures,
         },
       },

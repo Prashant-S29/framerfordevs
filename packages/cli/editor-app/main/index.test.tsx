@@ -44,7 +44,7 @@ const generatedForm = {
   source: "published",
   collectionId: fieldId,
   revisionId: fieldId,
-  formatVersion: 2,
+  formatVersion: 1,
   validationProfile: "ffd-fields@1",
   currencyRegistryProfile: null,
   contractHash: digest,
@@ -264,6 +264,7 @@ describe("bundled local editor application", () => {
               stateVersion: publicationStateVersion,
               resultKind: "changed",
               publication,
+              delivery: { status: "verified", currentPublicationId: publication.id },
             });
           case "publication.unpublish":
             publicationState = "unpublished";
@@ -277,6 +278,7 @@ describe("bundled local editor application", () => {
               unpublishedPublicationId: publication.id,
               unpublishedPublicationSequence: publication.sequence,
               unpublishedAt: timestamp,
+              delivery: { status: "verified", currentPublicationId: null },
             });
           case "entry.save":
             if (saveConflicts)

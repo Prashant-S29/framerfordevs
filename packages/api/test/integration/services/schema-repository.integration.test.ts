@@ -85,6 +85,7 @@ import { makeSchemaRepository } from "../../../src/services/schema/repository";
 import { makeToolingRepository } from "../../../src/services/tooling/repository";
 import { makeWebhookRepository } from "../../../src/services/webhook/repository";
 import { makeWebhookWorkerRepository } from "../../../src/services/webhook/worker-repository";
+import { assertIndexDefinitions, assertIndexedQuery } from "../../support/query-plan";
 
 const suffix = randomUUID();
 const ownerId = `m5-schema-owner-${suffix}`;
@@ -2291,40 +2292,59 @@ describe("schema repository PostgreSQL integration", () => {
         assert.isTrue(Exit.isFailure(revisionDelete));
         assert.isTrue(Exit.isFailure(fieldDelete));
 
-        const plans = yield* Effect.promise(() =>
+        yield* Effect.promise(() =>
           db.transaction(async (transaction) => {
             await transaction.execute(sql`set local enable_seqscan = off`);
-            const collectionPlan = await transaction.execute(
-              sql`explain (format json) select id from cms_collection where environment_id = ${collection.environmentId} order by created_at desc nulls last, id desc nulls last limit 20`,
+            await transaction.execute(sql`set local enable_sort = off`);
+            await assertIndexedQuery(
+              transaction,
+              sql`select id from cms_collection where environment_id = ${collection.environmentId} order by created_at desc nulls last, id desc nulls last limit 20`,
+              { table: "cms_collection", allowBitmap: true, order: "index" },
             );
-            const fieldPlan = await transaction.execute(
-              sql`explain (format json) select id from cms_collection_field where collection_id = ${collection.id} and removed_at is null and node_role = 'root' order by position`,
+            await assertIndexedQuery(
+              transaction,
+              sql`select id from cms_collection_field where collection_id = ${collection.id} and removed_at is null and node_role = 'root' order by position`,
+              { table: "cms_collection_field", allowBitmap: true, order: "index" },
             );
-            const revisionPlan = await transaction.execute(
-              sql`explain (format json) select id from cms_schema_revision where collection_id = ${collection.id} order by sequence desc limit 1`,
+            await assertIndexedQuery(
+              transaction,
+              sql`select id from cms_schema_revision where collection_id = ${collection.id} order by sequence desc nulls last limit 1`,
+              { table: "cms_schema_revision", allowBitmap: true, order: "index" },
             );
-            const outboxPlan = await transaction.execute(
-              sql`explain (format json) select id from outbox_event where processed_at is null order by available_at, id limit 20`,
+            await assertIndexedQuery(
+              transaction,
+              sql`select id from outbox_event where processed_at is null order by available_at, id limit 20`,
+              { table: "outbox_event", allowBitmap: true, indexCondition: false, order: "index" },
             );
-            const fieldIndex = await transaction.execute(
-              sql`select to_regclass('public.cms_field_collection_active_root_position_unique')::text as name`,
-            );
-            return JSON.stringify([
-              collectionPlan.rows,
-              fieldPlan.rows,
-              revisionPlan.rows,
-              outboxPlan.rows,
-              fieldIndex.rows,
-            ]);
           }),
         );
-        assert.match(
-          plans,
-          /cms_collection_environment_(?:created_id_idx|key_unique|source_key_unique)/u,
+        yield* Effect.promise(() =>
+          assertIndexDefinitions(db, [
+            {
+              table: "cms_collection",
+              name: "cms_collection_environment_created_id_idx",
+              keys: "environment_id, created_at DESC NULLS LAST, id DESC NULLS LAST",
+            },
+            {
+              table: "cms_collection_field",
+              name: "cms_field_collection_active_root_position_unique",
+              keys: 'collection_id, "position"',
+              unique: true,
+              where: "((removed_at IS NULL) AND ((node_role)::text = 'root'::text))",
+            },
+            {
+              table: "cms_schema_revision",
+              name: "cms_revision_collection_sequence_desc_idx",
+              keys: "collection_id, sequence DESC NULLS LAST",
+            },
+            {
+              table: "outbox_event",
+              name: "outbox_event_pending_available_id_idx",
+              keys: "available_at, id",
+              where: "(processed_at IS NULL)",
+            },
+          ]),
         );
-        assert.include(plans, "cms_field_collection_active_root_position_unique");
-        assert.match(plans, /cms_revision_collection_(sequence_desc_idx|sequence_unique)/u);
-        assert.include(plans, "outbox_event_pending_available_id_idx");
 
         const beforeRemoval = yield* schemas.getDraft(
           ownerActor,

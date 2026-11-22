@@ -4,9 +4,17 @@ import {
   decodeStudioEntryPageResponse,
   decodeStudioEntryWorkspaceResponse,
   decodeStudioNewEntryWorkspaceResponse,
+  decodeStudioPublicationPageResponse,
+  decodeStudioPublicationPlanResponse,
+  decodeStudioPublicationStatusResponse,
+  decodeStudioPublishResponse,
   decodeStudioRenameEntryResponse,
   decodeStudioResolveEntriesResponse,
+  decodeStudioRevisionComparisonResponse,
+  decodeStudioRevisionPageResponse,
+  decodeStudioRevisionResponse,
   decodeStudioSaveEntryDraftResponse,
+  decodeStudioUnpublishResponse,
   studioContentBrowserLimits,
   type StudioContentBrowserFailure,
   type StudioContentContextDto,
@@ -18,7 +26,16 @@ import {
   type StudioJsonObject,
   type StudioMutationReceiptDto,
   type StudioNewEntryWorkspaceDto,
+  type StudioPublicationPageDto,
+  type StudioPublicationPlanDto,
+  type StudioPublicationStatusDto,
+  type StudioPublishResultDto,
   type StudioResolvedEntryLabelsDto,
+  type StudioRevisionComparisonDto,
+  type StudioRevisionDto,
+  type StudioRevisionPageDto,
+  type StudioRevisionScope,
+  type StudioUnpublishResultDto,
 } from "../contracts/content";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -103,6 +120,38 @@ function validateEntryScope(scope: StudioContentEntryScope): StudioContentEntryS
     });
   }
   return { ...collection, entryId: scope.entryId };
+}
+
+function validateRevisionId(revisionId: string): string {
+  if (!uuid.test(revisionId)) {
+    throw new StudioContentClientError({
+      status: 0,
+      code: "STUDIO_REQUEST_INVALID",
+      message: "The Studio Content revision is invalid.",
+      retryable: false,
+    });
+  }
+  return revisionId;
+}
+
+function pageParameters(input: { readonly cursor: string | null; readonly limit: number }) {
+  if (
+    !Number.isSafeInteger(input.limit) ||
+    input.limit < 10 ||
+    input.limit > 50 ||
+    (input.cursor !== null && !/^[A-Za-z0-9_-]{1,1024}$/u.test(input.cursor))
+  ) {
+    throw new StudioContentClientError({
+      status: 0,
+      code: "STUDIO_REQUEST_INVALID",
+      message: "The Studio Content page request is invalid.",
+      retryable: false,
+    });
+  }
+  const parameters = new URLSearchParams();
+  if (input.cursor !== null) parameters.set("cursor", input.cursor);
+  parameters.set("limit", String(input.limit));
+  return parameters;
 }
 
 function validateResolutionEntryIds(entryIds: ReadonlyArray<string>): ReadonlyArray<string> {
@@ -266,7 +315,154 @@ export function createStudioContentClient(options: StudioContentClientOptions) {
     return `/api/content/collections/${valid.collectionId}/locales/${valid.locale}/entries`;
   };
 
+  const entryPath = (scope: StudioContentEntryScope): string => {
+    const valid = validateEntryScope(scope);
+    return `${collectionPath(valid)}/${valid.entryId}`;
+  };
+
   return {
+    revisions(
+      scope: StudioContentEntryScope,
+      input: {
+        readonly scope: StudioRevisionScope;
+        readonly cursor: string | null;
+        readonly limit: number;
+      },
+      visibleFieldIds: ReadonlySet<string>,
+      signal: AbortSignal,
+    ): Promise<StudioRevisionPageDto> {
+      const parameters = pageParameters(input);
+      parameters.set("scope", input.scope === "shared" ? "shared" : "localized");
+      return request({
+        path: `${entryPath(scope)}/revisions?${parameters.toString()}`,
+        method: "GET",
+        signal,
+        decoder: (value, status) =>
+          decodeStudioRevisionPageResponse(value, status, input.scope, visibleFieldIds),
+      });
+    },
+    revision(
+      scope: StudioContentEntryScope,
+      revisionId: string,
+      visibleFieldIds: ReadonlySet<string>,
+      signal: AbortSignal,
+    ): Promise<StudioRevisionDto> {
+      const valid = validateRevisionId(revisionId);
+      return request({
+        path: `${entryPath(scope)}/revisions/${valid}`,
+        method: "GET",
+        signal,
+        decoder: (value, status) =>
+          decodeStudioRevisionResponse(value, status, valid, visibleFieldIds),
+      });
+    },
+    compare(
+      scope: StudioContentEntryScope,
+      input: { readonly fromRevisionId: string; readonly toRevisionId: string },
+      visibleFieldIds: ReadonlySet<string>,
+      signal: AbortSignal,
+    ): Promise<StudioRevisionComparisonDto> {
+      const expected = {
+        fromRevisionId: validateRevisionId(input.fromRevisionId),
+        toRevisionId: validateRevisionId(input.toRevisionId),
+      };
+      return request({
+        path: `${entryPath(scope)}/revisions/${expected.fromRevisionId}/compare/${expected.toRevisionId}`,
+        method: "GET",
+        signal,
+        decoder: (value, status) =>
+          decodeStudioRevisionComparisonResponse(value, status, expected, visibleFieldIds),
+      });
+    },
+    restore(
+      scope: StudioContentEntryScope,
+      revisionId: string,
+      body: StudioJsonObject,
+      visibleFieldIds: ReadonlySet<string>,
+      signal: AbortSignal,
+    ): Promise<StudioMutationReceiptDto> {
+      const valid = validateEntryScope(scope);
+      return request({
+        path: `${entryPath(valid)}/revisions/${validateRevisionId(revisionId)}/restore`,
+        method: "POST",
+        signal,
+        body,
+        maximumRequestBytes: studioContentBrowserLimits.commandRequestBytes,
+        decoder: (value, status) =>
+          decodeStudioSaveEntryDraftResponse(value, status, valid, visibleFieldIds),
+      });
+    },
+    publication(
+      scope: StudioContentEntryScope,
+      visibleFieldIds: ReadonlySet<string>,
+      signal: AbortSignal,
+    ): Promise<StudioPublicationStatusDto> {
+      return request({
+        path: `${entryPath(scope)}/publication`,
+        method: "GET",
+        signal,
+        decoder: (value, status) =>
+          decodeStudioPublicationStatusResponse(value, status, visibleFieldIds),
+      });
+    },
+    publications(
+      scope: StudioContentEntryScope,
+      input: { readonly cursor: string | null; readonly limit: number },
+      visibleFieldIds: ReadonlySet<string>,
+      signal: AbortSignal,
+    ): Promise<StudioPublicationPageDto> {
+      return request({
+        path: `${entryPath(scope)}/publications?${pageParameters(input).toString()}`,
+        method: "GET",
+        signal,
+        decoder: (value, status) =>
+          decodeStudioPublicationPageResponse(value, status, visibleFieldIds),
+      });
+    },
+    validatePublication(
+      scope: StudioContentEntryScope,
+      visibleFieldIds: ReadonlySet<string>,
+      signal: AbortSignal,
+    ): Promise<StudioPublicationPlanDto> {
+      return request({
+        path: `${entryPath(scope)}/publication/validate`,
+        method: "POST",
+        signal,
+        body: {},
+        maximumRequestBytes: studioContentBrowserLimits.commandRequestBytes,
+        decoder: (value, status) =>
+          decodeStudioPublicationPlanResponse(value, status, visibleFieldIds),
+      });
+    },
+    publish(
+      scope: StudioContentEntryScope,
+      body: StudioJsonObject,
+      visibleFieldIds: ReadonlySet<string>,
+      signal: AbortSignal,
+    ): Promise<StudioPublishResultDto> {
+      return request({
+        path: `${entryPath(scope)}/publication/publish`,
+        method: "POST",
+        signal,
+        body,
+        maximumRequestBytes: studioContentBrowserLimits.commandRequestBytes,
+        decoder: (value, status) => decodeStudioPublishResponse(value, status, visibleFieldIds),
+      });
+    },
+    unpublish(
+      scope: StudioContentEntryScope,
+      body: StudioJsonObject,
+      signal: AbortSignal,
+    ): Promise<StudioUnpublishResultDto> {
+      return request({
+        path: `${entryPath(scope)}/publication/unpublish`,
+        method: "POST",
+        signal,
+        body,
+        maximumRequestBytes: studioContentBrowserLimits.commandRequestBytes,
+        decoder: decodeStudioUnpublishResponse,
+      });
+    },
     context(signal: AbortSignal): Promise<StudioContentContextDto> {
       return request({
         path: "/api/content/context",
