@@ -228,6 +228,7 @@ const context = Schema.decodeUnknownSync(StudioContentContext, { onExcessPropert
         canSaveLocalized: true,
         canSaveShared: true,
         canPublish: true,
+        canPublishPresentation: true,
       },
     },
   ],
@@ -274,6 +275,7 @@ const contentRepository: ReturnType<typeof makeStudioContentRepository> = {
       canWriteLocalized: true,
       canWriteShared: true,
       canPublish: true,
+      canPublishPresentation: true,
     }),
   getContext: () => Effect.succeed(context),
   listEntries: (_actor, input) =>

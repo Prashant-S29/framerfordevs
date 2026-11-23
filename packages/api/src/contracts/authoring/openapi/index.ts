@@ -34,6 +34,7 @@ import {
   AuthoringValidatePublicationRequest,
 } from "../publication";
 import { AuthoringSchemaApplyResponse, AuthoringSchemaPlanResponse } from "../schema";
+import { PreviewHandoffRequest, PreviewHandoffResponse } from "../../preview-handoff";
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -366,6 +367,8 @@ function schemaComponents() {
   );
   addEffectSchema(components, "AuthoringRestoreRevisionRequest", AuthoringRestoreRevisionRequest);
   addEffectSchema(components, "AuthoringRestoreRevisionResponse", AuthoringRestoreRevisionResponse);
+  addEffectSchema(components, "PreviewHandoffRequest", PreviewHandoffRequest);
+  addEffectSchema(components, "PreviewHandoffResponse", PreviewHandoffResponse);
   addEffectSchema(
     components,
     "AuthoringPublicationStatusResponse",
@@ -631,7 +634,7 @@ export const authoringOpenApiDocument = {
         operationId: "publishAuthoringPresentation",
         summary: "Publish one immutable presentation-only schema revision",
         security: [
-          { AuthoringOAuth: ["authoring:schema:push"] },
+          { AuthoringOAuth: ["authoring:presentation:publish"] },
           { AuthoringManagementCredential: [] },
         ],
         parameters: collectionPathParameters,
@@ -650,7 +653,7 @@ export const authoringOpenApiDocument = {
           ),
           ...commonFailures,
         },
-        "x-required-oauth-scope": "authoring:schema:push",
+        "x-required-oauth-scope": "authoring:presentation:publish",
         "x-required-management-scopes": ["schema.read", "schema.write", "schema.publish"],
       },
       options: {
@@ -898,6 +901,17 @@ export const authoringOpenApiDocument = {
         oauthScope: "authoring:draft:write",
         managementScope: "content.write",
       }),
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionKey}/locales/{locale}/entries/{entryId}/preview-handoffs":
+      revisionOperation({
+        operationId: "issueAuthoringPreviewHandoff",
+        summary: "Issue a five-minute Preview handoff token for the current draft or one revision",
+        method: "POST",
+        parameters: [],
+        request: "PreviewHandoffRequest",
+        result: "PreviewHandoffResponse",
+        oauthScope: "authoring:read",
+        managementScope: "content.read",
+      }),
     "/projects/{projectId}/environments/{environmentId}/collections/{collectionKey}/locales/{locale}/entries/{entryId}/publication":
       publicationOperation({
         operationId: "getAuthoringPublicationStatus",
@@ -989,6 +1003,7 @@ export const authoringOpenApiDocument = {
           "authoring:draft:write",
           "authoring:content:publish",
           "authoring:schema:push",
+          "authoring:presentation:publish",
         ],
       },
       AuthoringManagementCredential: {

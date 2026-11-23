@@ -252,34 +252,24 @@ const selectorParameters = ["sharedRevision", "localizedRevision"].map((name) =>
 }));
 
 const optionsOperation = {
-  summary: "Inspect Preview cross-origin request support",
+  summary: "Reject browser preflight requests",
   description:
-    "Preview permits wildcard, non-credentialed CORS for GET and HEAD. Authorization is an explicit request header; cookies and browser credential mode are not used.",
+    "Preview is server-to-server. It rejects every OPTIONS request and every request with an Origin header.",
   security: [],
   responses: {
-    "204": {
-      description: "The requested GET or HEAD preflight is allowed.",
-      headers: {
-        "Access-Control-Allow-Origin": {
-          description: "Always `*` for public Preview.",
-          schema: { type: "string", const: "*" },
-        },
-        "Access-Control-Allow-Methods": {
-          description: "Supported Preview methods.",
-          schema: { type: "string", example: "GET, HEAD, OPTIONS" },
-        },
-        "Access-Control-Allow-Headers": {
-          description: "The closed Preview request-header allowlist.",
-          schema: {
-            type: "string",
-            example: "Authorization, Traceparent, X-Request-Id",
-          },
-        },
-      },
-    },
-    "403": failureResponse("The requested Preview preflight is not allowed.", "FORBIDDEN", 403),
+    "403": failureResponse("Browser-origin Preview requests are not allowed.", "FORBIDDEN", 403),
   },
 } as const;
+
+function handoffOperation(head: boolean) {
+  return {
+    summary: "Preview the entry bound to a Studio or CLI handoff token",
+    description:
+      "Requires `Authorization: Bearer ffd_pvh_...`, a token that lives five minutes and binds one user, entry, locale, and source. The server makes sure on every read that the user can still read the entry in that locale and that the environment Preview URL did not change. Read the token only on your server. Never place it in a URL, browser storage, or logs.",
+    security: [{ previewHandoffBearer: [] }],
+    responses: { "200": successResponse(head), ...commonFailures },
+  };
+}
 
 function readOperation(source: "current" | "revision", head: boolean) {
   return {
@@ -327,6 +317,11 @@ export const previewOpenApiDocument = {
   servers: [{ url: "/api/preview/v1" }],
   tags: [{ name: "Preview", description: "Read-only unpublished content access." }],
   paths: {
+    "/handoff": {
+      get: handoffOperation(false),
+      head: handoffOperation(true),
+      options: optionsOperation,
+    },
     [currentPath]: {
       get: readOperation("current", false),
       head: readOperation("current", true),
@@ -347,6 +342,13 @@ export const previewOpenApiDocument = {
         bearerFormat: "ffd_prev_<credential-id>_<secret>",
         description:
           "Environment-wide Preview credential with `preview.read`, a mandatory expiry, and a maximum original lifetime of 30 days.",
+      },
+      previewHandoffBearer: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "ffd_pvh_<payload>.<signature>",
+        description:
+          "Five-minute signed handoff token from the Studio or `ffd entry preview`. It is accepted only by `/handoff`.",
       },
     },
     headers: {

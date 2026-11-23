@@ -23,6 +23,9 @@ const controlPlaneCommands = new Set([
   "studio registration set",
   "studio runtime activate",
   "studio runtime deactivate",
+  "preview target get",
+  "preview target set",
+  "preview target clear",
   "governance inspect",
   "member list",
   "member policy set",
@@ -159,7 +162,9 @@ function receiptMutation<A, E, R>(options: {
     | "studio_registration.runtime.set"
     | "project_locale.create"
     | "invalidation_mapping.create"
-    | "webhook.delivery.replay";
+    | "webhook.delivery.replay"
+    | "preview_target.put"
+    | "preview_target.clear";
   readonly suppliedCommandId: string | undefined;
   readonly input: unknown;
   readonly execute: (commandId: string) => Effect.Effect<A, E, R>;
@@ -1081,6 +1086,51 @@ export function executeControlPlaneCommand(options: {
             expectedVersion,
             enabled,
           }),
+      });
+      return { command, ...result };
+    }
+    if (command === "preview target get") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment-id");
+      return { command, target: yield* client.getPreviewTarget(projectId, environmentId) };
+    }
+    if (command === "preview target set") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment-id");
+      const previewUrl = yield* requiredFlag(arguments_, "url");
+      const expectedVersion =
+        stringFlag(arguments_, "expected-version") === undefined
+          ? null
+          : yield* positiveIntegerFlag(arguments_, "expected-version");
+      const suppliedCommandId = yield* optionalCommandId(arguments_);
+      const input = { projectId, environmentId, expectedVersion, previewUrl };
+      const result = yield* receiptMutation({
+        root: options.root,
+        operation: "preview_target.put",
+        suppliedCommandId,
+        input,
+        execute: (commandId) =>
+          client.putPreviewTarget(projectId, environmentId, {
+            commandId,
+            expectedVersion,
+            previewUrl,
+          }),
+      });
+      return { command, ...result };
+    }
+    if (command === "preview target clear") {
+      const projectId = yield* requiredFlag(arguments_, "project");
+      const environmentId = yield* requiredFlag(arguments_, "environment-id");
+      const expectedVersion = yield* positiveIntegerFlag(arguments_, "expected-version");
+      const suppliedCommandId = yield* optionalCommandId(arguments_);
+      const input = { projectId, environmentId, expectedVersion };
+      const result = yield* receiptMutation({
+        root: options.root,
+        operation: "preview_target.clear",
+        suppliedCommandId,
+        input,
+        execute: (commandId) =>
+          client.clearPreviewTarget(projectId, environmentId, { commandId, expectedVersion }),
       });
       return { command, ...result };
     }

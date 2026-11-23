@@ -512,6 +512,12 @@
         "description": "Environment-wide Preview credential with `preview.read`, a mandatory expiry, and a maximum original lifetime of 30 days.",
         "scheme": "bearer",
         "type": "http"
+      },
+      "previewHandoffBearer": {
+        "bearerFormat": "ffd_pvh_<payload>.<signature>",
+        "description": "Five-minute signed handoff token from the Studio or `ffd entry preview`. It is accepted only by `/handoff`.",
+        "scheme": "bearer",
+        "type": "http"
       }
     }
   },
@@ -522,6 +528,1081 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/handoff": {
+      "get": {
+        "description": "Requires `Authorization: Bearer ffd_pvh_...`, a token that lives five minutes and binds one user, entry, locale, and source. The server makes sure on every read that the user can still read the entry in that locale and that the environment Preview URL did not change. Read the token only on your server. Never place it in a URL, browser storage, or logs.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": {
+                    "collection": "articles",
+                    "collectionId": "019fae8b-1234-7000-8000-000000000002",
+                    "data": {
+                      "summary": "This safe draft may still be incomplete.",
+                      "title": "અપ્રકાશિત પૂર્વાવલોકન"
+                    },
+                    "id": "019fae8b-1234-7000-8000-000000000003",
+                    "locale": "gu",
+                    "preview": {
+                      "contractHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                      "localizedRevisionId": "019fae8b-1234-7000-8000-000000000006",
+                      "localizedVersion": 4,
+                      "schemaRevisionId": "019fae8b-1234-7000-8000-000000000004",
+                      "sharedRevisionId": "019fae8b-1234-7000-8000-000000000005",
+                      "sharedVersion": 2,
+                      "source": "current",
+                      "version": 1
+                    },
+                    "validation": {
+                      "capped": false,
+                      "issues": [
+                        {
+                          "code": "min_length",
+                          "fieldId": "019fae8b-1234-7000-8000-000000000006",
+                          "message": "Enter at least 60 characters.",
+                          "path": "summary"
+                        }
+                      ],
+                      "valid": false
+                    }
+                  },
+                  "error": null,
+                  "message": "Preview entry loaded.",
+                  "ok": true
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewItemResponse"
+                }
+              }
+            },
+            "description": "The exact selected unpublished Preview document. Soft-invalid content returns 200 with validation feedback.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "PREVIEW_QUERY_INVALID",
+                    "message": "The strict Preview path or query grammar is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The strict Preview path or query grammar is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "The strict Preview path or query grammar is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 400
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "CREDENTIAL_INVALID",
+                    "message": "A Preview bearer credential is required and must remain active.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "A Preview bearer credential is required and must remain active.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "A Preview bearer credential is required and must remain active.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "WWW-Authenticate": {
+                "$ref": "#/components/headers/WwwAuthenticate"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 401
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "The exact Preview resource or locale is unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The exact Preview resource or locale is unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "The exact Preview resource or locale is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 404
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "PREVIEW_REVISION_INCOMPATIBLE",
+                    "message": "The selected Preview sources are incompatible.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The selected Preview sources are incompatible.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "The selected Preview sources are incompatible.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 409
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "PREVIEW_RESPONSE_TOO_LARGE",
+                    "message": "The Preview representation exceeds 2.5 MiB.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The Preview representation exceeds 2.5 MiB.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "The Preview representation exceeds 2.5 MiB.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 413
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "RATE_LIMITED",
+                    "message": "Too many Preview requests. Try again later.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "Too many Preview requests. Try again later.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "Too many Preview requests. Try again later.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 429
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected internal error occurred.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "An unexpected internal error occurred.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 500
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "SERVICE_UNAVAILABLE",
+                    "message": "A required service is temporarily unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "A required service is temporarily unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 503
+          }
+        },
+        "security": [
+          {
+            "previewHandoffBearer": []
+          }
+        ],
+        "summary": "Preview the entry bound to a Studio or CLI handoff token"
+      },
+      "head": {
+        "description": "Requires `Authorization: Bearer ffd_pvh_...`, a token that lives five minutes and binds one user, entry, locale, and source. The server makes sure on every read that the user can still read the entry in that locale and that the environment Preview URL did not change. Read the token only on your server. Never place it in a URL, browser storage, or logs.",
+        "responses": {
+          "200": {
+            "description": "The authenticated Preview representation metadata. HEAD has no body but performs the same read and audit as GET.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "PREVIEW_QUERY_INVALID",
+                    "message": "The strict Preview path or query grammar is invalid.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The strict Preview path or query grammar is invalid.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "The strict Preview path or query grammar is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 400
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "CREDENTIAL_INVALID",
+                    "message": "A Preview bearer credential is required and must remain active.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "A Preview bearer credential is required and must remain active.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "A Preview bearer credential is required and must remain active.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "WWW-Authenticate": {
+                "$ref": "#/components/headers/WwwAuthenticate"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 401
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "NOT_FOUND",
+                    "message": "The exact Preview resource or locale is unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The exact Preview resource or locale is unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "The exact Preview resource or locale is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 404
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "PREVIEW_REVISION_INCOMPATIBLE",
+                    "message": "The selected Preview sources are incompatible.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The selected Preview sources are incompatible.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "The selected Preview sources are incompatible.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 409
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "PREVIEW_RESPONSE_TOO_LARGE",
+                    "message": "The Preview representation exceeds 2.5 MiB.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "The Preview representation exceeds 2.5 MiB.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "The Preview representation exceeds 2.5 MiB.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 413
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "RATE_LIMITED",
+                    "message": "Too many Preview requests. Try again later.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "Too many Preview requests. Try again later.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "Too many Preview requests. Try again later.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 429
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected internal error occurred.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "An unexpected internal error occurred.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 500
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "SERVICE_UNAVAILABLE",
+                    "message": "A required service is temporarily unavailable.",
+                    "requestId": "request.example-123",
+                    "retryable": true
+                  },
+                  "message": "A required service is temporarily unavailable.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 503
+          }
+        },
+        "security": [
+          {
+            "previewHandoffBearer": []
+          }
+        ],
+        "summary": "Preview the entry bound to a Studio or CLI handoff token"
+      },
+      "options": {
+        "description": "Preview is server-to-server. It rejects every OPTIONS request and every request with an Origin header.",
+        "responses": {
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": null,
+                  "error": {
+                    "code": "FORBIDDEN",
+                    "message": "Browser-origin Preview requests are not allowed.",
+                    "requestId": "request.example-123",
+                    "retryable": false
+                  },
+                  "message": "Browser-origin Preview requests are not allowed.",
+                  "ok": false
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewApiFailure"
+                }
+              }
+            },
+            "description": "Browser-origin Preview requests are not allowed.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "Content-Length": {
+                "$ref": "#/components/headers/ContentLength"
+              },
+              "Expires": {
+                "$ref": "#/components/headers/Expires"
+              },
+              "Pragma": {
+                "$ref": "#/components/headers/Pragma"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "x-http-status": 403
+          }
+        },
+        "security": [],
+        "summary": "Reject browser preflight requests"
+      }
+    },
     "/projects/{projectId}/environments/{environmentKey}/collections/{collectionKey}/entries/{entryId}/draft": {
       "get": {
         "description": "Requires `Authorization: Bearer ffd_prev_...`. The response may contain unpublished and soft-invalid values and never changes Delivery or publication state. Keep Preview credentials in server-side configuration; never place them in URLs, browser storage, analytics, or public bundles.",
@@ -1656,34 +2737,8 @@
         "summary": "Preview the current persisted draft"
       },
       "options": {
-        "description": "Preview permits wildcard, non-credentialed CORS for GET and HEAD. Authorization is an explicit request header; cookies and browser credential mode are not used.",
+        "description": "Preview is server-to-server. It rejects every OPTIONS request and every request with an Origin header.",
         "responses": {
-          "204": {
-            "description": "The requested GET or HEAD preflight is allowed.",
-            "headers": {
-              "Access-Control-Allow-Headers": {
-                "description": "The closed Preview request-header allowlist.",
-                "schema": {
-                  "example": "Authorization, Traceparent, X-Request-Id",
-                  "type": "string"
-                }
-              },
-              "Access-Control-Allow-Methods": {
-                "description": "Supported Preview methods.",
-                "schema": {
-                  "example": "GET, HEAD, OPTIONS",
-                  "type": "string"
-                }
-              },
-              "Access-Control-Allow-Origin": {
-                "description": "Always `*` for public Preview.",
-                "schema": {
-                  "const": "*",
-                  "type": "string"
-                }
-              }
-            }
-          },
           "403": {
             "content": {
               "application/json": {
@@ -1691,11 +2746,11 @@
                   "data": null,
                   "error": {
                     "code": "FORBIDDEN",
-                    "message": "The requested Preview preflight is not allowed.",
+                    "message": "Browser-origin Preview requests are not allowed.",
                     "requestId": "request.example-123",
                     "retryable": false
                   },
-                  "message": "The requested Preview preflight is not allowed.",
+                  "message": "Browser-origin Preview requests are not allowed.",
                   "ok": false
                 },
                 "schema": {
@@ -1703,7 +2758,7 @@
                 }
               }
             },
-            "description": "The requested Preview preflight is not allowed.",
+            "description": "Browser-origin Preview requests are not allowed.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -1740,7 +2795,7 @@
           }
         },
         "security": [],
-        "summary": "Inspect Preview cross-origin request support"
+        "summary": "Reject browser preflight requests"
       }
     },
     "/projects/{projectId}/environments/{environmentKey}/collections/{collectionKey}/entries/{entryId}/revisions/{schemaRevisionId}": {
@@ -2975,34 +4030,8 @@
         "summary": "Preview an explicit compatible historical source combination"
       },
       "options": {
-        "description": "Preview permits wildcard, non-credentialed CORS for GET and HEAD. Authorization is an explicit request header; cookies and browser credential mode are not used.",
+        "description": "Preview is server-to-server. It rejects every OPTIONS request and every request with an Origin header.",
         "responses": {
-          "204": {
-            "description": "The requested GET or HEAD preflight is allowed.",
-            "headers": {
-              "Access-Control-Allow-Headers": {
-                "description": "The closed Preview request-header allowlist.",
-                "schema": {
-                  "example": "Authorization, Traceparent, X-Request-Id",
-                  "type": "string"
-                }
-              },
-              "Access-Control-Allow-Methods": {
-                "description": "Supported Preview methods.",
-                "schema": {
-                  "example": "GET, HEAD, OPTIONS",
-                  "type": "string"
-                }
-              },
-              "Access-Control-Allow-Origin": {
-                "description": "Always `*` for public Preview.",
-                "schema": {
-                  "const": "*",
-                  "type": "string"
-                }
-              }
-            }
-          },
           "403": {
             "content": {
               "application/json": {
@@ -3010,11 +4039,11 @@
                   "data": null,
                   "error": {
                     "code": "FORBIDDEN",
-                    "message": "The requested Preview preflight is not allowed.",
+                    "message": "Browser-origin Preview requests are not allowed.",
                     "requestId": "request.example-123",
                     "retryable": false
                   },
-                  "message": "The requested Preview preflight is not allowed.",
+                  "message": "Browser-origin Preview requests are not allowed.",
                   "ok": false
                 },
                 "schema": {
@@ -3022,7 +4051,7 @@
                 }
               }
             },
-            "description": "The requested Preview preflight is not allowed.",
+            "description": "Browser-origin Preview requests are not allowed.",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -3059,7 +4088,7 @@
           }
         },
         "security": [],
-        "summary": "Inspect Preview cross-origin request support"
+        "summary": "Reject browser preflight requests"
       }
     }
   },

@@ -95,6 +95,9 @@ it("recognizes the complete operational administration command set", () => {
     "webhook attempt list",
     "webhook replay",
     "audit list",
+    "preview target get",
+    "preview target set",
+    "preview target clear",
   ];
   assert.isTrue(commands.every(isControlPlaneCommand));
 });

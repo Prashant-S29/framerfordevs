@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 
-import { createProjectClient, deliveryV1, previewV1 } from "./index";
+import { createProjectClient, deliveryV1, previewHandoffV1, previewV1 } from "./index";
 
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const entry = {
@@ -180,5 +180,44 @@ describe("SDK public clients", () => {
     assert.strictEqual(requested?.searchParams.get("locale"), "en");
     assert.strictEqual(requested?.searchParams.get("sharedRevision"), "none");
     assert.isFalse(String(requested).includes("preview-token"));
+  });
+
+  it("reads a handoff token as a bearer header on the handoff route only", async () => {
+    const token = `ffd_pvh_${"a".repeat(40)}.${"b".repeat(43)}`;
+    let requested: URL | undefined;
+    let authorization: string | null = null;
+    const reader = previewHandoffV1({
+      baseUrl: "https://api.example.com",
+      fetch: (input, init) => {
+        requested = new URL(String(input));
+        authorization = new Headers(init?.headers).get("authorization");
+        return Promise.resolve(
+          response({
+            id: entry.id,
+            collectionId: entry.collectionId,
+            collection: entry.collection,
+            locale: entry.locale,
+            data: entry.data,
+            preview: {
+              version: 1,
+              schemaRevisionId: entry.publication.schemaRevisionId,
+              contractHash: "a".repeat(64),
+              sharedRevisionId: null,
+              sharedVersion: 0,
+              localizedRevisionId: null,
+              localizedVersion: 0,
+              source: "current",
+            },
+            validation: { valid: true, issues: [], capped: false },
+          }),
+        );
+      },
+    });
+    const preview = await reader.read(token);
+    assert.strictEqual(preview.body?.ok, true);
+    assert.strictEqual(requested?.pathname, "/api/preview/v1/handoff");
+    assert.strictEqual(requested?.search, "");
+    assert.strictEqual(authorization, `Bearer ${token}`);
+    assert.throws(() => reader.read("ffd_prev_credential"));
   });
 });

@@ -35,6 +35,8 @@ const validatedEnv = createEnv({
     DELIVERY_CURSOR_PREVIOUS_SECRET: z.string().min(32).optional(),
     CONTROL_PLANE_CURSOR_SECRET: z.string().min(32).optional(),
     CONTROL_PLANE_CURSOR_PREVIOUS_SECRET: z.string().min(32).optional(),
+    PREVIEW_HANDOFF_SECRET: z.string().min(32).optional(),
+    PREVIEW_HANDOFF_PREVIOUS_SECRET: z.string().min(32).optional(),
     WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID: z
       .string()
       .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u)
@@ -128,6 +130,21 @@ if (
   validatedEnv.CONTROL_PLANE_CURSOR_SECRET === validatedEnv.CONTROL_PLANE_CURSOR_PREVIOUS_SECRET
 ) {
   throw new Error("Control Plane cursor active and previous secrets must be different.");
+}
+
+if (
+  validatedEnv.PREVIEW_HANDOFF_SECRET !== undefined &&
+  validatedEnv.PREVIEW_HANDOFF_SECRET === validatedEnv.PREVIEW_HANDOFF_PREVIOUS_SECRET
+) {
+  throw new Error("Preview handoff active and previous secrets must be different.");
+}
+
+if (
+  validatedEnv.NODE_ENV === "production" &&
+  validatedEnv.PREVIEW_API_ENABLED &&
+  validatedEnv.PREVIEW_HANDOFF_SECRET === undefined
+) {
+  throw new Error("Production Preview requires a persistent Preview handoff secret.");
 }
 
 if (

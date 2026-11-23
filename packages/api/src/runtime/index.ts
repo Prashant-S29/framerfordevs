@@ -86,6 +86,18 @@ import {
   AuthoringPresentationRepositoryLive,
 } from "../services/authoring/presentation-repository";
 import { SchemaRepository, SchemaRepositoryLive } from "../services/schema/repository";
+import {
+  PreviewTargetRepository,
+  PreviewTargetRepositoryLive,
+} from "../services/preview-target/repository";
+import {
+  PreviewHandoffRepository,
+  PreviewHandoffRepositoryLive,
+} from "../services/preview-handoff/repository";
+import {
+  PreviewHandoffSigner,
+  makePreviewHandoffSignerLive,
+} from "../services/preview-handoff/signer";
 import { SecretGenerator, SecretGeneratorLive } from "../services/secret-generator";
 import {
   ToolingCursorSigner,
@@ -154,6 +166,9 @@ export type ApplicationServices =
   | AuthoringContentRepository
   | AuthoringSchemaRepository
   | AuthoringPresentationRepository
+  | PreviewTargetRepository
+  | PreviewHandoffRepository
+  | PreviewHandoffSigner
   | ToolingCursorSigner
   | ToolingOAuthTokenVerifier
   | ToolingPrincipalAuthenticator
@@ -204,6 +219,12 @@ const StudioContentCursorSignerLive = makeStudioContentCursorSignerLive({
   ...(env.CONTROL_PLANE_CURSOR_PREVIOUS_SECRET === undefined
     ? {}
     : { previousSecret: env.CONTROL_PLANE_CURSOR_PREVIOUS_SECRET }),
+});
+const PreviewHandoffSignerLive = makePreviewHandoffSignerLive({
+  activeSecret: env.PREVIEW_HANDOFF_SECRET ?? randomBytes(32).toString("base64url"),
+  ...(env.PREVIEW_HANDOFF_PREVIOUS_SECRET === undefined
+    ? {}
+    : { previousSecret: env.PREVIEW_HANDOFF_PREVIOUS_SECRET }),
 });
 const ToolingCursorSignerLive = makeToolingCursorSignerLive({
   activeSecret: deliveryCursorSecret,
@@ -264,6 +285,9 @@ const InfrastructureLive = Layer.mergeAll(
   AuthoringContentRepositoryLive,
   AuthoringSchemaRepositoryLive,
   AuthoringPresentationRepositoryLive,
+  PreviewTargetRepositoryLive,
+  PreviewHandoffRepositoryLive,
+  PreviewHandoffSignerLive,
   ToolingOAuthTokenVerifierLive,
   ToolingPrincipalAuthenticatorLive,
   StudioOAuthTokenVerifierLive,

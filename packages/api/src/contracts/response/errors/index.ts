@@ -157,6 +157,10 @@ export class PreviewRevisionIncompatibleFailure extends Schema.TaggedError<Previ
   "PreviewRevisionIncompatibleFailure",
 )("PreviewRevisionIncompatibleFailure", {}) {}
 
+export class PreviewTargetRequiredFailure extends Schema.TaggedError<PreviewTargetRequiredFailure>(
+  "PreviewTargetRequiredFailure",
+)("PreviewTargetRequiredFailure", {}) {}
+
 export class PreviewResponseTooLargeFailure extends Schema.TaggedError<PreviewResponseTooLargeFailure>(
   "PreviewResponseTooLargeFailure",
 )("PreviewResponseTooLargeFailure", {}) {}
@@ -208,6 +212,14 @@ export class ControlPlaneRequestTooLargeFailure extends Schema.TaggedError<Contr
 export class ControlPlaneResponseTooLargeFailure extends Schema.TaggedError<ControlPlaneResponseTooLargeFailure>(
   "ControlPlaneResponseTooLargeFailure",
 )("ControlPlaneResponseTooLargeFailure", {}) {}
+
+export class PresentationRoleVisibilityForbiddenFailure extends Schema.TaggedError<PresentationRoleVisibilityForbiddenFailure>(
+  "PresentationRoleVisibilityForbiddenFailure",
+)("PresentationRoleVisibilityForbiddenFailure", {}) {}
+
+export class PresentationScopeRestrictedFailure extends Schema.TaggedError<PresentationScopeRestrictedFailure>(
+  "PresentationScopeRestrictedFailure",
+)("PresentationScopeRestrictedFailure", {}) {}
 
 export class AuthoringStaleSchemaFailure extends Schema.TaggedError<AuthoringStaleSchemaFailure>(
   "AuthoringStaleSchemaFailure",
@@ -369,6 +381,9 @@ export type ApplicationError =
   | ControlPlaneCursorInvalidFailure
   | ControlPlaneRequestTooLargeFailure
   | ControlPlaneResponseTooLargeFailure
+  | PreviewTargetRequiredFailure
+  | PresentationRoleVisibilityForbiddenFailure
+  | PresentationScopeRestrictedFailure
   | AuthoringStaleSchemaFailure
   | AuthoringDraftConflictFailure
   | AuthoringPublicationConflictFailure
@@ -422,6 +437,9 @@ export const apiErrorHttpStatus = {
   PREVIEW_QUERY_INVALID: 400,
   PREVIEW_REVISION_INCOMPATIBLE: 409,
   PREVIEW_RESPONSE_TOO_LARGE: 413,
+  PREVIEW_TARGET_REQUIRED: 409,
+  PRESENTATION_ROLE_VISIBILITY_FORBIDDEN: 403,
+  PRESENTATION_SCOPE_RESTRICTED: 403,
   TOOLING_CURSOR_INVALID: 400,
   TOOLING_CONCURRENT_SCHEMA_CHANGE: 409,
   TOOLING_RESPONSE_TOO_LARGE: 413,
@@ -713,6 +731,12 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
         retryable: false,
         details: error.details,
       };
+    case "PreviewTargetRequiredFailure":
+      return {
+        code: "PREVIEW_TARGET_REQUIRED",
+        message: "Preview is off for this environment. A developer must set a Preview URL first.",
+        retryable: false,
+      };
     case "PreviewRevisionIncompatibleFailure":
       return {
         code: "PREVIEW_REVISION_INCOMPATIBLE",
@@ -859,6 +883,19 @@ export function toPublicError(error: ApplicationError): PublicErrorDefinition {
       return {
         code: "CONTROL_PLANE_RESPONSE_TOO_LARGE",
         message: "The Control Plane response exceeds the maximum size.",
+        retryable: false,
+      };
+    case "PresentationRoleVisibilityForbiddenFailure":
+      return {
+        code: "PRESENTATION_ROLE_VISIBILITY_FORBIDDEN",
+        message: "Only an owner or developer can change which roles see or edit a field.",
+        retryable: false,
+      };
+    case "PresentationScopeRestrictedFailure":
+      return {
+        code: "PRESENTATION_SCOPE_RESTRICTED",
+        message:
+          "Some fields in this form are hidden from your role. Ask a developer to change the layout.",
         retryable: false,
       };
     case "AuthoringStaleSchemaFailure":

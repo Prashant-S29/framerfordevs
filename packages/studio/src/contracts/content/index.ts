@@ -83,6 +83,7 @@ export interface StudioContentCapabilities {
   readonly canSaveLocalized: boolean;
   readonly canSaveShared: boolean;
   readonly canPublish: boolean;
+  readonly canPublishPresentation: boolean;
 }
 
 export interface StudioContentContextDto {
@@ -357,6 +358,9 @@ export type StudioContentBrowserErrorCode =
   | "REVISION_INCOMPATIBLE"
   | "PUBLICATION_INVALID"
   | "PUBLICATION_STATE_CONFLICT"
+  | "PRESENTATION_ROLE_VISIBILITY_FORBIDDEN"
+  | "PRESENTATION_SCOPE_RESTRICTED"
+  | "PUBLISHED_SCHEMA_REQUIRED"
   | "INVALID_CURSOR"
   | "STALE_CURSOR"
   | "REQUEST_TOO_LARGE"
@@ -459,12 +463,14 @@ function capabilities(value: unknown): StudioContentCapabilities {
       "canSaveLocalized",
       "canSaveShared",
       "canPublish",
+      "canPublishPresentation",
     ]) ||
     typeof value.canCreate !== "boolean" ||
     typeof value.canRename !== "boolean" ||
     typeof value.canSaveLocalized !== "boolean" ||
     typeof value.canSaveShared !== "boolean" ||
-    typeof value.canPublish !== "boolean"
+    typeof value.canPublish !== "boolean" ||
+    typeof value.canPublishPresentation !== "boolean"
   ) {
     throw new Error("STUDIO_CONTENT_RESPONSE_INVALID");
   }
@@ -474,6 +480,7 @@ function capabilities(value: unknown): StudioContentCapabilities {
     canSaveLocalized: value.canSaveLocalized,
     canSaveShared: value.canSaveShared,
     canPublish: value.canPublish,
+    canPublishPresentation: value.canPublishPresentation,
   };
 }
 
@@ -1364,6 +1371,9 @@ const contentErrorCodes = new Set<string>([
   "REVISION_INCOMPATIBLE",
   "PUBLICATION_INVALID",
   "PUBLICATION_STATE_CONFLICT",
+  "PRESENTATION_ROLE_VISIBILITY_FORBIDDEN",
+  "PRESENTATION_SCOPE_RESTRICTED",
+  "PUBLISHED_SCHEMA_REQUIRED",
   "INVALID_CURSOR",
   "STALE_CURSOR",
   "REQUEST_TOO_LARGE",
@@ -1407,6 +1417,9 @@ function validFailureStatus(code: StudioContentBrowserErrorCode, status: number)
     REVISION_INCOMPATIBLE: [409],
     PUBLICATION_INVALID: [422],
     PUBLICATION_STATE_CONFLICT: [409],
+    PRESENTATION_ROLE_VISIBILITY_FORBIDDEN: [403],
+    PRESENTATION_SCOPE_RESTRICTED: [403],
+    PUBLISHED_SCHEMA_REQUIRED: [409],
     INVALID_CURSOR: [400],
     STALE_CURSOR: [409],
     REQUEST_TOO_LARGE: [413],
@@ -1526,6 +1539,14 @@ function failure(
 }
 
 type Decoder<T> = (value: unknown) => T;
+
+export function decodeStudioContentEnvelope<T>(
+  value: unknown,
+  status: number,
+  decodeData: (value: unknown) => T,
+): T | StudioContentBrowserFailure {
+  return envelope(value, status, decodeData);
+}
 
 function envelope<T>(
   value: unknown,
@@ -2082,5 +2103,6 @@ export const studioContentBrowserLimits = {
   maximumResolvedEntries: 100,
   mutationRequestBytes: 1 * 1_024 * 1_024,
   commandRequestBytes: 4 * 1_024,
+  presentationRequestBytes: 256 * 1_024,
   historyPageLimit: 20,
 } as const;

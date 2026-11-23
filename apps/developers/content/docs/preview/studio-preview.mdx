@@ -1,0 +1,66 @@
+---
+title: Studio Preview
+description: Show your rendered site inside the Studio for the current draft or any revision.
+---
+
+{/* Explains the server-to-server Preview handoff between the Studio and a developer renderer. */}
+
+The Studio can show your own site inside a sandboxed frame. Editors see the last saved draft, or any revision from history, rendered by your code.
+
+## How the Handoff Works
+
+1. The editor opens Preview in the Studio.
+2. The Studio server issues a five-minute handoff token for the exact entry, locale, and source.
+3. The Studio server posts the token to your Preview URL as the `token` form field. The token never reaches Studio JavaScript, a URL, or a Referer header.
+4. Your server reads the entry with the token and renders it.
+
+## Set the Preview URL
+
+An owner or developer sets one Preview URL for each environment. The URL must use HTTPS, or plain HTTP on `localhost`, and must have a path with no query. It must not share the Studio origin.
+
+```bash
+ffd preview target set --api https://api.example.com --project PROJECT_ID \
+  --environment-id ENVIRONMENT_ID --url https://www.example.com/api/ffd-preview --json
+```
+
+Pass the same URL as `previewUrl` when you create the Studio handler. The Studio then allows only that origin in its frame policy, and refuses to post a token if the URL on the server differs.
+
+```ts
+createStudioFetchHandler({
+  // existing Studio configuration
+  previewUrl: "https://www.example.com/api/ffd-preview",
+});
+```
+
+Each change to the Preview URL increments its version. Tokens issued before the change stop working. `ffd preview target clear` turns Studio Preview off.
+
+## Handle the Preview Request
+
+Your Preview route receives a form POST. Read the token on your server and load the entry with the SDK.
+
+```ts
+import { previewHandoffV1 } from "@framerfordevs/sdk";
+
+const preview = previewHandoffV1({ baseUrl: "https://api.example.com" });
+
+export async function POST(request: Request) {
+  const form = await request.formData();
+  const token = form.get("token");
+  if (typeof token !== "string") return new Response("Bad request", { status: 400 });
+  const result = await preview.read(token);
+  if (result.body === null || !result.body.ok)
+    return new Response("Preview unavailable", { status: 401 });
+  // Store what you need in your own short preview session, then render or redirect.
+  return renderPreview(result.body.data);
+}
+```
+
+The response is the same `PreviewItem` that Preview v1 returns. It names the collection, entry, locale, and source, so your route can pick the page to render.
+
+## Test Without the Studio
+
+`ffd entry preview` prints a handoff token. Post it to your route to test the renderer.
+
+```bash
+ffd entry preview --collection articles --entry ENTRY_ID --locale en --json
+```

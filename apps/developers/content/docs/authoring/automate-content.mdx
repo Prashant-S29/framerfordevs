@@ -63,16 +63,19 @@ Promise and Effect clients recursively validate requests and responses, reject r
 
 ## Grant only required authority
 
-| Workflow                                       | OAuth grant                 | Management permission                               |
-| ---------------------------------------------- | --------------------------- | --------------------------------------------------- |
-| Read forms, Presentation metadata, and entries | `authoring:read`            | `schema.read` or `content.read`, by operation       |
-| List, read, or compare revisions               | `authoring:read`            | `content.read`                                      |
-| CLI schema plan/apply or Presentation publish  | `authoring:schema:push`     | `schema.read`, `schema.write`, and `schema.publish` |
-| Create, rename, or save drafts                 | `authoring:draft:write`     | `content.write`                                     |
-| Restore a revision                             | `authoring:draft:write`     | `content.write`                                     |
-| Publish or unpublish content                   | `authoring:content:publish` | `content.publish`                                   |
+| Workflow                                       | OAuth grant                      | Management permission                               |
+| ---------------------------------------------- | -------------------------------- | --------------------------------------------------- |
+| Read forms, Presentation metadata, and entries | `authoring:read`                 | `schema.read` or `content.read`, by operation       |
+| List, read, or compare revisions               | `authoring:read`                 | `content.read`                                      |
+| CLI schema plan/apply                          | `authoring:schema:push`          | `schema.read`, `schema.write`, and `schema.publish` |
+| Presentation publish                           | `authoring:presentation:publish` | `schema.read`, `schema.write`, and `schema.publish` |
+| Create, rename, or save drafts                 | `authoring:draft:write`          | `content.write`                                     |
+| Restore a revision                             | `authoring:draft:write`          | `content.write`                                     |
+| Publish or unpublish content                   | `authoring:content:publish`      | `content.publish`                                   |
 
 Credential writes are audited as the credential, not as the user who issued it.
+
+A signed-in user with the `presentation.publish` permission can also publish Presentation. Owners, developers, and content administrators have it. If the user does not also have `schema.write` and `schema.publish`, the server accepts only editorial changes: labels, help text, placeholders, order, tabs, and groups. A publish that changes which roles can see or edit a field fails with `PRESENTATION_ROLE_VISIBILITY_FORBIDDEN`. If a field or layout node is hidden from the user's role, the publish fails with `PRESENTATION_SCOPE_RESTRICTED`. Management credentials always need the three schema permissions.
 
 ## Trusted-process requirement
 

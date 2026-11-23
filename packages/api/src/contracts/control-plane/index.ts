@@ -83,6 +83,31 @@ function isCanonicalStudioOrigin(value: string): boolean {
   }
 }
 
+function isCanonicalPreviewUrl(value: string): boolean {
+  if (utf8Length(value) > 2_048 || hasControlCharacter(value) || value.includes("\\")) {
+    return false;
+  }
+  try {
+    const url = new URL(value);
+    if (
+      url.username !== "" ||
+      url.password !== "" ||
+      url.search !== "" ||
+      url.hash !== "" ||
+      value.includes("?") ||
+      value.includes("#") ||
+      url.hostname.includes("*") ||
+      url.href !== value ||
+      !isCanonicalStudioOrigin(url.origin)
+    ) {
+      return false;
+    }
+    return url.pathname.startsWith("/") && !/\s/u.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
 function isCanonicalMountPath(value: string): boolean {
   if (
     utf8Length(value) > 240 ||
@@ -137,6 +162,8 @@ export const ControlPlaneCommandOperation = Schema.Literals([
   "studio_registration.runtime.set",
   "project_locale.create",
   "invalidation_mapping.create",
+  "preview_target.put",
+  "preview_target.clear",
 ]);
 export type ControlPlaneCommandOperation = typeof ControlPlaneCommandOperation.Type;
 
@@ -168,6 +195,16 @@ export const StudioApplicationOrigin = Schema.String.check(
   }),
 ).pipe(Schema.brand("StudioApplicationOrigin"));
 export type StudioApplicationOrigin = typeof StudioApplicationOrigin.Type;
+
+export const PreviewTargetUrl = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(2_048),
+  Schema.makeFilter(isCanonicalPreviewUrl, {
+    message:
+      "Use a canonical HTTPS URL, or an explicit loopback HTTP URL, with a path and no query.",
+  }),
+).pipe(Schema.brand("PreviewTargetUrl"));
+export type PreviewTargetUrl = typeof PreviewTargetUrl.Type;
 
 export const StudioMountPath = Schema.String.check(
   Schema.isMinLength(1),
@@ -594,6 +631,39 @@ export class ControlPlaneEnableCapabilityResult extends Schema.Class<ControlPlan
   replayed: Schema.Boolean,
 }) {}
 
+export class EnvironmentPreviewTarget extends Schema.Class<EnvironmentPreviewTarget>(
+  "EnvironmentPreviewTarget",
+)({
+  projectId: ProjectId,
+  environmentId: EnvironmentId,
+  previewUrl: Schema.NullOr(PreviewTargetUrl),
+  version: ResourceVersion,
+  updatedAt: IsoDateTime,
+}) {}
+
+export const ControlPlanePutPreviewTargetRequest = Schema.Struct({
+  commandId: ControlPlaneCommandId,
+  expectedVersion: Schema.NullOr(ResourceVersion),
+  previewUrl: PreviewTargetUrl,
+}).annotate({ identifier: "ControlPlanePutPreviewTargetRequest" });
+export type ControlPlanePutPreviewTargetRequest = typeof ControlPlanePutPreviewTargetRequest.Type;
+
+export const ControlPlaneClearPreviewTargetRequest = Schema.Struct({
+  commandId: ControlPlaneCommandId,
+  expectedVersion: ResourceVersion,
+}).annotate({ identifier: "ControlPlaneClearPreviewTargetRequest" });
+export type ControlPlaneClearPreviewTargetRequest =
+  typeof ControlPlaneClearPreviewTargetRequest.Type;
+
+export class ControlPlanePreviewTargetResult extends Schema.Class<ControlPlanePreviewTargetResult>(
+  "ControlPlanePreviewTargetResult",
+)({
+  target: EnvironmentPreviewTarget,
+  created: Schema.Boolean,
+  replayed: Schema.Boolean,
+  noOp: Schema.Boolean,
+}) {}
+
 export class ControlPlanePutStudioRegistrationResult extends Schema.Class<ControlPlanePutStudioRegistrationResult>(
   "ControlPlanePutStudioRegistrationResult",
 )({
@@ -675,6 +745,8 @@ export const ControlPlaneEnableCapabilityResponse = ApiSuccessSchema(
   ControlPlaneEnableCapabilityResult,
 );
 export const StudioRegistrationResponse = ApiSuccessSchema(StudioRegistration);
+export const EnvironmentPreviewTargetResponse = ApiSuccessSchema(EnvironmentPreviewTarget);
+export const ControlPlanePreviewTargetResponse = ApiSuccessSchema(ControlPlanePreviewTargetResult);
 export const ControlPlanePutStudioRegistrationResponse = ApiSuccessSchema(
   ControlPlanePutStudioRegistrationResult,
 );

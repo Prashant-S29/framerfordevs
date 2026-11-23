@@ -71,6 +71,10 @@ import {
   ControlPlaneWorkspacePageResponse,
   ControlPlaneWorkspaceResponse,
   StudioRegistrationResponse,
+  EnvironmentPreviewTargetResponse,
+  ControlPlanePreviewTargetResponse,
+  ControlPlanePutPreviewTargetRequest,
+  ControlPlaneClearPreviewTargetRequest,
 } from "..";
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -132,6 +136,10 @@ function schemaComponents() {
     ["StudioRegistrationResponse", StudioRegistrationResponse],
     ["ControlPlanePutStudioRegistrationRequest", ControlPlanePutStudioRegistrationRequest],
     ["ControlPlanePutStudioRegistrationResponse", ControlPlanePutStudioRegistrationResponse],
+    ["EnvironmentPreviewTargetResponse", EnvironmentPreviewTargetResponse],
+    ["ControlPlanePutPreviewTargetRequest", ControlPlanePutPreviewTargetRequest],
+    ["ControlPlaneClearPreviewTargetRequest", ControlPlaneClearPreviewTargetRequest],
+    ["ControlPlanePreviewTargetResponse", ControlPlanePreviewTargetResponse],
     ["ControlPlaneSetStudioRuntimeRequest", ControlPlaneSetStudioRuntimeRequest],
     ["ControlPlaneSetStudioRuntimeResponse", ControlPlaneSetStudioRuntimeResponse],
     ["ControlPlaneGovernanceResponse", ControlPlaneGovernanceResponse],
@@ -1281,6 +1289,46 @@ export const controlPlaneOpenApiDocument = {
         },
       },
       options: denyPreflight("denyControlPlaneStudioRegistrationPreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/preview-target": {
+      get: {
+        operationId: "getControlPlanePreviewTarget",
+        summary: "Get the Preview URL that the Studio frames for this environment",
+        security: exactRead,
+        parameters: [projectParameter, environmentParameter],
+        responses: {
+          "200": successResponse("EnvironmentPreviewTargetResponse", "Preview target."),
+          ...commonFailures,
+        },
+      },
+      put: {
+        operationId: "putControlPlanePreviewTarget",
+        summary: "Create or update the Preview URL for this environment",
+        description:
+          "The URL must use HTTPS, or HTTP on an exact loopback host, and carry a path with no query or fragment. Each change increments the version, so Preview handoff tokens bound to an earlier version stop working.",
+        security: exactWrite,
+        parameters: [projectParameter, environmentParameter],
+        requestBody: jsonBody("ControlPlanePutPreviewTargetRequest"),
+        responses: {
+          "200": successResponse("ControlPlanePreviewTargetResponse", "Preview target result."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlanePreviewTargetPreflight"),
+    },
+    "/projects/{projectId}/environments/{environmentId}/preview-target/clear": {
+      post: {
+        operationId: "clearControlPlanePreviewTarget",
+        summary: "Clear the Preview URL and turn Studio Preview off for this environment",
+        security: exactWrite,
+        parameters: [projectParameter, environmentParameter],
+        requestBody: jsonBody("ControlPlaneClearPreviewTargetRequest"),
+        responses: {
+          "200": successResponse("ControlPlanePreviewTargetResponse", "Preview target result."),
+          ...commonFailures,
+        },
+      },
+      options: denyPreflight("denyControlPlanePreviewTargetClearPreflight"),
     },
   },
   components: {

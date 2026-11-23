@@ -63,7 +63,7 @@ test("mounted Studio lists history, opens a read-only revision, and compares it 
   await expect(history.getByText("Changed Field 1").first()).toBeVisible();
   await expect(history.getByText(/^You ·/u).first()).toBeVisible();
 
-  await page.getByRole("button", { name: "View revision 1" }).click();
+  await page.getByRole("button", { name: "View revision 1", exact: true }).click();
   const viewDialog = page.getByRole("dialog", { name: "Revision 1" });
   await expect(viewDialog.getByText("First value")).toBeVisible();
   await page.keyboard.press("Escape");
@@ -125,6 +125,7 @@ test("mounted Studio restores a revision after confirmation and unpublishes one 
   await expect(page.getByText(/Delivery no longer serves this entry in English/u)).toBeVisible();
   await expect(publicationBadge(page)).toHaveText("Publication status: Unpublished");
   await expect(page.getByRole("button", { name: "Unpublish English" })).toHaveCount(0);
+  await expect(unpublishDialog).toBeHidden();
 
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);

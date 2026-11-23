@@ -163,6 +163,17 @@ describe("content CLI pre-auth input", () => {
       expect(restore.revision).toMatchObject({ scope: "localized", revisionId });
       const validate = await prepare(["entry", "validate", ...entryFlags]);
       expect(validate.command).toBe("entry validate");
+      const current = await prepare(["entry", "preview", ...entryFlags]);
+      expect(current.command).toBe("entry preview");
+      expect(current.revision.revisionId).toBeUndefined();
+      const historical = await prepare([
+        "entry",
+        "preview",
+        ...entryFlags,
+        "--revision",
+        revisionId,
+      ]);
+      expect(historical.revision.revisionId).toBe(revisionId);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -189,6 +200,9 @@ describe("content CLI pre-auth input", () => {
         ["entry", "validate", ...entryFlags, "--revision", revisionId],
         ["entry", "validate", "--collection", "posts", "--locale", "en-US"],
         ["entry", "publish", ...entryFlags, "--scope", "shared"],
+        ["entry", "preview", "--collection", "posts", "--locale", "en-US"],
+        ["entry", "preview", ...entryFlags, "--revision", "not-a-uuid"],
+        ["entry", "preview", ...entryFlags, "--scope", "shared"],
       ];
       for (const arguments_ of invalidCommands) {
         const exit = await Effect.runPromiseExit(prepareContentCommand(arguments_, root));

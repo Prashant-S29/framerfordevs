@@ -90,8 +90,9 @@ describe("Studio Content nested collection gate", () => {
       "validate",
       "publish",
       "unpublish",
+      "preview",
     ]);
-    assert.strictEqual(new Set(studioNestedCollectionOperations).size, 17);
+    assert.strictEqual(new Set(studioNestedCollectionOperations).size, 18);
   });
 
   it.effect("rejects excess properties on every mutation request", () =>
@@ -302,6 +303,7 @@ describe("Studio Content nested collection gate", () => {
         canWriteLocalized: true,
         canWriteShared: true,
         canPublish: true,
+        canPublishPresentation: true,
       });
       let authorizationCalls = 0;
       let draftCalls = 0;

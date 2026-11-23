@@ -57,6 +57,7 @@ export interface StudioHistoryPanelProps {
   readonly dirty: boolean;
   readonly onRestored: (message: string) => Promise<unknown>;
   readonly onReloadLatest: () => Promise<unknown>;
+  readonly onPreview?: (revision: StudioRevisionSummaryDto) => void;
 }
 
 function formatTime(value: string): string {
@@ -156,6 +157,15 @@ function RevisionList(props: RevisionListProps) {
                 <Button type="button" variant="outline" onClick={() => props.onView(revision)}>
                   View revision {revision.sequence}
                 </Button>
+                {props.onPreview === undefined ? null : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => props.onPreview?.(revision)}
+                  >
+                    Preview revision {revision.sequence}
+                  </Button>
+                )}
                 {head !== null && revision.id !== head ? (
                   <Button type="button" variant="outline" onClick={() => props.onCompare(revision)}>
                     Compare revision {revision.sequence} with current draft

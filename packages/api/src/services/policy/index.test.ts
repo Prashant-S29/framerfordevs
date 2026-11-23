@@ -47,6 +47,7 @@ const expectedAllowedActions = {
     "schema.read",
     "schema.write",
     "schema.publish",
+    "presentation.publish",
     "delivery.configure",
     "content.read",
     "content.write",
@@ -59,6 +60,7 @@ const expectedAllowedActions = {
     "project.read",
     "locale.read",
     "schema.read",
+    "presentation.publish",
     "content.read",
     "content.write",
     "content.review",
@@ -431,6 +433,7 @@ describe("PolicyService", () => {
     assert.notIncludeMembers(projection.effectiveProjectActions, [
       "schema.write",
       "schema.publish",
+      "presentation.publish",
       "delivery.configure",
       "webhook.read",
       "webhook.manage",

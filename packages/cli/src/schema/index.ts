@@ -357,6 +357,8 @@ export const ControlPlaneMutationOperation = Schema.Literals([
   "project_locale.create",
   "invalidation_mapping.create",
   "webhook.delivery.replay",
+  "preview_target.put",
+  "preview_target.clear",
 ]);
 export type ControlPlaneMutationOperation = typeof ControlPlaneMutationOperation.Type;
 

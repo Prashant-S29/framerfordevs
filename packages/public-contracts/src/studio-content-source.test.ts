@@ -42,11 +42,16 @@ describe("Studio Content contract source", () => {
         "validateStudioEntryPublication",
         "publishStudioEntry",
         "unpublishStudioEntry",
+        "getStudioPresentation",
+        "publishStudioPresentation",
+        "issueStudioPreviewHandoff",
       ].toSorted(),
     );
     expect(first).toContain("REVISION_INCOMPATIBLE");
     expect(first).toContain("PUBLICATION_STATE_CONFLICT");
     expect(first).toContain("PUBLICATION_INVALID");
+    expect(first).toContain("PRESENTATION_ROLE_VISIBILITY_FORBIDDEN");
+    expect(first).not.toContain("visibleToRoles");
     expect(first).not.toContain("access_token");
   });
 });

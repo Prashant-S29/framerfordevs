@@ -85,6 +85,7 @@ import {
   publishAuthoringPresentation,
   renameAuthoringEntry,
   restoreAuthoringEntryRevision,
+  issueAuthoringPreviewHandoff,
   saveAuthoringEntryDraft,
   unpublishAuthoringEntry,
   validateAuthoringPublication,
@@ -94,6 +95,7 @@ import {
   compareStudioEntryRevisions,
   createStudioEntry,
   decodeStudioCollectionLocaleScope,
+  decodeStudioCollectionScope,
   decodeStudioContentScope,
   decodeStudioCreateEntryRequest,
   decodeStudioEntryId,
@@ -101,6 +103,7 @@ import {
   decodeStudioListPublicationsQuery,
   decodeStudioListRevisionsQuery,
   decodeStudioPublishEntryRequest,
+  decodeStudioPublishPresentationRequest,
   decodeStudioRenameEntryRequest,
   decodeStudioResolveEntriesRequest,
   decodeStudioRestoreRevisionRequest,
@@ -114,9 +117,12 @@ import {
   getStudioEntryRevision,
   getStudioEntryWorkspace,
   getStudioNewEntryWorkspace,
+  getStudioPresentation,
   listStudioEntryPublications,
   listStudioEntryRevisions,
   publishStudioEntry,
+  publishStudioPresentation,
+  issueStudioPreviewHandoff,
   renameStudioEntry,
   resolveStudioEntryLabels,
   restoreStudioEntryRevision,
@@ -159,6 +165,10 @@ import {
   makeCurrentPreviewRouteScope,
   makeRevisionPreviewRouteScope,
 } from "@framerfordevs/api/operations/preview/public";
+import {
+  decodePreviewHandoffRequest,
+  readPreviewHandoff,
+} from "@framerfordevs/api/operations/preview-handoff";
 import {
   authenticateDeliveryRequest,
   evaluateDeliveryGlobalRateLimit,
@@ -765,21 +775,7 @@ function createDeliveryRouter(deliveryApiEnabled: boolean): Router {
   return router;
 }
 
-const previewAllowedHeaders = new Set(["authorization", "traceparent", "x-request-id"]);
-const previewExposedHeaders = [
-  "Cache-Control",
-  "X-Request-Id",
-  "RateLimit-Limit",
-  "RateLimit-Remaining",
-  "RateLimit-Reset",
-  "Retry-After",
-].join(", ");
-
 function setPreviewHeaders(res: Response): void {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Authorization, Traceparent, X-Request-Id");
-  res.setHeader("Access-Control-Expose-Headers", previewExposedHeaders);
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "no-referrer");
 }
@@ -926,33 +922,22 @@ function createPreviewRouter(previewApiEnabled: boolean): Router {
   const router = express.Router();
   router.use((req, res, next) => {
     setPreviewHeaders(res);
-    if (req.method !== "OPTIONS") {
+    const specificationRoute = req.path === "/openapi.json" || req.path === "/docs";
+    if (specificationRoute || (req.method !== "OPTIONS" && req.headers.origin === undefined)) {
       next();
       return;
     }
-    const requestedMethod = req.headers["access-control-request-method"]?.toUpperCase();
-    const requestedHeaders = (req.headers["access-control-request-headers"] ?? "")
-      .split(",")
-      .map((header) => header.trim().toLowerCase())
-      .filter(Boolean);
-    if (
-      (requestedMethod !== undefined && requestedMethod !== "GET" && requestedMethod !== "HEAD") ||
-      requestedHeaders.some((header) => !previewAllowedHeaders.has(header))
-    ) {
-      sendPreviewResponse(
-        req,
-        res,
-        403,
-        apiFailure({
-          code: "FORBIDDEN",
-          message: "The requested Preview preflight is not allowed.",
-          requestId: requestContext(req).requestId,
-          retryable: false,
-        }),
-      );
-      return;
-    }
-    res.status(204).end();
+    sendPreviewResponse(
+      req,
+      res,
+      403,
+      apiFailure({
+        code: "FORBIDDEN",
+        message: "Preview accepts only server-to-server requests without a browser Origin.",
+        requestId: requestContext(req).requestId,
+        retryable: false,
+      }),
+    );
   });
 
   router.get("/openapi.json", (_req, res) => {
@@ -970,6 +955,46 @@ function createPreviewRouter(previewApiEnabled: boolean): Router {
       url: "/api/preview/v1/openapi.json",
     }),
   );
+
+  const handoffHandler = async (req: Request, res: Response) => {
+    const context = createContext({ req });
+    if (!previewApiEnabled) {
+      sendPreviewResponse(
+        req,
+        res,
+        503,
+        apiFailure({
+          code: "SERVICE_UNAVAILABLE",
+          message: "The service is temporarily unavailable.",
+          requestId: context.request.requestId,
+          retryable: true,
+        }),
+      );
+      return;
+    }
+    if ((req.originalUrl.split("?", 2)[1] ?? "") !== "") {
+      sendPreviewResponse(
+        req,
+        res,
+        400,
+        apiFailure({
+          code: "VALIDATION_ERROR",
+          message: "The Preview handoff read does not accept query parameters.",
+          requestId: context.request.requestId,
+          retryable: false,
+        }),
+      );
+      return;
+    }
+    const result = await context.execute(
+      "api.preview.handoff",
+      readPreviewHandoff(req.headers.authorization ?? null, context.request.requestId),
+      "Preview entry loaded from a handoff.",
+    );
+    sendPreviewResponse(req, res, result.status, result.response);
+  };
+  router.get("/handoff", handoffHandler);
+  router.head("/handoff", handoffHandler);
 
   const entryPath =
     "/projects/:projectId/environments/:environmentKey/collections/:collectionKey/entries/:entryId";
@@ -1031,7 +1056,7 @@ function createPreviewRouter(previewApiEnabled: boolean): Router {
   router.head(`${entryPath}/revisions/:schemaRevisionId`, revisionHandler);
 
   router.use((req, res) => {
-    res.setHeader("Allow", "GET, HEAD, OPTIONS");
+    res.setHeader("Allow", "GET, HEAD");
     sendPreviewResponse(
       req,
       res,
@@ -1445,11 +1470,13 @@ function createStudioContentRouter(transformEffect?: ApplicationEffectTransform)
       ? studioContentLimits.searchRequestBytes
       : req.path.endsWith("/entries/resolve")
         ? studioContentLimits.resolveRequestBytes
-        : /\/entries\/[^/]+\/(?:revisions\/[^/]+\/restore|publication\/(?:validate|publish|unpublish))$/u.test(
+        : /\/entries\/[^/]+\/(?:revisions\/[^/]+\/restore|publication\/(?:validate|publish|unpublish)|preview-handoffs)$/u.test(
               req.path,
             )
           ? studioContentLimits.commandRequestBytes
-          : studioContentLimits.requestBytes;
+          : req.path.endsWith("/presentation/publish")
+            ? studioContentLimits.presentationRequestBytes
+            : studioContentLimits.requestBytes;
     if (
       req.headers["transfer-encoding"] !== undefined ||
       (typeof contentLength === "string" &&
@@ -1596,6 +1623,78 @@ function createStudioContentRouter(transformEffect?: ApplicationEffectTransform)
     if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
     else sendStudioContentSuccess(req, res, result.response);
   });
+
+  const presentationPath =
+    "/projects/:projectId/environments/:environmentId/collections/:collectionId/presentation";
+  const decodeCollectionScope = async (req: Request, res: Response, context: Context) => {
+    const result = await context.execute(
+      "api.studio_content.presentation.scope",
+      decodeStudioCollectionScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+        routeParameter(req, "collectionId"),
+      ),
+      "Studio Content collection scope decoded.",
+    );
+    if (!result.response.ok) {
+      sendStudioResponse(req, res, result.status, result.response);
+      return null;
+    }
+    return result.response.data;
+  };
+
+  router.get(presentationPath, async (req, res) => {
+    const context = makeContext(req);
+    const principal = await authenticate(req, res, context);
+    if (principal === null) return;
+    const scope = await decodeCollectionScope(req, res, context);
+    if (scope === null) return;
+    const result = await context.execute(
+      "api.studio_content.presentation.get",
+      getStudioPresentation(principal, scope),
+      "Studio form layout loaded.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.post(
+    `${presentationPath}/publish`,
+    express.json({
+      limit: studioContentLimits.presentationRequestBytes,
+      strict: true,
+      type: "application/json",
+    }),
+    async (req, res) => {
+      const context = makeContext(req);
+      const principal = await authenticate(req, res, context);
+      if (principal === null) return;
+      const scope = await decodeCollectionScope(req, res, context);
+      if (scope === null) return;
+      const request = await context.execute(
+        "api.studio_content.presentation.publish.request",
+        decodeStudioPublishPresentationRequest(req.body),
+        "Studio form layout request decoded.",
+      );
+      if (!request.response.ok) {
+        sendStudioResponse(req, res, request.status, request.response);
+        return;
+      }
+      const result = await context.execute(
+        "api.studio_content.presentation.publish",
+        publishStudioPresentation(
+          principal,
+          scope,
+          request.response.data,
+          new Date(),
+          context.request.requestId,
+        ),
+        "Studio form layout published.",
+      );
+      if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+      else sendStudioContentSuccess(req, res, result.response);
+    },
+  );
 
   const entriesPath =
     "/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries";
@@ -1956,6 +2055,34 @@ function createStudioContentRouter(transformEffect?: ApplicationEffectTransform)
         new Date(),
       ),
       "Studio Content revision loaded.",
+    );
+    if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
+    else sendStudioContentSuccess(req, res, result.response);
+  });
+
+  router.post(`${entryPath}/preview-handoffs`, commandBody, async (req, res) => {
+    const context = makeContext(req);
+    const target = await authorizedEntry(req, res, context);
+    if (target === null) return;
+    const request = await decodeBody(
+      req,
+      res,
+      context,
+      "api.studio_content.preview.handoff.request",
+      decodePreviewHandoffRequest(req.body),
+    );
+    if (request === null) return;
+    const result = await context.execute(
+      "api.studio_content.preview.handoff",
+      issueStudioPreviewHandoff(
+        target.principal,
+        target.scope,
+        target.entryId,
+        request,
+        new Date(),
+        context.request.requestId,
+      ),
+      "Studio Preview handoff issued.",
     );
     if (!result.response.ok) sendStudioResponse(req, res, result.status, result.response);
     else sendStudioContentSuccess(req, res, result.response);
@@ -3473,6 +3600,33 @@ function createAuthoringRouter(transformEffect?: ApplicationEffectTransform): Ro
         context.request.requestId,
       ),
       "Authoring entry revision restored.",
+    );
+    sendAuthoringResponse(req, res, result.status, result.response);
+  });
+
+  router.post(`${entryPath}/preview-handoffs`, async (req, res) => {
+    const context = createContext({ req });
+    const prepared = await prepareEntryScope(
+      req,
+      res,
+      context,
+      2,
+      authoringContentReadBearerRequirement,
+    );
+    if (prepared === undefined) return;
+    const result = await context.execute(
+      "api.authoring.preview.handoff",
+      Effect.flatMap(decodePreviewHandoffRequest(req.body), (body) =>
+        issueAuthoringPreviewHandoff(
+          prepared.principal,
+          prepared.project,
+          prepared.scope,
+          routeParameter(req, "entryId"),
+          body,
+          context.request.requestId,
+        ),
+      ),
+      "Authoring Preview handoff issued.",
     );
     sendAuthoringResponse(req, res, result.status, result.response);
   });

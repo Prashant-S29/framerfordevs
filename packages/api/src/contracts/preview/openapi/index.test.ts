@@ -8,12 +8,15 @@ const revisionPath =
   "/projects/{projectId}/environments/{environmentKey}/collections/{collectionKey}/entries/{entryId}/revisions/{schemaRevisionId}";
 
 describe("Preview OpenAPI", () => {
-  it("publishes only the two exact Preview source routes and tenant-neutral docs", () => {
+  it("publishes the two exact Preview source routes, the handoff route, and tenant-neutral docs", () => {
     expect(previewOpenApiDocument.openapi).toBe("3.1.0");
     expect(previewOpenApiDocument.info.title).toBe("Framer for Devs Preview API");
     expect(Object.keys(previewOpenApiDocument.paths).sort()).toEqual(
-      [currentPath, revisionPath].sort(),
+      ["/handoff", currentPath, revisionPath].sort(),
     );
+    expect(previewOpenApiDocument.paths["/handoff"].get.security).toEqual([
+      { previewHandoffBearer: [] },
+    ]);
     expect(Object.keys(previewOpenApiDocument.paths[currentPath]).sort()).toEqual([
       "get",
       "head",
@@ -24,6 +27,7 @@ describe("Preview OpenAPI", () => {
     expect(serialized).not.toContain("delivery.read");
     expect(serialized).not.toContain("Better Auth");
     expect(serialized).not.toContain("ffd_prev_example");
+    expect(serialized).not.toContain("Access-Control-Allow-Origin");
   });
 
   it("requires bearer Preview authority and explicit historical selectors", () => {

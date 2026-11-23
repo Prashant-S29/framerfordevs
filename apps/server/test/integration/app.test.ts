@@ -427,7 +427,7 @@ describe("Authoring HTTP isolation", () => {
     expect(specification.headers["access-control-allow-credentials"]).toBeUndefined();
     expect(specification.headers["x-content-type-options"]).toBe("nosniff");
     expect(specification.body.info.title).toBe("Framer for Developers Authoring API");
-    expect(Object.keys(specification.body.paths)).toHaveLength(16);
+    expect(Object.keys(specification.body.paths)).toHaveLength(17);
     expect(JSON.stringify(specification.body)).not.toContain("workspaceId");
     expect(JSON.stringify(specification.body)).not.toContain("credentialId");
     expect(reference.status).toBe(200);
@@ -750,40 +750,32 @@ describe("Preview HTTP isolation", () => {
     const reference = await request(app).get("/api/preview/v1/docs");
 
     expect(specification.status).toBe(200);
-    expect(specification.headers["access-control-allow-origin"]).toBe("*");
+    expect(specification.headers["access-control-allow-origin"]).toBeUndefined();
     expect(specification.headers["access-control-allow-credentials"]).toBeUndefined();
     expect(specification.headers["referrer-policy"]).toBe("no-referrer");
     expect(specification.text).toBe(expectedPublicArtifact("preview/v1"));
     expect(specification.body.info.title).toBe("Framer for Devs Preview API");
-    expect(Object.keys(specification.body.paths)).toHaveLength(2);
+    expect(Object.keys(specification.body.paths)).toHaveLength(3);
     expect(JSON.stringify(specification.body)).not.toContain("DELIVERY_CURSOR_STALE");
     expect(reference.status).toBe(200);
     expect(reference.text).toContain("Framer for Devs Preview API");
     expect(reference.text).toContain("/api/preview/v1/openapi.json");
   });
 
-  it("validates wildcard non-credentialed Preview preflight without authentication", async () => {
-    const allowed = await request(app)
+  it("rejects every Preview preflight and browser-origin request without authentication", async () => {
+    const preflight = await request(app)
       .options(path)
       .set("Origin", "https://consumer.example")
       .set("Access-Control-Request-Method", "GET")
       .set("Access-Control-Request-Headers", "Authorization, Traceparent, X-Request-Id");
-    const deniedHeader = await request(app)
-      .options(path)
-      .set("Access-Control-Request-Method", "GET")
-      .set("Access-Control-Request-Headers", "Cookie");
-    const deniedMethod = await request(app)
-      .options(path)
-      .set("Access-Control-Request-Method", "POST");
+    const browser = await request(app).get(path).set("Origin", "https://consumer.example");
 
-    expect(allowed.status).toBe(204);
-    expect(allowed.headers["access-control-allow-origin"]).toBe("*");
-    expect(allowed.headers["access-control-allow-headers"]).toBe(
-      "Authorization, Traceparent, X-Request-Id",
-    );
-    expect(deniedHeader.status).toBe(403);
-    expect(deniedHeader.body.error.code).toBe("FORBIDDEN");
-    expect(deniedMethod.status).toBe(403);
+    for (const response of [preflight, browser]) {
+      expect(response.status).toBe(403);
+      expect(response.body.error.code).toBe("FORBIDDEN");
+      expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+      expect(response.headers["www-authenticate"]).toBeUndefined();
+    }
   });
 
   it("keeps Preview content disabled behind its independent rollout gate", async () => {
@@ -812,7 +804,7 @@ describe("Preview HTTP isolation", () => {
       expect(response.status).toBe(401);
       expect(response.headers["www-authenticate"]).toBe('Bearer realm="preview"');
       expect(response.headers["cache-control"]).toBe("private, no-store, max-age=0");
-      expect(response.headers["access-control-allow-origin"]).toBe("*");
+      expect(response.headers["access-control-allow-origin"]).toBeUndefined();
       expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
       expect(response.headers.etag).toBeUndefined();
     }
@@ -832,7 +824,7 @@ describe("Preview HTTP isolation", () => {
     expect(head.headers["www-authenticate"]).toBe('Bearer realm="preview"');
     expect(head.headers["cache-control"]).toBe("private, no-store, max-age=0");
     expect(method.status).toBe(405);
-    expect(method.headers.allow).toBe("GET, HEAD, OPTIONS");
+    expect(method.headers.allow).toBe("GET, HEAD");
     expect(method.body.error.code).toBe("NOT_FOUND");
   });
 });

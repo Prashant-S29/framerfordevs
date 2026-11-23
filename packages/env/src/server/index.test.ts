@@ -24,6 +24,8 @@ const environmentKeys = [
   "DELIVERY_CURSOR_PREVIOUS_SECRET",
   "CONTROL_PLANE_CURSOR_SECRET",
   "CONTROL_PLANE_CURSOR_PREVIOUS_SECRET",
+  "PREVIEW_HANDOFF_SECRET",
+  "PREVIEW_HANDOFF_PREVIOUS_SECRET",
   "WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID",
   "WEBHOOK_ENCRYPTION_KEYS",
   "WEBHOOK_WORKER_ENABLED",
@@ -62,6 +64,8 @@ beforeEach(() => {
   delete process.env.DELIVERY_CURSOR_PREVIOUS_SECRET;
   delete process.env.CONTROL_PLANE_CURSOR_SECRET;
   delete process.env.CONTROL_PLANE_CURSOR_PREVIOUS_SECRET;
+  delete process.env.PREVIEW_HANDOFF_SECRET;
+  delete process.env.PREVIEW_HANDOFF_PREVIOUS_SECRET;
   delete process.env.WEBHOOK_ENCRYPTION_ACTIVE_KEY_ID;
   delete process.env.WEBHOOK_ENCRYPTION_KEYS;
   delete process.env.WEBHOOK_WORKER_ENABLED;
@@ -292,6 +296,37 @@ describe("server environment", () => {
 
     expect(String(failure)).toContain("must be different");
     expect(String(failure)).not.toContain(cursorSecret);
+  });
+
+  it("rejects identical Preview handoff rotation secrets", async () => {
+    const handoffSecret = "preview-handoff-test-secret-at-least-32-characters";
+    process.env.PREVIEW_HANDOFF_SECRET = handoffSecret;
+    process.env.PREVIEW_HANDOFF_PREVIOUS_SECRET = handoffSecret;
+
+    const failure = await import("./index").then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+
+    expect(String(failure)).toContain("must be different");
+    expect(String(failure)).not.toContain(handoffSecret);
+  });
+
+  it("requires a persistent Preview handoff secret for production Preview", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.BETTER_AUTH_URL = "https://api.example.com";
+    process.env.DASHBOARD_ORIGIN = "https://dashboard.example.com";
+    process.env.OPERATOR_ORIGIN = "https://operator.internal.example.com";
+    process.env.HOST_ROUTING_ENABLED = "true";
+    process.env.TOOLING_API_RESOURCE = "https://api.example.com/api/tooling/v1";
+    process.env.PREVIEW_API_ENABLED = "true";
+
+    const failure = await import("./index").then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+
+    expect(String(failure)).toContain("persistent Preview handoff secret");
   });
 
   it("fails early for invalid configuration without leaking secret values", async () => {

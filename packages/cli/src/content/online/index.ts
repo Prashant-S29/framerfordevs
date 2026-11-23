@@ -8,6 +8,7 @@ import { getValidAccessToken } from "../../oauth-device";
 import { acquireContentCommand, clearContentCommand } from "../../retry-journal";
 import type { ContentMutationOperation } from "../../schema";
 import { makeToolingHttpClient } from "../../tooling-http-client";
+import { makeAuthoringOperatorClient } from "../../authoring/client";
 
 function tokenForOrigin(apiOrigin: string) {
   const management = process.env["FFD_MANAGEMENT_TOKEN"];
@@ -215,6 +216,24 @@ const contentOnline = Effect.fn("cli.authoring.content.command")(function* (
       items: page.items,
       nextCursor: page.nextCursor,
     };
+  }
+
+  if (input.command === "entry preview") {
+    const operator = makeAuthoringOperatorClient({
+      baseUrl: input.config.apiBaseUrl,
+      token,
+      projectId: input.config.projectId,
+      environmentId,
+    });
+    const revisionId = input.revision.revisionId ?? null;
+    const response = yield* request(() =>
+      operator.preview.handoff(input.collection, input.locale, input.entryId ?? "", {
+        source: revisionId === null ? "current" : "revision",
+        revisionId,
+      }),
+    );
+    const handoff = yield* responseData(response);
+    return { command: input.command, accepted: true, environmentId, handoff };
   }
 
   if (input.command === "entry revision") {

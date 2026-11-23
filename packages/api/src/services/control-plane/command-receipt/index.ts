@@ -15,7 +15,8 @@ export type ControlPlaneReceiptResourceType =
   | "project_capability"
   | "studio_registration"
   | "project_locale"
-  | "cms_invalidation_route_mapping";
+  | "cms_invalidation_route_mapping"
+  | "environment_preview_target";
 export type ControlPlaneReceiptDisposition = "created" | "updated" | "no_op";
 
 export interface ControlPlaneCreateReceiptExpectation {
@@ -70,7 +71,8 @@ function isReceiptResourceType(value: string): value is ControlPlaneReceiptResou
     value === "project_capability" ||
     value === "studio_registration" ||
     value === "project_locale" ||
-    value === "cms_invalidation_route_mapping"
+    value === "cms_invalidation_route_mapping" ||
+    value === "environment_preview_target"
   );
 }
 

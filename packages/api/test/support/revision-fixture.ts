@@ -38,6 +38,7 @@ export interface RevisionFixture {
   readonly ownerId: AuthUserId;
   readonly editorId: AuthUserId;
   readonly reviewerId: AuthUserId;
+  readonly contentAdminId: AuthUserId;
   readonly workspaceId: string;
   readonly projectId: string;
   readonly environmentId: string;
@@ -161,7 +162,9 @@ export async function createRevisionFixture(label: string): Promise<RevisionFixt
   const ownerId = decodeUser(`${label}-owner-${suffix}`);
   const editorId = decodeUser(`${label}-editor-${suffix}`);
   const reviewerId = decodeUser(`${label}-reviewer-${suffix}`);
+  const contentAdminId = decodeUser(`${label}-content-admin-${suffix}`);
   await insertUser(ownerId, `${label} owner`, suffix);
+  await insertUser(contentAdminId, `${label} content admin`, suffix);
   await insertUser(editorId, `${label} editor`, suffix);
   await insertUser(reviewerId, `${label} reviewer`, suffix);
   const workspace = await Effect.runPromise(
@@ -210,6 +213,7 @@ export async function createRevisionFixture(label: string): Promise<RevisionFixt
   for (const [memberId, role] of [
     [editorId, "editor"],
     [reviewerId, "reviewer"],
+    [contentAdminId, "content_admin"],
   ] as const) {
     await db.insert(workspaceMembership).values({
       workspaceId: workspace.id,
@@ -289,6 +293,7 @@ export async function createRevisionFixture(label: string): Promise<RevisionFixt
     ownerId,
     editorId,
     reviewerId,
+    contentAdminId,
     workspaceId: workspace.id,
     projectId: project.id,
     environmentId: project.environment.id,

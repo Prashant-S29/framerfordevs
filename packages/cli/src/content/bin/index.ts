@@ -24,7 +24,8 @@ export type ContentCommand =
   | "entry revision"
   | "entry diff"
   | "entry restore"
-  | "entry validate";
+  | "entry validate"
+  | "entry preview";
 
 export type ContentRevisionScope = "shared" | "localized";
 
@@ -64,6 +65,7 @@ function contentCommand(value: string): ContentCommand | null {
     case "entry diff":
     case "entry restore":
     case "entry validate":
+    case "entry preview":
       return value;
     default:
       return null;
@@ -84,6 +86,7 @@ const entryCommands: ReadonlySet<ContentCommand> = new Set([
   "entry diff",
   "entry restore",
   "entry validate",
+  "entry preview",
 ]);
 
 function optionalUuid(value: string | undefined, required: boolean) {

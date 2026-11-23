@@ -20,6 +20,8 @@ import {
   ControlPlanePutStudioRegistrationRequest,
   ControlPlaneSetStudioRuntimeRequest,
   type ControlPlaneStudioRegistrationScope,
+  type ControlPlaneClearPreviewTargetRequest,
+  type ControlPlanePutPreviewTargetRequest,
 } from "../../contracts/control-plane";
 import { ArchiveProjectInput, AuthUserId, RestoreProjectInput } from "../../contracts/platform";
 import {
@@ -29,6 +31,7 @@ import {
 } from "../../contracts/response/errors";
 import { ControlPlaneCursorSigner } from "../../services/control-plane/cursor-signer";
 import { PlatformRepository } from "../../services/platform-repository";
+import { PreviewTargetRepository } from "../../services/preview-target/repository";
 
 const decodeSessionActor = (userId: string) =>
   Schema.decodeUnknownEffect(AuthUserId, { onExcessProperty: "error" })(userId).pipe(
@@ -353,4 +356,53 @@ export const setStudioRuntimeForSession = Effect.fn(
   "control-plane.studio-registration.runtime.set-session",
 )(function* (userId: string, input: ControlPlaneSetStudioRuntimeInput, requestId: string) {
   return yield* setStudioRuntime(yield* decodeSessionActor(userId), input, requestId);
+});
+
+export const getPreviewTarget = Effect.fn("control-plane.preview-target.get")(function* (
+  actor: ControlPlaneActor,
+  scope: ControlPlaneStudioRegistrationScope,
+) {
+  yield* Effect.annotateCurrentSpan({
+    projectId: scope.projectId,
+    environmentId: scope.environmentId,
+  });
+  return yield* (yield* PreviewTargetRepository).get(actor, scope.projectId, scope.environmentId);
+});
+
+export const putPreviewTarget = Effect.fn("control-plane.preview-target.put")(function* (
+  actor: ControlPlaneActor,
+  scope: ControlPlaneStudioRegistrationScope,
+  request: ControlPlanePutPreviewTargetRequest,
+  requestId: string,
+) {
+  yield* Effect.annotateCurrentSpan({
+    projectId: scope.projectId,
+    environmentId: scope.environmentId,
+  });
+  return yield* (yield* PreviewTargetRepository).put(
+    actor,
+    scope.projectId,
+    scope.environmentId,
+    request,
+    requestId,
+  );
+});
+
+export const clearPreviewTarget = Effect.fn("control-plane.preview-target.clear")(function* (
+  actor: ControlPlaneActor,
+  scope: ControlPlaneStudioRegistrationScope,
+  request: ControlPlaneClearPreviewTargetRequest,
+  requestId: string,
+) {
+  yield* Effect.annotateCurrentSpan({
+    projectId: scope.projectId,
+    environmentId: scope.environmentId,
+  });
+  return yield* (yield* PreviewTargetRepository).clear(
+    actor,
+    scope.projectId,
+    scope.environmentId,
+    request,
+    requestId,
+  );
 });

@@ -13,13 +13,17 @@ Do not embed Preview credentials in JavaScript, public environment variables, UR
 
 A preview application should authenticate its viewer, authorize the requested project and entry, and call Preview from a protected server boundary.
 
+## Handoff Tokens
+
+A Studio or `ffd entry preview` handoff token starts with `ffd_pvh_` and lives five minutes. It binds one user, entry, locale, and source. On every read, the server makes sure that the user can still read that entry and locale, and that the environment Preview URL did not change. Read the token only on your server, and never place it in a URL, browser storage, or logs.
+
 ## Cache Isolation
 
 Preview responses and failures use `no-store`. Do not place them in shared CDN caches or mix them with Delivery cache keys. Strip Preview authority before forwarding errors to browser clients.
 
 ## Origin and Redirect Safety
 
-Preview is bearer-only and rejects browser-origin use. SDK transport rejects unexpected redirects so a credential is not forwarded to another host.
+Preview is bearer-only. It rejects every OPTIONS request and every request with an `Origin` header, so browser JavaScript cannot call it. SDK transport rejects unexpected redirects so a credential is not forwarded to another host.
 
 ## Auditing and Limits
 

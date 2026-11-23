@@ -367,3 +367,35 @@ a {
   margin: 0.5rem 0 0;
   padding-left: 1.25rem;
 }
+.studio-layout-tab,
+.studio-layout-group {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+}
+.studio-layout-group[data-nested="true"] {
+  margin-inline-start: 1.5rem;
+}
+.studio-layout-tab > legend,
+.studio-layout-group > legend {
+  padding-inline: 0.25rem;
+  font-weight: 600;
+}
+.studio-layout-field {
+  display: grid;
+  gap: 0.25rem;
+}
+.studio-layout-placements {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+.studio-preview-frame {
+  width: 100%;
+  min-height: 32rem;
+  border: 1px solid var(--border);
+  background: var(--background);
+}

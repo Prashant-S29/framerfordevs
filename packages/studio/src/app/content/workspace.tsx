@@ -31,6 +31,7 @@ import type {
   StudioJsonObject,
   StudioJsonValue,
   StudioNewEntryWorkspaceDto,
+  StudioRevisionSummaryDto,
   StudioValidationDto,
 } from "../../contracts/content";
 import {
@@ -54,6 +55,7 @@ import { StudioReferencePicker, StudioReferenceResolutionProvider } from "./refe
 import { StudioHistoryPanel } from "./history/panel";
 import { StudioPublicationBadge } from "./publication/badge";
 import { StudioPublicationPanel } from "./publication/panel";
+import { StudioPreviewPanel, studioPreviewEnabled, type StudioPreviewSelection } from "./preview";
 
 type WorkspaceMode = "new" | "entry";
 
@@ -306,12 +308,18 @@ function WorkspaceEditor({
   const navigate = useNavigate();
   const {
     bootstrap,
+    mountPath,
     setWorkspaceDirty,
     allowWorkspaceNavigation,
     disallowWorkspaceNavigation,
     isWorkspaceNavigationAllowed,
   } = useStudioRuntime();
   const [authority, setAuthority] = useState(data);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewSelection, setPreviewSelection] = useState<StudioPreviewSelection>({
+    revisionId: null,
+    label: "the last saved draft",
+  });
   const definition = useMemo(() => adaptStudioContentForm(authority.form), [authority.form]);
   const existing = mode === "entry" && isEntryWorkspace(authority) ? authority : undefined;
   const initialValues = useMemo(
@@ -824,6 +832,22 @@ function WorkspaceEditor({
             onReloadLatest={reloadLatest}
           />
         ) : null}
+        {existing !== undefined && studioPreviewEnabled() ? (
+          <StudioPreviewPanel
+            mountPath={mountPath}
+            collectionId={collectionId}
+            locale={locale}
+            entryId={existing.draft.entry.id}
+            entryName={savedName}
+            open={previewOpen}
+            selection={previewSelection}
+            savedVersion={`${sharedVersion}:${localizedVersion}`}
+            onOpenChange={setPreviewOpen}
+            onShowCurrent={() =>
+              setPreviewSelection({ revisionId: null, label: "the last saved draft" })
+            }
+          />
+        ) : null}
         {existing !== undefined ? (
           <StudioHistoryPanel
             collectionId={collectionId}
@@ -845,6 +869,17 @@ function WorkspaceEditor({
               await reload();
             }}
             onReloadLatest={reloadLatest}
+            {...(studioPreviewEnabled()
+              ? {
+                  onPreview: (revision: StudioRevisionSummaryDto) => {
+                    setPreviewSelection({
+                      revisionId: revision.id,
+                      label: `${revision.scope === "shared" ? "shared" : localeLabel} revision ${revision.sequence}`,
+                    });
+                    setPreviewOpen(true);
+                  },
+                }
+              : {})}
           />
         ) : null}
         <div className="studio-save-bar">

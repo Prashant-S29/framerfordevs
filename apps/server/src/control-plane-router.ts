@@ -35,6 +35,9 @@ import {
   enableCapability as enableControlPlaneCapability,
   getProject as getControlPlaneProject,
   getStudioRegistration as getControlPlaneStudioRegistration,
+  getPreviewTarget as getControlPlanePreviewTarget,
+  putPreviewTarget as putControlPlanePreviewTarget,
+  clearPreviewTarget as clearControlPlanePreviewTarget,
   getWorkspace as getControlPlaneWorkspace,
   listCapabilities as listControlPlaneCapabilities,
   listProjects as listControlPlaneProjects,
@@ -105,6 +108,8 @@ import {
   decodeControlPlaneProjectLifecycleInput,
   decodeControlPlaneProjectScope,
   decodeControlPlanePutStudioRegistrationInput,
+  decodeControlPlanePutPreviewTargetRequest,
+  decodeControlPlaneClearPreviewTargetRequest,
   decodeControlPlaneSetStudioRuntimeInput,
   decodeControlPlaneReplaceWebhookSubscriptionsRequest,
   decodeControlPlaneReplayWebhookRequest,
@@ -401,6 +406,16 @@ export function classifyControlPlaneRequest(
   ) {
     return { operation: "studio_registration_runtime_set", costBucket: "5" };
   }
+  if (/^\/projects\/[^/]+\/environments\/[^/]+\/preview-target$/u.test(path)) {
+    if (method === "GET") return { operation: "preview_target_get", costBucket: "1" };
+    if (method === "PUT") return { operation: "preview_target_put", costBucket: "5" };
+  }
+  if (
+    /^\/projects\/[^/]+\/environments\/[^/]+\/preview-target\/clear$/u.test(path) &&
+    method === "POST"
+  ) {
+    return { operation: "preview_target_clear", costBucket: "5" };
+  }
   return null;
 }
 
@@ -633,6 +648,12 @@ function controlPlaneAllowedMethods(path: string): ReadonlyArray<string> | null 
   }
   if (/^\/projects\/[^/]+\/environments\/[^/]+\/studio-registration\/runtime$/u.test(path)) {
     return ["PUT"];
+  }
+  if (/^\/projects\/[^/]+\/environments\/[^/]+\/preview-target$/u.test(path)) {
+    return ["GET", "PUT"];
+  }
+  if (/^\/projects\/[^/]+\/environments\/[^/]+\/preview-target\/clear$/u.test(path)) {
+    return ["POST"];
   }
   return null;
 }
@@ -1577,6 +1598,104 @@ export function createControlPlaneRouter(
         context.request.requestId,
       ),
       "Control Plane locale status updated.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+
+  const previewTargetPath = "/projects/:projectId/environments/:environmentId/preview-target";
+  const previewTargetScope = async (
+    req: Request,
+    res: Response,
+    context: ReturnType<typeof controlPlaneContext>,
+  ) => {
+    const scopeResult = await context.execute(
+      "api.control-plane.preview-target.path",
+      decodeControlPlaneStudioRegistrationScope(
+        routeParameter(req, "projectId"),
+        routeParameter(req, "environmentId"),
+      ),
+      "Control Plane preview target path decoded.",
+    );
+    return controlPlaneStepData(req, res, scopeResult);
+  };
+  router.get(previewTargetPath, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.getPreviewTarget,
+      controlPlaneRequestCosts.read,
+    );
+    if (principal === undefined) return;
+    const scope = await previewTargetScope(req, res, context);
+    if (scope === null) return;
+    const result = await context.execute(
+      "api.control-plane.preview-target.get",
+      getControlPlanePreviewTarget(controlPlanePrincipalActor(principal), scope),
+      "Control Plane preview target loaded.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+  router.put(previewTargetPath, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.putPreviewTarget,
+      controlPlaneRequestCosts.studioWrite,
+    );
+    if (principal === undefined) return;
+    const scope = await previewTargetScope(req, res, context);
+    if (scope === null) return;
+    const bodyResult = await context.execute(
+      "api.control-plane.preview-target.put.input",
+      decodeControlPlanePutPreviewTargetRequest(req.body),
+      "Control Plane preview target input decoded.",
+    );
+    const body = controlPlaneStepData(req, res, bodyResult);
+    if (body === null) return;
+    const result = await context.execute(
+      "api.control-plane.preview-target.put",
+      putControlPlanePreviewTarget(
+        controlPlanePrincipalActor(principal),
+        scope,
+        body,
+        context.request.requestId,
+      ),
+      "Control Plane preview target stored.",
+    );
+    sendControlPlaneResponse(req, res, result.status, result.response);
+  });
+  router.post(`${previewTargetPath}/clear`, async (req, res) => {
+    const context = controlPlaneContext(req);
+    const principal = await prepareControlPlaneRequest(
+      req,
+      res,
+      context,
+      controlPlaneBearerRequirements.clearPreviewTarget,
+      controlPlaneRequestCosts.studioWrite,
+    );
+    if (principal === undefined) return;
+    const scope = await previewTargetScope(req, res, context);
+    if (scope === null) return;
+    const bodyResult = await context.execute(
+      "api.control-plane.preview-target.clear.input",
+      decodeControlPlaneClearPreviewTargetRequest(req.body),
+      "Control Plane preview target clear input decoded.",
+    );
+    const body = controlPlaneStepData(req, res, bodyResult);
+    if (body === null) return;
+    const result = await context.execute(
+      "api.control-plane.preview-target.clear",
+      clearControlPlanePreviewTarget(
+        controlPlanePrincipalActor(principal),
+        scope,
+        body,
+        context.request.requestId,
+      ),
+      "Control Plane preview target cleared.",
     );
     sendControlPlaneResponse(req, res, result.status, result.response);
   });

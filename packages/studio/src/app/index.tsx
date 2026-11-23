@@ -60,6 +60,11 @@ const contentRoute = createRoute({
   path: "/content",
   component: lazyRouteComponent(() => import("./content/navigation"), "ContentIndex"),
 });
+const layoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/content/$collectionId/layout",
+  component: lazyRouteComponent(() => import("./content/navigation"), "CollectionLayout"),
+});
 const collectionRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/content/$collectionId/locales/$locale",
@@ -79,6 +84,7 @@ const router = createRouter({
   routeTree: rootRoute.addChildren([
     indexRoute,
     contentRoute,
+    layoutRoute,
     collectionRoute,
     newEntryRoute,
     entryRoute,

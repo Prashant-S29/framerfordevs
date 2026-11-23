@@ -210,6 +210,21 @@ export const ControlPlaneStudioRegistration = Schema.Struct({
   updatedAt: IsoDateTime,
 });
 
+export const ControlPlanePreviewTarget = Schema.Struct({
+  projectId: Uuid,
+  environmentId: Uuid,
+  previewUrl: Schema.NullOr(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048))),
+  version: Version,
+  updatedAt: IsoDateTime,
+});
+
+export const ControlPlanePreviewTargetResult = Schema.Struct({
+  target: ControlPlanePreviewTarget,
+  created: Schema.Boolean,
+  replayed: Schema.Boolean,
+  noOp: Schema.Boolean,
+});
+
 export const ControlPlaneWorkspacePage = Schema.Struct({
   items: Schema.Array(ControlPlaneWorkspace).check(Schema.isMaxLength(50)),
   nextCursor: Schema.NullOr(Cursor),

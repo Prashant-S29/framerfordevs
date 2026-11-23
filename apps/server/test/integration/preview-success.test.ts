@@ -83,7 +83,7 @@ function assertIsolation(response: request.Response) {
   assert.strictEqual(response.headers.pragma, "no-cache");
   assert.strictEqual(response.headers.expires, "0");
   assert.strictEqual(response.headers["referrer-policy"], "no-referrer");
-  assert.strictEqual(response.headers["access-control-allow-origin"], "*");
+  assert.isUndefined(response.headers["access-control-allow-origin"]);
   assert.isUndefined(response.headers["access-control-allow-credentials"]);
   assert.isUndefined(response.headers.etag);
   assert.isUndefined(response.headers["last-modified"]);
@@ -161,15 +161,31 @@ describe("successful Preview transport", () => {
     assertIsolation(response);
   });
 
-  it("serves OPTIONS without invoking content authentication or read", async () => {
-    const response = await request(app)
+  it("rejects OPTIONS and browser-origin requests without invoking content authentication", async () => {
+    const preflight = await request(app)
       .options(`${root}/draft?locale=gu`)
       .set("Origin", "https://consumer.example")
       .set("Access-Control-Request-Method", "HEAD")
       .set("Access-Control-Request-Headers", "Authorization")
-      .expect(204);
-    assert.isUndefined(response.headers["www-authenticate"]);
-    assert.strictEqual(response.headers["access-control-allow-origin"], "*");
+      .expect(403);
+    assert.isUndefined(preflight.headers["www-authenticate"]);
+    assert.isUndefined(preflight.headers["access-control-allow-origin"]);
+    const browser = await request(app)
+      .get(`${root}/draft?locale=gu`)
+      .set("Authorization", bearer)
+      .set("Origin", "https://consumer.example")
+      .expect(403);
+    assert.strictEqual(browser.body.error.code, "FORBIDDEN");
+    const handoff = await request(app)
+      .get("/api/preview/v1/handoff")
+      .set("Authorization", "Bearer ffd_pvh_not-a-token")
+      .expect(401);
+    assert.strictEqual(handoff.body.error.code, "CREDENTIAL_INVALID");
+    await request(app)
+      .get("/api/preview/v1/handoff?entry=1")
+      .set("Authorization", bearer)
+      .expect(400);
+    await request(app).get("/api/preview/v1/handoff").expect(401);
   });
 
   it("serves explicit revision GET and HEAD without validators", async () => {

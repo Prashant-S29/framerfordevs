@@ -22,7 +22,7 @@ import {
   LocaleUnavailableFailure,
   NotFoundFailure,
 } from "../../../contracts/response/errors";
-import { SchemaRevisionId } from "../../../contracts/schema";
+import { type PublishedSchemaRevision, SchemaRevisionId } from "../../../contracts/schema";
 import {
   StudioContentCollection,
   StudioContentContext,
@@ -38,6 +38,7 @@ import {
   type StudioResolveEntryIds,
   StudioResolvedEntryLabel,
 } from "../../../contracts/studio-content";
+import { isPresentationVisibleToRole } from "../../../lib/authoring/presentation-editorial";
 import { generatedFormDefinition } from "../../../lib/field/form-definition";
 import { projectStudioForm } from "../../../lib/studio-content/form-projection";
 import { decideStudioCollectionProjection } from "../../../lib/studio-content/projection";
@@ -52,6 +53,18 @@ interface StudioContentRepositoryOptions {
   readonly database?: Pick<ApplicationDb, "transaction">;
 }
 
+function canPublishPresentation(
+  role: ProjectRole,
+  localeAccessMode: string,
+  published: PublishedSchemaRevision | null,
+): boolean {
+  if (localeAccessMode !== "all" || published === null) return false;
+  if (isRoleAllowed(role, "schema.write") && isRoleAllowed(role, "schema.publish")) return true;
+  return (
+    isRoleAllowed(role, "presentation.publish") && isPresentationVisibleToRole(published, role)
+  );
+}
+
 export interface StudioCollectionAuthority {
   readonly workspaceId: WorkspaceId;
   readonly role: typeof ProjectRole.Type;
@@ -63,6 +76,7 @@ export interface StudioCollectionAuthority {
   readonly canWriteLocalized: boolean;
   readonly canWriteShared: boolean;
   readonly canPublish: boolean;
+  readonly canPublishPresentation: boolean;
 }
 
 export interface StudioEntryBrowseOrder {
@@ -206,11 +220,13 @@ async function selectCollectionAuthority(
   let projectedRootFieldCount = 0;
   let projectedPlacementCount = 0;
   let projectedEditableFieldCount = 0;
+  let publishedRevision: PublishedSchemaRevision | null = null;
   try {
     const published = decodePublishedSchemaRevisionSync({
       revision: revision.revision,
       fields: persistedFields,
     });
+    publishedRevision = published;
     const form = generatedFormDefinition({
       source: "published",
       collectionId: revision.revision.collectionId,
@@ -266,6 +282,11 @@ async function selectCollectionAuthority(
       canWriteLocalized,
       canWriteShared: canWriteLocalized && access.localeAccessMode === "all",
       canPublish: isRoleAllowed(role, "content.publish"),
+      canPublishPresentation: canPublishPresentation(
+        role,
+        access.localeAccessMode,
+        publishedRevision,
+      ),
     } satisfies StudioCollectionAuthority,
   };
 }
@@ -641,11 +662,13 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
               let projectedPlacementCount = 0;
               let projectedEditableFieldCount = 0;
               let projectionFailed = false;
+              let publishedRevision: PublishedSchemaRevision | null = null;
               try {
                 const published = decodePublishedSchemaRevisionSync({
                   revision,
                   fields: persistedFields,
                 });
+                publishedRevision = published;
                 const form = generatedFormDefinition({
                   source: "published",
                   collectionId: revision.collectionId,
@@ -704,6 +727,11 @@ export function makeStudioContentRepository(options: StudioContentRepositoryOpti
                     canSaveLocalized: canMutate,
                     canSaveShared: canMutate && access.localeAccessMode === "all",
                     canPublish: roleCanPublish,
+                    canPublishPresentation: canPublishPresentation(
+                      role,
+                      access.localeAccessMode,
+                      publishedRevision,
+                    ),
                   },
                 }),
               );

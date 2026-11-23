@@ -1,6 +1,7 @@
 import {
   AUTHORING_CONTENT_PUBLISH_SCOPE,
   AUTHORING_DRAFT_WRITE_SCOPE,
+  AUTHORING_PRESENTATION_PUBLISH_SCOPE,
   AUTHORING_READ_SCOPE,
   AUTHORING_SCHEMA_PUSH_SCOPE,
   type CliApiOAuthScope,
@@ -58,9 +59,12 @@ import {
   AuthoringRiskyAcknowledgementRequiredFailure,
   AuthoringSourceIdentityConflictFailure,
   AuthoringStaleSchemaFailure,
+  ForbiddenFailure,
   UnauthorizedFailure,
   ValidationFailure,
 } from "../../../contracts/response/errors";
+import type { PreviewHandoffRequest } from "../../../contracts/preview-handoff";
+import { issuePreviewHandoff } from "../../preview-handoff";
 import {
   GetEntryPublicationStatusInput,
   PublishEntryInput,
@@ -233,7 +237,7 @@ export const authoringSchemaApplyBearerRequirement: AuthoringBearerRequirement =
 };
 
 export const authoringPresentationPublishBearerRequirement: AuthoringBearerRequirement = {
-  oauthScope: AUTHORING_SCHEMA_PUSH_SCOPE,
+  oauthScope: AUTHORING_PRESENTATION_PUBLISH_SCOPE,
   managementScopes: ["schema.read", "schema.write", "schema.publish"],
 };
 
@@ -1242,3 +1246,30 @@ export const applyAuthoringProjectSchema = Effect.fn("authoring.public.schema.ap
       return yield* Effect.die(new Error("Allocated Authoring candidate parity failed."));
   }
 });
+
+export const issueAuthoringPreviewHandoff = Effect.fn("authoring.public.preview.handoff")(
+  function* (
+    principal: ToolingPrincipal,
+    project: AuthoringProjectScope,
+    scope: AuthoringEntryScope,
+    entryId: string,
+    request: PreviewHandoffRequest,
+    requestId: string,
+  ) {
+    if (principal.kind !== "oauth_user") return yield* ForbiddenFailure.make();
+    const resolved = yield* resolveRevisionCollection(
+      principal,
+      project,
+      scope,
+      entryId,
+      "content.read",
+    );
+    return yield* issuePreviewHandoff(
+      AuthUserId.make(principal.userId),
+      { ...project, collectionId: resolved.collectionId, entryId, locale: scope.locale },
+      request,
+      "authoring",
+      requestId,
+    );
+  },
+);

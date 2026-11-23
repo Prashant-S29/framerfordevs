@@ -148,7 +148,8 @@ export function governanceErrorMessage(error: unknown, ambiguousInvitation = fal
 const roleDescriptions: Readonly<Record<ProjectRole, string>> = {
   owner: "Full project governance, members, credentials, and archive access.",
   developer: "Project configuration, schemas, content, and credentials without member governance.",
-  content_admin: "Content authoring, review, and publication without implementation settings.",
+  content_admin:
+    "Content authoring, review, publication, and form layout without implementation settings.",
   editor: "Draft content authoring without review or publication authority.",
   reviewer: "Content review and publication without draft editing.",
   client_editor: "Constrained client-facing content editing.",

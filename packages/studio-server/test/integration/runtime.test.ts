@@ -69,6 +69,7 @@ const contentCapabilities = {
   canSaveLocalized: true,
   canSaveShared: true,
   canPublish: true,
+  canPublishPresentation: true,
 };
 const contentPublicationId = "abababab-abab-4bab-8bab-abababababab";
 const contentPublicationSummary = {
@@ -822,6 +823,334 @@ describe("Studio Fetch runtime", () => {
         message: "Content operation completed.",
       });
     expect((await send("/publication")).status).toBe(502);
+  });
+
+  it("frames only the configured Preview origin and launches the handoff server-side", async () => {
+    expect(() =>
+      createStudioFetchHandler({ ...config().value, previewUrl: "ftp://preview.test/x" }),
+    ).toThrow();
+    expect(() =>
+      createStudioFetchHandler({ ...config().value, previewUrl: "http://localhost:4100/preview" }),
+    ).toThrow();
+    expect(() =>
+      createStudioFetchHandler({ ...config().value, previewUrl: "http://localhost:4300/p?x=1" }),
+    ).toThrow();
+
+    const previewUrl = "http://localhost:4300/api/ffd-preview";
+    const token = `ffd_pvh_${"a".repeat(40)}.${"b".repeat(43)}`;
+    const setup = config();
+    const baseFetch = setup.value.fetch;
+    const calls: Array<{ readonly url: string; readonly body: string | null }> = [];
+    let upstream: () => Response = () =>
+      Response.json({
+        ok: true,
+        data: {
+          token,
+          expiresAt: "2027-01-01T00:05:00.000Z",
+          previewUrl,
+          source: "current",
+          schemaRevisionId: null,
+          sharedRevisionId: null,
+          localizedRevisionId: null,
+        },
+        error: null,
+        message: "Preview handoff issued.",
+      });
+    const contentFetch: typeof globalThis.fetch = async (input, init) => {
+      const url =
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("/api/studio-content/v1/")) {
+        calls.push({ url, body: typeof init?.body === "string" ? init.body : null });
+        return upstream();
+      }
+      return baseFetch(input, init);
+    };
+    const handler = createStudioFetchHandler({ ...setup.value, previewUrl, fetch: contentFetch });
+    const session = await authenticate(handler);
+    const send = (target: string, headers: Record<string, string>) =>
+      handler.fetch(new Request(`http://localhost:4100${target}`, { headers }), {
+        rawTarget: target,
+      });
+    const frameHeaders = {
+      Cookie: session,
+      "Sec-Fetch-Site": "same-origin",
+      "Sec-Fetch-Dest": "iframe",
+    };
+
+    const shell = await send("/studio/content", { Cookie: session });
+    expect(shell.headers.get("content-security-policy")).toContain(
+      "frame-src 'self' http://localhost:4300;",
+    );
+    expect(await shell.text()).toContain('<meta name="ffd-studio-preview" content="enabled">');
+    const script = await send("/studio/preview/launch.js", { Cookie: session });
+    expect(script.status).toBe(200);
+
+    const launchTarget = `/studio/preview/launch?collection=${contentCollectionId}&locale=en&entry=${contentEntryId}`;
+    const launched = await send(launchTarget, frameHeaders);
+    const html = await launched.text();
+    expect(launched.status, html).toBe(200);
+    expect(launched.headers.get("content-security-policy")).toContain(
+      "form-action http://localhost:4300;",
+    );
+    expect(launched.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(html).toContain(`action="${previewUrl}"`);
+    expect(html).toContain(`name="token" value="${token}"`);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe(
+      `http://localhost:3000/api/studio-content/v1/projects/${projectId}/environments/${environmentId}/collections/${contentCollectionId}/locales/en/entries/${contentEntryId}/preview-handoffs`,
+    );
+    expect(calls[0]?.body).toBe(JSON.stringify({ source: "current", revisionId: null }));
+
+    await send(`${launchTarget}&revision=${contentRevisionId}`, frameHeaders);
+    expect(calls[1]?.body).toBe(
+      JSON.stringify({ source: "revision", revisionId: contentRevisionId }),
+    );
+
+    for (const [target, headers] of [
+      [
+        launchTarget,
+        { Cookie: session, "Sec-Fetch-Site": "cross-site", "Sec-Fetch-Dest": "iframe" },
+      ],
+      [
+        launchTarget,
+        { Cookie: session, "Sec-Fetch-Site": "same-origin", "Sec-Fetch-Dest": "document" },
+      ],
+      [`${launchTarget}&extra=1`, frameHeaders],
+      [launchTarget.replace(contentEntryId, "not-a-uuid"), frameHeaders],
+    ] as const) {
+      expect([400, 403], target).toContain((await send(target, headers)).status);
+    }
+    expect(calls).toHaveLength(2);
+
+    upstream = () =>
+      Response.json({
+        ok: true,
+        data: {
+          token,
+          expiresAt: "2027-01-01T00:05:00.000Z",
+          previewUrl: "http://localhost:4300/elsewhere",
+          source: "current",
+          schemaRevisionId: null,
+          sharedRevisionId: null,
+          localizedRevisionId: null,
+        },
+        error: null,
+        message: "Preview handoff issued.",
+      });
+    const mismatch = await send(launchTarget, frameHeaders);
+    const mismatchHtml = await mismatch.text();
+    expect(mismatchHtml).not.toContain(token);
+    expect(mismatchHtml).toContain("Preview URL changed");
+
+    upstream = () =>
+      Response.json(
+        {
+          ok: false,
+          data: null,
+          error: {
+            code: "PREVIEW_TARGET_REQUIRED",
+            message: "Off.",
+            retryable: false,
+            requestId: "request-1",
+          },
+          message: "Off.",
+        },
+        { status: 409 },
+      );
+    const off = await send(launchTarget, frameHeaders);
+    expect(off.status).toBe(409);
+    expect(await off.text()).toContain("Preview is off for this environment");
+
+    const unconfigured = createStudioFetchHandler({ ...config().value });
+    const plain = await unconfigured.fetch(new Request("http://localhost:4100/studio/content"), {
+      rawTarget: "/studio/content",
+    });
+    expect(plain.headers.get("content-security-policy")).toContain("frame-src 'none'");
+    expect(
+      (
+        await unconfigured.fetch(new Request(`http://localhost:4100${launchTarget}`), {
+          rawTarget: launchTarget,
+        })
+      ).status,
+    ).toBe(404);
+  });
+
+  it("adapts the form layout read and publish without role lists or extra keys", async () => {
+    const setup = config();
+    const baseFetch = setup.value.fetch;
+    const tabId = "dededede-dede-4ede-8ede-dededededede";
+    const groupId = "edededed-eded-4ded-8ded-edededededed";
+    const fieldId = "fafafafa-fafa-4afa-8afa-fafafafafafa";
+    const layout = {
+      tabs: [
+        {
+          id: tabId,
+          title: "Content",
+          description: null,
+          position: 0,
+          groups: [
+            {
+              id: groupId,
+              title: "Main",
+              description: null,
+              position: 0,
+              columns: 1,
+              fields: [{ fieldId, position: 0, helpTextOverride: null }],
+            },
+          ],
+        },
+      ],
+      sidebarGroups: [],
+    };
+    const editField = {
+      fieldId,
+      displayLabel: "Title",
+      position: 0,
+      helpText: null,
+      placeholder: null,
+      enumOptions: [],
+    };
+    const presentation = {
+      collectionId: contentCollectionId,
+      revisionId: contentRevisionId,
+      sequence: 3,
+      presentation: {
+        displayName: "Articles",
+        description: null,
+        fields: [{ ...editField, parentFieldId: null, kind: "short_text" }],
+        layout,
+      },
+    };
+    const calls: Array<{
+      readonly url: string;
+      readonly method: string;
+      readonly body: string | null;
+    }> = [];
+    let upstream: (url: string) => Response = (url) =>
+      Response.json({
+        ok: true,
+        data: url.endsWith("/publish")
+          ? { replayed: false, noOp: false, presentation }
+          : presentation,
+        error: null,
+        message: "Form layout loaded.",
+      });
+    const contentFetch: typeof globalThis.fetch = async (input, init) => {
+      const url =
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("/api/studio-content/v1/")) {
+        calls.push({
+          url,
+          method: init?.method ?? "GET",
+          body: typeof init?.body === "string" ? init.body : null,
+        });
+        return upstream(url);
+      }
+      return baseFetch(input, init);
+    };
+    const handler = createStudioFetchHandler({ ...setup.value, fetch: contentFetch });
+    const session = await authenticate(handler);
+    const browserHeaders = {
+      Cookie: session,
+      Origin: "http://localhost:4100",
+      "Sec-Fetch-Site": "same-origin",
+    };
+    const base = `/studio/api/content/collections/${contentCollectionId}/presentation`;
+    const send = (path: string, init: RequestInit = {}) => {
+      const request = new Request(`http://localhost:4100${base}${path}`, {
+        headers:
+          init.body === undefined
+            ? browserHeaders
+            : { ...browserHeaders, "Content-Type": "application/json" },
+        ...init,
+      });
+      const url = new URL(request.url);
+      return handler.fetch(request, { rawTarget: `${url.pathname}${url.search}` });
+    };
+    const publishBody = {
+      commandId: contentCommandId,
+      expectedRevisionId: contentRevisionId,
+      expectedSequence: 3,
+      presentation: { displayName: "Stories", description: null, fields: [editField], layout },
+    };
+
+    expect((await send("")).status).toBe(200);
+    const published = await send("/publish", { method: "POST", body: JSON.stringify(publishBody) });
+    expect(published.status, await published.clone().text()).toBe(200);
+    const upstreamBase = `http://localhost:3000/api/studio-content/v1/projects/${projectId}/environments/${environmentId}/collections/${contentCollectionId}/presentation`;
+    expect(calls.map(({ method, url }) => `${method} ${url.replace(upstreamBase, "")}`)).toEqual([
+      "GET ",
+      "POST /publish",
+    ]);
+    expect(calls[1]?.body).toBe(JSON.stringify(publishBody));
+
+    const roleField = { ...editField, visibleToRoles: ["owner"] };
+    const rejected = [
+      ["?expand=roles", {}],
+      ["", { method: "POST", body: "{}" }],
+      ["/publish", {}],
+      ["/publish", { method: "POST", body: JSON.stringify({ ...publishBody, force: true }) }],
+      [
+        "/publish",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            ...publishBody,
+            presentation: { ...publishBody.presentation, fields: [roleField] },
+          }),
+        },
+      ],
+      [
+        "/publish",
+        {
+          method: "POST",
+          body: JSON.stringify({ ...publishBody, padding: "x".repeat(256 * 1_024) }),
+        },
+      ],
+    ] as const;
+    for (const [path, init] of rejected) {
+      const response = await send(path, init);
+      expect([400, 404, 405, 413, 415], path).toContain(response.status);
+    }
+    expect(calls).toHaveLength(2);
+
+    for (const [code, status] of [
+      ["PRESENTATION_ROLE_VISIBILITY_FORBIDDEN", 403],
+      ["PRESENTATION_SCOPE_RESTRICTED", 403],
+      ["STALE_SCHEMA", 409],
+    ] as const) {
+      upstream = () =>
+        Response.json(
+          {
+            ok: false,
+            data: null,
+            error: { code, message: "Rejected.", retryable: false, requestId: "request-1" },
+            message: "Rejected.",
+          },
+          { status },
+        );
+      const response = await send("/publish", {
+        method: "POST",
+        body: JSON.stringify(publishBody),
+      });
+      expect(response.status, code).toBe(status);
+      expect((await response.json()).error.code).toBe(code);
+    }
+
+    upstream = () =>
+      Response.json({
+        ok: true,
+        data: {
+          ...presentation,
+          presentation: {
+            ...presentation.presentation,
+            fields: [{ ...presentation.presentation.fields[0], visibleToRoles: ["owner"] }],
+          },
+        },
+        error: null,
+        message: "Form layout loaded.",
+      });
+    expect((await send("")).status).toBe(502);
   });
 
   it("adapts the nine authoring Studio Content operation families without exposing bearer authority", async () => {
@@ -2075,6 +2404,7 @@ describe("Studio Fetch runtime", () => {
       `/studio/content/${contentCollectionId}/locales/en`,
       `/studio/content/${contentCollectionId}/locales/en/entries/new`,
       `/studio/content/${contentCollectionId}/locales/en/entries/${contentEntryId}`,
+      `/studio/content/${contentCollectionId}/layout`,
     ];
     for (const route of contentShellRoutes) {
       const response = await handler.fetch(new Request(`http://localhost:4100${route}`), {
@@ -2093,6 +2423,8 @@ describe("Studio Fetch runtime", () => {
       "/studio/content/",
       `/studio/content/${contentCollectionId}/locales/en/entries`,
       `/studio/content/not-a-uuid/locales/en`,
+      "/studio/content/not-a-uuid/layout",
+      `/studio/content/${contentCollectionId}/layout/extra`,
       `/studio/content/${contentCollectionId}/locales/en?search=secret`,
     ]) {
       const response = await handler.fetch(new Request(`http://localhost:4100${route}`), {

@@ -253,18 +253,20 @@ async function boundedJson(response: Response): Promise<unknown> {
   }
 }
 
-export function createStudioContentClient(options: StudioContentClientOptions) {
+export interface StudioContentRequest<T> {
+  readonly path: string;
+  readonly method: "GET" | "POST" | "PATCH";
+  readonly signal: AbortSignal;
+  readonly decoder: ResponseDecoder<T>;
+  readonly body?: StudioJsonObject;
+  readonly maximumRequestBytes?: number;
+}
+
+export function createStudioContentRequest(options: StudioContentClientOptions) {
   const mountPath = validateMountPath(options.mountPath);
   const requestFetch = options.fetch ?? globalThis.fetch;
 
-  const request = async <T>(input: {
-    readonly path: string;
-    readonly method: "GET" | "POST" | "PATCH";
-    readonly signal: AbortSignal;
-    readonly decoder: ResponseDecoder<T>;
-    readonly body?: StudioJsonObject;
-    readonly maximumRequestBytes?: number;
-  }): Promise<T> => {
+  return async <T>(input: StudioContentRequest<T>): Promise<T> => {
     const body =
       input.body === undefined
         ? undefined
@@ -309,6 +311,10 @@ export function createStudioContentClient(options: StudioContentClientOptions) {
     if (isDecodedFailure(decoded)) return throwFailure(response, decoded);
     return decoded;
   };
+}
+
+export function createStudioContentClient(options: StudioContentClientOptions) {
+  const request = createStudioContentRequest(options);
 
   const collectionPath = (scope: StudioContentCollectionScope): string => {
     const valid = validateCollectionScope(scope);

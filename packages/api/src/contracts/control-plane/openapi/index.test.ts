@@ -55,6 +55,8 @@ describe("Control Plane OpenAPI", () => {
       "/projects/{projectId}/audit-events",
       "/projects/{projectId}/environments/{environmentId}/studio-registration/runtime",
       "/projects/{projectId}/environments/{environmentId}/studio-registration",
+      "/projects/{projectId}/environments/{environmentId}/preview-target",
+      "/projects/{projectId}/environments/{environmentId}/preview-target/clear",
     ]);
 
     const operationIds = Object.values(controlPlaneOpenApiDocument.paths).flatMap((path) =>
@@ -62,7 +64,7 @@ describe("Control Plane OpenAPI", () => {
         .filter(([method]) => dataMethods.has(method))
         .map(([, operation]) => operation.operationId),
     );
-    assert.strictEqual(operationIds.length, 53);
+    assert.strictEqual(operationIds.length, 56);
     assert.strictEqual(new Set(operationIds).size, operationIds.length);
   });
 

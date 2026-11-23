@@ -15,6 +15,7 @@ import { cmsInvalidationRouteMapping } from "@framerfordevs/db/schema/webhooks";
 import { Context, Effect, Layer, Schema } from "effect";
 
 import { ApiErrorDetail } from "../../contracts/response/api";
+import { ProjectRole } from "../../contracts/access";
 import type { AuthoringProjectScope, CmsActor } from "../../contracts/authoring";
 import {
   AuthoringPresentationRevision,
@@ -29,15 +30,29 @@ import {
   DatabaseFailure,
   ForbiddenFailure,
   NotFoundFailure,
+  PresentationRoleVisibilityForbiddenFailure,
+  PresentationScopeRestrictedFailure,
   PublishedSchemaRequiredFailure,
   ValidationFailure,
 } from "../../contracts/response/errors";
-import { SchemaRevisionId } from "../../contracts/schema";
+import { SchemaRevisionId, SchemaValidationIssue } from "../../contracts/schema";
+import {
+  StudioPresentation,
+  type StudioPublishPresentationRequest,
+  StudioPublishPresentationResult,
+} from "../../contracts/studio-content";
 import {
   buildAuthoringPresentationCandidate,
   fingerprintAuthoringPresentation,
   publishedPresentation,
 } from "../../lib/authoring/presentation";
+import {
+  fingerprintStudioPresentation,
+  isPresentationVisibleToRole,
+  mergeStudioPresentation,
+  preservesRoleVisibility,
+  studioPresentationDocument,
+} from "../../lib/authoring/presentation-editorial";
 import { canonicalizeEntryValue } from "../../lib/entry/values";
 import { canonicalizeSchemaDocument } from "../../lib/field/document";
 import { flattenFieldTree } from "../../lib/field/tree";
@@ -77,9 +92,12 @@ async function authorizePresentation(
   executor: ApplicationExecutor,
   actor: CmsActor,
   scope: AuthoringProjectScope,
-  actions: ReadonlyArray<"schema.read" | "schema.write" | "schema.publish">,
+  actions: ReadonlyArray<
+    "schema.read" | "schema.write" | "schema.publish" | "presentation.publish"
+  >,
 ) {
   let workspaceId: string | null = null;
+  let role: ProjectRole | null = null;
   for (const action of actions) {
     const authorization = await authorizeCmsActorProject(
       executor,
@@ -91,8 +109,10 @@ async function authorizePresentation(
     if (authorization.kind !== "allowed") return authorization;
     if (authorization.access.project.archivedAt !== null) return { kind: "forbidden" } as const;
     workspaceId = authorization.access.project.workspaceId;
+    if (!Schema.is(ProjectRole)(authorization.access.role)) return { kind: "forbidden" } as const;
+    role = authorization.access.role;
   }
-  if (workspaceId === null) return { kind: "not_found" } as const;
+  if (workspaceId === null || role === null) return { kind: "not_found" } as const;
   const [environmentRow] = await executor
     .select({ id: environment.id })
     .from(environment)
@@ -119,7 +139,26 @@ async function authorizePresentation(
     .limit(1);
   return capability === undefined
     ? ({ kind: "cms_required" } as const)
-    : ({ kind: "allowed", workspaceId } as const);
+    : ({ kind: "allowed", workspaceId, role } as const);
+}
+
+async function authorizePresentationPublish(
+  executor: ApplicationExecutor,
+  actor: CmsActor,
+  scope: AuthoringProjectScope,
+) {
+  const structural = await authorizePresentation(executor, actor, scope, [
+    "schema.read",
+    "schema.write",
+    "schema.publish",
+  ]);
+  if (structural.kind === "allowed") return { ...structural, mode: "structural" } as const;
+  if (structural.kind !== "forbidden" || actor.kind !== "user") return structural;
+  const editorial = await authorizePresentation(executor, actor, scope, [
+    "schema.read",
+    "presentation.publish",
+  ]);
+  return editorial.kind === "allowed" ? ({ ...editorial, mode: "editorial" } as const) : editorial;
 }
 
 function presentationRevision(options: {
@@ -159,6 +198,64 @@ function publicationResult(options: {
   });
 }
 
+type PresentationPublishInput =
+  | { readonly kind: "authoring"; readonly request: AuthoringPublishPresentationRequest }
+  | { readonly kind: "studio"; readonly request: StudioPublishPresentationRequest };
+
+async function loadCurrentRows(
+  executor: ApplicationExecutor,
+  workspaceId: string,
+  scope: AuthoringProjectScope,
+  collectionKey: string,
+) {
+  const [current] = await executor
+    .select({
+      collectionId: cmsCollection.id,
+      revisionId: cmsCollectionSchemaHead.currentPublishedRevisionId,
+    })
+    .from(cmsCollection)
+    .innerJoin(
+      cmsCollectionSchemaHead,
+      and(
+        eq(cmsCollectionSchemaHead.collectionId, cmsCollection.id),
+        eq(cmsCollectionSchemaHead.workspaceId, cmsCollection.workspaceId),
+        eq(cmsCollectionSchemaHead.projectId, cmsCollection.projectId),
+        eq(cmsCollectionSchemaHead.environmentId, cmsCollection.environmentId),
+      ),
+    )
+    .where(
+      and(
+        eq(cmsCollection.workspaceId, workspaceId),
+        eq(cmsCollection.projectId, scope.projectId),
+        eq(cmsCollection.environmentId, scope.environmentId),
+        eq(cmsCollection.apiKey, collectionKey),
+      ),
+    )
+    .limit(1);
+  if (!current) return { kind: "not_found" } as const;
+  if (current.revisionId === null) return { kind: "published_required" } as const;
+  const rows = await loadPublishedRevisionRows(executor, {
+    collectionId: current.collectionId,
+    projectId: scope.projectId,
+    environmentId: scope.environmentId,
+    revisionId: current.revisionId,
+  });
+  if (!rows) throw new Error("Current presentation revision is missing.");
+  return { kind: "success", rows } as const;
+}
+
+function studioPresentation(
+  rows: NonNullable<Awaited<ReturnType<typeof loadPublishedRevisionRows>>>,
+): StudioPresentation {
+  const published = decodePublishedSchemaRevisionSync(rows);
+  return StudioPresentation.make({
+    collectionId: published.collectionId,
+    revisionId: published.id,
+    sequence: published.sequence,
+    presentation: studioPresentationDocument(published),
+  });
+}
+
 function fieldPresentationValue(field: ReturnType<typeof flattenFieldTree>[number]) {
   return {
     displayLabel: field.displayLabel,
@@ -175,93 +272,62 @@ export function makeAuthoringPresentationRepository(options: RepositoryOptions =
       throw new Error(`Injected Authoring presentation failure after ${stage}.`);
   };
 
-  return {
-    get: Effect.fn("AuthoringPresentationRepository.get")(function* (
-      actor: CmsActor,
-      scope: AuthoringProjectScope,
-      collectionKey: string,
-    ) {
-      const result = yield* Effect.tryPromise({
-        try: async () => {
-          const authorization = await authorizePresentation(database, actor, scope, [
-            "schema.read",
-          ]);
-          if (authorization.kind !== "allowed") return authorization;
-          const [current] = await database
-            .select({
-              collectionId: cmsCollection.id,
-              revisionId: cmsCollectionSchemaHead.currentPublishedRevisionId,
-            })
-            .from(cmsCollection)
-            .innerJoin(
-              cmsCollectionSchemaHead,
-              and(
-                eq(cmsCollectionSchemaHead.collectionId, cmsCollection.id),
-                eq(cmsCollectionSchemaHead.workspaceId, cmsCollection.workspaceId),
-                eq(cmsCollectionSchemaHead.projectId, cmsCollection.projectId),
-                eq(cmsCollectionSchemaHead.environmentId, cmsCollection.environmentId),
-              ),
-            )
-            .where(
-              and(
-                eq(cmsCollection.workspaceId, authorization.workspaceId),
-                eq(cmsCollection.projectId, scope.projectId),
-                eq(cmsCollection.environmentId, scope.environmentId),
-                eq(cmsCollection.apiKey, collectionKey),
-              ),
-            )
-            .limit(1);
-          if (!current) return { kind: "not_found" } as const;
-          if (current.revisionId === null) return { kind: "published_required" } as const;
-          const rows = await loadPublishedRevisionRows(database, {
-            collectionId: current.collectionId,
-            projectId: scope.projectId,
-            environmentId: scope.environmentId,
-            revisionId: current.revisionId,
-          });
-          if (!rows) throw new Error("Current presentation revision is missing.");
-          const published = decodePublishedSchemaRevisionSync(rows);
-          return {
-            kind: "success",
-            value: AuthoringPresentationSnapshot.make({
-              revision: presentationRevision({
-                collectionId: current.collectionId,
-                revision: rows.revision,
-                contractHash: published.contractHash,
-              }),
-              presentation: publishedPresentation(published),
+  const getPresentation = Effect.fn("AuthoringPresentationRepository.get")(function* (
+    actor: CmsActor,
+    scope: AuthoringProjectScope,
+    collectionKey: string,
+  ) {
+    const result = yield* Effect.tryPromise({
+      try: async () => {
+        const authorization = await authorizePresentation(database, actor, scope, ["schema.read"]);
+        if (authorization.kind !== "allowed") return authorization;
+        const current = await loadCurrentRows(
+          database,
+          authorization.workspaceId,
+          scope,
+          collectionKey,
+        );
+        if (current.kind !== "success") return current;
+        const rows = current.rows;
+        const published = decodePublishedSchemaRevisionSync(rows);
+        return {
+          kind: "success",
+          value: AuthoringPresentationSnapshot.make({
+            revision: presentationRevision({
+              collectionId: published.collectionId,
+              revision: rows.revision,
+              contractHash: published.contractHash,
             }),
-          } as const;
-        },
-        catch: (cause) => databaseFailure("authoring.presentation.get", cause),
-      });
-      if (result.kind === "not_found")
-        return yield* NotFoundFailure.make({ resource: "collection" });
-      if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
-      if (result.kind === "cms_required") return yield* CmsCapabilityRequiredFailure.make();
-      if (result.kind === "published_required") return yield* PublishedSchemaRequiredFailure.make();
-      return result.value;
-    }),
+            presentation: publishedPresentation(published),
+          }),
+        } as const;
+      },
+      catch: (cause) => databaseFailure("authoring.presentation.get", cause),
+    });
+    if (result.kind === "not_found") return yield* NotFoundFailure.make({ resource: "collection" });
+    if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
+    if (result.kind === "cms_required") return yield* CmsCapabilityRequiredFailure.make();
+    if (result.kind === "published_required") return yield* PublishedSchemaRequiredFailure.make();
+    return result.value;
+  });
 
-    publish: Effect.fn("AuthoringPresentationRepository.publish")(function* (
+  const publishPresentation = Effect.fn("AuthoringPresentationRepository.publishPresentation")(
+    function* (
       actor: CmsActor,
       scope: AuthoringProjectScope,
       collectionKey: string,
-      request: AuthoringPublishPresentationRequest,
+      input: PresentationPublishInput,
       now: Date,
       requestId: string,
     ) {
+      const request = input.request;
       const result = yield* Effect.tryPromise({
         try: () =>
           database.transaction(async (transaction) => {
             await transaction.execute(
               sql`select id from project where id = ${scope.projectId} for update`,
             );
-            const authorization = await authorizePresentation(transaction, actor, scope, [
-              "schema.read",
-              "schema.write",
-              "schema.publish",
-            ]);
+            const authorization = await authorizePresentationPublish(transaction, actor, scope);
             if (authorization.kind !== "allowed") return authorization;
             const [collection] = await transaction
               .select()
@@ -295,7 +361,7 @@ export function makeAuthoringPresentationRepository(options: RepositoryOptions =
             if (head.currentPublishedRevisionId === null)
               return { kind: "published_required" } as const;
 
-            const fingerprint = fingerprintAuthoringPresentation({
+            const fingerprintScope = {
               actor,
               projectId: scope.projectId,
               environmentId: scope.environmentId,
@@ -303,8 +369,17 @@ export function makeAuthoringPresentationRepository(options: RepositoryOptions =
               commandId: request.commandId,
               expectedRevisionId: request.expectedRevisionId,
               expectedSequence: request.expectedSequence,
-              presentation: request.presentation,
-            });
+            };
+            const fingerprint =
+              input.kind === "authoring"
+                ? fingerprintAuthoringPresentation({
+                    ...fingerprintScope,
+                    presentation: input.request.presentation,
+                  })
+                : fingerprintStudioPresentation({
+                    ...fingerprintScope,
+                    presentation: input.request.presentation,
+                  });
             const [existing] = await transaction
               .select()
               .from(cmsSchemaRevision)
@@ -332,15 +407,7 @@ export function makeAuthoringPresentationRepository(options: RepositoryOptions =
                 revisionId: existing.id,
               });
               if (!rows) throw new Error("Presentation replay revision is missing.");
-              return {
-                kind: "success",
-                value: publicationResult({
-                  commandId: request.commandId,
-                  replayed: true,
-                  noOp: false,
-                  rows,
-                }),
-              } as const;
+              return { kind: "success", replayed: true, noOp: false, rows } as const;
             }
             if (
               head.currentPublishedRevisionId !== request.expectedRevisionId ||
@@ -356,21 +423,40 @@ export function makeAuthoringPresentationRepository(options: RepositoryOptions =
             });
             if (!currentRows) throw new Error("Current presentation revision is missing.");
             const current = decodePublishedSchemaRevisionSync(currentRows);
-            const candidate = buildAuthoringPresentationCandidate({
-              current,
-              presentation: request.presentation,
-            });
-            if (!candidate.valid) return { kind: "invalid", issues: candidate.issues } as const;
-            if (candidate.noOp) {
+            const editorial = authorization.mode === "editorial";
+            if (editorial && !isPresentationVisibleToRole(current, authorization.role)) {
+              return { kind: "scope_restricted" } as const;
+            }
+            const presentation =
+              input.kind === "authoring"
+                ? input.request.presentation
+                : mergeStudioPresentation(current, input.request.presentation);
+            if (presentation === null) {
               return {
-                kind: "success",
-                value: publicationResult({
-                  commandId: request.commandId,
-                  replayed: false,
-                  noOp: true,
-                  rows: currentRows,
-                }),
+                kind: "invalid",
+                issues: [
+                  SchemaValidationIssue.make({
+                    path: "presentation",
+                    code: "presentation_invalid",
+                    message: "The form layout has duplicate or invalid entries.",
+                  }),
+                ],
               } as const;
+            }
+            const candidate = buildAuthoringPresentationCandidate({ current, presentation });
+            if (!candidate.valid) return { kind: "invalid", issues: candidate.issues } as const;
+            if (
+              editorial &&
+              !preservesRoleVisibility(
+                current,
+                candidate.draft.fields,
+                candidate.draft.editorLayout,
+              )
+            ) {
+              return { kind: "role_visibility" } as const;
+            }
+            if (candidate.noOp) {
+              return { kind: "success", replayed: false, noOp: true, rows: currentRows } as const;
             }
             const changes = classifyCollectionSchemaChanges(current, candidate.draft);
             if (changes.breakingCount > 0 || changes.potentiallyBreakingCount > 0) {
@@ -623,15 +709,7 @@ export function makeAuthoringPresentationRepository(options: RepositoryOptions =
               revisionId,
             });
             if (!rows) throw new Error("Published presentation revision is missing.");
-            return {
-              kind: "success",
-              value: publicationResult({
-                commandId: request.commandId,
-                replayed: false,
-                noOp: false,
-                rows,
-              }),
-            } as const;
+            return { kind: "success", replayed: false, noOp: false, rows } as const;
           }),
         catch: (cause) => databaseFailure("authoring.presentation.publish", cause),
       });
@@ -642,6 +720,10 @@ export function makeAuthoringPresentationRepository(options: RepositoryOptions =
       if (result.kind === "published_required") return yield* PublishedSchemaRequiredFailure.make();
       if (result.kind === "command_conflict") return yield* AuthoringCommandConflictFailure.make();
       if (result.kind === "stale") return yield* AuthoringStaleSchemaFailure.make();
+      if (result.kind === "scope_restricted")
+        return yield* PresentationScopeRestrictedFailure.make();
+      if (result.kind === "role_visibility")
+        return yield* PresentationRoleVisibilityForbiddenFailure.make();
       if (result.kind === "invalid") {
         return yield* ValidationFailure.make({
           details: result.issues.map((current) =>
@@ -653,7 +735,95 @@ export function makeAuthoringPresentationRepository(options: RepositoryOptions =
           ),
         });
       }
+      return result;
+    },
+  );
+
+  return {
+    get: getPresentation,
+
+    publish: Effect.fn("AuthoringPresentationRepository.publish")(function* (
+      actor: CmsActor,
+      scope: AuthoringProjectScope,
+      collectionKey: string,
+      request: AuthoringPublishPresentationRequest,
+      now: Date,
+      requestId: string,
+    ) {
+      const result = yield* publishPresentation(
+        actor,
+        scope,
+        collectionKey,
+        { kind: "authoring", request },
+        now,
+        requestId,
+      );
+      return publicationResult({
+        commandId: request.commandId,
+        replayed: result.replayed,
+        noOp: result.noOp,
+        rows: result.rows,
+      });
+    }),
+
+    getStudio: Effect.fn("AuthoringPresentationRepository.getStudio")(function* (
+      actor: CmsActor,
+      scope: AuthoringProjectScope,
+      collectionKey: string,
+    ) {
+      const result = yield* Effect.tryPromise({
+        try: async () => {
+          const authorization = await authorizePresentationPublish(database, actor, scope);
+          if (authorization.kind !== "allowed") return authorization;
+          const rows = await loadCurrentRows(
+            database,
+            authorization.workspaceId,
+            scope,
+            collectionKey,
+          );
+          if (rows.kind !== "success") return rows;
+          const current = decodePublishedSchemaRevisionSync(rows.rows);
+          if (
+            authorization.mode === "editorial" &&
+            !isPresentationVisibleToRole(current, authorization.role)
+          ) {
+            return { kind: "scope_restricted" } as const;
+          }
+          return { kind: "success", value: studioPresentation(rows.rows) } as const;
+        },
+        catch: (cause) => databaseFailure("studio.presentation.get", cause),
+      });
+      if (result.kind === "not_found")
+        return yield* NotFoundFailure.make({ resource: "collection" });
+      if (result.kind === "forbidden") return yield* ForbiddenFailure.make();
+      if (result.kind === "cms_required") return yield* CmsCapabilityRequiredFailure.make();
+      if (result.kind === "published_required") return yield* PublishedSchemaRequiredFailure.make();
+      if (result.kind === "scope_restricted")
+        return yield* PresentationScopeRestrictedFailure.make();
       return result.value;
+    }),
+
+    publishStudio: Effect.fn("AuthoringPresentationRepository.publishStudio")(function* (
+      actor: CmsActor,
+      scope: AuthoringProjectScope,
+      collectionKey: string,
+      request: StudioPublishPresentationRequest,
+      now: Date,
+      requestId: string,
+    ) {
+      const result = yield* publishPresentation(
+        actor,
+        scope,
+        collectionKey,
+        { kind: "studio", request },
+        now,
+        requestId,
+      );
+      return StudioPublishPresentationResult.make({
+        replayed: result.replayed,
+        noOp: result.noOp,
+        presentation: studioPresentation(result.rows),
+      });
     }),
   };
 }

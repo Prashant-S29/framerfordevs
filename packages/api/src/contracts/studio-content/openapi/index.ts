@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 
 import { make as makeJsonSchema } from "../../response/json-schema";
+import { PreviewHandoffRequest, PreviewHandoffResponse } from "../../preview-handoff";
 
 import {
   StudioContentApiFailure,
@@ -13,7 +14,10 @@ import {
   StudioPublicationPageResponse,
   StudioPublicationPlanResponse,
   StudioPublicationStatusResponse,
+  StudioPresentationResponse,
   StudioPublishEntryRequest,
+  StudioPublishPresentationRequest,
+  StudioPublishPresentationResponse,
   StudioPublishResponse,
   StudioRenameEntryRequest,
   StudioRenameEntryResponse,
@@ -102,6 +106,11 @@ function schemaComponents() {
     ["StudioPublishResponse", StudioPublishResponse],
     ["StudioUnpublishEntryRequest", StudioUnpublishEntryRequest],
     ["StudioUnpublishResponse", StudioUnpublishResponse],
+    ["StudioPresentationResponse", StudioPresentationResponse],
+    ["PreviewHandoffRequest", PreviewHandoffRequest],
+    ["PreviewHandoffResponse", PreviewHandoffResponse],
+    ["StudioPublishPresentationRequest", StudioPublishPresentationRequest],
+    ["StudioPublishPresentationResponse", StudioPublishPresentationResponse],
   ] as const) {
     addEffectSchema(components, name, schema);
   }
@@ -143,7 +152,9 @@ function failure(description: string) {
 const commonFailures = {
   "400": failure("The strict path, query, cursor, or request body is invalid."),
   "401": failure("A current Studio bearer token is required."),
-  "403": failure("The current Studio user is not allowed to perform this operation."),
+  "403": failure(
+    "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
+  ),
   "404": failure("The exact authorized Studio Content scope is unavailable."),
   "409": failure(
     "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
@@ -163,6 +174,15 @@ const projectParameters = [
   },
   {
     name: "environmentId",
+    in: "path",
+    required: true,
+    schema: { type: "string", format: "uuid" },
+  },
+] as const;
+const presentationParameters = [
+  ...projectParameters,
+  {
+    name: "collectionId",
     in: "path",
     required: true,
     schema: { type: "string", format: "uuid" },
@@ -536,6 +556,52 @@ export const studioContentOpenApiDocument = {
           "200": success(
             "StudioUnpublishResponse",
             "The unpublish result and the Delivery origin read-back.",
+          ),
+          ...commonFailures,
+        },
+      },
+    },
+    [`${entries}/{entryId}/preview-handoffs`]: {
+      post: {
+        operationId: "issueStudioPreviewHandoff",
+        summary: "Issue a five-minute Preview handoff token for the Studio server",
+        description:
+          "Only the Studio server calls this operation. It posts the token to the environment Preview URL and never exposes it to Studio browser JavaScript.",
+        security: [{ studioBearer: [] }],
+        parameters: entryParameters,
+        requestBody: jsonBody("PreviewHandoffRequest", studioContentLimits.commandRequestBytes),
+        responses: {
+          "200": success("PreviewHandoffResponse", "The signed handoff and the Preview URL."),
+          ...commonFailures,
+        },
+      },
+    },
+    [`${root}/collections/{collectionId}/presentation`]: {
+      get: {
+        operationId: "getStudioPresentation",
+        summary: "Load the editorial form layout without role visibility",
+        security: [{ studioBearer: [] }],
+        parameters: presentationParameters,
+        responses: {
+          "200": success("StudioPresentationResponse", "The current editorial form layout."),
+          ...commonFailures,
+        },
+      },
+    },
+    [`${root}/collections/{collectionId}/presentation/publish`]: {
+      post: {
+        operationId: "publishStudioPresentation",
+        summary: "Publish labels, order, tabs, and groups as one presentation revision",
+        security: [{ studioBearer: [] }],
+        parameters: presentationParameters,
+        requestBody: jsonBody(
+          "StudioPublishPresentationRequest",
+          studioContentLimits.presentationRequestBytes,
+        ),
+        responses: {
+          "200": success(
+            "StudioPublishPresentationResponse",
+            "The published, replayed, or unchanged form layout revision.",
           ),
           ...commonFailures,
         },

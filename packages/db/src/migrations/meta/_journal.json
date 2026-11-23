@@ -169,6 +169,13 @@
       "when": 1795371873168,
       "tag": "0023_entry_revision_immutability",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795376133203,
+      "tag": "0024_add_environment_preview_target",
+      "breakpoints": true
     }
   ]
 }

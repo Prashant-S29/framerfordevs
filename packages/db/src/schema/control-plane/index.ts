@@ -58,7 +58,7 @@ export const controlPlaneCommandReceipt = pgTable(
     }).onDelete("restrict"),
     check(
       "control_plane_command_receipt_operation_valid",
-      sql`${table.operation} in ('workspace.create', 'project.create', 'project.capability.enable', 'studio_registration.put', 'studio_registration.runtime.set', 'project_locale.create', 'invalidation_mapping.create')`,
+      sql`${table.operation} in ('workspace.create', 'project.create', 'project.capability.enable', 'studio_registration.put', 'studio_registration.runtime.set', 'project_locale.create', 'invalidation_mapping.create', 'preview_target.put', 'preview_target.clear')`,
     ),
     check(
       "control_plane_command_receipt_actor_valid",
@@ -70,7 +70,7 @@ export const controlPlaneCommandReceipt = pgTable(
     ),
     check(
       "control_plane_command_receipt_result_type_valid",
-      sql`${table.resultResourceType} in ('workspace', 'project', 'project_capability', 'studio_registration', 'project_locale', 'cms_invalidation_route_mapping')`,
+      sql`${table.resultResourceType} in ('workspace', 'project', 'project_capability', 'studio_registration', 'project_locale', 'cms_invalidation_route_mapping', 'environment_preview_target')`,
     ),
     check(
       "control_plane_command_receipt_disposition_valid",
@@ -78,7 +78,7 @@ export const controlPlaneCommandReceipt = pgTable(
     ),
     check(
       "control_plane_command_receipt_scope_result_valid",
-      sql`(${table.operation} = 'workspace.create' and ${table.actorType} = 'user' and ${table.projectId} is null and ${table.environmentId} is null and ${table.resultResourceType} = 'workspace' and ${table.resultResourceId} = ${table.workspaceId} and ${table.resultDisposition} = 'created') or (${table.operation} = 'project.create' and ${table.actorType} = 'user' and ${table.projectId} is not null and ${table.environmentId} is null and ${table.resultResourceType} = 'project' and ${table.resultResourceId} = ${table.projectId} and ${table.resultDisposition} = 'created') or (${table.operation} = 'project.capability.enable' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'project_capability' and ${table.resultDisposition} = 'created') or (${table.operation} = 'studio_registration.put' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'studio_registration') or (${table.operation} = 'studio_registration.runtime.set' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'studio_registration' and ${table.resultDisposition} in ('updated', 'no_op')) or (${table.operation} = 'project_locale.create' and ${table.projectId} is not null and ((${table.actorType} = 'user' and ${table.environmentId} is null) or (${table.actorType} = 'credential' and ${table.environmentId} is not null)) and ${table.resultResourceType} = 'project_locale' and ${table.resultDisposition} = 'created') or (${table.operation} = 'invalidation_mapping.create' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'cms_invalidation_route_mapping' and ${table.resultDisposition} = 'created')`,
+      sql`(${table.operation} = 'workspace.create' and ${table.actorType} = 'user' and ${table.projectId} is null and ${table.environmentId} is null and ${table.resultResourceType} = 'workspace' and ${table.resultResourceId} = ${table.workspaceId} and ${table.resultDisposition} = 'created') or (${table.operation} = 'project.create' and ${table.actorType} = 'user' and ${table.projectId} is not null and ${table.environmentId} is null and ${table.resultResourceType} = 'project' and ${table.resultResourceId} = ${table.projectId} and ${table.resultDisposition} = 'created') or (${table.operation} = 'project.capability.enable' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'project_capability' and ${table.resultDisposition} = 'created') or (${table.operation} = 'studio_registration.put' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'studio_registration') or (${table.operation} = 'studio_registration.runtime.set' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'studio_registration' and ${table.resultDisposition} in ('updated', 'no_op')) or (${table.operation} = 'project_locale.create' and ${table.projectId} is not null and ((${table.actorType} = 'user' and ${table.environmentId} is null) or (${table.actorType} = 'credential' and ${table.environmentId} is not null)) and ${table.resultResourceType} = 'project_locale' and ${table.resultDisposition} = 'created') or (${table.operation} = 'invalidation_mapping.create' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'cms_invalidation_route_mapping' and ${table.resultDisposition} = 'created') or (${table.operation} = 'preview_target.put' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'environment_preview_target') or (${table.operation} = 'preview_target.clear' and ${table.projectId} is not null and ${table.environmentId} is not null and ${table.resultResourceType} = 'environment_preview_target' and ${table.resultDisposition} in ('updated', 'no_op'))`,
     ),
     index("control_plane_command_receipt_actor_operation_created_idx").on(
       table.actorType,
@@ -216,6 +216,99 @@ export const studioRegistration = pgTable(
   ],
 );
 
+// A cleared target keeps its row with a null URL, so `version` never restarts and a
+// preview handoff token bound to an earlier version cannot become valid again.
+export const environmentPreviewTarget = pgTable(
+  "environment_preview_target",
+  {
+    id: controlPlaneId("id").primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environmentId: uuid("environment_id").notNull(),
+    previewUrl: varchar("preview_url", { length: 2048 }),
+    version: integer("version").default(1).notNull(),
+    createdByUserId: text("created_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    createdByCredentialId: uuid("created_by_credential_id"),
+    changedByUserId: text("changed_by_user_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    changedByCredentialId: uuid("changed_by_credential_id"),
+    createdAt: controlPlaneTimestamp("created_at").defaultNow().notNull(),
+    updatedAt: controlPlaneTimestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "environment_preview_target_environment_tenant_fk",
+      columns: [table.environmentId, table.projectId, table.workspaceId],
+      foreignColumns: [environment.id, environment.projectId, environment.workspaceId],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "environment_preview_target_created_credential_tenant_fk",
+      columns: [
+        table.createdByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "environment_preview_target_changed_credential_tenant_fk",
+      columns: [
+        table.changedByCredentialId,
+        table.workspaceId,
+        table.projectId,
+        table.environmentId,
+      ],
+      foreignColumns: [
+        apiCredential.id,
+        apiCredential.workspaceId,
+        apiCredential.projectId,
+        apiCredential.environmentId,
+      ],
+    }).onDelete("restrict"),
+    unique("environment_preview_target_environment_unique").on(table.environmentId),
+    unique("environment_preview_target_id_tenant_unique").on(
+      table.id,
+      table.workspaceId,
+      table.projectId,
+      table.environmentId,
+    ),
+    check(
+      "environment_preview_target_created_actor_exactly_one",
+      sql`num_nonnulls(${table.createdByUserId}, ${table.createdByCredentialId}) = 1`,
+    ),
+    check(
+      "environment_preview_target_changed_actor_exactly_one",
+      sql`num_nonnulls(${table.changedByUserId}, ${table.changedByCredentialId}) = 1`,
+    ),
+    check(
+      "environment_preview_target_preview_url_valid",
+      sql`${table.previewUrl} is null or (octet_length(${table.previewUrl}) between 1 and 2048 and ${table.previewUrl} = btrim(${table.previewUrl}) and ${table.previewUrl} !~ '[[:cntrl:][:space:]?#]' and position(chr(92) in ${table.previewUrl}) = 0 and (${table.previewUrl} ~ '^https://[^/@]+/' or ${table.previewUrl} ~ '^http://(localhost|127[.]0[.]0[.]1)(:[0-9]{1,5})?/' or (left(${table.previewUrl}, 12) = 'http://[::1]' and substring(${table.previewUrl} from 13) ~ '^(:[0-9]{1,5})?/')))`,
+    ),
+    check("environment_preview_target_version_positive", sql`${table.version} > 0`),
+    index("environment_preview_target_created_by_user_idx")
+      .on(table.createdByUserId)
+      .where(sql`${table.createdByUserId} is not null`),
+    index("environment_preview_target_changed_by_user_idx")
+      .on(table.changedByUserId)
+      .where(sql`${table.changedByUserId} is not null`),
+    index("environment_preview_target_created_by_credential_idx")
+      .on(table.createdByCredentialId)
+      .where(sql`${table.createdByCredentialId} is not null`),
+    index("environment_preview_target_changed_by_credential_idx")
+      .on(table.changedByCredentialId)
+      .where(sql`${table.changedByCredentialId} is not null`),
+  ],
+);
+
 export const controlPlaneCommandReceiptRelations = relations(
   controlPlaneCommandReceipt,
   ({ one }) => ({
@@ -295,5 +388,30 @@ export const studioRegistrationRelations = relations(studioRegistration, ({ one 
       apiCredential.projectId,
       apiCredential.environmentId,
     ],
+  }),
+}));
+
+export const environmentPreviewTargetRelations = relations(environmentPreviewTarget, ({ one }) => ({
+  project: one(project, {
+    fields: [environmentPreviewTarget.projectId, environmentPreviewTarget.workspaceId],
+    references: [project.id, project.workspaceId],
+  }),
+  environment: one(environment, {
+    fields: [
+      environmentPreviewTarget.environmentId,
+      environmentPreviewTarget.projectId,
+      environmentPreviewTarget.workspaceId,
+    ],
+    references: [environment.id, environment.projectId, environment.workspaceId],
+  }),
+  createdByUser: one(user, {
+    relationName: "environmentPreviewTargetUserCreator",
+    fields: [environmentPreviewTarget.createdByUserId],
+    references: [user.id],
+  }),
+  changedByUser: one(user, {
+    relationName: "environmentPreviewTargetUserChanger",
+    fields: [environmentPreviewTarget.changedByUserId],
+    references: [user.id],
   }),
 }));

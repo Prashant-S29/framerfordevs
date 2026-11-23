@@ -28,10 +28,15 @@ const maximumContentRequestBytes = 1 * 1_024 * 1_024;
 const maximumContentSearchRequestBytes = 2 * 1_024;
 const maximumContentResolveRequestBytes = 8 * 1_024;
 const maximumContentCommandRequestBytes = 4 * 1_024;
+const maximumContentPresentationRequestBytes = 256 * 1_024;
 const maximumContentResponseBytes = 4 * 1_024 * 1_024;
 const maximumCookieHeaderBytes = 4 * 1_024;
-const csp =
-  "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; manifest-src 'none'; worker-src 'none'; child-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+function shellCsp(previewOrigin: string | null): string {
+  const frames = previewOrigin === null ? "'none'" : `'self' ${previewOrigin}`;
+  return `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; manifest-src 'none'; worker-src 'none'; child-src ${frames}; frame-src ${frames}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`;
+}
+const csp = shellCsp(null);
+const previewLaunchScript = 'document.getElementById("ffd-preview-launch")?.submit();\n';
 
 export interface StudioServerTelemetryEvent {
   readonly operation:
@@ -66,6 +71,7 @@ export interface StudioServerConfig {
   readonly now?: () => number;
   readonly observe?: (event: StudioServerTelemetryEvent) => void;
   readonly upstreamTimeoutMs?: number;
+  readonly previewUrl?: string;
 }
 
 export interface StudioRequestContext {
@@ -103,7 +109,7 @@ class StudioHttpFailure extends Data.TaggedError("StudioHttpFailure")<{
 
 interface ValidatedConfig extends Omit<
   StudioServerConfig,
-  "fetch" | "now" | "observe" | "upstreamTimeoutMs" | "encryption"
+  "fetch" | "now" | "observe" | "upstreamTimeoutMs" | "encryption" | "previewUrl"
 > {
   readonly issuer: string;
   readonly authorizationUrl: string;
@@ -123,6 +129,9 @@ interface ValidatedConfig extends Omit<
   readonly now: () => number;
   readonly observe: (event: StudioServerTelemetryEvent) => void;
   readonly upstreamTimeoutMs: number;
+  readonly previewUrl: string | null;
+  readonly previewOrigin: string | null;
+  readonly shellCsp: string;
 }
 
 interface OAuthAttempt {
@@ -186,6 +195,23 @@ function exactOrigin(value: string, secureRequired: boolean): string {
   return url.origin;
 }
 
+function exactPreviewUrl(value: string, secureRequired: boolean): string {
+  if (value.length > 2_048 || value.includes("?") || value.includes("#") || /\s/u.test(value)) {
+    throw new Error("STUDIO_CONFIGURATION_INVALID");
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("STUDIO_CONFIGURATION_INVALID");
+  }
+  exactOrigin(url.origin, secureRequired);
+  if (url.href !== value || url.username || url.password) {
+    throw new Error("STUDIO_CONFIGURATION_INVALID");
+  }
+  return value;
+}
+
 function validateAssets(assets: StudioAssets): StudioAssets {
   const assetPath = /^\/assets\/(?:chunk\/)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
   if (
@@ -244,6 +270,7 @@ function validateConfig(input: StudioServerConfig): ValidatedConfig {
     "now",
     "observe",
     "upstreamTimeoutMs",
+    "previewUrl",
   ]);
   if (
     Object.keys(input).some((key) => !allowedKeys.has(key)) ||
@@ -283,6 +310,12 @@ function validateConfig(input: StudioServerConfig): ValidatedConfig {
       !input.store.capabilities.atomicRefreshFence)
   )
     throw new Error("STUDIO_CONFIGURATION_INVALID");
+  const previewUrl =
+    input.previewUrl === undefined ? null : exactPreviewUrl(input.previewUrl, secureRequired);
+  const previewOrigin = previewUrl === null ? null : new URL(previewUrl).origin;
+  if (previewOrigin !== null && previewOrigin === applicationOrigin) {
+    throw new Error("STUDIO_CONFIGURATION_INVALID");
+  }
   const registrationDigest = createHash("sha256")
     .update(input.registrationId, "utf8")
     .digest("hex");
@@ -312,6 +345,9 @@ function validateConfig(input: StudioServerConfig): ValidatedConfig {
     now: input.now ?? Date.now,
     observe: input.observe ?? (() => undefined),
     upstreamTimeoutMs: input.upstreamTimeoutMs ?? 10_000,
+    previewUrl,
+    previewOrigin,
+    shellCsp: shellCsp(previewOrigin),
   };
 }
 
@@ -330,10 +366,14 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function securityHeaders(contentType: string, cacheControl = "no-store"): Headers {
+function securityHeaders(
+  contentType: string,
+  cacheControl = "no-store",
+  contentSecurityPolicy = csp,
+): Headers {
   return new Headers({
     "Cache-Control": cacheControl,
-    "Content-Security-Policy": csp,
+    "Content-Security-Policy": contentSecurityPolicy,
     "Content-Type": contentType,
     "Cross-Origin-Opener-Policy": "same-origin",
     "Cross-Origin-Resource-Policy": "same-origin",
@@ -1600,6 +1640,8 @@ function studioContentErrorStatus(code: unknown): number | null {
     case "UNAUTHORIZED":
       return 401;
     case "FORBIDDEN":
+    case "PRESENTATION_ROLE_VISIBILITY_FORBIDDEN":
+    case "PRESENTATION_SCOPE_RESTRICTED":
     case "STUDIO_REGISTRATION_INACTIVE":
     case "STUDIO_AUTHORITY_CHANGED":
     case "STUDIO_GRANT_INVALID":
@@ -1616,6 +1658,7 @@ function studioContentErrorStatus(code: unknown): number | null {
     case "STALE_CURSOR":
     case "REVISION_INCOMPATIBLE":
     case "PUBLICATION_STATE_CONFLICT":
+    case "PUBLISHED_SCHEMA_REQUIRED":
       return 409;
     case "PUBLICATION_INVALID":
       return 422;
@@ -1696,6 +1739,7 @@ function validStudioContentCapabilities(value: unknown): boolean {
       "canSaveLocalized",
       "canSaveShared",
       "canPublish",
+      "canPublishPresentation",
     ]) &&
     Object.values(value).every((entry) => typeof entry === "boolean")
   );
@@ -2250,7 +2294,9 @@ type StudioContentSuccessKind =
   | "publication_page"
   | "publication_plan"
   | "publish"
-  | "unpublish";
+  | "unpublish"
+  | "presentation"
+  | "presentation_publish";
 
 function studioUuidOrNull(value: unknown): boolean {
   return value === null || (typeof value === "string" && uuid.test(value));
@@ -2379,6 +2425,158 @@ function validStudioCursorPage(
     (value.nextCursor === null ||
       (typeof value.nextCursor === "string" && /^[A-Za-z0-9_-]{1,1024}$/u.test(value.nextCursor)))
   );
+}
+
+function studioPosition(value: unknown, maximum: number): boolean {
+  return Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= maximum;
+}
+
+function studioNullableText(value: unknown, maximum: number): boolean {
+  return value === null || boundedStudioContentString(value, 0, maximum);
+}
+
+function validStudioPresentationGroup(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, [
+      "id",
+      "title",
+      "description",
+      "position",
+      "columns",
+      "fields",
+    ]) &&
+    studioUuid(value.id) &&
+    boundedStudioContentString(value.title, 1, 100) &&
+    studioNullableText(value.description, 500) &&
+    studioPosition(value.position, 19) &&
+    (value.columns === 1 || value.columns === 2) &&
+    Array.isArray(value.fields) &&
+    value.fields.length <= 100 &&
+    value.fields.every(
+      (placement) =>
+        isRecord(placement) &&
+        exactStudioContentKeys(placement, ["fieldId", "position", "helpTextOverride"]) &&
+        studioUuid(placement.fieldId) &&
+        studioPosition(placement.position, 99) &&
+        studioNullableText(placement.helpTextOverride, 500),
+    )
+  );
+}
+
+function validStudioPresentationLayout(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, ["tabs", "sidebarGroups"]) &&
+    Array.isArray(value.tabs) &&
+    value.tabs.length >= 1 &&
+    value.tabs.length <= 10 &&
+    value.tabs.every(
+      (tab) =>
+        isRecord(tab) &&
+        exactStudioContentKeys(tab, ["id", "title", "description", "position", "groups"]) &&
+        studioUuid(tab.id) &&
+        boundedStudioContentString(tab.title, 1, 100) &&
+        studioNullableText(tab.description, 500) &&
+        studioPosition(tab.position, 9) &&
+        Array.isArray(tab.groups) &&
+        tab.groups.length >= 1 &&
+        tab.groups.length <= 20 &&
+        tab.groups.every(validStudioPresentationGroup),
+    ) &&
+    Array.isArray(value.sidebarGroups) &&
+    value.sidebarGroups.length <= 10 &&
+    value.sidebarGroups.every(validStudioPresentationGroup)
+  );
+}
+
+function validStudioPresentationField(value: unknown, document: boolean): boolean {
+  const keys = ["fieldId", "displayLabel", "position", "helpText", "placeholder", "enumOptions"];
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, document ? [...keys, "parentFieldId", "kind"] : keys) &&
+    studioUuid(value.fieldId) &&
+    (value.displayLabel === null || boundedStudioContentString(value.displayLabel, 1, 100)) &&
+    studioPosition(value.position, 99) &&
+    studioNullableText(value.helpText, 500) &&
+    studioNullableText(value.placeholder, 200) &&
+    Array.isArray(value.enumOptions) &&
+    value.enumOptions.length <= 100 &&
+    value.enumOptions.every(
+      (option) =>
+        isRecord(option) &&
+        exactStudioContentKeys(option, ["optionId", "label", "position"]) &&
+        studioUuid(option.optionId) &&
+        boundedStudioContentString(option.label, 1, 100) &&
+        studioPosition(option.position, 99),
+    ) &&
+    (!document ||
+      (studioUuidOrNull(value.parentFieldId) && boundedStudioContentString(value.kind, 1, 32)))
+  );
+}
+
+function validStudioPresentationDocument(value: unknown, document: boolean): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, ["displayName", "description", "fields", "layout"]) &&
+    boundedStudioContentString(value.displayName, 1, 100) &&
+    studioNullableText(value.description, 500) &&
+    Array.isArray(value.fields) &&
+    value.fields.length >= 1 &&
+    value.fields.length <= 100 &&
+    value.fields.every((field) => validStudioPresentationField(field, document)) &&
+    validStudioPresentationLayout(value.layout)
+  );
+}
+
+function validStudioPresentation(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactStudioContentKeys(value, ["collectionId", "revisionId", "sequence", "presentation"]) &&
+    studioUuid(value.collectionId) &&
+    studioUuid(value.revisionId) &&
+    studioCount(value.sequence, 1) &&
+    validStudioPresentationDocument(value.presentation, true)
+  );
+}
+
+function validStudioPresentationBody(value: Readonly<Record<string, unknown>>): boolean {
+  return (
+    exactStudioContentKeys(value, [
+      "commandId",
+      "expectedRevisionId",
+      "expectedSequence",
+      "presentation",
+    ]) &&
+    studioUuid(value.commandId) &&
+    studioUuid(value.expectedRevisionId) &&
+    studioCount(value.expectedSequence, 1) &&
+    validStudioPresentationDocument(value.presentation, false)
+  );
+}
+
+function studioPresentationTarget(
+  route: string,
+  query: string,
+  method: string,
+): StudioContentTarget | null | undefined {
+  const match = /^\/api\/content\/collections\/([^/]+)\/presentation(\/publish)?$/u.exec(route);
+  if (match === null) return undefined;
+  const collectionId = match[1] ?? "";
+  if (!uuid.test(collectionId) || query !== "") return null;
+  const upstreamPath = `/collections/${collectionId}/presentation`;
+  if (match[2] === undefined) {
+    return method === "GET"
+      ? { upstreamPath, bodyAllowed: false, successKind: "presentation" }
+      : null;
+  }
+  return method === "POST"
+    ? {
+        upstreamPath: `${upstreamPath}/publish`,
+        bodyAllowed: true,
+        successKind: "presentation_publish",
+      }
+    : null;
 }
 
 function validStudioHistorySuccessData(
@@ -2515,6 +2713,15 @@ function validStudioContentSuccessData(
   if (!isRecord(value)) return false;
   const history = validStudioHistorySuccessData(kind, value);
   if (history !== null) return history;
+  if (kind === "presentation") return validStudioPresentation(value);
+  if (kind === "presentation_publish") {
+    return (
+      exactStudioContentKeys(value, ["replayed", "noOp", "presentation"]) &&
+      typeof value.replayed === "boolean" &&
+      typeof value.noOp === "boolean" &&
+      validStudioPresentation(value.presentation)
+    );
+  }
   if (kind === "page") return validStudioContentPage(value);
   if (kind === "resolve") {
     if (
@@ -2787,6 +2994,8 @@ interface StudioContentTarget {
 
 function isStudioContentShellRoute(route: string): boolean {
   if (route === "/content") return true;
+  const layout = /^\/content\/([^/]+)\/layout$/u.exec(route);
+  if (layout !== null) return uuid.test(layout[1] ?? "");
   const match = /^\/content\/([^/]+)\/locales\/([^/]+)(?:\/entries\/(new|[^/]+))?$/u.exec(route);
   if (match === null || !uuid.test(match[1] ?? "")) return false;
   const locale = match[2] ?? "";
@@ -2805,6 +3014,8 @@ function studioContentTarget(
   if (route === "/api/content/context" && method === "GET" && query === "") {
     return { upstreamPath: "/context", bodyAllowed: false, successKind: "context" };
   }
+  const presentation = studioPresentationTarget(route, query, method);
+  if (presentation !== undefined) return presentation;
   const match =
     /^\/api\/content\/collections\/([^/]+)\/locales\/([^/]+)\/entries(?:\/(.*))?$/u.exec(route);
   if (match === null || !uuid.test(match[1] ?? "")) return null;
@@ -3085,6 +3296,7 @@ function validStudioHistoryBody(route: string, value: Readonly<Record<string, un
 
 function validStudioContentBody(route: string, value: unknown): boolean {
   if (!isRecord(value)) return false;
+  if (route.endsWith("/presentation/publish")) return validStudioPresentationBody(value);
   if (studioContentCommandRoute(route)) return validStudioHistoryBody(route, value);
   if (route.endsWith("/search")) {
     return (
@@ -3148,6 +3360,187 @@ function validStudioContentBody(route: string, value: unknown): boolean {
   );
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function previewLaunchPage(
+  previewUrl: string,
+  status: number,
+  content: string,
+  setCookie: string | null,
+): Response {
+  const headers = securityHeaders(
+    "text/html; charset=utf-8",
+    "no-store",
+    `default-src 'none'; script-src 'self'; style-src 'none'; img-src 'none'; connect-src 'none'; form-action ${new URL(previewUrl).origin}; base-uri 'none'; object-src 'none'; frame-ancestors 'self'`,
+  );
+  headers.set("X-Frame-Options", "SAMEORIGIN");
+  if (setCookie !== null) headers.append("Set-Cookie", setCookie);
+  return new Response(
+    `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Preview</title>${content}</html>\n`,
+    { status, headers },
+  );
+}
+
+const previewLaunchMessages: Readonly<Record<string, string>> = {
+  PREVIEW_TARGET_REQUIRED:
+    "Preview is off for this environment. Ask a developer to set a Preview URL.",
+  PREVIEW_REVISION_INCOMPATIBLE:
+    "This point in history uses another content model and cannot be previewed.",
+  NOT_FOUND: "This entry is unavailable or you no longer have access.",
+  FORBIDDEN: "You do not have access to preview this entry.",
+  RATE_LIMITED: "Preview is busy. Wait a moment and reload the preview.",
+};
+
+function validPreviewHandoff(
+  value: unknown,
+  status: number,
+  previewUrl: string,
+): value is { readonly data: { readonly token: string } } {
+  return (
+    status === 200 &&
+    isRecord(value) &&
+    value.ok === true &&
+    isRecord(value.data) &&
+    typeof value.data.token === "string" &&
+    value.data.token.length <= 2_048 &&
+    /^ffd_pvh_[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/u.test(value.data.token) &&
+    value.data.previewUrl === previewUrl
+  );
+}
+
+// The launch page runs inside the Studio Preview iframe. The Studio server mints the handoff
+// token and posts it straight to the developer's Preview URL, so the token never reaches Studio
+// JavaScript, a URL, a Referer header, or browser history.
+function previewLaunch(
+  config: ValidatedConfig,
+  request: Request,
+  method: string,
+  query: string,
+  requestId: string,
+): Effect.Effect<Response, StudioHttpFailure> {
+  return Effect.gen(function* () {
+    const previewUrl = config.previewUrl;
+    if (previewUrl === null || method !== "GET") {
+      return yield* new StudioHttpFailure({
+        status: 404,
+        code: "STUDIO_ROUTE_NOT_FOUND",
+        message: "The Studio route was not found.",
+        outcome: "rejected",
+      });
+    }
+    if (
+      request.headers.get("sec-fetch-site") !== "same-origin" ||
+      request.headers.get("sec-fetch-dest") !== "iframe"
+    ) {
+      return yield* new StudioHttpFailure({
+        status: 403,
+        code: "STUDIO_ORIGIN_INVALID",
+        message: "The request origin is not allowed.",
+        outcome: "rejected",
+      });
+    }
+    const parameters = new URLSearchParams(query);
+    const keys = [...parameters.keys()];
+    const collection = parameters.get("collection") ?? "";
+    const locale = parameters.get("locale") ?? "";
+    const entry = parameters.get("entry") ?? "";
+    const revision = parameters.get("revision");
+    if (
+      keys.length !== new Set(keys).size ||
+      keys.some((key) => !["collection", "locale", "entry", "revision"].includes(key)) ||
+      !uuid.test(collection) ||
+      !uuid.test(entry) ||
+      locale.length > 35 ||
+      !/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/u.test(locale) ||
+      (revision !== null && !uuid.test(revision))
+    ) {
+      return yield* new StudioHttpFailure({
+        status: 400,
+        code: "STUDIO_REQUEST_INVALID",
+        message: "The Preview request is invalid.",
+        outcome: "rejected",
+      });
+    }
+    const active = yield* loadContentSession(config, request);
+    const setCookie = active.rotated
+      ? cookie(
+          config,
+          config.sessionCookie,
+          active.key,
+          (active.session.grantExpiresAtEpochMs - config.now()) / 1_000,
+        )
+      : null;
+    const upstream = yield* upstreamFetch(
+      config,
+      `${config.studioContentBaseUrl}/collections/${collection}/locales/${locale}/entries/${entry}/preview-handoffs`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${active.session.accessToken}`,
+          "Content-Type": "application/json",
+          "X-Request-Id": requestId,
+        },
+        body: JSON.stringify(
+          revision === null
+            ? { source: "current", revisionId: null }
+            : { source: "revision", revisionId: revision },
+        ),
+        signal: request.signal,
+      },
+    );
+    const text = yield* Effect.tryPromise({
+      try: () => boundedText(upstream, 16 * 1_024),
+      catch: () =>
+        new StudioHttpFailure({
+          status: 502,
+          code: "STUDIO_UPSTREAM_UNAVAILABLE",
+          message: "The Studio Content service returned an invalid response.",
+          outcome: "upstream_failure",
+        }),
+    });
+    const body = yield* Effect.try({
+      try: () => parseJson(text),
+      catch: () =>
+        new StudioHttpFailure({
+          status: 502,
+          code: "STUDIO_UPSTREAM_UNAVAILABLE",
+          message: "The Studio Content service returned an invalid response.",
+          outcome: "upstream_failure",
+        }),
+    });
+    if (isJsonResponse(upstream) && validPreviewHandoff(body, upstream.status, previewUrl)) {
+      return previewLaunchPage(
+        previewUrl,
+        200,
+        `<script src="${config.mountPath}/preview/launch.js" defer></script></head><body><form id="ffd-preview-launch" method="post" action="${escapeHtml(previewUrl)}"><input type="hidden" name="token" value="${body.data.token}"><noscript><button type="submit">Open preview</button></noscript></form></body>`,
+        setCookie,
+      );
+    }
+    const code =
+      isRecord(body) && isRecord(body.error) && typeof body.error.code === "string"
+        ? body.error.code
+        : "";
+    const message =
+      previewLaunchMessages[code] ??
+      (body !== null && isRecord(body) && body.ok === true
+        ? "The Preview URL changed. Reload Studio before previewing."
+        : "Preview could not open. Try again.");
+    return previewLaunchPage(
+      previewUrl,
+      upstream.status >= 400 ? upstream.status : 502,
+      `</head><body><p role="alert">${escapeHtml(message)}</p></body>`,
+      setCookie,
+    );
+  });
+}
+
 function routeRequest(
   config: ValidatedConfig,
   request: Request,
@@ -3197,8 +3590,13 @@ function routeRequest(
       });
     const method = request.method.toUpperCase();
     if ((method === "GET" || method === "HEAD") && parsed.route === "/" && parsed.query === "") {
-      const body = renderStudioHtml(config.mountPath, config.dashboardOrigin, config.assets);
-      const headers = securityHeaders("text/html; charset=utf-8");
+      const body = renderStudioHtml(
+        config.mountPath,
+        config.dashboardOrigin,
+        config.assets,
+        config.previewUrl !== null,
+      );
+      const headers = securityHeaders("text/html; charset=utf-8", "no-store", config.shellCsp);
       return new Response(method === "HEAD" ? null : body, { status: 200, headers });
     }
     if (isStudioContentShellRoute(parsed.route) && parsed.query === "") {
@@ -3211,8 +3609,13 @@ function routeRequest(
           outcome: "rejected",
         });
       }
-      const body = renderStudioHtml(config.mountPath, config.dashboardOrigin, config.assets);
-      const headers = securityHeaders("text/html; charset=utf-8");
+      const body = renderStudioHtml(
+        config.mountPath,
+        config.dashboardOrigin,
+        config.assets,
+        config.previewUrl !== null,
+      );
+      const headers = securityHeaders("text/html; charset=utf-8", "no-store", config.shellCsp);
       return new Response(method === "HEAD" ? null : body, { status: 200, headers });
     }
     if (
@@ -3243,6 +3646,21 @@ function routeRequest(
       body.set(asset.body);
       return new Response(method === "HEAD" ? null : body.buffer, { status: 200, headers });
     }
+    if (parsed.route === "/preview/launch.js" && parsed.query === "") {
+      if ((method !== "GET" && method !== "HEAD") || config.previewUrl === null) {
+        return yield* new StudioHttpFailure({
+          status: 404,
+          code: "STUDIO_ROUTE_NOT_FOUND",
+          message: "The Studio route was not found.",
+          outcome: "rejected",
+        });
+      }
+      const headers = securityHeaders("text/javascript; charset=utf-8");
+      return new Response(method === "HEAD" ? null : previewLaunchScript, { status: 200, headers });
+    }
+    if (parsed.route === "/preview/launch") {
+      return yield* previewLaunch(config, request, method, parsed.query, requestId);
+    }
     if (parsed.route.startsWith("/api/content/")) {
       yield* requireSameOrigin(request, config);
       const target = studioContentTarget(parsed.route, parsed.query, method);
@@ -3271,7 +3689,9 @@ function routeRequest(
             ? maximumContentResolveRequestBytes
             : studioContentCommandRoute(parsed.route)
               ? maximumContentCommandRequestBytes
-              : maximumContentRequestBytes;
+              : parsed.route.endsWith("/presentation/publish")
+                ? maximumContentPresentationRequestBytes
+                : maximumContentRequestBytes;
         requestBody = yield* Effect.tryPromise({
           try: () => boundedRequestText(request, maximumRequestBytes),
           catch: () =>

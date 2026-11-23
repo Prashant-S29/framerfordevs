@@ -401,6 +401,7 @@ const contentRepository = {
           canWriteLocalized: behavior.canWriteLocalized,
           canWriteShared: false,
           canPublish: behavior.canPublish,
+          canPublishPresentation: false,
         }),
 };
 const schemaRepository = {

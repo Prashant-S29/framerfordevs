@@ -62,6 +62,8 @@ import {
   ControlPlaneSetStudioRuntimeInput,
   ControlPlaneStudioRegistrationScope,
   ControlPlanePutStudioRegistrationRequest,
+  ControlPlanePutPreviewTargetRequest,
+  ControlPlaneClearPreviewTargetRequest,
   ControlPlaneSetStudioRuntimeRequest,
   ControlPlaneUpdateInvalidationMappingRequest,
   ControlPlaneUpdateLocaleRequest,
@@ -679,6 +681,14 @@ export function decodeControlPlanePutStudioRegistrationInput(
   );
 }
 
+export function decodeControlPlanePutPreviewTargetRequest(body: unknown) {
+  return decodeInput(ControlPlanePutPreviewTargetRequest, body, "body");
+}
+
+export function decodeControlPlaneClearPreviewTargetRequest(body: unknown) {
+  return decodeInput(ControlPlaneClearPreviewTargetRequest, body, "body");
+}
+
 export function decodeControlPlaneSetStudioRuntimeInput(
   projectId: string,
   environmentId: string,
@@ -726,6 +736,9 @@ export const controlPlaneBearerRequirements = {
   listCapabilities: projectAuthority(CONTROL_PLANE_READ_SCOPE, ["project.read"]),
   enableCapability: projectAuthority(CONTROL_PLANE_WRITE_SCOPE, ["project.capability.manage"]),
   getStudioRegistration: projectAuthority(CONTROL_PLANE_READ_SCOPE, ["project.read"]),
+  getPreviewTarget: projectAuthority(CONTROL_PLANE_READ_SCOPE, ["project.read"]),
+  putPreviewTarget: projectAuthority(CONTROL_PLANE_WRITE_SCOPE, ["project.update"]),
+  clearPreviewTarget: projectAuthority(CONTROL_PLANE_WRITE_SCOPE, ["project.update"]),
   putStudioRegistration: projectAuthority(CONTROL_PLANE_WRITE_SCOPE, ["project.update"]),
   setStudioRuntime: oauthOnly(CONTROL_PLANE_WRITE_SCOPE),
   getGovernance: oauthOnly(CONTROL_PLANE_GOVERNANCE_READ_SCOPE),

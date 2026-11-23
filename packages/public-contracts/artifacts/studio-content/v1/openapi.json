@@ -812,6 +812,140 @@
         ],
         "type": "object"
       },
+      "PreviewHandoffEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "expiresAt": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+            "type": "string"
+          },
+          "localizedRevisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previewUrl": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "type": "string"
+          },
+          "schemaRevisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sharedRevisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "enum": [
+              "current",
+              "revision"
+            ],
+            "type": "string"
+          },
+          "token": {
+            "maxLength": 2048,
+            "minLength": 8,
+            "pattern": "^ffd_pvh_[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]{43}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "expiresAt",
+          "previewUrl",
+          "source",
+          "schemaRevisionId",
+          "sharedRevisionId",
+          "localizedRevisionId"
+        ],
+        "type": "object"
+      },
+      "PreviewHandoffRequest": {
+        "$ref": "#/components/schemas/PreviewHandoffRequestEncoded"
+      },
+      "PreviewHandoffRequestEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "revisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "enum": [
+              "current",
+              "revision"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "revisionId"
+        ],
+        "type": "object"
+      },
+      "PreviewHandoffResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PreviewHandoffEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
       "ReferenceConfiguration": {
         "additionalProperties": false,
         "properties": {
@@ -1060,6 +1194,11 @@
               "REVISION_INCOMPATIBLE",
               "PUBLICATION_INVALID",
               "PUBLICATION_STATE_CONFLICT",
+              "PRESENTATION_ROLE_VISIBILITY_FORBIDDEN",
+              "PRESENTATION_SCOPE_RESTRICTED",
+              "PUBLISHED_SCHEMA_REQUIRED",
+              "PREVIEW_TARGET_REQUIRED",
+              "PREVIEW_REVISION_INCOMPATIBLE",
               "INVALID_CURSOR",
               "STALE_CURSOR",
               "REQUEST_TOO_LARGE",
@@ -1148,6 +1287,9 @@
           "canPublish": {
             "type": "boolean"
           },
+          "canPublishPresentation": {
+            "type": "boolean"
+          },
           "canRename": {
             "type": "boolean"
           },
@@ -1163,7 +1305,8 @@
           "canRename",
           "canSaveLocalized",
           "canSaveShared",
-          "canPublish"
+          "canPublish",
+          "canPublishPresentation"
         ],
         "type": "object"
       },
@@ -4335,6 +4478,484 @@
         ],
         "type": "object"
       },
+      "StudioPresentationDocumentEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/StudioPresentationFieldEncoded"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/StudioPresentationLayoutEncoded"
+          }
+        },
+        "required": [
+          "displayName",
+          "description",
+          "fields",
+          "layout"
+        ],
+        "type": "object"
+      },
+      "StudioPresentationEditEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/StudioPresentationFieldEditEncoded"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/StudioPresentationLayoutEncoded"
+          }
+        },
+        "required": [
+          "displayName",
+          "description",
+          "fields",
+          "layout"
+        ],
+        "type": "object"
+      },
+      "StudioPresentationEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "collectionId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "presentation": {
+            "$ref": "#/components/schemas/StudioPresentationDocumentEncoded"
+          },
+          "revisionId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "sequence": {
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "collectionId",
+          "revisionId",
+          "sequence",
+          "presentation"
+        ],
+        "type": "object"
+      },
+      "StudioPresentationEnumOptionEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "optionId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "position": {
+            "maximum": 99,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "optionId",
+          "label",
+          "position"
+        ],
+        "type": "object"
+      },
+      "StudioPresentationFieldEditEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "displayLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enumOptions": {
+            "items": {
+              "$ref": "#/components/schemas/StudioPresentationEnumOptionEncoded"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "fieldId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "helpText": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "placeholder": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "maximum": 99,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fieldId",
+          "displayLabel",
+          "position",
+          "helpText",
+          "placeholder",
+          "enumOptions"
+        ],
+        "type": "object"
+      },
+      "StudioPresentationFieldEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "displayLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enumOptions": {
+            "items": {
+              "$ref": "#/components/schemas/StudioPresentationEnumOptionEncoded"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "fieldId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "helpText": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "enum": [
+              "short_text",
+              "long_text",
+              "rich_text",
+              "number",
+              "decimal",
+              "money",
+              "boolean",
+              "date",
+              "date_time",
+              "enum",
+              "url",
+              "email",
+              "slug",
+              "json",
+              "object",
+              "list",
+              "reference",
+              "external_asset"
+            ],
+            "type": "string"
+          },
+          "parentFieldId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "placeholder": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "maximum": 99,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fieldId",
+          "displayLabel",
+          "position",
+          "helpText",
+          "placeholder",
+          "enumOptions",
+          "parentFieldId",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "StudioPresentationGroupEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "columns": {
+            "enum": [
+              1,
+              2
+            ],
+            "type": "number"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/StudioPresentationPlacementEncoded"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "position": {
+            "maximum": 19,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "position",
+          "columns",
+          "fields"
+        ],
+        "type": "object"
+      },
+      "StudioPresentationLayoutEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "sidebarGroups": {
+            "items": {
+              "$ref": "#/components/schemas/StudioPresentationGroupEncoded"
+            },
+            "maxItems": 10,
+            "type": "array"
+          },
+          "tabs": {
+            "items": {
+              "$ref": "#/components/schemas/StudioPresentationTabEncoded"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "tabs",
+          "sidebarGroups"
+        ],
+        "type": "object"
+      },
+      "StudioPresentationPlacementEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "fieldId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "helpTextOverride": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "maximum": 99,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fieldId",
+          "position",
+          "helpTextOverride"
+        ],
+        "type": "object"
+      },
+      "StudioPresentationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudioPresentationEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StudioPresentationTabEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/StudioPresentationGroupEncoded"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "position": {
+            "maximum": 9,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "position",
+          "groups"
+        ],
+        "type": "object"
+      },
       "StudioPublicationEntryIssueEncoded": {
         "additionalProperties": false,
         "properties": {
@@ -4774,6 +5395,88 @@
           "expectedSharedRevisionId",
           "expectedLocalizedVersion",
           "expectedLocalizedRevisionId"
+        ],
+        "type": "object"
+      },
+      "StudioPublishPresentationRequest": {
+        "$ref": "#/components/schemas/StudioPublishPresentationRequestEncoded"
+      },
+      "StudioPublishPresentationRequestEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "expectedRevisionId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+            "type": "string"
+          },
+          "expectedSequence": {
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "presentation": {
+            "$ref": "#/components/schemas/StudioPresentationEditEncoded"
+          }
+        },
+        "required": [
+          "commandId",
+          "expectedRevisionId",
+          "expectedSequence",
+          "presentation"
+        ],
+        "type": "object"
+      },
+      "StudioPublishPresentationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudioPublishPresentationResultEncoded"
+          },
+          "error": {
+            "type": "null"
+          },
+          "message": {
+            "maxLength": 512,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ok": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "error",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StudioPublishPresentationResultEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "noOp": {
+            "type": "boolean"
+          },
+          "presentation": {
+            "$ref": "#/components/schemas/StudioPresentationEncoded"
+          },
+          "replayed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "replayed",
+          "noOp",
+          "presentation"
         ],
         "type": "object"
       },
@@ -5866,7 +6569,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -6257,7 +6960,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -6648,7 +7351,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -7050,7 +7753,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -7452,7 +8155,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -7684,6 +8387,409 @@
         "summary": "Optimistically rename locale-neutral entry metadata"
       }
     },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/{entryId}/preview-handoffs": {
+      "post": {
+        "description": "Only the Studio server calls this operation. It posts the token to the environment Preview URL and never exposes it to Studio browser JavaScript.",
+        "operationId": "issueStudioPreviewHandoff",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "maxLength": 35,
+              "minLength": 2,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entryId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewHandoffRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-maximum-bytes": 4096
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewHandoffResponse"
+                }
+              }
+            },
+            "description": "The signed handoff and the Preview URL.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The strict path, query, cursor, or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A current Studio bearer token is required.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The exact authorized Studio Content scope is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The request or projected response exceeds its fixed bound.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The Studio request quota is exhausted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "studioBearer": []
+          }
+        ],
+        "summary": "Issue a five-minute Preview handoff token for the Studio server"
+      }
+    },
     "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/locales/{locale}/entries/{entryId}/publication": {
       "get": {
         "operationId": "getStudioEntryPublication",
@@ -7843,7 +8949,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -8245,7 +9351,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -8680,7 +9786,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -9082,7 +10188,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -9494,7 +10600,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -9918,7 +11024,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -10327,7 +11433,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -10727,7 +11833,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -11138,7 +12244,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -11520,7 +12626,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -11913,7 +13019,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -12306,7 +13412,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"
@@ -12538,6 +13644,761 @@
         "summary": "Search literal case-insensitive display-name prefixes"
       }
     },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/presentation": {
+      "get": {
+        "operationId": "getStudioPresentation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPresentationResponse"
+                }
+              }
+            },
+            "description": "The current editorial form layout.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The strict path, query, cursor, or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A current Studio bearer token is required.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The exact authorized Studio Content scope is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The request or projected response exceeds its fixed bound.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The Studio request quota is exhausted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "studioBearer": []
+          }
+        ],
+        "summary": "Load the editorial form layout without role visibility"
+      }
+    },
+    "/projects/{projectId}/environments/{environmentId}/collections/{collectionId}/presentation/publish": {
+      "post": {
+        "operationId": "publishStudioPresentation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "environmentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioPublishPresentationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-maximum-bytes": 262144
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioPublishPresentationResponse"
+                }
+              }
+            },
+            "description": "The published, replayed, or unchanged form layout revision.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The strict path, query, cursor, or request body is invalid.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A current Studio bearer token is required.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The exact authorized Studio Content scope is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "Current schema, configuration, name, draft, command, revision compatibility (REVISION_INCOMPATIBLE), or publication state (PUBLICATION_STATE_CONFLICT) authority conflicts.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The request or projected response exceeds its fixed bound.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "The Studio request quota is exhausted.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "An unexpected internal error occurred.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioContentApiFailure"
+                }
+              }
+            },
+            "description": "A required service is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              },
+              "RateLimit-Limit": {
+                "$ref": "#/components/headers/RateLimitLimit"
+              },
+              "RateLimit-Remaining": {
+                "$ref": "#/components/headers/RateLimitRemaining"
+              },
+              "RateLimit-Reset": {
+                "$ref": "#/components/headers/RateLimitReset"
+              },
+              "Referrer-Policy": {
+                "$ref": "#/components/headers/ReferrerPolicy"
+              },
+              "X-Content-Type-Options": {
+                "$ref": "#/components/headers/ContentTypeOptions"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "studioBearer": []
+          }
+        ],
+        "summary": "Publish labels, order, tabs, and groups as one presentation revision"
+      }
+    },
     "/projects/{projectId}/environments/{environmentId}/context": {
       "get": {
         "operationId": "getStudioContentContext",
@@ -12669,7 +14530,7 @@
                 }
               }
             },
-            "description": "The current Studio user is not allowed to perform this operation.",
+            "description": "The current Studio user is not allowed to perform this operation, or a form layout change is outside editorial authority (PRESENTATION_ROLE_VISIBILITY_FORBIDDEN, PRESENTATION_SCOPE_RESTRICTED).",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/CacheControl"

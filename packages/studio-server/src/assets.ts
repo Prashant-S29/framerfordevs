@@ -107,6 +107,7 @@ export function renderStudioHtml(
   mountPath: string,
   dashboardOrigin: string,
   assets: StudioAssets,
+  previewEnabled = false,
 ): string {
-  return `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="ffd-studio-mount" content="${mountPath}"><meta name="ffd-studio-dashboard-origin" content="${dashboardOrigin}"><title>Studio</title>${assets.stylesheets.map((path) => `<link rel="stylesheet" href="${mountPath}${path}">`).join("")}</head><body><a class="sr-only focus:not-sr-only" href="#main-content">Skip to content</a><div id="studio-root"></div><noscript>Studio requires JavaScript.</noscript><script type="module" src="${mountPath}${assets.entryScript}"></script></body></html>\n`;
+  return `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="ffd-studio-mount" content="${mountPath}"><meta name="ffd-studio-dashboard-origin" content="${dashboardOrigin}">${previewEnabled ? '<meta name="ffd-studio-preview" content="enabled">' : ""}<title>Studio</title>${assets.stylesheets.map((path) => `<link rel="stylesheet" href="${mountPath}${path}">`).join("")}</head><body><a class="sr-only focus:not-sr-only" href="#main-content">Skip to content</a><div id="studio-root"></div><noscript>Studio requires JavaScript.</noscript><script type="module" src="${mountPath}${assets.entryScript}"></script></body></html>\n`;
 }

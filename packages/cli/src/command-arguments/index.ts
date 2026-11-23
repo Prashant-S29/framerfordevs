@@ -156,6 +156,29 @@ export function validateFlags(arguments_: ParsedArguments): void {
       "command-id": "string",
       json: "boolean",
     },
+    "preview target get": {
+      api: "string",
+      project: "string",
+      "environment-id": "string",
+      json: "boolean",
+    },
+    "preview target set": {
+      api: "string",
+      project: "string",
+      "environment-id": "string",
+      url: "string",
+      "expected-version": "string",
+      "command-id": "string",
+      json: "boolean",
+    },
+    "preview target clear": {
+      api: "string",
+      project: "string",
+      "environment-id": "string",
+      "expected-version": "string",
+      "command-id": "string",
+      json: "boolean",
+    },
     "governance inspect": { api: "string", project: "string", json: "boolean" },
     "member list": {
       api: "string",
@@ -300,6 +323,13 @@ export function validateFlags(arguments_: ParsedArguments): void {
       scope: "string",
       cursor: "string",
       limit: "string",
+      json: "boolean",
+    },
+    "entry preview": {
+      collection: "string",
+      entry: "string",
+      locale: "string",
+      revision: "string",
       json: "boolean",
     },
     "entry revision": {

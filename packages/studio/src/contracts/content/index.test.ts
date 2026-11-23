@@ -31,6 +31,7 @@ const capabilities = {
   canSaveLocalized: true,
   canSaveShared: false,
   canPublish: true,
+  canPublishPresentation: false,
 };
 
 const form = {

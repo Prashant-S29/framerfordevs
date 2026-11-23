@@ -532,6 +532,31 @@ export function previewV1(
   };
 }
 
+/**
+ * Creates a server-side reader for Preview handoff tokens.
+ *
+ * The Studio posts a five-minute `ffd_pvh_` token to your Preview URL as the `token` form field.
+ * `ffd entry preview` prints the same kind of token. Call `read` on your server with that token to
+ * load the bound entry, locale, and source. Never send the token to browser JavaScript, a URL, or logs.
+ */
+export function previewHandoffV1(options: Omit<ClientFactoryOptions, "token">) {
+  const request = makeClient(options);
+  return {
+    /**
+     * Reads the entry that the handoff token binds.
+     *
+     * Fails with `CREDENTIAL_INVALID` when the token expired, was changed, or the environment
+     * Preview URL changed after the token was issued.
+     */
+    read: (token: string, input: ClientRequestOptions = {}) => {
+      if (!/^ffd_pvh_[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/u.test(token) || token.length > 2_048) {
+        throw new Error("Preview handoff requires an ffd_pvh_ token.");
+      }
+      return request("/api/preview/v1/handoff", decodePreview, input, token);
+    },
+  };
+}
+
 export function createProjectClient(options: ProjectClientOptions) {
   return {
     delivery: deliveryV1(options),

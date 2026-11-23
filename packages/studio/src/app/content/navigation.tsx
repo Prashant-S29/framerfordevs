@@ -15,6 +15,8 @@ import {
   useStudioContentContext,
 } from "./data";
 
+export { CollectionLayout } from "./layout";
+
 function ContentFailure({
   error,
   onRetry,
@@ -69,6 +71,11 @@ export function ContentIndex() {
                   </li>
                 ))}
               </ul>
+              {collection.capabilities.canPublishPresentation ? (
+                <Link to="/content/$collectionId/layout" params={{ collectionId: collection.id }}>
+                  Edit form layout
+                </Link>
+              ) : null}
             </article>
           ))}
         </div>

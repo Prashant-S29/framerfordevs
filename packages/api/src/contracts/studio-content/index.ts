@@ -19,6 +19,7 @@ import {
 } from "../entry";
 import {
   EditorLayoutNodeId,
+  EnumOptionId,
   type FieldConfigurationByKind,
   FieldNodeRole,
   fieldConfigurationSchemas,
@@ -34,6 +35,7 @@ import {
 } from "../publication";
 import { ApiErrorDetail, type ApiData, ApiSuccessSchema, RequestIdSchema } from "../response/api";
 import {
+  CollectionDescription,
   CollectionDisplayName,
   CollectionFieldDisplayLabel,
   CollectionFieldId,
@@ -41,7 +43,9 @@ import {
   CollectionFieldLocalization,
   CollectionId,
   ContractHash,
+  SchemaPublicationCommandId,
   SchemaRevisionId,
+  SchemaRevisionSequence,
 } from "../schema";
 
 export const studioContentLimits = {
@@ -49,6 +53,7 @@ export const studioContentLimits = {
   responseBytes: 4_194_304,
   searchRequestBytes: 2_048,
   commandRequestBytes: 4_096,
+  presentationRequestBytes: 262_144,
   pageLimitDefault: 25,
   pageLimitMinimum: 10,
   pageLimitMaximum: 50,
@@ -69,6 +74,16 @@ export class StudioContentScope extends Schema.Class<StudioContentScope>("Studio
   Schema.Struct({
     projectId: ProjectId,
     environmentId: EnvironmentId,
+  }),
+) {}
+
+export class StudioCollectionScope extends Schema.Class<StudioCollectionScope>(
+  "StudioCollectionScope",
+)(
+  Schema.Struct({
+    projectId: ProjectId,
+    environmentId: EnvironmentId,
+    collectionId: CollectionId,
   }),
 ) {}
 
@@ -148,6 +163,7 @@ export class StudioContentCollectionCapabilities extends Schema.Class<StudioCont
     canSaveLocalized: Schema.Boolean,
     canSaveShared: Schema.Boolean,
     canPublish: Schema.Boolean,
+    canPublishPresentation: Schema.Boolean,
   }),
 ) {}
 
@@ -781,6 +797,149 @@ export class StudioUnpublishEntryRequest extends Schema.Class<StudioUnpublishEnt
   }),
 ) {}
 
+const PresentationPosition = (maximum: number) =>
+  Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 0, maximum }));
+const PresentationTitle = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100));
+const PresentationDescription = Schema.NullOr(Schema.String.check(Schema.isMaxLength(500)));
+
+export class StudioPresentationEnumOption extends Schema.Class<StudioPresentationEnumOption>(
+  "StudioPresentationEnumOption",
+)(
+  Schema.Struct({
+    optionId: EnumOptionId,
+    label: PresentationTitle,
+    position: PresentationPosition(99),
+  }),
+) {}
+
+const studioPresentationFieldFields = {
+  fieldId: CollectionFieldId,
+  displayLabel: Schema.NullOr(CollectionFieldDisplayLabel),
+  position: PresentationPosition(99),
+  helpText: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
+  placeholder: Schema.NullOr(Schema.String.check(Schema.isMaxLength(200))),
+  enumOptions: Schema.Array(StudioPresentationEnumOption).check(Schema.isMaxLength(100)),
+};
+
+export class StudioPresentationFieldEdit extends Schema.Class<StudioPresentationFieldEdit>(
+  "StudioPresentationFieldEdit",
+)(Schema.Struct(studioPresentationFieldFields)) {}
+
+export class StudioPresentationField extends Schema.Class<StudioPresentationField>(
+  "StudioPresentationField",
+)(
+  Schema.Struct({
+    ...studioPresentationFieldFields,
+    parentFieldId: Schema.NullOr(CollectionFieldId),
+    kind: CollectionFieldKind,
+  }),
+) {}
+
+export class StudioPresentationPlacement extends Schema.Class<StudioPresentationPlacement>(
+  "StudioPresentationPlacement",
+)(
+  Schema.Struct({
+    fieldId: CollectionFieldId,
+    position: PresentationPosition(99),
+    helpTextOverride: Schema.NullOr(Schema.String.check(Schema.isMaxLength(500))),
+  }),
+) {}
+
+export class StudioPresentationGroup extends Schema.Class<StudioPresentationGroup>(
+  "StudioPresentationGroup",
+)(
+  Schema.Struct({
+    id: EditorLayoutNodeId,
+    title: PresentationTitle,
+    description: PresentationDescription,
+    position: PresentationPosition(19),
+    columns: Schema.Literals([1, 2]),
+    fields: Schema.Array(StudioPresentationPlacement).check(Schema.isMaxLength(100)),
+  }),
+) {}
+
+export class StudioPresentationTab extends Schema.Class<StudioPresentationTab>(
+  "StudioPresentationTab",
+)(
+  Schema.Struct({
+    id: EditorLayoutNodeId,
+    title: PresentationTitle,
+    description: PresentationDescription,
+    position: PresentationPosition(9),
+    groups: Schema.Array(StudioPresentationGroup).check(
+      Schema.isMinLength(1),
+      Schema.isMaxLength(20),
+    ),
+  }),
+) {}
+
+export class StudioPresentationLayout extends Schema.Class<StudioPresentationLayout>(
+  "StudioPresentationLayout",
+)(
+  Schema.Struct({
+    tabs: Schema.Array(StudioPresentationTab).check(Schema.isMinLength(1), Schema.isMaxLength(10)),
+    sidebarGroups: Schema.Array(StudioPresentationGroup).check(Schema.isMaxLength(10)),
+  }),
+) {}
+
+export class StudioPresentationEdit extends Schema.Class<StudioPresentationEdit>(
+  "StudioPresentationEdit",
+)(
+  Schema.Struct({
+    displayName: CollectionDisplayName,
+    description: Schema.NullOr(CollectionDescription),
+    fields: Schema.Array(StudioPresentationFieldEdit).check(
+      Schema.isMinLength(1),
+      Schema.isMaxLength(100),
+    ),
+    layout: StudioPresentationLayout,
+  }),
+) {}
+
+export class StudioPresentationDocument extends Schema.Class<StudioPresentationDocument>(
+  "StudioPresentationDocument",
+)(
+  Schema.Struct({
+    displayName: CollectionDisplayName,
+    description: Schema.NullOr(CollectionDescription),
+    fields: Schema.Array(StudioPresentationField).check(
+      Schema.isMinLength(1),
+      Schema.isMaxLength(100),
+    ),
+    layout: StudioPresentationLayout,
+  }),
+) {}
+
+export class StudioPresentation extends Schema.Class<StudioPresentation>("StudioPresentation")(
+  Schema.Struct({
+    collectionId: CollectionId,
+    revisionId: SchemaRevisionId,
+    sequence: SchemaRevisionSequence,
+    presentation: StudioPresentationDocument,
+  }),
+) {}
+
+export class StudioPublishPresentationRequest extends Schema.Class<StudioPublishPresentationRequest>(
+  "StudioPublishPresentationRequest",
+)(
+  Schema.Struct({
+    commandId: SchemaPublicationCommandId,
+    expectedRevisionId: SchemaRevisionId,
+    expectedSequence: SchemaRevisionSequence,
+    presentation: StudioPresentationEdit,
+  }),
+) {}
+
+export class StudioPublishPresentationResult extends Schema.Class<StudioPublishPresentationResult>(
+  "StudioPublishPresentationResult",
+)(
+  Schema.Struct({
+    replayed: Schema.Boolean,
+    noOp: Schema.Boolean,
+    presentation: StudioPresentation,
+  }),
+) {}
+
 export class StudioCreateEntryRequest extends Schema.Class<StudioCreateEntryRequest>(
   "StudioCreateEntryRequest",
 )(
@@ -865,6 +1024,11 @@ export const StudioContentApiErrorCode = Schema.Literals([
   "REVISION_INCOMPATIBLE",
   "PUBLICATION_INVALID",
   "PUBLICATION_STATE_CONFLICT",
+  "PRESENTATION_ROLE_VISIBILITY_FORBIDDEN",
+  "PRESENTATION_SCOPE_RESTRICTED",
+  "PUBLISHED_SCHEMA_REQUIRED",
+  "PREVIEW_TARGET_REQUIRED",
+  "PREVIEW_REVISION_INCOMPATIBLE",
   "INVALID_CURSOR",
   "STALE_CURSOR",
   "REQUEST_TOO_LARGE",
@@ -928,6 +1092,10 @@ export const StudioPublicationPageResponse = studioContentSuccessSchema(StudioPu
 export const StudioPublicationPlanResponse = studioContentSuccessSchema(StudioPublicationPlan);
 export const StudioPublishResponse = studioContentSuccessSchema(StudioPublishResult);
 export const StudioUnpublishResponse = studioContentSuccessSchema(StudioUnpublishResult);
+export const StudioPresentationResponse = studioContentSuccessSchema(StudioPresentation);
+export const StudioPublishPresentationResponse = studioContentSuccessSchema(
+  StudioPublishPresentationResult,
+);
 
 // Retained only for adapters that accept the shared cursor contract at an internal boundary.
 export const StudioSharedCursor = Cursor;

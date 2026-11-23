@@ -104,6 +104,8 @@ ffd presentation publish --collection articles --file presentation.json --json
 
 The file carries exact project/environment/collection/revision/sequence authority, contains no credential, and must stay inside the linked project. Schema structure remains a separate `ffd schema` workflow.
 
+Content administrators can edit labels, help text, placeholders, order, tabs, and groups in the mounted Studio under **Edit form layout**. The Studio never shows or changes role visibility. Owners and developers change role visibility with the CLI, Authoring v1, or the hosted Presentation editor.
+
 ## Experimental composition
 
 `ffd schema build` can explicitly produce Tier 1 source from bounded local composition code. It is default-off, credential-blind, and never runs implicitly from plan, push, or the editor. The QuickJS runtime reports `memoryLimitHard: false`; upstream issue `justjake/quickjs-emscripten#255` blocks production/default Tier 2 activation.

@@ -27,6 +27,8 @@ import {
   NotFoundFailure,
   ValidationFailure,
 } from "../../contracts/response/errors";
+import { AuthoringProjectScope } from "../../contracts/authoring";
+import { GetCollectionInput } from "../../contracts/schema";
 import { StudioBootstrapScope } from "../../contracts/studio";
 import {
   StudioCommandConflictFailure,
@@ -38,6 +40,8 @@ import {
   type StudioContentPageLimit,
   StudioContentScope,
   StudioCollectionLocaleScope,
+  StudioCollectionScope,
+  StudioPublishPresentationRequest,
   StudioDraftVersionConflictFailure,
   type StudioCollectionLocaleScope as StudioCollectionLocaleScopeType,
   StudioEntryDraftProjection,
@@ -86,6 +90,9 @@ import { ApplicationLogger } from "../../observability/logger";
 import { EntryRepository } from "../../services/entry/repository";
 import { PublicationRepository } from "../../services/publication/repository";
 import { SchemaRepository } from "../../services/schema/repository";
+import { AuthoringPresentationRepository } from "../../services/authoring/presentation-repository";
+import type { PreviewHandoffRequest } from "../../contracts/preview-handoff";
+import { issuePreviewHandoff } from "../preview-handoff";
 import { StudioContentCursorSigner } from "../../services/studio-content/cursor-signer";
 import {
   type StudioCollectionAuthority,
@@ -203,6 +210,24 @@ export function decodeStudioContentScope(projectId: string, environmentId: strin
     projectId,
     environmentId,
   }).pipe(Effect.mapError(() => invalidPath()));
+}
+
+export function decodeStudioCollectionScope(
+  projectId: string,
+  environmentId: string,
+  collectionId: string,
+) {
+  return Schema.decodeUnknownEffect(StudioCollectionScope, { onExcessProperty: "error" })({
+    projectId,
+    environmentId,
+    collectionId,
+  }).pipe(Effect.mapError(() => invalidPath()));
+}
+
+export function decodeStudioPublishPresentationRequest(value: unknown) {
+  return Schema.decodeUnknownEffect(StudioPublishPresentationRequest, {
+    onExcessProperty: "error",
+  })(value).pipe(Effect.mapError(() => invalidPath()));
 }
 
 export function decodeStudioCollectionLocaleScope(
@@ -340,6 +365,7 @@ export const studioNestedCollectionOperations = [
   "validate",
   "publish",
   "unpublish",
+  "preview",
 ] as const;
 export type StudioNestedCollectionOperation = (typeof studioNestedCollectionOperations)[number];
 
@@ -361,6 +387,7 @@ const studioOperationCost = {
   validate: 3,
   publish: 5,
   unpublish: 5,
+  preview: 2,
 } as const satisfies Readonly<Record<StudioNestedCollectionOperation, number>>;
 
 function decodeActorId(principal: StudioOAuthPrincipal) {
@@ -572,6 +599,7 @@ function studioCapabilities(authority: StudioCollectionAuthority) {
     canSaveLocalized: authority.canWriteLocalized,
     canSaveShared: authority.canWriteShared,
     canPublish: authority.canPublish,
+    canPublishPresentation: authority.canPublishPresentation,
   };
 }
 
@@ -1115,5 +1143,77 @@ export const unpublishStudioEntry = Effect.fn("studio_content.public.publication
       unpublishedAt: result.unpublishedAt,
       delivery: result.delivery,
     });
+  },
+);
+
+const resolveStudioPresentationCollection = Effect.fn(
+  "studio_content.public.presentation.authorize",
+)(function* (principal: StudioOAuthPrincipal, scope: StudioCollectionScope, cost: number) {
+  yield* evaluateStudioUserRateLimit(principal, cost);
+  yield* Effect.annotateCurrentSpan({
+    projectId: scope.projectId,
+    environmentId: scope.environmentId,
+    collectionId: scope.collectionId,
+  });
+  yield* revalidateStudioContentPrincipal(principal, scope);
+  const actorId = yield* decodeActorId(principal);
+  const collection = yield* (yield* SchemaRepository).getCollection(
+    actorId,
+    GetCollectionInput.make(scope),
+  );
+  return {
+    actor: { kind: "user" as const, id: actorId },
+    project: AuthoringProjectScope.make({
+      projectId: scope.projectId,
+      environmentId: scope.environmentId,
+    }),
+    collectionKey: collection.apiKey,
+  };
+});
+
+export const getStudioPresentation = Effect.fn("studio_content.public.presentation.get")(function* (
+  principal: StudioOAuthPrincipal,
+  scope: StudioCollectionScope,
+) {
+  const target = yield* resolveStudioPresentationCollection(principal, scope, 1);
+  return yield* (yield* AuthoringPresentationRepository).getStudio(
+    target.actor,
+    target.project,
+    target.collectionKey,
+  );
+});
+
+export const publishStudioPresentation = Effect.fn("studio_content.public.presentation.publish")(
+  function* (
+    principal: StudioOAuthPrincipal,
+    scope: StudioCollectionScope,
+    request: StudioPublishPresentationRequest,
+    now: Date,
+    requestId: string,
+  ) {
+    const target = yield* resolveStudioPresentationCollection(principal, scope, 5);
+    return yield* (yield* AuthoringPresentationRepository).publishStudio(
+      target.actor,
+      target.project,
+      target.collectionKey,
+      request,
+      now,
+      requestId,
+    );
+  },
+);
+
+export const issueStudioPreviewHandoff = Effect.fn("studio_content.public.preview.handoff")(
+  function* (
+    principal: StudioOAuthPrincipal,
+    scope: StudioCollectionLocaleScopeType,
+    entryId: typeof EntryId.Type,
+    request: PreviewHandoffRequest,
+    now: Date,
+    requestId: string,
+  ) {
+    yield* authorizeStudioCollectionOperation(principal, scope, "preview", now);
+    const actorId = yield* decodeActorId(principal);
+    return yield* issuePreviewHandoff(actorId, { ...scope, entryId }, request, "studio", requestId);
   },
 );

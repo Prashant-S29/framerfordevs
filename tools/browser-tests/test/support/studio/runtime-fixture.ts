@@ -12,7 +12,12 @@ import { makeMemoryStudioStore } from "@framerfordevs/studio-server/testing";
 
 export interface StudioBrowserFixture {
   readonly origin: string;
+  readonly renderedTokens: ReadonlyArray<string>;
   readonly close: () => Promise<void>;
+}
+
+function previewToken(source: "current" | "revision"): string {
+  return `ffd_pvh_${source}${"x".repeat(24)}.${"s".repeat(43)}`;
 }
 
 const contentCollectionId = "55555555-5555-4555-8555-555555555555";
@@ -142,6 +147,7 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
     canSaveLocalized: true,
     canSaveShared: false,
     canPublish: true,
+    canPublishPresentation: true,
   };
   const readOnlyCapabilities = {
     canCreate: false,
@@ -149,7 +155,71 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
     canSaveLocalized: false,
     canSaveShared: false,
     canPublish: false,
+    canPublishPresentation: false,
   };
+  const layoutForm = browserContentForm();
+  let presentation = {
+    collectionId: contentCollectionId,
+    revisionId: contentSchemaRevisionId,
+    sequence: 1,
+    presentation: {
+      displayName: "Articles",
+      description: null as string | null,
+      fields: layoutForm.fields.map((field) => ({
+        fieldId: field.id,
+        parentFieldId: null,
+        kind: field.kind,
+        displayLabel: field.displayLabel as string | null,
+        position: field.position,
+        helpText: null as string | null,
+        placeholder: null as string | null,
+        enumOptions: [] as ReadonlyArray<unknown>,
+      })),
+      layout: {
+        tabs: layoutForm.tabs.map((tab) => ({
+          id: tab.id,
+          title: tab.title,
+          description: tab.description,
+          position: tab.position,
+          groups: tab.groups.map((group) => ({
+            id: group.id,
+            title: group.title,
+            description: group.description,
+            position: group.position,
+            columns: group.columns,
+            fields: group.fields.map((placement) => ({
+              fieldId: placement.fieldId,
+              position: placement.position,
+              helpTextOverride: placement.helpTextOverride,
+            })),
+          })),
+        })) as ReadonlyArray<unknown>,
+        sidebarGroups: [] as ReadonlyArray<unknown>,
+      },
+    },
+  };
+  const renderedTokens: Array<string> = [];
+  const renderer = express();
+  renderer.post(
+    "/api/ffd-preview",
+    express.urlencoded({ extended: false, limit: "8kb" }),
+    (request, response) => {
+      const token =
+        isRecord(request.body) && typeof request.body.token === "string" ? request.body.token : "";
+      renderedTokens.push(token);
+      const source =
+        token === previewToken("revision")
+          ? "revision"
+          : token === previewToken("current")
+            ? "current"
+            : "invalid";
+      response
+        .type("html")
+        .send(
+          `<!doctype html><html lang="en"><head><title>Rendered preview</title></head><body><h1>Rendered ${source} preview</h1></body></html>`,
+        );
+    },
+  );
   const revisions: Array<FixtureRevision> = [];
   const publications: Array<FixturePublication> = [];
   let publicationStateVersion = 0;
@@ -534,8 +604,55 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
       );
     },
   );
+  const presentationRoute =
+    "/api/studio-content/v1/projects/:projectId/environments/:environmentId/collections/:collectionId/presentation";
+  app.get(presentationRoute, (_request, response) => response.json(contentEnvelope(presentation)));
+  app.post(`${presentationRoute}/publish`, (request, response) => {
+    if (!isRecord(request.body) || request.body.expectedRevisionId !== presentation.revisionId) {
+      const stale = failure(409, "STALE_SCHEMA", "The form layout changed.");
+      response.status(stale.status).json(stale.body);
+      return;
+    }
+    const edit = isRecord(request.body.presentation) ? request.body.presentation : {};
+    const sequence = presentation.sequence + 1;
+    const editedFields = Array.isArray(edit.fields) ? edit.fields : [];
+    presentation = {
+      ...presentation,
+      revisionId: fixtureId("c", sequence),
+      sequence,
+      presentation: {
+        ...presentation.presentation,
+        displayName: typeof edit.displayName === "string" ? edit.displayName : "Articles",
+        fields: presentation.presentation.fields.map((field) => {
+          const next = editedFields.find(
+            (candidate) => isRecord(candidate) && candidate.fieldId === field.fieldId,
+          );
+          return isRecord(next) &&
+            (typeof next.displayLabel === "string" || next.displayLabel === null)
+            ? { ...field, displayLabel: next.displayLabel }
+            : field;
+        }),
+      },
+    };
+    response.json(contentEnvelope({ replayed: false, noOp: false, presentation }));
+  });
   const entryRoute =
     "/api/studio-content/v1/projects/:projectId/environments/:environmentId/collections/:collectionId/locales/:locale/entries/:entryId";
+  app.post(`${entryRoute}/preview-handoffs`, (request, response) => {
+    const source =
+      isRecord(request.body) && request.body.source === "revision" ? "revision" : "current";
+    response.json(
+      contentEnvelope({
+        token: previewToken(source),
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+        previewUrl: rendererPreviewUrl,
+        source,
+        schemaRevisionId: source === "revision" ? contentSchemaRevisionId : null,
+        sharedRevisionId: null,
+        localizedRevisionId: source === "revision" ? headRevisionId() : null,
+      }),
+    );
+  });
   app.get(`${entryRoute}/revisions`, (request, response) => {
     const items =
       request.query.scope === "localized" ? revisions.toReversed().map(revisionSummary) : [];
@@ -713,6 +830,15 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
     );
   });
 
+  const rendererServer = createServer(renderer);
+  await new Promise<void>((resolve, reject) => {
+    rendererServer.once("error", reject);
+    rendererServer.listen({ host: "127.0.0.1", port: 0, exclusive: true }, resolve);
+  });
+  const rendererAddress = rendererServer.address();
+  if (rendererAddress === null || typeof rendererAddress === "string")
+    throw new Error("Studio renderer fixture bind failed.");
+  const rendererPreviewUrl = `http://localhost:${rendererAddress.port}/api/ffd-preview`;
   const server = createServer(app);
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -737,13 +863,19 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
       keys: [{ id: "browser", key: new Uint8Array(32).fill(9) }],
     },
     assets: await loadPackagedStudioAssets(),
+    previewUrl: rendererPreviewUrl,
   });
   middleware = createExpressStudioMiddleware(handler);
 
   return {
     origin,
+    renderedTokens,
     close: async () => {
       await handler.dispose();
+      await new Promise<void>((resolve, reject) => {
+        rendererServer.close((error) => (error ? reject(error) : resolve()));
+        rendererServer.closeAllConnections();
+      });
       await new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
         server.closeAllConnections();

@@ -41,6 +41,7 @@ describe("Authoring public contract", () => {
       `${revisionsPath}/{revisionId}`,
       `${revisionsPath}/{fromRevisionId}/compare/{toRevisionId}`,
       `${revisionsPath}/{revisionId}/restore`,
+      `${entryPath}/preview-handoffs`,
       publicationPath,
       `${publicationPath}/validate`,
       `${publicationPath}/publish`,
@@ -56,13 +57,13 @@ describe("Authoring public contract", () => {
       authoringOpenApiDocument.paths[presentationPath].get["x-required-management-scopes"],
     ).toEqual(["schema.read"]);
     expect(authoringOpenApiDocument.paths[presentationPath].post["x-required-oauth-scope"]).toBe(
-      "authoring:schema:push",
+      "authoring:presentation:publish",
     );
     expect(
       authoringOpenApiDocument.paths[presentationPath].post["x-required-management-scopes"],
     ).toEqual(["schema.read", "schema.write", "schema.publish"]);
     expect(authoringPresentationPublishBearerRequirement).toEqual({
-      oauthScope: "authoring:schema:push",
+      oauthScope: "authoring:presentation:publish",
       managementScopes: ["schema.read", "schema.write", "schema.publish"],
     });
     expect(authoringOpenApiDocument.paths[formPath].get["x-required-oauth-scope"]).toBe(

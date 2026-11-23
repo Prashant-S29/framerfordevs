@@ -35,6 +35,8 @@ import {
   ControlPlanePutStudioRegistrationResult,
   ControlPlaneSetStudioRuntimeResult,
   ControlPlaneStudioRegistration,
+  ControlPlanePreviewTarget,
+  ControlPlanePreviewTargetResult,
   ControlPlaneWebhookAttemptList,
   ControlPlaneWebhookDeliveryDetail,
   ControlPlaneWebhookDeliveryPage,
@@ -117,6 +119,17 @@ export interface PutStudioRegistrationRequest {
   readonly expectedVersion: number | null;
   readonly applicationOrigin: string;
   readonly mountPath: string;
+}
+
+export interface PutPreviewTargetRequest {
+  readonly commandId: string;
+  readonly expectedVersion: number | null;
+  readonly previewUrl: string;
+}
+
+export interface ClearPreviewTargetRequest {
+  readonly commandId: string;
+  readonly expectedVersion: number;
 }
 
 export interface SetStudioRuntimeRequest {
@@ -896,6 +909,44 @@ export function makeControlPlaneHttpClient(options: ControlPlaneHttpClientOption
         "PUT",
         `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/studio-registration`,
         ControlPlanePutStudioRegistrationResult,
+        body,
+        requestOptions,
+      ),
+    getPreviewTarget: (
+      projectId: string,
+      environmentId: string,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "GET",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/preview-target`,
+        ControlPlanePreviewTarget,
+        null,
+        requestOptions,
+      ),
+    putPreviewTarget: (
+      projectId: string,
+      environmentId: string,
+      body: PutPreviewTargetRequest,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "PUT",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/preview-target`,
+        ControlPlanePreviewTargetResult,
+        body,
+        requestOptions,
+      ),
+    clearPreviewTarget: (
+      projectId: string,
+      environmentId: string,
+      body: ClearPreviewTargetRequest,
+      requestOptions?: ControlPlaneRequestOptions,
+    ) =>
+      request(
+        "POST",
+        `/api/control-plane/v1/projects/${segment(projectId)}/environments/${segment(environmentId)}/preview-target/clear`,
+        ControlPlanePreviewTargetResult,
         body,
         requestOptions,
       ),

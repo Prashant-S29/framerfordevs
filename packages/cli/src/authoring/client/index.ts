@@ -44,6 +44,29 @@ const ApiKey = Schema.String.check(
   Schema.isPattern(/^[a-z][a-z0-9_]{0,62}$/u),
   Schema.makeFilter((value) => !value.includes("__") && !value.endsWith("_")),
 );
+const Locale = Schema.String.check(
+  Schema.isMinLength(2),
+  Schema.isMaxLength(35),
+  Schema.isPattern(/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/u),
+);
+const PreviewHandoffRequest = Schema.Struct({
+  source: Schema.Literals(["current", "revision"]),
+  revisionId: Schema.NullOr(Uuid),
+});
+export type PreviewHandoffRequest = typeof PreviewHandoffRequest.Type;
+const PreviewHandoff = Schema.Struct({
+  token: Schema.String.check(
+    Schema.isMaxLength(2_048),
+    Schema.isPattern(/^ffd_pvh_[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/u),
+  ),
+  expiresAt: Schema.String.check(Schema.isMinLength(20), Schema.isMaxLength(35)),
+  previewUrl: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)),
+  source: Schema.Literals(["current", "revision"]),
+  schemaRevisionId: Schema.NullOr(Uuid),
+  sharedRevisionId: Schema.NullOr(Uuid),
+  localizedRevisionId: Schema.NullOr(Uuid),
+});
+
 const reservedSourceKeys = new Set([
   "id",
   "entry_id",
@@ -291,6 +314,10 @@ const AuthoringErrorCode = Schema.Literals([
   "PUBLICATION_CONFLICT",
   "PUBLICATION_INVALID",
   "COMMAND_CONFLICT",
+  "PRESENTATION_ROLE_VISIBILITY_FORBIDDEN",
+  "PREVIEW_TARGET_REQUIRED",
+  "PREVIEW_REVISION_INCOMPATIBLE",
+  "PRESENTATION_SCOPE_RESTRICTED",
   "RISKY_ACKNOWLEDGEMENT_REQUIRED",
   "SOURCE_IDENTITY_CONFLICT",
   "REQUEST_TOO_LARGE",
@@ -515,6 +542,20 @@ export function makeAuthoringOperatorClient(options: AuthoringOperatorClientOpti
           "POST",
           requestBody(AuthoringSchemaApplyRequest, body),
           AuthoringSchemaApply,
+        ),
+    },
+    preview: {
+      handoff: (
+        collectionKey: string,
+        locale: string,
+        entryId: string,
+        body: PreviewHandoffRequest,
+      ) =>
+        request(
+          `${collectionPath(collectionKey)}/locales/${segment(Locale, locale)}/entries/${segment(Uuid, entryId)}/preview-handoffs`,
+          "POST",
+          requestBody(PreviewHandoffRequest, body),
+          PreviewHandoff,
         ),
     },
     presentation: {

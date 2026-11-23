@@ -106,6 +106,7 @@ describe("Studio Content contracts", () => {
       canSaveLocalized: true,
       canSaveShared: true,
       canPublish: true,
+      canPublishPresentation: false,
     };
     const form = {
       collectionId: ids.collection,
@@ -375,6 +376,7 @@ describe("Studio Content contracts", () => {
       canSaveLocalized: true,
       canSaveShared: true,
       canPublish: true,
+      canPublishPresentation: false,
     };
     const collection = { id: ids.collection, displayName: "Entries", capabilities };
     const notice = {
