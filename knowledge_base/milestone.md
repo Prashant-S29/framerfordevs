@@ -20,16 +20,9 @@ Scope per milestone. Status is in `progress.md`. A pending entry is context, not
 - 14–17: Control Plane v1 bootstrap and CLI parity. Governance and operational administration with recovery. Separate marketing, docs, and dashboard hosts.
 - 18A–18B: Studio registration authority, OAuth, mounted Studio runtime, encrypted sessions, framework adapters.
 - 19A–19B: Studio Content protocol and the mounted browse, search, edit, and recovery experience.
-- 20A: Studio revision history, compare, restore, and exact-locale publication with Authoring, SDK, and CLI parity.
-- 20B: Studio current and historical Preview through a server token handoff, and editorial Presentation publication for content_admin.
+- 20A–20C: Studio revision history, compare, restore, and exact-locale publication. Studio Preview through a server token handoff and editorial Presentation publication. `ffd editor` hosts the Studio on loopback, and the dashboard keeps only structure and administration.
 
 ## Pending
-
-### Milestone 20 — Studio editorial lifecycle
-
-Converge the local editor and the hosted dashboard on the Studio before client handover, in one remaining part. Exclude review approval, scheduling, visual editing, and schema mutation.
-
-- 20C: Host the Studio workspace in `ffd editor` over its loopback transport without exposing the token. Retire dashboard editorial and preview routes after parity browser specs pass, and keep hosted structure and administration.
 
 ### Milestone 21 — Client handover and editorial safety
 

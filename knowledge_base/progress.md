@@ -28,7 +28,7 @@ Status: `[A]` accepted, `[R]` in developer review, `[~]` in progress, `[P]` plan
 | 19B | Mounted Studio content experience       | `[A]`  | `ec37524` |
 | 20A | Studio revisions and publication        | `[A]`  | `ebe2aa8` |
 | 20B | Studio Preview and Presentation         | `[A]`  | `1e8fe9b` |
-| 20C | Editor convergence and route retirement | `[R]`  | —         |
+| 20C | Editor convergence and route retirement | `[A]`  | `94bd7f4` |
 | 21  | Client handover and editorial safety    | `[P]`  | —         |
 | 22  | Data durability and portability         | `[P]`  | —         |
 | 23  | Production security and operations      | `[P]`  | —         |
@@ -47,4 +47,4 @@ Status: `[A]` accepted, `[R]` in developer review, `[~]` in progress, `[P]` plan
 - Migrations `0000`–`0024` are applied locally. The developer generates and applies every migration.
 - The schema, SDK, CLI, and Studio packages are unpublished at `0.0.0`. Versioning and publication wait for the developer.
 - Production OAuth, domains, configuration, and deployment are not set up.
-- QuickJS issue #255 blocks production activation of the Tier 2 schema build. It does not block M20–M30.
+- QuickJS issue #255 blocks production activation of the Tier 2 schema build. It does not block M21–M30.
