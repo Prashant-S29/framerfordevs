@@ -1,7 +1,12 @@
 import { Schema } from "effect";
 
 import { CanonicalEmail, ProjectRole } from "../access";
-import { StudioApplicationOrigin, StudioMountPath, StudioRegistrationId } from "../control-plane";
+import {
+  PreviewTargetUrl,
+  StudioApplicationOrigin,
+  StudioMountPath,
+  StudioRegistrationId,
+} from "../control-plane";
 
 export { StudioRuntimeStatus } from "../control-plane";
 import {
@@ -84,9 +89,24 @@ const StudioBootstrapActions = Schema.Array(StudioBootstrapAction).check(
   }),
 );
 
+export class StudioMountedHost extends Schema.Class<StudioMountedHost>("StudioMountedHost")({
+  kind: Schema.Literal("mounted"),
+  registration: StudioRegistrationAuthority,
+}) {}
+
+export class StudioLocalEditorHost extends Schema.Class<StudioLocalEditorHost>(
+  "StudioLocalEditorHost",
+)({
+  kind: Schema.Literal("local_editor"),
+  previewUrl: Schema.NullOr(PreviewTargetUrl),
+}) {}
+
+export const StudioBootstrapHost = Schema.Union([StudioMountedHost, StudioLocalEditorHost]);
+export type StudioBootstrapHost = typeof StudioBootstrapHost.Type;
+
 export class StudioBootstrap extends Schema.Class<StudioBootstrap>("StudioBootstrap")({
   formatVersion: Schema.Literal(1),
-  registration: StudioRegistrationAuthority,
+  host: StudioBootstrapHost,
   project: StudioProjectIdentity,
   environment: StudioEnvironmentIdentity,
   user: StudioUserIdentity,

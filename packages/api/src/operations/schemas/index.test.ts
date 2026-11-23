@@ -2,16 +2,6 @@ import { assert, describe, layer } from "@effect/vitest";
 import { Effect, Exit, Layer, Schema } from "effect";
 
 import {
-  AuthoringCollectionPresentation,
-  AuthoringPresentationRevision,
-  AuthoringPresentationSnapshot,
-  AuthoringPublishPresentationResult,
-} from "../../contracts/authoring/presentation";
-import {
-  GetCollectionPresentationInput,
-  PublishCollectionPresentationInput,
-} from "../../contracts/presentation/management";
-import {
   CollectionDraftSchema,
   GetCollectionDraftInput,
   GetLatestPublishedSchemaInput,
@@ -19,18 +9,8 @@ import {
   PublishedSchemaRevision,
 } from "../../contracts/schema";
 import { TelemetryLive } from "../../observability/telemetry";
-import {
-  AuthoringPresentationRepository,
-  makeAuthoringPresentationRepository,
-} from "../../services/authoring/presentation-repository";
 import { SchemaRepository, makeSchemaRepository } from "../../services/schema/repository";
-import {
-  getCollectionDraft,
-  getCollectionPresentation,
-  getLatestPublishedSchema,
-  getPublishedSchemaRevision,
-  publishCollectionPresentation,
-} from "./index";
+import { getCollectionDraft, getLatestPublishedSchema, getPublishedSchemaRevision } from "./index";
 
 const projectId = "019fae8b-1234-7000-8000-000000000001";
 const environmentId = "019fae8b-1234-7000-8000-000000000002";
@@ -155,45 +135,6 @@ const revision = Schema.decodeUnknownSync(PublishedSchemaRevision, { onExcessPro
   editorLayout,
 });
 
-const presentation = Schema.decodeUnknownSync(AuthoringCollectionPresentation, {
-  onExcessProperty: "error",
-})({
-  displayName: "Articles",
-  description: null,
-  fields: [
-    {
-      fieldId,
-      displayLabel: "Title",
-      position: 0,
-      editor,
-      enumOptions: [],
-    },
-  ],
-  editorLayout,
-});
-const presentationRevision = Schema.decodeUnknownSync(AuthoringPresentationRevision, {
-  onExcessProperty: "error",
-})({
-  collectionId,
-  revisionId,
-  previousRevisionId: null,
-  sequence: 1,
-  schemaHash: "a".repeat(64),
-  structureHash: "c".repeat(64),
-  contractHash: "b".repeat(64),
-  publishedAt: timestamp,
-});
-const presentationSnapshot = AuthoringPresentationSnapshot.make({
-  revision: presentationRevision,
-  presentation,
-});
-const presentationResult = AuthoringPublishPresentationResult.make({
-  commandId: revision.commandId,
-  replayed: false,
-  noOp: false,
-  ...presentationSnapshot,
-});
-
 const calls: Array<string> = [];
 const RepositoryTest = Layer.succeed(SchemaRepository, {
   ...makeSchemaRepository(),
@@ -202,12 +143,7 @@ const RepositoryTest = Layer.succeed(SchemaRepository, {
   getLatestPublished: () => Effect.sync(() => (calls.push("getLatestPublished"), revision)),
   getPublishedRevision: () => Effect.sync(() => (calls.push("getPublishedRevision"), revision)),
 });
-const PresentationRepositoryTest = Layer.succeed(AuthoringPresentationRepository, {
-  ...makeAuthoringPresentationRepository(),
-  get: () => Effect.sync(() => (calls.push("getPresentation"), presentationSnapshot)),
-  publish: () => Effect.sync(() => (calls.push("publishPresentation"), presentationResult)),
-});
-const OperationTest = Layer.mergeAll(RepositoryTest, PresentationRepositoryTest, TelemetryLive);
+const OperationTest = Layer.mergeAll(RepositoryTest, TelemetryLive);
 
 describe("schema operations", () => {
   layer(OperationTest)((it) => {
@@ -220,25 +156,6 @@ describe("schema operations", () => {
           yield* Schema.decodeUnknownEffect(GetCollectionDraftInput, { onExcessProperty: "error" })(
             scope,
           ),
-        );
-        yield* getCollectionPresentation(
-          "user-1",
-          yield* Schema.decodeUnknownEffect(GetCollectionPresentationInput, {
-            onExcessProperty: "error",
-          })(scope),
-        );
-        yield* publishCollectionPresentation(
-          "user-1",
-          yield* Schema.decodeUnknownEffect(PublishCollectionPresentationInput, {
-            onExcessProperty: "error",
-          })({
-            ...scope,
-            commandId,
-            expectedRevisionId: revisionId,
-            expectedSequence: 1,
-            presentation,
-          }),
-          "request-presentation-operation",
         );
         yield* getLatestPublishedSchema(
           "user-1",
@@ -256,15 +173,7 @@ describe("schema operations", () => {
           }),
         );
 
-        assert.deepEqual(calls, [
-          "getDraft",
-          "getCollection",
-          "getPresentation",
-          "getCollection",
-          "publishPresentation",
-          "getLatestPublished",
-          "getPublishedRevision",
-        ]);
+        assert.deepEqual(calls, ["getDraft", "getLatestPublished", "getPublishedRevision"]);
       }),
     );
 

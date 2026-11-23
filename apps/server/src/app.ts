@@ -208,7 +208,8 @@ import {
   reportBoundaryDefect,
 } from "@framerfordevs/api/runtime";
 import { appRouter } from "@framerfordevs/api/routers";
-import { auth, type StudioOAuthPrincipal } from "@framerfordevs/auth";
+import { auth } from "@framerfordevs/auth";
+import type { StudioRequestPrincipal } from "@framerfordevs/api/services/studio/principal-authenticator";
 import { env } from "@framerfordevs/env/server";
 import { OpenAPIHandler } from "@orpc/openapi/node";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
@@ -1134,7 +1135,7 @@ async function enforceStudioQuota(
   req: Request,
   res: Response,
   context: Context,
-  principal: StudioOAuthPrincipal | null,
+  principal: StudioRequestPrincipal | null,
 ): Promise<boolean> {
   const result = await context.execute(
     principal === null ? "api.studio.rate_limit.global" : "api.studio.rate_limit.user",

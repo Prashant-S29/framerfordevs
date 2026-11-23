@@ -218,11 +218,18 @@
             ],
             "type": "number"
           },
+          "host": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StudioMountedHostEncoded"
+              },
+              {
+                "$ref": "#/components/schemas/StudioLocalEditorHostEncoded"
+              }
+            ]
+          },
           "project": {
             "$ref": "#/components/schemas/StudioProjectIdentityEncoded"
-          },
-          "registration": {
-            "$ref": "#/components/schemas/StudioRegistrationAuthorityEncoded"
           },
           "role": {
             "enum": [
@@ -245,7 +252,7 @@
         },
         "required": [
           "formatVersion",
-          "registration",
+          "host",
           "project",
           "environment",
           "user",
@@ -309,6 +316,53 @@
           "id",
           "key",
           "name"
+        ],
+        "type": "object"
+      },
+      "StudioLocalEditorHostEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "local_editor"
+            ],
+            "type": "string"
+          },
+          "previewUrl": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "previewUrl"
+        ],
+        "type": "object"
+      },
+      "StudioMountedHostEncoded": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "mounted"
+            ],
+            "type": "string"
+          },
+          "registration": {
+            "$ref": "#/components/schemas/StudioRegistrationAuthorityEncoded"
+          }
+        },
+        "required": [
+          "kind",
+          "registration"
         ],
         "type": "object"
       },
@@ -409,7 +463,7 @@
     "securitySchemes": {
       "studioBearer": {
         "bearerFormat": "JWT",
-        "description": "A five-minute Studio access token for the exact Studio v1 resource and `studio:session` scope. Cookies and browser storage are never accepted.",
+        "description": "A five-minute Studio access token for the exact Studio v1 resource and `studio:session` scope, or an official CLI access token with the `studio:content` scope for `ffd editor`. Cookies and browser storage are never accepted.",
         "scheme": "bearer",
         "type": "http"
       }
@@ -424,7 +478,7 @@
   "paths": {
     "/projects/{projectId}/environments/{environmentId}/bootstrap": {
       "get": {
-        "description": "Revalidates the active registration, exact token authority, current project membership, role, CMS capability, and audited grant marker. No content or management credential is returned.",
+        "description": "For a Studio token, revalidates the active registration, exact token authority, current project membership, role, CMS capability, and audited grant marker, and returns a `mounted` host. For a local editor token, revalidates current project membership, role, and CMS capability, and returns a `local_editor` host with the environment Preview URL. No content or management credential is returned.",
         "operationId": "getStudioBootstrap",
         "parameters": [
           {
@@ -464,16 +518,19 @@
                       "name": "main"
                     },
                     "formatVersion": 1,
+                    "host": {
+                      "kind": "mounted",
+                      "registration": {
+                        "applicationOrigin": "https://application.example.test",
+                        "id": "019fae8b-1234-7000-8000-000000000001",
+                        "mountPath": "/studio",
+                        "version": 3
+                      }
+                    },
                     "project": {
                       "id": "019fae8b-1234-7000-8000-000000000002",
                       "name": "Customer Site",
                       "workspaceId": "019fae8b-1234-7000-8000-000000000004"
-                    },
-                    "registration": {
-                      "applicationOrigin": "https://application.example.test",
-                      "id": "019fae8b-1234-7000-8000-000000000001",
-                      "mountPath": "/studio",
-                      "version": 3
                     },
                     "role": "developer",
                     "session": {

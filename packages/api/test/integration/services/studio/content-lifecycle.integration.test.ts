@@ -84,11 +84,14 @@ const services = Layer.mergeAll(
       Effect.succeed(
         Schema.decodeUnknownSync(StudioBootstrap, { onExcessProperty: "error" })({
           formatVersion: 1,
-          registration: {
-            id: "019fae8b-1234-7000-8000-000000000031",
-            version: 1,
-            applicationOrigin: "https://application.example.test",
-            mountPath: "/studio",
+          host: {
+            kind: "mounted",
+            registration: {
+              id: "019fae8b-1234-7000-8000-000000000031",
+              version: 1,
+              applicationOrigin: "https://application.example.test",
+              mountPath: "/studio",
+            },
           },
           project: {
             id: fixture.projectId,

@@ -1,4 +1,3 @@
-import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
 import { env } from "@framerfordevs/env/server";
 import { Effect, Schema } from "effect";
 
@@ -11,7 +10,10 @@ import {
 import { RateLimitCost } from "../../contracts/rate-limit";
 import { StudioBootstrapScope } from "../../contracts/studio";
 import { RateLimitManager } from "../../services/rate-limit/manager";
-import { authenticateStudioBearer } from "../../services/studio/principal-authenticator";
+import {
+  authenticateStudioBearer,
+  type StudioRequestPrincipal,
+} from "../../services/studio/principal-authenticator";
 import { StudioRepository } from "../../services/studio/repository";
 
 const bearerPattern = /^Bearer ([^\s,]+)$/u;
@@ -120,12 +122,15 @@ export const evaluateStudioGlobalRateLimit = Effect.fn("studio.public.rate_limit
 );
 
 export const evaluateStudioUserRateLimit = Effect.fn("studio.public.rate_limit.user")(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   cost: number,
 ) {
   const decision = yield* (yield* RateLimitManager).evaluate({
     policy: "studio.user",
-    identity: `${principal.registrationId}:${principal.userId}`,
+    identity:
+      principal.kind === "studio_oauth_user"
+        ? `${principal.registrationId}:${principal.userId}`
+        : `editor:${principal.userId}`,
     cost: RateLimitCost.make(cost),
   });
   return yield* requireSharedProductionRateLimit(decision);
@@ -139,7 +144,7 @@ export const authorizeStudioOAuth = Effect.fn("studio.oauth.authorize")(function
 });
 
 export const getStudioBootstrap = Effect.fn("studio.public.bootstrap.get")(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   scope: StudioBootstrapScope,
 ) {
   return yield* (yield* StudioRepository).getBootstrap({

@@ -1,193 +1,46 @@
 import { assert, describe, layer } from "@effect/vitest";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Exit, Layer, Schema } from "effect";
 
-import {
-  CmsEntry,
-  CmsEntryDraft,
-  CmsEntryPage,
-  CreateEntryInput,
-  EntryRevisionPage,
-  EntryValidation,
-  GetEntryDraftInput,
-  ListEntriesInput,
-  ListEntryRevisionsInput,
-  RenameEntryInput,
-  RestoreEntryRevisionInput,
-  SaveEntryDraftInput,
-  SaveEntryDraftResult,
-} from "../../contracts/entry";
+import { CmsEntryPage, ListEntriesInput } from "../../contracts/entry";
 import { EntryRepository, makeEntryRepository } from "../../services/entry/repository";
-import {
-  createEntry,
-  getEntryDraft,
-  listEntries,
-  listEntryRevisions,
-  renameEntry,
-  restoreEntryRevision,
-  saveEntryDraft,
-} from "./index";
+import { listEntries } from "./index";
 
-const projectId = "019fae8b-1234-7000-8000-000000000001";
-const environmentId = "019fae8b-1234-7000-8000-000000000002";
-const collectionId = "019fae8b-1234-7000-8000-000000000003";
-const entryId = "019fae8b-1234-7000-8000-000000000004";
-const revisionId = "019fae8b-1234-7000-8000-000000000005";
-const schemaRevisionId = "019fae8b-1234-7000-8000-000000000006";
-const commandId = "019fae8b-1234-7000-8000-000000000007";
-const localeId = "019fae8b-1234-7000-8000-000000000008";
-const workspaceId = "019fae8b-1234-7000-8000-000000000009";
-const timestamp = "2026-08-08T12:00:00.000Z";
-const contractHash = "a".repeat(64);
-const validation = EntryValidation.make({ valid: true, issues: [], capped: false });
-const entry = Schema.decodeUnknownSync(CmsEntry, { onExcessProperty: "error" })({
-  id: entryId,
-  workspaceId,
-  projectId,
-  environmentId,
-  collectionId,
-  displayName: "Test entry",
-  nameVersion: 1,
-  createdByUserId: "user-1",
-  createdByCredentialId: null,
-  changedByUserId: "user-1",
-  changedByCredentialId: null,
-  createdAt: timestamp,
-  updatedAt: timestamp,
-});
-const page = CmsEntryPage.make({ items: [], nextCursor: null });
-const draft = Schema.decodeUnknownSync(CmsEntryDraft, { onExcessProperty: "error" })({
-  entry,
-  localeId,
+const scope = {
+  projectId: "019fae8b-1234-7000-8000-000000000001",
+  environmentId: "019fae8b-1234-7000-8000-000000000002",
+  collectionId: "019fae8b-1234-7000-8000-000000000003",
   locale: "en",
-  schemaRevisionId,
-  contractHash,
-  sharedVersion: 0,
-  sharedRevisionId: null,
-  sharedValues: {},
-  localizedVersion: 0,
-  localizedRevisionId: null,
-  localizedValues: {},
-  canEditShared: true,
-  validation,
-});
-const saveResult = Schema.decodeUnknownSync(SaveEntryDraftResult, { onExcessProperty: "error" })({
-  entryId,
-  commandId,
-  sharedChanged: false,
-  sharedVersion: 0,
-  sharedRevisionId: null,
-  localizedChanged: false,
-  localizedVersion: 0,
-  localizedRevisionId: null,
-  validation,
-});
-const revisionPage = EntryRevisionPage.make({ items: [], nextCursor: null });
+};
+const page = CmsEntryPage.make({ items: [], nextCursor: null });
 const calls: Array<string> = [];
 const RepositoryTest = Layer.succeed(EntryRepository, {
   ...makeEntryRepository(),
   listEntries: () => Effect.sync(() => (calls.push("list"), page)),
-  createEntry: () => Effect.sync(() => (calls.push("create"), entry)),
-  renameEntry: () => Effect.sync(() => (calls.push("rename"), entry)),
-  getDraft: () => Effect.sync(() => (calls.push("get"), draft)),
-  saveDraft: () => Effect.sync(() => (calls.push("save"), saveResult)),
-  listRevisions: () => Effect.sync(() => (calls.push("revisions"), revisionPage)),
-  restoreRevision: () => Effect.sync(() => (calls.push("restore"), saveResult)),
 });
 
 describe("entry operations", () => {
   layer(RepositoryTest)((it) => {
-    it.effect("forwards the complete entry lifecycle through one replaceable service", () =>
+    it.effect("forwards the entry list through one replaceable service", () =>
       Effect.gen(function* () {
         calls.length = 0;
-        const scope = { projectId, environmentId, collectionId, locale: "en" };
-        yield* listEntries(
-          "user-1",
-          yield* Schema.decodeUnknownEffect(ListEntriesInput, { onExcessProperty: "error" })({
-            ...scope,
-            cursor: null,
-            limit: 25,
-          }),
-        );
-        yield* createEntry(
-          "user-1",
-          yield* Schema.decodeUnknownEffect(CreateEntryInput, { onExcessProperty: "error" })({
-            ...scope,
-            displayName: "Test entry",
-            schemaRevisionId,
-            contractHash,
-            commandId,
-          }),
-          "request-create",
-        );
-        yield* renameEntry(
-          "user-1",
-          yield* Schema.decodeUnknownEffect(RenameEntryInput, { onExcessProperty: "error" })({
-            ...scope,
-            entryId,
-            displayName: "Renamed entry",
-            expectedNameVersion: 1,
-          }),
-          "request-rename",
-        );
-        yield* getEntryDraft(
-          "user-1",
-          yield* Schema.decodeUnknownEffect(GetEntryDraftInput, { onExcessProperty: "error" })({
-            ...scope,
-            entryId,
-          }),
-        );
-        yield* saveEntryDraft(
-          "user-1",
-          yield* Schema.decodeUnknownEffect(SaveEntryDraftInput, { onExcessProperty: "error" })({
-            ...scope,
-            entryId,
-            schemaRevisionId,
-            contractHash,
-            commandId,
-            expectedSharedVersion: 0,
-            expectedLocalizedVersion: 0,
-            sharedMutations: [],
-            localizedMutations: [],
-          }),
-          "request-save",
-        );
-        yield* listEntryRevisions(
-          "user-1",
-          yield* Schema.decodeUnknownEffect(ListEntryRevisionsInput, { onExcessProperty: "error" })(
-            {
-              ...scope,
-              entryId,
-              scope: "localized",
-              cursor: null,
-              limit: 25,
-            },
-          ),
-        );
-        yield* restoreEntryRevision(
-          "user-1",
-          yield* Schema.decodeUnknownEffect(RestoreEntryRevisionInput, {
-            onExcessProperty: "error",
-          })({
-            ...scope,
-            entryId,
-            scope: "localized",
-            revisionId,
-            schemaRevisionId,
-            contractHash,
-            expectedVersion: 0,
-            commandId,
-          }),
-          "request-restore",
-        );
-        assert.deepEqual(calls, [
-          "list",
-          "create",
-          "rename",
-          "get",
-          "save",
-          "revisions",
-          "restore",
-        ]);
+        const input = yield* Schema.decodeUnknownEffect(ListEntriesInput, {
+          onExcessProperty: "error",
+        })({ ...scope, cursor: null, limit: 25 });
+        const result = yield* listEntries("user-1", input);
+        assert.deepEqual({ ...result }, { ...page });
+        assert.deepEqual(calls, ["list"]);
+      }),
+    );
+
+    it.effect("rejects malformed actors before repository access", () =>
+      Effect.gen(function* () {
+        calls.length = 0;
+        const input = yield* Schema.decodeUnknownEffect(ListEntriesInput, {
+          onExcessProperty: "error",
+        })({ ...scope, cursor: null, limit: 25 });
+        const exit = yield* Effect.exit(listEntries("", input));
+        assert.isTrue(Exit.isFailure(exit));
+        assert.deepEqual(calls, []);
       }),
     );
   });

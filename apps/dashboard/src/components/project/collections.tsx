@@ -16,10 +16,10 @@ import {
 import { Spinner } from "@framerfordevs/ui/components/spinner";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRightIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { OpenStudioLink } from "@/components/project/open-studio-link";
 import { client, orpc } from "@/utils/orpc";
 
 export function ProjectCollections({
@@ -78,9 +78,10 @@ export function ProjectCollections({
       <CardHeader>
         <CardTitle>Collections</CardTitle>
         <CardDescription>
-          Structure is managed through code-first schema authoring. The dashboard retains content,
-          presentation, and Delivery controls.
+          Structure is managed through code-first schema authoring. The dashboard keeps Delivery
+          controls. Content and form layout are edited in the Studio.
         </CardDescription>
+        <OpenStudioLink projectId={projectId} environmentId={environmentId} size="sm" />
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {items.length === 0 ? (
@@ -120,18 +121,6 @@ export function ProjectCollections({
                 ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  render={
-                    <Link
-                      to="/projects/$projectId/collections/$collectionId/entries"
-                      params={{ projectId, collectionId: collection.id }}
-                    />
-                  }
-                >
-                  Entries <ArrowRightIcon data-icon="inline-end" />
-                </Button>
                 {canWrite && !isArchived ? (
                   <Button
                     variant="ghost"

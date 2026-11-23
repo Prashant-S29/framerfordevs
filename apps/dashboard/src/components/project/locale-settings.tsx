@@ -50,7 +50,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { LocaleTabs } from "@/components/entry/locale-tabs";
+import { LocaleTabs } from "@/components/locale/tabs";
 import { localeFormSchema } from "@/lib/validation/platform";
 import { orpc } from "@/utils/orpc";
 

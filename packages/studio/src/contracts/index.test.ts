@@ -4,11 +4,14 @@ import { decodeStudioBrowserResponse } from ".";
 
 const bootstrap = {
   formatVersion: 1 as const,
-  registration: {
-    id: "11111111-1111-4111-8111-111111111111",
-    version: 3,
-    applicationOrigin: "https://app.example.test",
-    mountPath: "/studio",
+  host: {
+    kind: "mounted" as const,
+    registration: {
+      id: "11111111-1111-4111-8111-111111111111",
+      version: 3,
+      applicationOrigin: "https://app.example.test",
+      mountPath: "/studio",
+    },
   },
   project: {
     id: "22222222-2222-4222-8222-222222222222",
@@ -41,7 +44,15 @@ describe("Studio browser contract", () => {
   it.each([
     { ...bootstrap, accessToken: "secret" },
     { ...bootstrap, session: { ...bootstrap.session, refreshToken: "secret" } },
-    { ...bootstrap, registration: { ...bootstrap.registration, clientSecret: "secret" } },
+    {
+      ...bootstrap,
+      host: {
+        ...bootstrap.host,
+        registration: { ...bootstrap.host.registration, clientSecret: "secret" },
+      },
+    },
+    { ...bootstrap, host: { kind: "local_editor", accessToken: "secret" } },
+    { ...bootstrap, host: { kind: "local_editor", registration: bootstrap.host.registration } },
   ])("rejects secret-shaped excess fields", (data) => {
     expect(() =>
       decodeStudioBrowserResponse({
@@ -51,6 +62,18 @@ describe("Studio browser contract", () => {
         message: "Studio bootstrap loaded.",
       }),
     ).toThrow("STUDIO_BROWSER_RESPONSE_INVALID");
+  });
+
+  it("accepts the local editor host without registration authority", () => {
+    const local = { ...bootstrap, host: { kind: "local_editor" as const } };
+    expect(
+      decodeStudioBrowserResponse({
+        ok: true,
+        data: local,
+        error: null,
+        message: "Studio bootstrap loaded.",
+      }),
+    ).toMatchObject({ ok: true, data: local });
   });
 
   it("rejects excess failure-envelope authority", () => {

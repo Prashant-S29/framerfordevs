@@ -260,7 +260,7 @@ export const studioContentOpenApiDocument = {
     title: "Framer for Devs Studio Content API",
     version: "1.0.0",
     description:
-      "Bounded server-to-server content projection for the mounted Studio. It reuses the exact Studio OAuth grant and never exposes bearer authority to browser JavaScript.",
+      "Bounded server-to-server content projection for the mounted Studio and the `ffd editor` local Studio. It reuses the exact Studio OAuth grant or the CLI `studio:content` grant, and never exposes bearer authority to browser JavaScript.",
   },
   servers: [{ url: "/api/studio-content/v1" }],
   paths: {
@@ -615,7 +615,7 @@ export const studioContentOpenApiDocument = {
         scheme: "bearer",
         bearerFormat: "JWT",
         description:
-          "The existing five-minute Studio access token for the exact Studio v1 resource and `studio:session offline_access` scope set.",
+          "The existing five-minute Studio access token for the exact Studio v1 resource and `studio:session offline_access` scope set, or an official CLI access token with the `studio:content` scope. Every request revalidates current project membership.",
       },
     },
     headers: {

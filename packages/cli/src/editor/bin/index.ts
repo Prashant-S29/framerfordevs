@@ -2,7 +2,7 @@ import { isProjectSchema } from "@framerfordevs/schema/validate";
 import { Cause, Effect, Option } from "effect";
 
 import { readAuthoringEnvironmentAuthority } from "../../schema/authoring/files";
-import { booleanFlag, parseArguments, validateFlags } from "../../command-arguments";
+import { parseArguments, validateFlags } from "../../command-arguments";
 import { CliConfigFileSystemLive, loadCliConfig } from "../../config";
 import { checkSchemaBuildManifest } from "../../schema/build/command";
 import {
@@ -103,22 +103,6 @@ export function prepareEditorCommand(
   }).pipe(Effect.provide(CliConfigFileSystemLive));
 }
 
-async function readManagementTokenFromStdin(): Promise<string> {
-  if (process.stdin.isTTY) throw new Error("CLI_EDITOR_TOKEN_STDIN_REQUIRED");
-  let value = "";
-  process.stdin.setEncoding("utf8");
-  for await (const chunk of process.stdin) {
-    value += chunk;
-    if (value.length > 16_385) throw new Error("CLI_EDITOR_TOKEN_INVALID");
-  }
-  const token = value.trim();
-  value = "";
-  if (token.length < 1 || token.length > 16_384 || /\s/u.test(token)) {
-    throw new Error("CLI_EDITOR_TOKEN_INVALID");
-  }
-  return token;
-}
-
 export async function runEditorCli(rawArguments: ReadonlyArray<string>) {
   const prepared = await Effect.runPromiseExit(prepareEditorCommand(rawArguments));
   if (prepared._tag === "Failure") {
@@ -130,17 +114,17 @@ export async function runEditorCli(rawArguments: ReadonlyArray<string>) {
     return;
   }
   try {
-    const tokenFromStdin = booleanFlag(parseArguments(rawArguments), "token-stdin");
-    if (tokenFromStdin && process.env["FFD_MANAGEMENT_TOKEN"] !== undefined) {
-      throw new Error("CLI_EDITOR_TOKEN_AMBIGUOUS");
+    if (process.env["FFD_MANAGEMENT_TOKEN"] !== undefined) {
+      throw new Error("CLI_EDITOR_OAUTH_REQUIRED");
     }
-    const managementToken = tokenFromStdin ? await readManagementTokenFromStdin() : undefined;
     const online = await import("../online/index.js");
-    await online.runEditorOnline(prepared.value, { managementToken });
+    await online.runEditorOnline(prepared.value);
   } catch (failure) {
     const code = failureCode(failure);
     process.stderr.write(
-      `The command failed (${code}). Check credentials or current hosted authority.\n`,
+      code === "CLI_EDITOR_OAUTH_REQUIRED"
+        ? "The command failed (CLI_EDITOR_OAUTH_REQUIRED). The local editor uses your ffd login. Unset FFD_MANAGEMENT_TOKEN and run ffd login.\n"
+        : `The command failed (${code}). Check credentials or current hosted authority.\n`,
     );
     process.exitCode = 1;
   }

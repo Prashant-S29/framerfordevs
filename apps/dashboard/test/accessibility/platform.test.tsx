@@ -12,12 +12,6 @@ import {
 import { StudioRegistration } from "@framerfordevs/api/contracts/control-plane";
 import { ProjectLocale } from "@framerfordevs/api/contracts/locale";
 import { Project } from "@framerfordevs/api/contracts/platform";
-import {
-  EntryPublicationPage,
-  EntryPublicationPlan,
-  EntryPublicationStatus,
-  EntryPublicationSummary,
-} from "@framerfordevs/api/contracts/publication";
 import { CollectionDraftSchema } from "@framerfordevs/api/contracts/schema";
 import { WebhookEndpoint } from "@framerfordevs/api/contracts/webhook";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -34,7 +28,7 @@ import { CreateWorkspaceDialog } from "@/components/create-workspace-dialog";
 import { EditProjectDialog } from "@/components/project/edit-dialog";
 import { RestoreProjectDialog } from "@/components/project/restore-dialog";
 import { StudioRegistrationSettings } from "@/components/project/studio-registration";
-import { LocaleTabs } from "@/components/entry/locale-tabs";
+import { LocaleTabs } from "@/components/locale/tabs";
 import {
   CredentialRow,
   InviteMemberDialog,
@@ -44,8 +38,6 @@ import {
   governanceErrorMessage,
 } from "@/components/project/access-settings";
 import { AddLocaleDialog } from "@/components/project/locale-settings";
-import { CreateEntryDialog } from "@/components/entry/collection-entries";
-import { PublicationCard, RenameEntryDialog } from "@/components/entry/editor";
 import { CodeManagedStructureCard } from "@/components/collection-overview";
 import {
   CreateInvalidationMappingDialog,
@@ -679,161 +671,6 @@ describe("platform management accessibility", () => {
   it("has accessible locale creation semantics", async () => {
     renderWithQueryClient(<AddLocaleDialog projectId={project.id} />);
     await expectOpenDialogToHaveNoViolations(/add locale/i);
-  });
-
-  it("has accessible entry creation and rename semantics", async () => {
-    renderWithQueryClient(
-      <CreateEntryDialog
-        projectId={project.id}
-        environmentId={project.environment.id}
-        collectionId={collectionDraft.collection.id}
-        locale="en"
-        schemaRevisionId="019fae8b-1234-7000-8000-000000000020"
-        contractHash={"c".repeat(64)}
-      />,
-    );
-    await expectOpenDialogToHaveNoViolations(/new entry/i);
-    cleanup();
-    renderWithQueryClient(
-      <RenameEntryDialog
-        projectId={project.id}
-        environmentId={project.environment.id}
-        collectionId={collectionDraft.collection.id}
-        entryId="019fae8b-1234-7000-8000-000000000021"
-        locale="en"
-        displayName="Homepage"
-        nameVersion={1}
-      />,
-    );
-    await expectOpenDialogToHaveNoViolations(/rename entry/i);
-  });
-
-  it("has accessible exact-locale publication and unpublish semantics", async () => {
-    const publicationId = "019fae8b-1234-7000-8000-000000000041";
-    const schemaRevisionId = "019fae8b-1234-7000-8000-000000000042";
-    const hash = "d".repeat(64);
-    const scope = {
-      projectId: project.id,
-      environmentId: project.environment.id,
-      collectionId: collectionDraft.collection.id,
-      entryId: "019fae8b-1234-7000-8000-000000000043",
-      locale: "en",
-    };
-    const size = {
-      documentBytes: 512,
-      referenceManifestBytes: 2,
-      combinedBytes: 514,
-      maximumBytes: 1_048_576,
-      bucket: "small",
-    };
-    const summary = Schema.decodeUnknownSync(EntryPublicationSummary, {
-      onExcessProperty: "error",
-    })({
-      id: publicationId,
-      snapshotId: publicationId,
-      entryId: scope.entryId,
-      localeId: locale.id,
-      locale: scope.locale,
-      sequence: 1,
-      schemaRevisionId,
-      contractHash: hash,
-      sharedRevisionId: null,
-      sharedVersion: 0,
-      localizedRevisionId: null,
-      localizedVersion: 0,
-      contentHash: hash,
-      authorityHash: hash,
-      documentHash: hash,
-      changedFieldIds: [],
-      size,
-      publishedByUserId: "accessible-user",
-      publishedByCredentialId: null,
-      publishedAt: "2026-08-09T12:00:00.000Z",
-      current: true,
-    });
-    const status = Schema.decodeUnknownSync(EntryPublicationStatus, { onExcessProperty: "error" })({
-      entryId: scope.entryId,
-      localeId: locale.id,
-      locale: scope.locale,
-      state: "published",
-      stateVersion: 1,
-      currentPublication: summary,
-      currentSchemaRevisionId: schemaRevisionId,
-      currentContractHash: hash,
-      currentSharedRevisionId: null,
-      currentSharedVersion: 0,
-      currentLocalizedRevisionId: null,
-      currentLocalizedVersion: 0,
-      sharedChanged: false,
-      localizedChanged: false,
-      schemaChanged: false,
-      changedSincePublication: false,
-    });
-    const plan = Schema.decodeUnknownSync(EntryPublicationPlan, { onExcessProperty: "error" })({
-      entryId: scope.entryId,
-      localeId: locale.id,
-      locale: scope.locale,
-      stateVersion: 1,
-      currentPublicationId: publicationId,
-      schemaRevisionId,
-      contractHash: hash,
-      sharedRevisionId: null,
-      sharedVersion: 0,
-      localizedRevisionId: null,
-      localizedVersion: 0,
-      valid: true,
-      issues: [],
-      capped: false,
-      contentHash: hash,
-      authorityHash: hash,
-      changedFieldIds: [],
-      size,
-      referencesWouldRefresh: false,
-      wouldCreatePublication: false,
-    });
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { staleTime: Number.POSITIVE_INFINITY, retry: false } },
-    });
-    const statusOptions =
-      orpc.platform.projects.collections.entries.publications.status.queryOptions({ input: scope });
-    const historyOptions =
-      orpc.platform.projects.collections.entries.publications.list.queryOptions({
-        input: { ...scope, cursor: null, limit: 5 },
-      });
-    const planOptions =
-      orpc.platform.projects.collections.entries.publications.validate.queryOptions({
-        input: scope,
-      });
-    queryClient.setQueryData(statusOptions.queryKey, {
-      ok: true,
-      data: status,
-      error: null,
-      message: "Publication status loaded.",
-    });
-    queryClient.setQueryData(historyOptions.queryKey, {
-      ok: true,
-      data: EntryPublicationPage.make({ items: [summary], nextCursor: null }),
-      error: null,
-      message: "Publication history loaded.",
-    });
-    queryClient.setQueryData(planOptions.queryKey, {
-      ok: true,
-      data: plan,
-      error: null,
-      message: "Publication validation completed.",
-    });
-    renderWithQueryClient(
-      <PublicationCard {...scope} canPublish hasUnsavedChanges={false} />,
-      queryClient,
-    );
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^publish en$/i }));
-    const publishDialog = await screen.findByRole("dialog");
-    expect((await axe.run(publishDialog)).violations).toEqual([]);
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
-    await user.click(screen.getByRole("button", { name: /^unpublish en$/i }));
-    const unpublishDialog = await screen.findByRole("alertdialog");
-    expect((await axe.run(unpublishDialog)).violations).toEqual([]);
   });
 
   it("has accessible code-managed structure semantics without mutation controls", async () => {

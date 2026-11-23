@@ -13,6 +13,10 @@ import {
   StudioOAuthTokenVerifier,
 } from "@framerfordevs/api/services/studio/principal-authenticator";
 import {
+  makeToolingOAuthTokenVerifier,
+  ToolingOAuthTokenVerifier,
+} from "@framerfordevs/api/services/tooling/principal-authenticator";
+import {
   makeStudioRepository,
   StudioRepository,
 } from "@framerfordevs/api/services/studio/repository";
@@ -42,11 +46,14 @@ const principal: StudioOAuthPrincipal = {
 };
 const bootstrap = Schema.decodeUnknownSync(StudioBootstrap, { onExcessProperty: "error" })({
   formatVersion: 1,
-  registration: {
-    id: registrationId,
-    version: 3,
-    applicationOrigin: "https://application.example.test",
-    mountPath: "/studio",
+  host: {
+    kind: "mounted",
+    registration: {
+      id: registrationId,
+      version: 3,
+      applicationOrigin: "https://application.example.test",
+      mountPath: "/studio",
+    },
   },
   project: {
     id: projectId,
@@ -63,15 +70,42 @@ const bootstrap = Schema.decodeUnknownSync(StudioBootstrap, { onExcessProperty: 
 const verifier = makeStudioOAuthTokenVerifier((token) =>
   Promise.resolve(token === "studio-http-token" ? principal : null),
 );
+const editorBootstrap = Schema.decodeUnknownSync(StudioBootstrap, { onExcessProperty: "error" })({
+  ...JSON.parse(JSON.stringify(bootstrap)),
+  host: { kind: "local_editor", previewUrl: null },
+});
+const editorScopes: string[] = [];
+const toolingVerifier = makeToolingOAuthTokenVerifier((token, requiredScope) => {
+  editorScopes.push(requiredScope);
+  return Promise.resolve(
+    (token === "cli-studio-token" && requiredScope === "studio:content") ||
+      (token === "cli-tooling-token" && requiredScope === "tooling:read")
+      ? {
+          kind: "oauth_user",
+          userId: principal.userId,
+          clientId: "framerfordevs-cli",
+          scopes: [requiredScope],
+          expiresAtEpochSeconds: 1_800_000_000,
+        }
+      : null,
+  );
+});
+const bootstrapPrincipals: string[] = [];
 const repository: ReturnType<typeof makeStudioRepository> = {
   authorizeOAuth: () => Effect.succeed({ allowed: true as const }),
-  getBootstrap: () => Effect.succeed(bootstrap),
+  getBootstrap: (input) =>
+    Effect.sync(() => {
+      bootstrapPrincipals.push(input.principal.kind);
+      return input.principal.kind === "studio_editor_user" ? editorBootstrap : bootstrap;
+    }),
 };
 const evaluatedPolicies: string[] = [];
+const evaluatedIdentities: string[] = [];
 const rateLimitManager: RateLimitManagerService = {
   evaluate: (input) =>
     Effect.sync(() => {
       evaluatedPolicies.push(input.policy);
+      evaluatedIdentities.push(input.identity);
       return Schema.decodeUnknownSync(RateLimitDecision, { onExcessProperty: "error" })({
         allowed: true,
         policy: input.policy,
@@ -88,6 +122,7 @@ const rateLimitManager: RateLimitManagerService = {
 };
 const studioEffectTransform: ApplicationEffectTransform = (effect) =>
   Effect.provideService(effect, StudioOAuthTokenVerifier, verifier).pipe(
+    Effect.provideService(ToolingOAuthTokenVerifier, toolingVerifier),
     Effect.provideService(StudioRepository, repository),
     Effect.provideService(RateLimitManager, rateLimitManager),
   );
@@ -166,6 +201,35 @@ describe("Studio bootstrap HTTP boundary", () => {
       message: "Studio bootstrap loaded.",
     });
     expect(evaluatedPolicies).toEqual(["studio.global", "studio.user"]);
+  });
+
+  it("serves a local editor bootstrap to a CLI token with the studio:content scope", async () => {
+    evaluatedIdentities.length = 0;
+    bootstrapPrincipals.length = 0;
+    const response = await api
+      .get(`/api/studio/v1/projects/${projectId}/environments/${environmentId}/bootstrap`)
+      .set("Authorization", "Bearer cli-studio-token");
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.host).toEqual({ kind: "local_editor", previewUrl: null });
+    expect(JSON.stringify(response.body)).not.toContain("registration");
+    expect(bootstrapPrincipals).toEqual(["studio_editor_user"]);
+    expect(evaluatedIdentities).toContain(`editor:${principal.userId}`);
+  });
+
+  it("rejects CLI tokens without studio:content and management credentials", async () => {
+    const tooling = await api
+      .get(`/api/studio/v1/projects/${projectId}/environments/${environmentId}/bootstrap`)
+      .set("Authorization", "Bearer cli-tooling-token");
+    expect(tooling.status).toBe(401);
+    expect(tooling.body.error.code).toBe("UNAUTHORIZED");
+
+    editorScopes.length = 0;
+    const management = await api
+      .get(`/api/studio/v1/projects/${projectId}/environments/${environmentId}/bootstrap`)
+      .set("Authorization", "Bearer ffd_mgmt_example");
+    expect(management.status).toBe(401);
+    expect(editorScopes).toEqual([]);
   });
 
   it("rejects bodies and oversized input before authentication", async () => {

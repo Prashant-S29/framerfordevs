@@ -361,7 +361,7 @@ export function validateFlags(arguments_: ParsedArguments): void {
       locale: "string",
       json: "boolean",
     },
-    editor: { "token-stdin": "boolean" },
+    editor: {},
     generate: { offline: "boolean", force: "boolean", json: "boolean" },
   };
   const commandFlags = allowed[command];

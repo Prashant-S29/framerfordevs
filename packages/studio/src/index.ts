@@ -3,10 +3,17 @@ export type {
   StudioBrowserError,
   StudioBrowserErrorCode,
   StudioBrowserFailure,
+  StudioBrowserHost,
   StudioBrowserResponse,
   StudioBrowserSuccess,
 } from "./contracts";
-export { decodeStudioBrowserBootstrap, decodeStudioBrowserResponse } from "./contracts";
+export {
+  decodeStudioBrowserBootstrap,
+  decodeStudioBrowserResponse,
+  decodeStudioLocalEditorStatus,
+  type StudioLocalEditorSchemaState,
+  type StudioLocalEditorStatus,
+} from "./contracts";
 export {
   createStudioContentClient,
   StudioContentClientError,

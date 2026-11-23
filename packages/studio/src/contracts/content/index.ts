@@ -378,7 +378,8 @@ export type StudioContentBrowserErrorCode =
   | "STUDIO_RATE_LIMITED"
   | "STUDIO_FORBIDDEN"
   | "STUDIO_PROJECT_UNAVAILABLE"
-  | "STUDIO_CMS_DISABLED";
+  | "STUDIO_CMS_DISABLED"
+  | "STUDIO_SCHEMA_DRIFT";
 
 export interface StudioContentBrowserFailure {
   readonly ok: false;
@@ -1392,6 +1393,7 @@ const contentErrorCodes = new Set<string>([
   "STUDIO_FORBIDDEN",
   "STUDIO_PROJECT_UNAVAILABLE",
   "STUDIO_CMS_DISABLED",
+  "STUDIO_SCHEMA_DRIFT",
 ]);
 
 function isContentErrorCode(value: unknown): value is StudioContentBrowserErrorCode {
@@ -1438,6 +1440,7 @@ function validFailureStatus(code: StudioContentBrowserErrorCode, status: number)
     STUDIO_FORBIDDEN: [403],
     STUDIO_PROJECT_UNAVAILABLE: [404],
     STUDIO_CMS_DISABLED: [409],
+    STUDIO_SCHEMA_DRIFT: [409],
   };
   return statuses[code].includes(status);
 }

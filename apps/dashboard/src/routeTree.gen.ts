@@ -20,10 +20,6 @@ import { Route as AuthProjectsProjectIdRouteImport } from './routes/_auth/projec
 import { Route as AuthProjectsProjectIdOperationsRouteImport } from './routes/_auth/projects/$projectId_/operations'
 import { Route as AuthProjectsProjectIdWebhooksRouteImport } from './routes/_auth/projects/$projectId_/webhooks'
 import { Route as AuthProjectsProjectIdCollectionsCollectionIdRouteImport } from './routes/_auth/projects/$projectId_/collections/$collectionId'
-import { Route as AuthProjectsProjectIdCollectionsCollectionIdEntriesRouteImport } from './routes/_auth/projects/$projectId_/collections/$collectionId_/entries'
-import { Route as AuthProjectsProjectIdCollectionsCollectionIdPresentationRouteImport } from './routes/_auth/projects/$projectId_/collections/$collectionId_/presentation'
-import { Route as AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdRouteImport } from './routes/_auth/projects/$projectId_/collections/$collectionId_/entries_/$entryId'
-import { Route as AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdPreviewRouteImport } from './routes/_auth/projects/$projectId_/collections/$collectionId_/entries_/$entryId_/preview'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -82,32 +78,6 @@ const AuthProjectsProjectIdCollectionsCollectionIdRoute =
     path: '/projects/$projectId/collections/$collectionId',
     getParentRoute: () => AuthRouteRoute,
   } as any)
-const AuthProjectsProjectIdCollectionsCollectionIdEntriesRoute =
-  AuthProjectsProjectIdCollectionsCollectionIdEntriesRouteImport.update({
-    id: '/projects/$projectId_/collections/$collectionId_/entries',
-    path: '/projects/$projectId/collections/$collectionId/entries',
-    getParentRoute: () => AuthRouteRoute,
-  } as any)
-const AuthProjectsProjectIdCollectionsCollectionIdPresentationRoute =
-  AuthProjectsProjectIdCollectionsCollectionIdPresentationRouteImport.update({
-    id: '/projects/$projectId_/collections/$collectionId_/presentation',
-    path: '/projects/$projectId/collections/$collectionId/presentation',
-    getParentRoute: () => AuthRouteRoute,
-  } as any)
-const AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdRoute =
-  AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdRouteImport.update({
-    id: '/projects/$projectId_/collections/$collectionId_/entries_/$entryId',
-    path: '/projects/$projectId/collections/$collectionId/entries/$entryId',
-    getParentRoute: () => AuthRouteRoute,
-  } as any)
-const AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdPreviewRoute =
-  AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdPreviewRouteImport.update(
-    {
-      id: '/projects/$projectId_/collections/$collectionId_/entries_/$entryId_/preview',
-      path: '/projects/$projectId/collections/$collectionId/entries/$entryId/preview',
-      getParentRoute: () => AuthRouteRoute,
-    } as any,
-  )
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -120,10 +90,6 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/operations': typeof AuthProjectsProjectIdOperationsRoute
   '/projects/$projectId/webhooks': typeof AuthProjectsProjectIdWebhooksRoute
   '/projects/$projectId/collections/$collectionId': typeof AuthProjectsProjectIdCollectionsCollectionIdRoute
-  '/projects/$projectId/collections/$collectionId/entries': typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesRoute
-  '/projects/$projectId/collections/$collectionId/presentation': typeof AuthProjectsProjectIdCollectionsCollectionIdPresentationRoute
-  '/projects/$projectId/collections/$collectionId/entries/$entryId': typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdRoute
-  '/projects/$projectId/collections/$collectionId/entries/$entryId/preview': typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdPreviewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -136,10 +102,6 @@ export interface FileRoutesByTo {
   '/projects/$projectId/operations': typeof AuthProjectsProjectIdOperationsRoute
   '/projects/$projectId/webhooks': typeof AuthProjectsProjectIdWebhooksRoute
   '/projects/$projectId/collections/$collectionId': typeof AuthProjectsProjectIdCollectionsCollectionIdRoute
-  '/projects/$projectId/collections/$collectionId/entries': typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesRoute
-  '/projects/$projectId/collections/$collectionId/presentation': typeof AuthProjectsProjectIdCollectionsCollectionIdPresentationRoute
-  '/projects/$projectId/collections/$collectionId/entries/$entryId': typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdRoute
-  '/projects/$projectId/collections/$collectionId/entries/$entryId/preview': typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdPreviewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -154,10 +116,6 @@ export interface FileRoutesById {
   '/_auth/projects/$projectId_/operations': typeof AuthProjectsProjectIdOperationsRoute
   '/_auth/projects/$projectId_/webhooks': typeof AuthProjectsProjectIdWebhooksRoute
   '/_auth/projects/$projectId_/collections/$collectionId': typeof AuthProjectsProjectIdCollectionsCollectionIdRoute
-  '/_auth/projects/$projectId_/collections/$collectionId_/entries': typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesRoute
-  '/_auth/projects/$projectId_/collections/$collectionId_/presentation': typeof AuthProjectsProjectIdCollectionsCollectionIdPresentationRoute
-  '/_auth/projects/$projectId_/collections/$collectionId_/entries_/$entryId': typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdRoute
-  '/_auth/projects/$projectId_/collections/$collectionId_/entries_/$entryId_/preview': typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdPreviewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -172,10 +130,6 @@ export interface FileRouteTypes {
     | '/projects/$projectId/operations'
     | '/projects/$projectId/webhooks'
     | '/projects/$projectId/collections/$collectionId'
-    | '/projects/$projectId/collections/$collectionId/entries'
-    | '/projects/$projectId/collections/$collectionId/presentation'
-    | '/projects/$projectId/collections/$collectionId/entries/$entryId'
-    | '/projects/$projectId/collections/$collectionId/entries/$entryId/preview'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -188,10 +142,6 @@ export interface FileRouteTypes {
     | '/projects/$projectId/operations'
     | '/projects/$projectId/webhooks'
     | '/projects/$projectId/collections/$collectionId'
-    | '/projects/$projectId/collections/$collectionId/entries'
-    | '/projects/$projectId/collections/$collectionId/presentation'
-    | '/projects/$projectId/collections/$collectionId/entries/$entryId'
-    | '/projects/$projectId/collections/$collectionId/entries/$entryId/preview'
   id:
     | '__root__'
     | '/'
@@ -205,10 +155,6 @@ export interface FileRouteTypes {
     | '/_auth/projects/$projectId_/operations'
     | '/_auth/projects/$projectId_/webhooks'
     | '/_auth/projects/$projectId_/collections/$collectionId'
-    | '/_auth/projects/$projectId_/collections/$collectionId_/entries'
-    | '/_auth/projects/$projectId_/collections/$collectionId_/presentation'
-    | '/_auth/projects/$projectId_/collections/$collectionId_/entries_/$entryId'
-    | '/_auth/projects/$projectId_/collections/$collectionId_/entries_/$entryId_/preview'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -299,34 +245,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthProjectsProjectIdCollectionsCollectionIdRouteImport
       parentRoute: typeof AuthRouteRoute
     }
-    '/_auth/projects/$projectId_/collections/$collectionId_/entries': {
-      id: '/_auth/projects/$projectId_/collections/$collectionId_/entries'
-      path: '/projects/$projectId/collections/$collectionId/entries'
-      fullPath: '/projects/$projectId/collections/$collectionId/entries'
-      preLoaderRoute: typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesRouteImport
-      parentRoute: typeof AuthRouteRoute
-    }
-    '/_auth/projects/$projectId_/collections/$collectionId_/presentation': {
-      id: '/_auth/projects/$projectId_/collections/$collectionId_/presentation'
-      path: '/projects/$projectId/collections/$collectionId/presentation'
-      fullPath: '/projects/$projectId/collections/$collectionId/presentation'
-      preLoaderRoute: typeof AuthProjectsProjectIdCollectionsCollectionIdPresentationRouteImport
-      parentRoute: typeof AuthRouteRoute
-    }
-    '/_auth/projects/$projectId_/collections/$collectionId_/entries_/$entryId': {
-      id: '/_auth/projects/$projectId_/collections/$collectionId_/entries_/$entryId'
-      path: '/projects/$projectId/collections/$collectionId/entries/$entryId'
-      fullPath: '/projects/$projectId/collections/$collectionId/entries/$entryId'
-      preLoaderRoute: typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdRouteImport
-      parentRoute: typeof AuthRouteRoute
-    }
-    '/_auth/projects/$projectId_/collections/$collectionId_/entries_/$entryId_/preview': {
-      id: '/_auth/projects/$projectId_/collections/$collectionId_/entries_/$entryId_/preview'
-      path: '/projects/$projectId/collections/$collectionId/entries/$entryId/preview'
-      fullPath: '/projects/$projectId/collections/$collectionId/entries/$entryId/preview'
-      preLoaderRoute: typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdPreviewRouteImport
-      parentRoute: typeof AuthRouteRoute
-    }
   }
 }
 
@@ -336,10 +254,6 @@ interface AuthRouteRouteChildren {
   AuthProjectsProjectIdOperationsRoute: typeof AuthProjectsProjectIdOperationsRoute
   AuthProjectsProjectIdWebhooksRoute: typeof AuthProjectsProjectIdWebhooksRoute
   AuthProjectsProjectIdCollectionsCollectionIdRoute: typeof AuthProjectsProjectIdCollectionsCollectionIdRoute
-  AuthProjectsProjectIdCollectionsCollectionIdEntriesRoute: typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesRoute
-  AuthProjectsProjectIdCollectionsCollectionIdPresentationRoute: typeof AuthProjectsProjectIdCollectionsCollectionIdPresentationRoute
-  AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdRoute: typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdRoute
-  AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdPreviewRoute: typeof AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdPreviewRoute
 }
 
 const AuthRouteRouteChildren: AuthRouteRouteChildren = {
@@ -349,14 +263,6 @@ const AuthRouteRouteChildren: AuthRouteRouteChildren = {
   AuthProjectsProjectIdWebhooksRoute: AuthProjectsProjectIdWebhooksRoute,
   AuthProjectsProjectIdCollectionsCollectionIdRoute:
     AuthProjectsProjectIdCollectionsCollectionIdRoute,
-  AuthProjectsProjectIdCollectionsCollectionIdEntriesRoute:
-    AuthProjectsProjectIdCollectionsCollectionIdEntriesRoute,
-  AuthProjectsProjectIdCollectionsCollectionIdPresentationRoute:
-    AuthProjectsProjectIdCollectionsCollectionIdPresentationRoute,
-  AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdRoute:
-    AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdRoute,
-  AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdPreviewRoute:
-    AuthProjectsProjectIdCollectionsCollectionIdEntriesEntryIdPreviewRoute,
 }
 
 const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(

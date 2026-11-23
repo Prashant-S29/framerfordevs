@@ -122,11 +122,14 @@ function decode<A, I>(schema: Schema.Codec<A, I>, value: unknown): A {
 
 const bootstrap = decode(StudioBootstrap, {
   formatVersion: 1,
-  registration: {
-    id: ids.registration,
-    version: 1,
-    applicationOrigin: "https://application.example.test",
-    mountPath: "/studio",
+  host: {
+    kind: "mounted",
+    registration: {
+      id: ids.registration,
+      version: 1,
+      applicationOrigin: "https://application.example.test",
+      mountPath: "/studio",
+    },
   },
   project: { id: ids.project, name: "Studio Project", workspaceId: ids.workspace },
   environment: { id: ids.environment, key: "main", name: "main" },

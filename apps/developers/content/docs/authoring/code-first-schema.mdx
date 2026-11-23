@@ -92,9 +92,9 @@ Use an environment-bound management credential with only the permissions needed 
 
 ## Dashboard authority
 
-Dashboard collection creation and structure mutation procedures are not available. Use schema code and the CLI for structure, the hosted content editor for entries, and Delivery settings for exposure.
+The dashboard shows structure read-only and keeps Delivery settings. Use schema code and the CLI for structure, and the Studio for entries. The Studio is the mounted Studio in your application, or `ffd editor` on your machine.
 
-Use the hosted Presentation editor for labels, help, placeholders, order, groups, tabs, sidebars, and role visibility. Publishing Presentation creates a new immutable revision while preserving code-owned structure and contract hashes. Agents can perform the same editorial-metadata workflow without an SDK administration method:
+Publish Presentation for labels, help, placeholders, order, groups, tabs, sidebars, and role visibility with the CLI or Authoring v1. Publishing Presentation creates a new immutable revision while preserving code-owned structure and contract hashes:
 
 ```bash
 ffd presentation get --collection articles --json > presentation.json
@@ -104,7 +104,7 @@ ffd presentation publish --collection articles --file presentation.json --json
 
 The file carries exact project/environment/collection/revision/sequence authority, contains no credential, and must stay inside the linked project. Schema structure remains a separate `ffd schema` workflow.
 
-Content administrators can edit labels, help text, placeholders, order, tabs, and groups in the mounted Studio under **Edit form layout**. The Studio never shows or changes role visibility. Owners and developers change role visibility with the CLI, Authoring v1, or the hosted Presentation editor.
+Content administrators can edit labels, help text, placeholders, order, tabs, and groups in the mounted Studio under **Edit form layout**. The Studio never shows or changes role visibility. Owners and developers change role visibility with the CLI or Authoring v1.
 
 ## Experimental composition
 

@@ -4,22 +4,28 @@ import { Effect, Layer, ManagedRuntime } from "effect";
 
 import { makeAuthoringOperatorClient } from "../../authoring/client";
 import { canonicalJsonBytes, sha256, toJsonValue } from "../../canonical";
-import { createEditorAuthoringHandler, makeEditorAuthoringGateway } from "../authoring";
-import { loadPackagedEditorAssets } from "../assets";
+import { CredentialStoreLive } from "../../credential-store";
+import { BrowserOpener, BrowserOpenerLive, getValidAccessToken } from "../../oauth-device";
+import { makeToolingHttpClient } from "../../tooling-http-client";
+import { loadPackagedStudioArtifact, type EditorStudioArtifact } from "../assets";
 import type { PreparedEditorCommand } from "../bin";
+import { editorBootstrapFailure, readEditorPreviewUrl } from "../bootstrap";
 import {
+  editorMountPath,
   startEditorLoopback,
   type EditorLoopbackOptions,
   type EditorLoopbackServer,
+  type EditorLoopbackStatus,
+  type EditorUpstreamRequest,
+  type EditorUpstreamResponse,
 } from "../loopback";
 import {
   startEditorSchemaWatcher,
   type EditorSchemaWatcher,
   type EditorSchemaWatcherInput,
 } from "../schema-watcher";
-import { CredentialStoreLive } from "../../credential-store";
-import { BrowserOpener, BrowserOpenerLive, getValidAccessToken } from "../../oauth-device";
-import { makeToolingHttpClient } from "../../tooling-http-client";
+
+const upstreamTimeoutMs = 10_000;
 
 export interface EditorOnlineDependencies {
   readonly acquireToken: (apiOrigin: string) => Promise<string>;
@@ -32,21 +38,14 @@ export interface EditorOnlineDependencies {
     environmentId: string,
     token: string,
   ) => Promise<unknown>;
-  readonly loadHostedLocales: (
-    prepared: PreparedEditorCommand,
-    environmentId: string,
+  readonly fetchUpstream: (
+    apiBaseUrl: string,
     token: string,
-  ) => Promise<ReadonlyArray<string>>;
+    request: EditorUpstreamRequest,
+  ) => Promise<EditorUpstreamResponse>;
+  readonly loadArtifact: () => Promise<EditorStudioArtifact>;
   readonly startWatcher: (input: EditorSchemaWatcherInput) => EditorSchemaWatcher;
-  readonly makeOperation: (
-    prepared: PreparedEditorCommand,
-    environmentId: string,
-    token: () => string | null,
-    localSchema: () => unknown,
-  ) => NonNullable<EditorLoopbackOptions["operation"]>;
-  readonly startLoopback: (
-    options: Omit<EditorLoopbackOptions, "assets">,
-  ) => Promise<EditorLoopbackServer>;
+  readonly startLoopback: (options: EditorLoopbackOptions) => Promise<EditorLoopbackServer>;
   readonly openBrowser: (url: string) => Promise<void>;
   readonly randomChallenge: () => string;
 }
@@ -57,40 +56,94 @@ export interface EditorOnlineSession {
   readonly close: () => Promise<void>;
 }
 
-function projectCollections(project: unknown) {
-  if (typeof project !== "object" || project === null) return [];
-  const collections = Reflect.get(project, "collections");
-  if (!Array.isArray(collections)) return [];
-  return collections.flatMap((collection) => {
-    if (typeof collection !== "object" || collection === null) return [];
-    const sourceKey = Reflect.get(collection, "sourceKey");
-    const apiKey = Reflect.get(collection, "apiKey");
-    return typeof sourceKey === "string" && typeof apiKey === "string"
-      ? [{ sourceKey, apiKey }]
-      : [];
-  });
+const tokenReuseMs = 60_000;
+
+export function serializedTokenProvider(
+  acquire: () => Promise<string>,
+  now: () => number = Date.now,
+) {
+  let active: Promise<string> | null = null;
+  let cached: { readonly token: string; readonly acquiredAt: number } | null = null;
+  let cleared = false;
+  return {
+    token: (): Promise<string> => {
+      if (cleared) return Promise.reject(new Error("EDITOR_CREDENTIAL_CLEARED"));
+      if (cached !== null && now() - cached.acquiredAt < tokenReuseMs) {
+        return Promise.resolve(cached.token);
+      }
+      active ??= acquire()
+        .then((token) => {
+          if (!cleared) cached = { token, acquiredAt: now() };
+          return token;
+        })
+        .finally(() => {
+          active = null;
+        });
+      return active;
+    },
+    clear: () => {
+      cleared = true;
+      cached = null;
+    },
+  };
 }
 
-function projectCollectionCount(project: unknown): number {
-  return projectCollections(project).length;
+function schemaStatus(watcher: EditorSchemaWatcher | null): EditorLoopbackStatus {
+  const snapshot = watcher?.snapshot();
+  if (snapshot === undefined || !snapshot.valid) {
+    return { schema: "invalid", diagnosticCode: snapshot?.diagnosticCode ?? "CLI_SCHEMA_INVALID" };
+  }
+  return { schema: snapshot.schemaMatchesHosted ? "matches" : "differs", diagnosticCode: null };
 }
 
 export async function initializeEditorOnline(
   prepared: PreparedEditorCommand,
   dependencies: EditorOnlineDependencies,
 ): Promise<EditorOnlineSession> {
-  let token: string | null = await dependencies.acquireToken(prepared.config.apiBaseUrl);
+  const credentials = serializedTokenProvider(() =>
+    dependencies.acquireToken(prepared.config.apiBaseUrl),
+  );
   let watcher: EditorSchemaWatcher | null = null;
   let loopback: EditorLoopbackServer | null = null;
   let authorityTimer: ReturnType<typeof setInterval> | null = null;
   let authorityRefresh: Promise<void> | null = null;
+  const upstream = async (request: EditorUpstreamRequest) =>
+    dependencies.fetchUpstream(prepared.config.apiBaseUrl, await credentials.token(), request);
   try {
-    const environmentId = await dependencies.resolveEnvironmentId(prepared, token);
-    const hostedProject = await dependencies.loadHostedProject(prepared, environmentId, token);
-    const hostedLocales = await dependencies.loadHostedLocales(prepared, environmentId, token);
-    let hostedProjectAuthority = hostedProject;
+    const initialToken = await credentials.token();
+    const environmentId = await dependencies.resolveEnvironmentId(prepared, initialToken);
+    const bootstrapPath = `/api/studio/v1/projects/${prepared.config.projectId}/environments/${environmentId}/bootstrap`;
+    const bootstrap = await upstream({
+      path: bootstrapPath,
+      method: "GET",
+      requestId: randomBytes(16).toString("hex"),
+      maximumResponseBytes: 64 * 1_024,
+    });
+    let bootstrapBody: unknown = null;
+    try {
+      bootstrapBody = JSON.parse(bootstrap.text);
+    } catch {
+      throw new Error("CLI_EDITOR_HOSTED_AUTHORITY_INVALID");
+    }
+    const previewUrl = bootstrap.status === 200 ? readEditorPreviewUrl(bootstrapBody) : undefined;
+    if (previewUrl === undefined) {
+      const failure = editorBootstrapFailure(bootstrapBody, bootstrap.status);
+      throw new Error(
+        failure.status === 401
+          ? "CLI_EDITOR_LOGIN_REQUIRED"
+          : failure.status === 403 || failure.status === 404
+            ? "CLI_EDITOR_ACCESS_DENIED"
+            : "CLI_EDITOR_HOSTED_AUTHORITY_INVALID",
+      );
+    }
+    const hostedProject = await dependencies.loadHostedProject(
+      prepared,
+      environmentId,
+      initialToken,
+    );
     const hostedProjectSha256 = sha256(canonicalJsonBytes(toJsonValue(hostedProject)));
     const schemaMatchesHosted = hostedProjectSha256 === prepared.projectSha256;
+    const artifact = await dependencies.loadArtifact();
     watcher = dependencies.startWatcher({
       projectRoot: prepared.projectRoot,
       entry: prepared.config.schema,
@@ -103,12 +156,11 @@ export async function initializeEditorOnline(
       },
     });
     const refreshHostedAuthority = () => {
-      if (authorityRefresh !== null || token === null || watcher === null) return;
-      const activeToken = token;
-      authorityRefresh = dependencies
-        .loadHostedProject(prepared, environmentId, activeToken)
+      if (authorityRefresh !== null || watcher === null) return;
+      authorityRefresh = credentials
+        .token()
+        .then((token) => dependencies.loadHostedProject(prepared, environmentId, token))
         .then((project) => {
-          hostedProjectAuthority = project;
           watcher?.setHostedProjectSha256(sha256(canonicalJsonBytes(toJsonValue(project))));
         })
         .catch(() => undefined)
@@ -121,32 +173,16 @@ export async function initializeEditorOnline(
     const challenge = dependencies.randomChallenge();
     loopback = await dependencies.startLoopback({
       challenge,
-      status: () => {
-        const schema = watcher?.snapshot();
-        return {
-          projectId: prepared.config.projectId,
-          environment: prepared.config.environment,
-          schemaMatchesHosted: schema?.schemaMatchesHosted ?? false,
-          schemaValid: schema?.valid ?? false,
-          schemaGeneration: schema?.generation ?? 0,
-          schemaDiagnosticCode: schema?.diagnosticCode ?? null,
-          localCollectionCount:
-            schema?.localCollectionCount ?? projectCollectionCount(prepared.project),
-          locales: hostedLocales,
-          collections: projectCollections(schema?.project ?? prepared.project),
-        };
-      },
-      operation: dependencies.makeOperation(
-        prepared,
-        environmentId,
-        () => token,
-        () => ({
-          localProject: watcher?.snapshot().project ?? prepared.project,
-          hostedProject: hostedProjectAuthority,
-        }),
-      ),
+      projectId: prepared.config.projectId,
+      environmentId,
+      previewUrl,
+      artifact,
+      status: () => schemaStatus(watcher),
+      upstream,
     });
-    await dependencies.openBrowser(`${loopback.origin}/#session=${encodeURIComponent(challenge)}`);
+    await dependencies.openBrowser(
+      `${loopback.origin}${editorMountPath}/session#session=${encodeURIComponent(challenge)}`,
+    );
     let closed = false;
     return {
       origin: loopback.origin,
@@ -157,7 +193,7 @@ export async function initializeEditorOnline(
         if (authorityTimer !== null) clearInterval(authorityTimer);
         authorityTimer = null;
         const activeRefresh = authorityRefresh;
-        token = null;
+        credentials.clear();
         const activeLoopback = loopback;
         const activeWatcher = watcher;
         loopback = null;
@@ -171,7 +207,7 @@ export async function initializeEditorOnline(
     if (authorityTimer !== null) clearInterval(authorityTimer);
     authorityTimer = null;
     const activeRefresh = authorityRefresh;
-    token = null;
+    credentials.clear();
     await loopback?.close();
     await watcher?.close();
     await activeRefresh;
@@ -179,20 +215,57 @@ export async function initializeEditorOnline(
   }
 }
 
-function managementOrOAuthToken(apiOrigin: string) {
-  const management = process.env["FFD_MANAGEMENT_TOKEN"];
-  return management !== undefined && management.length > 0
-    ? Effect.sync(() => {
-        delete process.env["FFD_MANAGEMENT_TOKEN"];
-        return management;
-      })
-    : getValidAccessToken({ apiOrigin });
+async function boundedText(response: Response, maximumBytes: number): Promise<string> {
+  const declared = response.headers.get("content-length");
+  if (declared !== null && Number(declared) > maximumBytes)
+    throw new Error("EDITOR_UPSTREAM_INVALID");
+  const reader = response.body?.getReader();
+  if (reader === undefined) return "";
+  const chunks: Array<Uint8Array> = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maximumBytes) {
+      await reader.cancel();
+      throw new Error("EDITOR_UPSTREAM_INVALID");
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+export async function fetchEditorUpstream(
+  apiBaseUrl: string,
+  token: string,
+  request: EditorUpstreamRequest,
+  fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
+): Promise<EditorUpstreamResponse> {
+  const response = await fetchImplementation(new URL(request.path, apiBaseUrl), {
+    method: request.method,
+    redirect: "error",
+    signal: AbortSignal.timeout(upstreamTimeoutMs),
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+      "X-Request-Id": request.requestId,
+      ...(request.body === undefined ? {} : { "Content-Type": "application/json" }),
+    },
+    ...(request.body === undefined ? {} : { body: request.body }),
+  });
+  return {
+    status: response.status,
+    contentType: response.headers.get("content-type"),
+    retryAfter: response.headers.get("retry-after"),
+    text: await boundedText(response, request.maximumResponseBytes),
+  };
 }
 
 const liveRuntime = ManagedRuntime.make(Layer.merge(CredentialStoreLive, BrowserOpenerLive));
 
 const liveDependencies: EditorOnlineDependencies = {
-  acquireToken: (apiOrigin) => liveRuntime.runPromise(managementOrOAuthToken(apiOrigin)),
+  acquireToken: (apiOrigin) => liveRuntime.runPromise(getValidAccessToken({ apiOrigin })),
   resolveEnvironmentId: async (prepared, token) => {
     if (prepared.environmentId !== null) return prepared.environmentId;
     const tooling = makeToolingHttpClient({ baseUrl: prepared.config.apiBaseUrl, token });
@@ -215,32 +288,10 @@ const liveDependencies: EditorOnlineDependencies = {
     }
     return response.body.data.project;
   },
-  loadHostedLocales: async (prepared, environmentId, token) => {
-    const tooling = makeToolingHttpClient({ baseUrl: prepared.config.apiBaseUrl, token });
-    const manifest = await Effect.runPromise(
-      tooling.getManifestPage(prepared.config.projectId, prepared.config.environment, null, 1),
-    );
-    if (manifest.environmentId !== environmentId) {
-      throw new Error("CLI_EDITOR_ENVIRONMENT_AUTHORITY_INVALID");
-    }
-    return manifest.locales.map((locale) => locale.tag);
-  },
+  fetchUpstream: (apiBaseUrl, token, request) => fetchEditorUpstream(apiBaseUrl, token, request),
+  loadArtifact: loadPackagedStudioArtifact,
   startWatcher: startEditorSchemaWatcher,
-  makeOperation: (prepared, environmentId, token, localSchema) =>
-    createEditorAuthoringHandler({
-      localSchema,
-      projectRoot: prepared.projectRoot,
-      projectId: prepared.config.projectId,
-      environmentId,
-      gateway: makeEditorAuthoringGateway({
-        baseUrl: prepared.config.apiBaseUrl,
-        token,
-        projectId: prepared.config.projectId,
-        environmentId,
-      }),
-    }),
-  startLoopback: async (options) =>
-    startEditorLoopback({ ...options, assets: await loadPackagedEditorAssets() }),
+  startLoopback: startEditorLoopback,
   openBrowser: (url) =>
     liveRuntime.runPromise(Effect.flatMap(BrowserOpener, ({ open }) => open(url))),
   randomChallenge: () => randomBytes(32).toString("base64url"),
@@ -258,19 +309,13 @@ function waitForShutdown(): Promise<void> {
   });
 }
 
-export async function runEditorOnline(
-  prepared: PreparedEditorCommand,
-  options: { readonly managementToken?: string } = {},
-) {
+export async function runEditorOnline(prepared: PreparedEditorCommand) {
   let session: EditorOnlineSession | null = null;
-  const managementToken = options.managementToken;
-  const dependencies =
-    managementToken === undefined
-      ? liveDependencies
-      : { ...liveDependencies, acquireToken: async () => managementToken };
   try {
-    session = await initializeEditorOnline(prepared, dependencies);
-    process.stdout.write(`Local editor running at ${session.origin}/. Press Ctrl+C to stop.\n`);
+    session = await initializeEditorOnline(prepared, liveDependencies);
+    process.stdout.write(
+      `Local editor running at ${session.origin}${editorMountPath}. Press Ctrl+C to stop.\n`,
+    );
     await waitForShutdown();
   } finally {
     await session?.close();

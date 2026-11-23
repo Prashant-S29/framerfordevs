@@ -30,11 +30,14 @@ const response = {
   ok: true,
   data: {
     formatVersion: 1,
-    registration: {
-      id: "11111111-1111-4111-8111-111111111111",
-      version: 3,
-      applicationOrigin: "http://localhost:4100",
-      mountPath: "/studio",
+    host: {
+      kind: "mounted",
+      registration: {
+        id: "11111111-1111-4111-8111-111111111111",
+        version: 3,
+        applicationOrigin: "http://localhost:4100",
+        mountPath: "/studio",
+      },
     },
     project: {
       id: "22222222-2222-4222-8222-222222222222",
@@ -68,7 +71,11 @@ describe("Studio shell accessibility", () => {
     );
     const view = render(
       <QueryClientProvider client={new QueryClient()}>
-        <StudioShell mountPath="/studio" dashboardOrigin="https://dashboard.example.test" />
+        <StudioShell
+          mountPath="/studio"
+          host="mounted"
+          dashboardOrigin="https://dashboard.example.test"
+        />
       </QueryClientProvider>,
     );
     await screen.findByText("Studio is connected");
@@ -103,7 +110,11 @@ describe("Studio shell accessibility", () => {
     );
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <StudioShell mountPath="/studio" dashboardOrigin="https://dashboard.example.test" />
+        <StudioShell
+          mountPath="/studio"
+          host="mounted"
+          dashboardOrigin="https://dashboard.example.test"
+        />
       </QueryClientProvider>,
     );
     expect(await screen.findByRole("heading", { name: heading })).toBeTruthy();
@@ -129,7 +140,11 @@ describe("Studio shell accessibility", () => {
     );
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <StudioShell mountPath="/studio" dashboardOrigin="https://dashboard.example.test" />
+        <StudioShell
+          mountPath="/studio"
+          host="mounted"
+          dashboardOrigin="https://dashboard.example.test"
+        />
       </QueryClientProvider>,
     );
     await waitFor(() => expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy());
@@ -146,7 +161,11 @@ describe("Studio shell accessibility", () => {
     vi.stubGlobal("fetch", fetch);
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <StudioShell mountPath="/studio" dashboardOrigin="https://dashboard.example.test" />
+        <StudioShell
+          mountPath="/studio"
+          host="mounted"
+          dashboardOrigin="https://dashboard.example.test"
+        />
       </QueryClientProvider>,
     );
     expect(await screen.findByText(/leaves your dashboard session active/iu)).toBeTruthy();
@@ -158,11 +177,73 @@ describe("Studio shell accessibility", () => {
   });
 
   it("renders an accessible not-found recovery state", async () => {
-    const view = render(<StudioNotFound dashboardOrigin="https://dashboard.example.test" />);
+    const view = render(
+      <StudioNotFound host="mounted" dashboardOrigin="https://dashboard.example.test" />,
+    );
     expect(screen.getByRole("heading", { name: "Studio page not found" })).toBeTruthy();
     const results = await axe.run(view.container, {
       rules: { "color-contrast": { enabled: false } },
     });
     expect(results.violations.filter((violation) => violation.impact === "serious")).toEqual([]);
+  });
+
+  it("hides sign-out and shows the schema drift notice in the local editor", async () => {
+    const local = { ...response, data: { ...response.data, host: { kind: "local_editor" } } };
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input) =>
+      String(input).endsWith("/api/editor/status")
+        ? new Response(
+            JSON.stringify({
+              ok: true,
+              data: { schema: "differs", diagnosticCode: null },
+              error: null,
+              message: "Local editor status loaded.",
+            }),
+          )
+        : new Response(JSON.stringify(local)),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const view = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <StudioShell mountPath="/studio" host="local_editor" dashboardOrigin={null} />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText(/uses your CLI login/iu)).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", {
+        name: "The local schema differs from the hosted schema",
+      }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
+    expect(screen.queryByRole("link", { name: /open dashboard/iu })).toBeNull();
+    expect(screen.getByText("Local editor")).toBeTruthy();
+    const results = await axe.run(view.container, {
+      rules: { "color-contrast": { enabled: false } },
+    });
+    expect(results.violations.filter((violation) => violation.impact === "serious")).toEqual([]);
+  });
+
+  it("tells a local editor user to sign in with the CLI instead of the browser", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              ok: false,
+              data: null,
+              error: { code: "STUDIO_AUTH_REQUIRED", message: "Authentication required." },
+              message: "Authentication required.",
+            }),
+            { status: 401 },
+          ),
+      ),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <StudioShell mountPath="/studio" host="local_editor" dashboardOrigin={null} />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText(/run ffd login/iu)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Sign in" })).toBeNull();
   });
 });

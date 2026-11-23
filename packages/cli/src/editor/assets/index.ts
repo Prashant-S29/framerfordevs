@@ -1,23 +1,24 @@
-import { readdir, readFile } from "node:fs/promises";
-import { extname, join, relative, sep } from "node:path";
+import { lstat, readFile } from "node:fs/promises";
+import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const maximumAssetCount = 32;
+const maximumAssetCount = 64;
 const maximumAssetBytes = 4_194_304;
 const maximumTotalBytes = 8_388_608;
-const allowedAssetName = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/u;
+const assetPath = /^assets\/(?:chunk\/)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 
 export interface EditorStaticAsset {
   readonly contentType: string;
   readonly body: Uint8Array;
 }
 
-export interface EditorStaticAssets {
-  readonly html: string;
+export interface EditorStudioArtifact {
+  readonly entryScript: string;
+  readonly stylesheets: ReadonlyArray<string>;
   readonly files: ReadonlyMap<string, EditorStaticAsset>;
 }
 
-function contentType(path: string): string | null {
+function contentType(path: string): string {
   switch (extname(path)) {
     case ".js":
       return "text/javascript; charset=utf-8";
@@ -30,60 +31,53 @@ function contentType(path: string): string | null {
     case ".webp":
       return "image/webp";
     default:
-      return null;
+      throw new Error("EDITOR_ASSET_INVALID");
   }
 }
 
-async function filesBelow(root: string, directory: string): Promise<ReadonlyArray<string>> {
-  const entries = await readdir(directory, { withFileTypes: true });
-  const paths: Array<string> = [];
-  for (const entry of entries) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) paths.push(...(await filesBelow(root, path)));
-    else if (entry.isFile()) paths.push(relative(root, path));
-    else throw new Error("EDITOR_ASSET_INVALID");
-  }
-  return paths;
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export async function loadEditorAssetsFrom(root: string): Promise<EditorStaticAssets> {
-  const paths = [...(await filesBelow(root, root))].sort();
-  if (paths.length < 2 || paths.length > maximumAssetCount || !paths.includes("index.html")) {
-    throw new Error("EDITOR_ASSET_INVALID");
+function validAssetPath(value: unknown): value is string {
+  return typeof value === "string" && assetPath.test(value) && !value.includes("..");
+}
+
+export async function loadStudioArtifactFrom(root: string): Promise<EditorStudioArtifact> {
+  const manifest: unknown = JSON.parse(await readFile(join(root, "manifest.json"), "utf8"));
+  if (!isRecord(manifest)) throw new Error("EDITOR_ASSET_INVALID");
+  const entries = Object.values(manifest);
+  if (!entries.every(isRecord)) throw new Error("EDITOR_ASSET_INVALID");
+  const entry = entries.find((candidate) => isRecord(candidate) && candidate.isEntry === true);
+  if (!isRecord(entry) || !validAssetPath(entry.file)) throw new Error("EDITOR_ASSET_INVALID");
+  const css = entry.css ?? [];
+  if (!Array.isArray(css) || !css.every(validAssetPath)) throw new Error("EDITOR_ASSET_INVALID");
+  const paths = new Set<string>([entry.file, ...css]);
+  for (const candidate of entries) {
+    if (!isRecord(candidate) || candidate.file === undefined) continue;
+    if (!validAssetPath(candidate.file)) throw new Error("EDITOR_ASSET_INVALID");
+    paths.add(candidate.file);
   }
-  let total = 0;
+  if (paths.size > maximumAssetCount) throw new Error("EDITOR_ASSET_INVALID");
   const files = new Map<string, EditorStaticAsset>();
-  let html: string | null = null;
-  for (const path of paths) {
-    if (
-      path.includes(`..${sep}`) ||
-      path.startsWith(sep) ||
-      !allowedAssetName.test(path.replaceAll(sep, "/"))
-    ) {
-      throw new Error("EDITOR_ASSET_INVALID");
-    }
-    const bytes = await readFile(join(root, path));
-    total += bytes.byteLength;
-    if (bytes.byteLength > maximumAssetBytes || total > maximumTotalBytes) {
-      throw new Error("EDITOR_ASSET_INVALID");
-    }
-    if (path === "index.html") {
-      html = bytes.toString("utf8");
-      continue;
-    }
+  let total = 0;
+  for (const path of [...paths].sort()) {
     const type = contentType(path);
-    if (type === null) throw new Error("EDITOR_ASSET_INVALID");
-    files.set(`/${path.replaceAll(sep, "/")}`, { contentType: type, body: bytes });
+    const file = join(root, path);
+    if (!(await lstat(file)).isFile()) throw new Error("EDITOR_ASSET_INVALID");
+    const body = await readFile(file);
+    total += body.byteLength;
+    if (body.byteLength > maximumAssetBytes || total > maximumTotalBytes) {
+      throw new Error("EDITOR_ASSET_INVALID");
+    }
+    files.set(`/${path}`, { contentType: type, body });
   }
-  if (html === null || !html.startsWith("<!doctype html>")) {
-    throw new Error("EDITOR_ASSET_INVALID");
-  }
-  return { html, files };
+  return { entryScript: `/${entry.file}`, stylesheets: css.map((path) => `/${path}`), files };
 }
 
-export function loadPackagedEditorAssets(): Promise<EditorStaticAssets> {
-  const assets = import.meta.url.endsWith(".mjs")
-    ? new URL("./editor-assets", import.meta.url)
-    : new URL("../../../dist/editor-assets", import.meta.url);
-  return loadEditorAssetsFrom(fileURLToPath(assets));
+export function loadPackagedStudioArtifact(): Promise<EditorStudioArtifact> {
+  const root = import.meta.url.endsWith(".mjs")
+    ? fileURLToPath(new URL("./studio-assets", import.meta.url))
+    : dirname(fileURLToPath(import.meta.resolve("@framerfordevs/studio/artifact/manifest.json")));
+  return loadStudioArtifactFrom(root);
 }

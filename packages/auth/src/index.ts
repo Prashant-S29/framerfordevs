@@ -27,6 +27,7 @@ import { allowsLocalLoopbackRedirect } from "./redirect-policy";
 
 export const OFFICIAL_CLI_OAUTH_CLIENT_ID = "framerfordevs-cli";
 export const STUDIO_SESSION_SCOPE = "studio:session";
+export const STUDIO_CONTENT_SCOPE = "studio:content";
 export const TOOLING_READ_SCOPE = "tooling:read";
 export const AUTHORING_READ_SCOPE = "authoring:read";
 export const AUTHORING_DRAFT_WRITE_SCOPE = "authoring:draft:write";
@@ -48,6 +49,7 @@ export const CLI_API_OAUTH_SCOPES = [
   AUTHORING_CONTENT_PUBLISH_SCOPE,
   AUTHORING_SCHEMA_PUSH_SCOPE,
   AUTHORING_PRESENTATION_PUBLISH_SCOPE,
+  STUDIO_CONTENT_SCOPE,
   CONTROL_PLANE_READ_SCOPE,
   CONTROL_PLANE_WRITE_SCOPE,
   CONTROL_PLANE_PROJECT_LIFECYCLE_SCOPE,

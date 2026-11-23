@@ -31,11 +31,14 @@ const contentSharedRevisionId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const contentLocalizedRevisionId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const browserBootstrap = (now: number) => ({
   formatVersion: 1,
-  registration: {
-    id: registrationId,
-    version: 3,
-    applicationOrigin: "http://localhost:4100",
-    mountPath: "/studio",
+  host: {
+    kind: "mounted",
+    registration: {
+      id: registrationId,
+      version: 3,
+      applicationOrigin: "http://localhost:4100",
+      mountPath: "/studio",
+    },
   },
   project: { id: projectId, name: "Website", workspaceId },
   environment: { id: environmentId, key: "main", name: "main" },
@@ -46,11 +49,14 @@ const browserBootstrap = (now: number) => ({
 });
 const platformBootstrap = (now: number) => ({
   formatVersion: 1,
-  registration: {
-    id: registrationId,
-    version: 3,
-    applicationOrigin: "http://localhost:4100",
-    mountPath: "/studio",
+  host: {
+    kind: "mounted",
+    registration: {
+      id: registrationId,
+      version: 3,
+      applicationOrigin: "http://localhost:4100",
+      mountPath: "/studio",
+    },
   },
   project: { id: projectId, name: "Website", workspaceId },
   environment: { id: environmentId, key: "main", name: "main" },

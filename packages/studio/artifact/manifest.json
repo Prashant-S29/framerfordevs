@@ -38,8 +38,8 @@
     "file": "assets/chunk/rolldown-runtime-XKyaHtl9.js",
     "name": "rolldown-runtime"
   },
-  "_shell-DUZLaPJ0.js": {
-    "file": "assets/chunk/shell-DUZLaPJ0.js",
+  "_shell-BQwEc-8g.js": {
+    "file": "assets/chunk/shell-BQwEc-8g.js",
     "name": "shell",
     "imports": [
       "_rolldown-runtime-XKyaHtl9.js",
@@ -50,13 +50,13 @@
       "src/app/content/dirty-sign-out-dialog.tsx"
     ]
   },
-  "_textarea-B76PFZ2B.js": {
-    "file": "assets/chunk/textarea-B76PFZ2B.js",
+  "_textarea-D7q7IyV5.js": {
+    "file": "assets/chunk/textarea-D7q7IyV5.js",
     "name": "textarea",
     "imports": [
       "_rolldown-runtime-XKyaHtl9.js",
       "_react-dom-iITjFaYY.js",
-      "_shell-DUZLaPJ0.js",
+      "_shell-BQwEc-8g.js",
       "_button-CxET-oXT.js",
       "_dialog-Ci4XuRyF.js"
     ]
@@ -72,30 +72,30 @@
     ]
   },
   "src/app/content/navigation.tsx": {
-    "file": "assets/chunk/navigation-DW409jFR.js",
+    "file": "assets/chunk/navigation-wD54yg22.js",
     "name": "navigation",
     "src": "src/app/content/navigation.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-XKyaHtl9.js",
       "_react-dom-iITjFaYY.js",
-      "_shell-DUZLaPJ0.js",
+      "_shell-BQwEc-8g.js",
       "_button-CxET-oXT.js",
-      "_textarea-B76PFZ2B.js",
+      "_textarea-D7q7IyV5.js",
       "_dialog-Ci4XuRyF.js"
     ]
   },
   "src/app/content/workspace.tsx": {
-    "file": "assets/chunk/workspace-BpMH4ukb.js",
+    "file": "assets/chunk/workspace-KIEil8Xx.js",
     "name": "workspace",
     "src": "src/app/content/workspace.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-XKyaHtl9.js",
       "_react-dom-iITjFaYY.js",
-      "_shell-DUZLaPJ0.js",
+      "_shell-BQwEc-8g.js",
       "src/app/index.tsx",
-      "_textarea-B76PFZ2B.js",
+      "_textarea-D7q7IyV5.js",
       "_button-CxET-oXT.js",
       "_dialog-Ci4XuRyF.js"
     ],
@@ -104,21 +104,21 @@
     ]
   },
   "src/app/index.tsx": {
-    "file": "assets/studio-BJbxX68H.js",
+    "file": "assets/studio-Dx967LTs.js",
     "name": "index",
     "src": "src/app/index.tsx",
     "isEntry": true,
     "imports": [
       "_rolldown-runtime-XKyaHtl9.js",
       "_react-dom-iITjFaYY.js",
-      "_shell-DUZLaPJ0.js"
+      "_shell-BQwEc-8g.js"
     ],
     "dynamicImports": [
       "src/app/content/navigation.tsx",
       "src/app/content/workspace.tsx"
     ],
     "css": [
-      "assets/studio-BgGbDG5h.css"
+      "assets/studio-BvnPKqet.css"
     ]
   }
 }

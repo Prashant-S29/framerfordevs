@@ -15,6 +15,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./contracts": "./src/contracts/index.ts",
+    "./bff-routes": "./src/bff-routes/index.ts",
     "./artifact/manifest.json": "./artifact/manifest.json",
     "./artifact/*": "./artifact/*"
   },
@@ -28,12 +29,16 @@
         "types": "./dist/index.d.mts",
         "import": "./dist/index.mjs"
       },
+      "./bff-routes": {
+        "types": "./dist/bff-routes/index.d.mts",
+        "import": "./dist/bff-routes/index.mjs"
+      },
       "./artifact/manifest.json": "./artifact/manifest.json",
       "./artifact/*": "./artifact/*"
     }
   },
   "scripts": {
-    "build": "vite build && tsdown src/index.ts --format esm --dts --clean",
+    "build": "vite build && tsdown src/index.ts src/bff-routes/index.ts --format esm --dts --clean",
     "prepack": "pnpm run build",
     "check-types": "tsc --noEmit",
     "test": "vitest run && pnpm test:bundle",

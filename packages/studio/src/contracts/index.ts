@@ -13,14 +13,21 @@ const roles = new Set([
   "read_only",
 ]);
 
+export type StudioBrowserHost =
+  | Readonly<{
+      readonly kind: "mounted";
+      readonly registration: Readonly<{
+        readonly id: string;
+        readonly version: number;
+        readonly applicationOrigin: string;
+        readonly mountPath: string;
+      }>;
+    }>
+  | Readonly<{ readonly kind: "local_editor" }>;
+
 export interface StudioBrowserBootstrap {
   readonly formatVersion: 1;
-  readonly registration: Readonly<{
-    readonly id: string;
-    readonly version: number;
-    readonly applicationOrigin: string;
-    readonly mountPath: string;
-  }>;
+  readonly host: StudioBrowserHost;
   readonly project: Readonly<{
     readonly id: string;
     readonly name: string;
@@ -102,29 +109,14 @@ function canonicalOrigin(value: unknown): value is string {
   }
 }
 
-export function decodeStudioBrowserBootstrap(value: unknown): StudioBrowserBootstrap {
-  if (
-    !isRecord(value) ||
-    !exactKeys(value, [
-      "formatVersion",
-      "registration",
-      "project",
-      "environment",
-      "user",
-      "role",
-      "effectiveActions",
-      "session",
-    ])
-  )
-    throw new Error("STUDIO_BROWSER_RESPONSE_INVALID");
+function decodeStudioBrowserHost(value: unknown): StudioBrowserHost | null {
+  if (!isRecord(value)) return null;
+  if (value.kind === "local_editor")
+    return exactKeys(value, ["kind"]) ? { kind: "local_editor" } : null;
   const registration = isRecord(value.registration) ? value.registration : {};
-  const project = isRecord(value.project) ? value.project : {};
-  const environment = isRecord(value.environment) ? value.environment : {};
-  const user = isRecord(value.user) ? value.user : {};
-  const session = isRecord(value.session) ? value.session : {};
-  const actions = value.effectiveActions;
   if (
-    value.formatVersion !== 1 ||
+    value.kind !== "mounted" ||
+    !exactKeys(value, ["kind", "registration"]) ||
     !exactKeys(registration, ["id", "version", "applicationOrigin", "mountPath"]) ||
     typeof registration.id !== "string" ||
     !uuid.test(registration.id) ||
@@ -134,7 +126,44 @@ export function decodeStudioBrowserBootstrap(value: unknown): StudioBrowserBoots
     !canonicalOrigin(registration.applicationOrigin) ||
     typeof registration.mountPath !== "string" ||
     registration.mountPath.length > 240 ||
-    !mountPath.test(registration.mountPath) ||
+    !mountPath.test(registration.mountPath)
+  )
+    return null;
+  return {
+    kind: "mounted",
+    registration: {
+      id: registration.id,
+      version: registration.version,
+      applicationOrigin: registration.applicationOrigin,
+      mountPath: registration.mountPath,
+    },
+  };
+}
+
+export function decodeStudioBrowserBootstrap(value: unknown): StudioBrowserBootstrap {
+  if (
+    !isRecord(value) ||
+    !exactKeys(value, [
+      "formatVersion",
+      "host",
+      "project",
+      "environment",
+      "user",
+      "role",
+      "effectiveActions",
+      "session",
+    ])
+  )
+    throw new Error("STUDIO_BROWSER_RESPONSE_INVALID");
+  const host = decodeStudioBrowserHost(value.host);
+  const project = isRecord(value.project) ? value.project : {};
+  const environment = isRecord(value.environment) ? value.environment : {};
+  const user = isRecord(value.user) ? value.user : {};
+  const session = isRecord(value.session) ? value.session : {};
+  const actions = value.effectiveActions;
+  if (
+    value.formatVersion !== 1 ||
+    host === null ||
     !exactKeys(project, ["id", "name", "workspaceId"]) ||
     typeof project.id !== "string" ||
     !uuid.test(project.id) ||
@@ -163,12 +192,7 @@ export function decodeStudioBrowserBootstrap(value: unknown): StudioBrowserBoots
     throw new Error("STUDIO_BROWSER_RESPONSE_INVALID");
   return {
     formatVersion: 1,
-    registration: {
-      id: registration.id,
-      version: registration.version,
-      applicationOrigin: registration.applicationOrigin,
-      mountPath: registration.mountPath,
-    },
+    host,
     project: { id: project.id, name: project.name, workspaceId: project.workspaceId },
     environment: { id: environment.id, key: "main", name: "main" },
     user: { id: user.id, name: user.name, email: user.email },
@@ -176,6 +200,32 @@ export function decodeStudioBrowserBootstrap(value: unknown): StudioBrowserBoots
     effectiveActions: actions,
     session: { expiresAt: session.expiresAt },
   };
+}
+
+export type StudioLocalEditorSchemaState = "matches" | "differs" | "invalid";
+
+export interface StudioLocalEditorStatus {
+  readonly schema: StudioLocalEditorSchemaState;
+  readonly diagnosticCode: string | null;
+}
+
+export function decodeStudioLocalEditorStatus(value: unknown): StudioLocalEditorStatus {
+  const data = isRecord(value) && value.ok === true && isRecord(value.data) ? value.data : null;
+  if (
+    !isRecord(value) ||
+    !exactKeys(value, ["ok", "data", "error", "message"]) ||
+    value.error !== null ||
+    !boundedString(value.message, 1, 200) ||
+    data === null ||
+    !exactKeys(data, ["schema", "diagnosticCode"]) ||
+    (data.schema !== "matches" && data.schema !== "differs" && data.schema !== "invalid") ||
+    !(
+      data.diagnosticCode === null ||
+      (typeof data.diagnosticCode === "string" && /^[A-Z0-9_]{1,64}$/u.test(data.diagnosticCode))
+    )
+  )
+    throw new Error("STUDIO_BROWSER_RESPONSE_INVALID");
+  return { schema: data.schema, diagnosticCode: data.diagnosticCode };
 }
 
 function isErrorCode(value: unknown): value is StudioBrowserErrorCode {

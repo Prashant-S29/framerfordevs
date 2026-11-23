@@ -1,5 +1,6 @@
 import type { CanonicalEmail, ProjectRole } from "../../../contracts/access";
 import type {
+  PreviewTargetUrl,
   StudioApplicationOrigin,
   StudioMountPath,
   StudioRegistrationId,
@@ -16,6 +17,8 @@ import type {
 import {
   StudioBootstrap,
   StudioEnvironmentIdentity,
+  StudioLocalEditorHost,
+  StudioMountedHost,
   StudioProjectIdentity,
   StudioRegistrationAuthority,
   StudioSessionAuthority,
@@ -23,13 +26,20 @@ import {
 } from "../../../contracts/studio";
 import { projectStudioActions } from "../authority";
 
+export type StudioBootstrapHostInput =
+  | Readonly<{
+      kind: "mounted";
+      registration: Readonly<{
+        id: StudioRegistrationId;
+        version: ResourceVersion;
+        applicationOrigin: StudioApplicationOrigin;
+        mountPath: StudioMountPath;
+      }>;
+    }>
+  | Readonly<{ kind: "local_editor"; previewUrl: PreviewTargetUrl | null }>;
+
 export interface StudioBootstrapInput {
-  readonly registration: Readonly<{
-    id: StudioRegistrationId;
-    version: ResourceVersion;
-    applicationOrigin: StudioApplicationOrigin;
-    mountPath: StudioMountPath;
-  }>;
+  readonly host: StudioBootstrapHostInput;
   readonly project: Readonly<{
     id: ProjectId;
     name: ProjectName;
@@ -52,7 +62,13 @@ export interface StudioBootstrapInput {
 export function buildStudioBootstrap(input: StudioBootstrapInput) {
   return StudioBootstrap.make({
     formatVersion: 1,
-    registration: StudioRegistrationAuthority.make({ ...input.registration }),
+    host:
+      input.host.kind === "mounted"
+        ? StudioMountedHost.make({
+            kind: "mounted",
+            registration: StudioRegistrationAuthority.make({ ...input.host.registration }),
+          })
+        : StudioLocalEditorHost.make({ kind: "local_editor", previewUrl: input.host.previewUrl }),
     project: StudioProjectIdentity.make({ ...input.project }),
     environment: StudioEnvironmentIdentity.make({ ...input.environment }),
     user: StudioUserIdentity.make({ ...input.user }),

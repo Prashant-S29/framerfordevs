@@ -10,7 +10,13 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 
-import { StudioHome, StudioNotFound, StudioShell, useStudioBootstrap } from "./shell";
+import {
+  StudioHome,
+  StudioNotFound,
+  StudioShell,
+  useStudioBootstrap,
+  type StudioHostMode,
+} from "./shell";
 import "./styles.css";
 
 function configuredMount(): string {
@@ -21,10 +27,18 @@ function configuredMount(): string {
   return content;
 }
 
-function configuredDashboardOrigin(): string {
+function configuredHost(): StudioHostMode {
+  const content = document.querySelector<HTMLMetaElement>('meta[name="ffd-studio-host"]')?.content;
+  if (content === undefined || content === "mounted") return "mounted";
+  if (content === "local_editor") return "local_editor";
+  throw new Error("Studio host configuration is invalid.");
+}
+
+function configuredDashboardOrigin(host: StudioHostMode): string | null {
   const content = document.querySelector<HTMLMetaElement>(
     'meta[name="ffd-studio-dashboard-origin"]',
   )?.content;
+  if (content === undefined && host === "local_editor") return null;
   if (content === undefined) throw new Error("Studio dashboard configuration is invalid.");
   const url = new URL(content);
   const loopback =
@@ -42,10 +56,11 @@ function StudioIndex() {
 }
 
 const mountPath = configuredMount();
-const dashboardOrigin = configuredDashboardOrigin();
+const host = configuredHost();
+const dashboardOrigin = configuredDashboardOrigin(host);
 const rootRoute = createRootRoute({
   component: () => (
-    <StudioShell mountPath={mountPath} dashboardOrigin={dashboardOrigin}>
+    <StudioShell mountPath={mountPath} host={host} dashboardOrigin={dashboardOrigin}>
       <Outlet />
     </StudioShell>
   ),
@@ -91,7 +106,7 @@ const router = createRouter({
   ]),
   basepath: mountPath,
   defaultPreload: "intent",
-  defaultNotFoundComponent: () => <StudioNotFound dashboardOrigin={dashboardOrigin} />,
+  defaultNotFoundComponent: () => <StudioNotFound host={host} dashboardOrigin={dashboardOrigin} />,
 });
 
 declare module "@tanstack/react-router" {

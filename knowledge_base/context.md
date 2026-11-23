@@ -30,5 +30,5 @@ Local stack: `docker compose up -d postgres redis` for tests, and the app servic
 
 ## Current work and next gate
 
-- **Current — M20B review:** editorial Presentation publication through `presentation.publish`, and Studio current and historical Preview through a server-side `ffd_pvh_` handoff to the environment Preview URL. Migration `0024_add_environment_preview_target` is applied.
-- **Next — M20B acceptance:** the developer reviews M20B and commits. M20C design waits for acceptance. Commit, publication, rollout, and deployment remain developer actions.
+- **Current — M20C review:** `ffd editor` serves the Studio over a loopback backend with the CLI `studio:content` login, Studio Content accepts that editor principal, and the dashboard editorial, Presentation, and Preview routes are removed. The Studio route table lives in `@framerfordevs/studio/bff-routes`. No migration.
+- **Next — M20C acceptance:** the developer reviews M20C and commits. M20 then closes, and M21 design waits for acceptance. Commit, publication, rollout, and deployment remain developer actions.

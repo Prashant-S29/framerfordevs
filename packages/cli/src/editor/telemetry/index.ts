@@ -1,8 +1,8 @@
 import { Effect, Metric } from "effect";
 
-import type { EditorOperationRequest } from "../protocol";
+import type { StudioContentSuccessKind } from "@framerfordevs/studio/bff-routes";
 
-export type EditorProxyOperation = EditorOperationRequest["operation"];
+export type EditorProxyOperation = StudioContentSuccessKind | "bootstrap" | "content" | "preview";
 export type EditorProxyOutcome = "success" | "rejected" | "upstream_failure" | "failure";
 export type EditorProxyStatusFamily = "2xx" | "4xx" | "5xx";
 export type EditorProxySizeBucket = "none" | "small" | "medium" | "large";

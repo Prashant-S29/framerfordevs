@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -233,27 +233,25 @@ try {
       throw new Error(`Credential-bearing dependency entered editor pre-auth graph: ${forbidden}`);
     }
   }
-  const editorAssetsDirectory = join(testDirectory, "../../../dist/editor-assets");
-  const editorAssetNames = (await readdir(join(editorAssetsDirectory, "assets"))).sort();
-  const editorHtml = await readFile(join(editorAssetsDirectory, "index.html"), "utf8");
-  const editorJavaScript = await readFile(join(editorAssetsDirectory, "assets/editor.js"), "utf8");
+  const studioAssetsDirectory = join(testDirectory, "../../../dist/studio-assets");
+  const studioManifest = JSON.parse(
+    await readFile(join(studioAssetsDirectory, "manifest.json"), "utf8"),
+  );
+  const studioFiles = Object.values(studioManifest).map((entry) => entry.file);
+  const studioEntry = Object.values(studioManifest).find((entry) => entry.isEntry === true);
   const allEditorJavaScript = (
     await Promise.all(
-      editorAssetNames
-        .filter((name) => name.endsWith(".js"))
-        .map((name) => readFile(join(editorAssetsDirectory, "assets", name), "utf8")),
+      studioFiles
+        .filter((name) => typeof name === "string" && name.endsWith(".js"))
+        .map((name) => readFile(join(studioAssetsDirectory, name), "utf8")),
     )
   ).join("\n");
   if (
-    !editorAssetNames.includes("editor.js") ||
-    !editorAssetNames.includes("editor.css") ||
-    !editorAssetNames.some((name) => /^content-form-[A-Za-z0-9_-]+\.js$/u.test(name)) ||
-    !editorAssetNames.some((name) => /^portable-text-field-[A-Za-z0-9_-]+\.js$/u.test(name)) ||
-    Buffer.byteLength(editorJavaScript) > 500_000 ||
-    !editorHtml.includes('src="/assets/editor.js"') ||
-    /https?:\/\//u.test(editorHtml)
+    studioEntry === undefined ||
+    !studioFiles.every((name) => typeof name === "string" && name.startsWith("assets/")) ||
+    !studioFiles.some((name) => /portable-text-field-[A-Za-z0-9_-]+\.js$/u.test(name))
   ) {
-    throw new Error("Packaged editor assets are absent, external, or not route-split.");
+    throw new Error("Packaged Studio assets are absent or not route-split.");
   }
   for (const forbidden of [
     "FFD_MANAGEMENT_TOKEN",

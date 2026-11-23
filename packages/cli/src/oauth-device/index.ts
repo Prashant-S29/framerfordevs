@@ -12,7 +12,7 @@ import {
 
 const clientId = "framerfordevs-cli";
 const scope =
-  "openid profile offline_access tooling:read authoring:read authoring:draft:write authoring:content:publish authoring:schema:push authoring:presentation:publish control-plane:read control-plane:write control-plane:project:lifecycle control-plane:governance:read control-plane:governance:write control-plane:operations:read control-plane:operations:write control-plane:security:read";
+  "openid profile offline_access tooling:read authoring:read authoring:draft:write authoring:content:publish authoring:schema:push authoring:presentation:publish studio:content control-plane:read control-plane:write control-plane:project:lifecycle control-plane:governance:read control-plane:governance:write control-plane:operations:read control-plane:operations:write control-plane:security:read";
 const deviceGrant = "urn:ietf:params:oauth:grant-type:device_code";
 const maximumResponseBytes = 64 * 1_024;
 const requestTimeoutMs = 15_000;

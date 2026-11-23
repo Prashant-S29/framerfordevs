@@ -27,8 +27,8 @@ Status: `[A]` accepted, `[R]` in developer review, `[~]` in progress, `[P]` plan
 | 19A | Studio content protocol and BFF         | `[A]`  | `788b782` |
 | 19B | Mounted Studio content experience       | `[A]`  | `ec37524` |
 | 20A | Studio revisions and publication        | `[A]`  | `ebe2aa8` |
-| 20B | Studio Preview and Presentation         | `[R]`  | —         |
-| 20C | Editor convergence and route retirement | `[P]`  | —         |
+| 20B | Studio Preview and Presentation         | `[A]`  | `1e8fe9b` |
+| 20C | Editor convergence and route retirement | `[R]`  | —         |
 | 21  | Client handover and editorial safety    | `[P]`  | —         |
 | 22  | Data durability and portability         | `[P]`  | —         |
 | 23  | Production security and operations      | `[P]`  | —         |

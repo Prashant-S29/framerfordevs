@@ -96,11 +96,14 @@ const principal: StudioOAuthPrincipal = {
 };
 const bootstrap = Schema.decodeUnknownSync(StudioBootstrap, { onExcessProperty: "error" })({
   formatVersion: 1,
-  registration: {
-    id: ids.registration,
-    version: 3,
-    applicationOrigin: "https://application.example.test",
-    mountPath: "/studio",
+  host: {
+    kind: "mounted",
+    registration: {
+      id: ids.registration,
+      version: 3,
+      applicationOrigin: "https://application.example.test",
+      mountPath: "/studio",
+    },
   },
   project: { id: ids.project, name: "Studio Project", workspaceId: ids.workspace },
   environment: { id: ids.environment, key: "main", name: "main" },

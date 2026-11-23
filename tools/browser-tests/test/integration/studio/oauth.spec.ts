@@ -59,7 +59,7 @@ async function exchangeAndBootstrap(
   expect(body).toMatchObject({
     ok: true,
     data: {
-      registration: { id: fixture.registrationId },
+      host: { kind: "mounted", registration: { id: fixture.registrationId } },
       project: { id: fixture.projectId, name: "Browser Customer Site" },
       environment: { id: fixture.environmentId, key: "main" },
     },

@@ -33,37 +33,7 @@ import {
   GetDeliveryConfigurationInputSchema,
   UpdateDeliveryConfigurationInputSchema,
 } from "../contracts/delivery";
-import {
-  CmsEntryDraftOutputSchema,
-  CmsEntryOutputSchema,
-  CmsEntryPageOutputSchema,
-  CreateEntryInputSchema,
-  EntryRevisionPageOutputSchema,
-  GetEntryDraftInputSchema,
-  ListEntriesInputSchema,
-  ListEntryRevisionsInputSchema,
-  RenameEntryInputSchema,
-  RestoreEntryRevisionInputSchema,
-  SaveEntryDraftInputSchema,
-  SaveEntryDraftResultOutputSchema,
-} from "../contracts/entry";
-import {
-  GetCurrentUserPreviewInputSchema,
-  GetRevisionUserPreviewInputSchema,
-  PreviewItemOutputSchema,
-} from "../contracts/preview";
-import {
-  EntryPublicationPageOutputSchema,
-  EntryPublicationPlanOutputSchema,
-  EntryPublicationStatusOutputSchema,
-  GetEntryPublicationStatusInputSchema,
-  ListEntryPublicationsInputSchema,
-  PublishEntryInputSchema,
-  PublishEntryResultOutputSchema,
-  UnpublishEntryInputSchema,
-  UnpublishEntryResultOutputSchema,
-  ValidateEntryPublicationInputSchema,
-} from "../contracts/publication";
+import { CmsEntryPageOutputSchema, ListEntriesInputSchema } from "../contracts/entry";
 import {
   CreateProjectLocaleInputSchema,
   ListProjectLocalesInputSchema,
@@ -74,21 +44,10 @@ import {
   UpdateProjectLocaleStatusInputSchema,
 } from "../contracts/locale";
 import {
-  CollectionPresentationOutputSchema,
-  GetCollectionPresentationInputSchema,
-  PublishCollectionPresentationInputSchema,
-  PublishCollectionPresentationOutputSchema,
-} from "../contracts/presentation/management";
-import {
-  CmsCollectionOutputSchema,
   CmsCollectionPageOutputSchema,
   CollectionDraftSchemaOutputSchema,
   GetCollectionDraftInputSchema,
-  GetCollectionInputSchema,
-  GetDraftGeneratedFormInputSchema,
-  GeneratedFormDefinitionOutputSchema,
   GetLatestPublishedSchemaInputSchema,
-  GetPublishedGeneratedFormInputSchema,
   GetPublishedSchemaRevisionInputSchema,
   ListCollectionsInputSchema,
   PublishedSchemaRevisionOutputSchema,
@@ -164,23 +123,7 @@ import {
   updateProjectMemberPolicy,
 } from "../operations/access";
 import { getDeliveryConfiguration, updateDeliveryConfiguration } from "../operations/delivery/api";
-import {
-  createEntry,
-  getEntryDraft,
-  listEntries,
-  listEntryRevisions,
-  renameEntry,
-  restoreEntryRevision,
-  saveEntryDraft,
-} from "../operations/entries";
-import { getUserCurrentPreview, getUserRevisionPreview } from "../operations/preview/api";
-import {
-  getEntryPublicationStatus,
-  listEntryPublications,
-  publishEntryLocale,
-  unpublishEntryLocale,
-  validateEntryPublication,
-} from "../operations/publications";
+import { listEntries } from "../operations/entries";
 import {
   changeApiCredentialRotation,
   issueApiCredential,
@@ -196,15 +139,10 @@ import {
   updateProjectLocaleStatus,
 } from "../operations/locales";
 import {
-  getCollection,
   getCollectionDraft,
-  getCollectionPresentation,
-  getDraftGeneratedForm,
   getLatestPublishedSchema,
-  getPublishedGeneratedForm,
   getPublishedSchemaRevision,
   listCollections,
-  publishCollectionPresentation,
 } from "../operations/schemas";
 import {
   archiveProject,
@@ -721,17 +659,6 @@ export const appRouter = {
               "Collections loaded.",
             ),
           ),
-        get: protectedProcedure
-          .input(GetCollectionInputSchema)
-          .output(CmsCollectionOutputSchema)
-          .handler(({ context, input }) =>
-            executeProcedure(
-              context,
-              "api.schema.collection.get",
-              getCollection(context.session.user.id, input),
-              "Collection loaded.",
-            ),
-          ),
         deliveryConfiguration: {
           get: protectedProcedure
             .input(GetDeliveryConfigurationInputSchema)
@@ -772,153 +699,6 @@ export const appRouter = {
                 "Entries loaded.",
               ),
             ),
-          create: protectedProcedure
-            .input(CreateEntryInputSchema)
-            .output(CmsEntryOutputSchema)
-            .handler(({ context, input }) =>
-              executeProcedure(
-                context,
-                "api.entry.create",
-                createEntry(context.session.user.id, input, context.request.requestId),
-                "Entry created.",
-              ),
-            ),
-          rename: protectedProcedure
-            .input(RenameEntryInputSchema)
-            .output(CmsEntryOutputSchema)
-            .handler(({ context, input }) =>
-              executeProcedure(
-                context,
-                "api.entry.rename",
-                renameEntry(context.session.user.id, input, context.request.requestId),
-                "Entry renamed.",
-              ),
-            ),
-          getDraft: protectedProcedure
-            .input(GetEntryDraftInputSchema)
-            .output(CmsEntryDraftOutputSchema)
-            .handler(({ context, input }) =>
-              executeProcedure(
-                context,
-                "api.entry.draft.get",
-                getEntryDraft(context.session.user.id, input),
-                "Entry draft loaded.",
-              ),
-            ),
-          saveDraft: protectedProcedure
-            .input(SaveEntryDraftInputSchema)
-            .output(SaveEntryDraftResultOutputSchema)
-            .handler(({ context, input }) =>
-              executeProcedure(
-                context,
-                "api.entry.draft.save",
-                saveEntryDraft(context.session.user.id, input, context.request.requestId),
-                "Entry draft saved.",
-              ),
-            ),
-          listRevisions: protectedProcedure
-            .input(ListEntryRevisionsInputSchema)
-            .output(EntryRevisionPageOutputSchema)
-            .handler(({ context, input }) =>
-              executeProcedure(
-                context,
-                "api.entry.revision.list",
-                listEntryRevisions(context.session.user.id, input),
-                "Entry revisions loaded.",
-              ),
-            ),
-          restoreRevision: protectedProcedure
-            .input(RestoreEntryRevisionInputSchema)
-            .output(SaveEntryDraftResultOutputSchema)
-            .handler(({ context, input }) =>
-              executeProcedure(
-                context,
-                "api.entry.revision.restore",
-                restoreEntryRevision(context.session.user.id, input, context.request.requestId),
-                "Entry revision restored.",
-              ),
-            ),
-          preview: {
-            current: protectedProcedure
-              .input(GetCurrentUserPreviewInputSchema)
-              .output(PreviewItemOutputSchema)
-              .handler(({ context, input }) =>
-                executeProcedure(
-                  context,
-                  "api.preview.user.current",
-                  getUserCurrentPreview(context.session.user.id, input, context.request.requestId),
-                  "Preview entry loaded.",
-                ),
-              ),
-            revision: protectedProcedure
-              .input(GetRevisionUserPreviewInputSchema)
-              .output(PreviewItemOutputSchema)
-              .handler(({ context, input }) =>
-                executeProcedure(
-                  context,
-                  "api.preview.user.revision",
-                  getUserRevisionPreview(context.session.user.id, input, context.request.requestId),
-                  "Preview entry loaded.",
-                ),
-              ),
-          },
-          publications: {
-            status: protectedProcedure
-              .input(GetEntryPublicationStatusInputSchema)
-              .output(EntryPublicationStatusOutputSchema)
-              .handler(({ context, input }) =>
-                executeProcedure(
-                  context,
-                  "api.entry.publication.status",
-                  getEntryPublicationStatus(context.session.user.id, input),
-                  "Publication status loaded.",
-                ),
-              ),
-            validate: protectedProcedure
-              .input(ValidateEntryPublicationInputSchema)
-              .output(EntryPublicationPlanOutputSchema)
-              .handler(({ context, input }) =>
-                executeProcedure(
-                  context,
-                  "api.entry.publication.validate",
-                  validateEntryPublication(context.session.user.id, input),
-                  "Publication validation completed.",
-                ),
-              ),
-            publish: protectedProcedure
-              .input(PublishEntryInputSchema)
-              .output(PublishEntryResultOutputSchema)
-              .handler(({ context, input }) =>
-                executeProcedure(
-                  context,
-                  "api.entry.publication.publish",
-                  publishEntryLocale(context.session.user.id, input, context.request.requestId),
-                  "Entry locale published.",
-                ),
-              ),
-            unpublish: protectedProcedure
-              .input(UnpublishEntryInputSchema)
-              .output(UnpublishEntryResultOutputSchema)
-              .handler(({ context, input }) =>
-                executeProcedure(
-                  context,
-                  "api.entry.publication.unpublish",
-                  unpublishEntryLocale(context.session.user.id, input, context.request.requestId),
-                  "Entry locale unpublished.",
-                ),
-              ),
-            list: protectedProcedure
-              .input(ListEntryPublicationsInputSchema)
-              .output(EntryPublicationPageOutputSchema)
-              .handler(({ context, input }) =>
-                executeProcedure(
-                  context,
-                  "api.entry.publication.list",
-                  listEntryPublications(context.session.user.id, input),
-                  "Publication history loaded.",
-                ),
-              ),
-          },
         },
         schema: {
           draft: {
@@ -931,58 +711,6 @@ export const appRouter = {
                   "api.schema.draft.get",
                   getCollectionDraft(context.session.user.id, input),
                   "Draft schema loaded.",
-                ),
-              ),
-          },
-          presentation: {
-            get: protectedProcedure
-              .input(GetCollectionPresentationInputSchema)
-              .output(CollectionPresentationOutputSchema)
-              .handler(({ context, input }) =>
-                executeProcedure(
-                  context,
-                  "api.schema.presentation.get",
-                  getCollectionPresentation(context.session.user.id, input),
-                  "Collection presentation loaded.",
-                ),
-              ),
-            publish: protectedProcedure
-              .input(PublishCollectionPresentationInputSchema)
-              .output(PublishCollectionPresentationOutputSchema)
-              .handler(({ context, input }) =>
-                executeProcedure(
-                  context,
-                  "api.schema.presentation.publish",
-                  publishCollectionPresentation(
-                    context.session.user.id,
-                    input,
-                    context.request.requestId,
-                  ),
-                  "Collection presentation published.",
-                ),
-              ),
-          },
-          form: {
-            getDraft: protectedProcedure
-              .input(GetDraftGeneratedFormInputSchema)
-              .output(GeneratedFormDefinitionOutputSchema)
-              .handler(({ context, input }) =>
-                executeProcedure(
-                  context,
-                  "api.schema.form.get_draft",
-                  getDraftGeneratedForm(context.session.user.id, input),
-                  "Draft form definition loaded.",
-                ),
-              ),
-            getPublished: protectedProcedure
-              .input(GetPublishedGeneratedFormInputSchema)
-              .output(GeneratedFormDefinitionOutputSchema)
-              .handler(({ context, input }) =>
-                executeProcedure(
-                  context,
-                  "api.schema.form.get_published",
-                  getPublishedGeneratedForm(context.session.user.id, input),
-                  "Published form definition loaded.",
                 ),
               ),
           },

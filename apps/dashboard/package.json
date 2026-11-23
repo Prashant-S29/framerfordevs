@@ -18,7 +18,6 @@
     "@better-auth/utils": "0.5.1",
     "@better-fetch/fetch": "1.3.3",
     "@framerfordevs/api": "workspace:*",
-    "@framerfordevs/content-form": "workspace:*",
     "@framerfordevs/env": "workspace:*",
     "@framerfordevs/ui": "workspace:*",
     "@orpc/client": "catalog:",

@@ -90,8 +90,10 @@ describe("CLI command arguments", () => {
 
     const editor = parseArguments(["editor"]);
     validateFlags(editor);
-    validateFlags(parseArguments(["editor", "--token-stdin"]));
     expect(editor.command).toEqual(["editor"]);
+    expect(() => validateFlags(parseArguments(["editor", "--token-stdin"]))).toThrowError(
+      "CLI_FLAG_INVALID",
+    );
     expect(() => validateFlags(parseArguments(["editor", "--api", "x"]))).toThrowError(
       "CLI_FLAG_INVALID",
     );

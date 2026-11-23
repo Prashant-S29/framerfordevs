@@ -342,11 +342,14 @@ export async function startStudioBrowserFixture(): Promise<StudioBrowserFixture>
         ok: true,
         data: {
           formatVersion: 1,
-          registration: {
-            id: "11111111-1111-4111-8111-111111111111",
-            version: 3,
-            applicationOrigin: origin,
-            mountPath: "/studio",
+          host: {
+            kind: "mounted",
+            registration: {
+              id: "11111111-1111-4111-8111-111111111111",
+              version: 3,
+              applicationOrigin: origin,
+              mountPath: "/studio",
+            },
           },
           project: {
             id: "22222222-2222-4222-8222-222222222222",

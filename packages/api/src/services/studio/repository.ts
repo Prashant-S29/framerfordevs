@@ -3,7 +3,6 @@ import {
   isStudioGrantActive,
   studioGrantExpiresAtEpochSeconds,
   studioSessionAuditRequestId,
-  type StudioOAuthPrincipal,
 } from "@framerfordevs/auth";
 import { db } from "@framerfordevs/db";
 import { and, eq, gt, isNull, sql } from "@framerfordevs/db/query";
@@ -15,7 +14,10 @@ import {
   oauthRefreshToken,
   user,
 } from "@framerfordevs/db/schema/auth";
-import { studioRegistration } from "@framerfordevs/db/schema/control-plane";
+import {
+  environmentPreviewTarget,
+  studioRegistration,
+} from "@framerfordevs/db/schema/control-plane";
 import {
   auditEvent,
   environment,
@@ -28,6 +30,7 @@ import { Context, Effect, Layer, Schema } from "effect";
 
 import { CanonicalEmail, ProjectRole } from "../../contracts/access";
 import {
+  PreviewTargetUrl,
   StudioApplicationOrigin,
   StudioMountPath,
   StudioRegistrationId,
@@ -54,10 +57,11 @@ import {
 import { StudioBootstrap } from "../../contracts/studio";
 import { studioResource } from "../../lib/studio/authority";
 import { buildStudioBootstrap } from "../../lib/studio/bootstrap";
+import type { StudioEditorPrincipal, StudioRequestPrincipal } from "./principal-authenticator";
 import type { ApplicationDb } from "../project-access";
 
 interface StudioBootstrapInput {
-  readonly principal: StudioOAuthPrincipal;
+  readonly principal: StudioRequestPrincipal;
   readonly projectId: ProjectId;
   readonly environmentId: EnvironmentId;
 }
@@ -96,6 +100,147 @@ function metadataMatches(
 export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
   const database = options.database ?? db;
   const audience = studioResource(options.apiOrigin ?? env.BETTER_AUTH_URL);
+
+  const getEditorBootstrap = Effect.fn("StudioRepository.getEditorBootstrap")(function* (input: {
+    readonly principal: StudioEditorPrincipal;
+    readonly projectId: ProjectId;
+    readonly environmentId: EnvironmentId;
+  }) {
+    const result = yield* Effect.tryPromise({
+      try: () =>
+        database.transaction(async (transaction) => {
+          const [currentProject] = await transaction
+            .select({
+              id: project.id,
+              workspaceId: project.workspaceId,
+              name: project.name,
+              archivedAt: project.archivedAt,
+            })
+            .from(project)
+            .where(eq(project.id, input.projectId))
+            .limit(1);
+          if (!currentProject || currentProject.archivedAt !== null) {
+            return { kind: "not_found" as const };
+          }
+          const [currentEnvironment] = await transaction
+            .select({ id: environment.id, key: environment.key, name: environment.name })
+            .from(environment)
+            .where(
+              and(
+                eq(environment.id, input.environmentId),
+                eq(environment.projectId, currentProject.id),
+                eq(environment.workspaceId, currentProject.workspaceId),
+                eq(environment.isPrimary, true),
+              ),
+            )
+            .limit(1);
+          if (!currentEnvironment) return { kind: "not_found" as const };
+          const [workspaceAccess] = await transaction
+            .select({ role: workspaceMembership.role })
+            .from(workspaceMembership)
+            .where(
+              and(
+                eq(workspaceMembership.workspaceId, currentProject.workspaceId),
+                eq(workspaceMembership.userId, input.principal.userId),
+                isNull(workspaceMembership.revokedAt),
+              ),
+            )
+            .limit(1);
+          const [projectAccess] = await transaction
+            .select({ role: projectMembership.role })
+            .from(projectMembership)
+            .where(
+              and(
+                eq(projectMembership.workspaceId, currentProject.workspaceId),
+                eq(projectMembership.projectId, currentProject.id),
+                eq(projectMembership.userId, input.principal.userId),
+                isNull(projectMembership.removedAt),
+              ),
+            )
+            .limit(1);
+          const role = workspaceAccess?.role === "owner" ? "owner" : projectAccess?.role;
+          if (!role) return { kind: "not_found" as const };
+          const [cmsCapability] = await transaction
+            .select({ status: projectCapability.status })
+            .from(projectCapability)
+            .where(
+              and(
+                eq(projectCapability.workspaceId, currentProject.workspaceId),
+                eq(projectCapability.projectId, currentProject.id),
+                eq(projectCapability.key, "cms"),
+              ),
+            )
+            .limit(1);
+          if (cmsCapability?.status !== "enabled") return { kind: "cms_required" as const };
+          const [currentUser] = await transaction
+            .select({ id: user.id, name: user.name, email: user.email })
+            .from(user)
+            .where(eq(user.id, input.principal.userId))
+            .limit(1);
+          if (!currentUser) return { kind: "not_found" as const };
+          const [previewTarget] = await transaction
+            .select({ previewUrl: environmentPreviewTarget.previewUrl })
+            .from(environmentPreviewTarget)
+            .where(
+              and(
+                eq(environmentPreviewTarget.workspaceId, currentProject.workspaceId),
+                eq(environmentPreviewTarget.projectId, currentProject.id),
+                eq(environmentPreviewTarget.environmentId, currentEnvironment.id),
+              ),
+            )
+            .limit(1);
+          return {
+            kind: "success" as const,
+            project: currentProject,
+            environment: currentEnvironment,
+            user: currentUser,
+            role,
+            previewUrl: previewTarget?.previewUrl ?? null,
+          };
+        }),
+      catch: (cause) => failure("studio.editor_bootstrap.get", cause),
+    });
+    switch (result.kind) {
+      case "not_found":
+        return yield* NotFoundFailure.make({ resource: "studio" });
+      case "cms_required":
+        return yield* CmsCapabilityRequiredFailure.make();
+      case "success": {
+        const role = yield* Schema.decodeUnknownEffect(ProjectRole)(result.role).pipe(
+          Effect.mapError((cause) => failure("studio.editor_bootstrap.role.decode", cause)),
+        );
+        const previewUrl =
+          result.previewUrl === null
+            ? null
+            : yield* Schema.decodeUnknownEffect(PreviewTargetUrl)(result.previewUrl).pipe(
+                Effect.mapError((cause) =>
+                  failure("studio.editor_bootstrap.preview.decode", cause),
+                ),
+              );
+        const bootstrap = buildStudioBootstrap({
+          host: { kind: "local_editor", previewUrl },
+          project: {
+            id: ProjectId.make(result.project.id),
+            name: ProjectName.make(result.project.name),
+            workspaceId: WorkspaceId.make(result.project.workspaceId),
+          },
+          environment: { id: EnvironmentId.make(result.environment.id), key: "main", name: "main" },
+          user: {
+            id: AuthUserId.make(result.user.id),
+            name: result.user.name,
+            email: CanonicalEmail.make(result.user.email),
+          },
+          role,
+          expiresAt: IsoDateTime.make(
+            new Date(input.principal.expiresAtEpochSeconds * 1_000).toISOString(),
+          ),
+        });
+        return yield* Schema.decodeUnknownEffect(StudioBootstrap)(bootstrap).pipe(
+          Effect.mapError((cause) => failure("studio.editor_bootstrap.decode", cause)),
+        );
+      }
+    }
+  });
 
   return {
     authorizeOAuth: Effect.fn("StudioRepository.authorizeOAuth")(function* (
@@ -191,9 +336,13 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
     getBootstrap: Effect.fn("StudioRepository.getBootstrap")(function* (
       input: StudioBootstrapInput,
     ) {
+      if (input.principal.kind === "studio_editor_user") {
+        return yield* getEditorBootstrap({ ...input, principal: input.principal });
+      }
+      const principal = input.principal;
       if (
-        input.principal.projectId !== input.projectId ||
-        input.principal.environmentId !== input.environmentId
+        principal.projectId !== input.projectId ||
+        principal.environmentId !== input.environmentId
       ) {
         return yield* NotFoundFailure.make({ resource: "studio" });
       }
@@ -206,7 +355,7 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
               .from(studioRegistration)
               .where(
                 and(
-                  eq(studioRegistration.id, input.principal.registrationId),
+                  eq(studioRegistration.id, principal.registrationId),
                   eq(studioRegistration.projectId, input.projectId),
                   eq(studioRegistration.environmentId, input.environmentId),
                 ),
@@ -218,7 +367,7 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
             }
             if (
               !isPortableStudioMountPath(registration.mountPath) ||
-              registration.version !== input.principal.registrationVersion
+              registration.version !== principal.registrationVersion
             ) {
               return { kind: "authority_changed" as const };
             }
@@ -268,7 +417,7 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
               .where(
                 and(
                   eq(workspaceMembership.workspaceId, registration.workspaceId),
-                  eq(workspaceMembership.userId, input.principal.userId),
+                  eq(workspaceMembership.userId, principal.userId),
                   isNull(workspaceMembership.revokedAt),
                 ),
               )
@@ -280,7 +429,7 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
                 and(
                   eq(projectMembership.workspaceId, registration.workspaceId),
                   eq(projectMembership.projectId, registration.projectId),
-                  eq(projectMembership.userId, input.principal.userId),
+                  eq(projectMembership.userId, principal.userId),
                   isNull(projectMembership.removedAt),
                 ),
               )
@@ -288,7 +437,7 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
             const [currentUser] = await transaction
               .select({ id: user.id, name: user.name, email: user.email })
               .from(user)
-              .where(eq(user.id, input.principal.userId))
+              .where(eq(user.id, principal.userId))
               .limit(1);
             const [client] = await transaction
               .select({
@@ -297,14 +446,14 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
                 metadata: oauthClient.metadata,
               })
               .from(oauthClient)
-              .where(eq(oauthClient.clientId, input.principal.clientId))
+              .where(eq(oauthClient.clientId, principal.clientId))
               .limit(1);
             const [resourceLink] = await transaction
               .select({ id: oauthClientResource.id })
               .from(oauthClientResource)
               .where(
                 and(
-                  eq(oauthClientResource.clientId, input.principal.clientId),
+                  eq(oauthClientResource.clientId, principal.clientId),
                   eq(oauthClientResource.resourceId, audience),
                 ),
               )
@@ -318,19 +467,19 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
               .from(oauthConsent)
               .where(
                 and(
-                  eq(oauthConsent.clientId, input.principal.clientId),
-                  eq(oauthConsent.userId, input.principal.userId),
+                  eq(oauthConsent.clientId, principal.clientId),
+                  eq(oauthConsent.userId, principal.userId),
                 ),
               )
               .limit(1);
-            const grantIdHex = input.principal.grantId.replaceAll("-", "");
+            const grantIdHex = principal.grantId.replaceAll("-", "");
             const [currentGrant] = await transaction
               .select({ id: oauthRefreshToken.id })
               .from(oauthRefreshToken)
               .where(
                 and(
-                  eq(oauthRefreshToken.clientId, input.principal.clientId),
-                  eq(oauthRefreshToken.userId, input.principal.userId),
+                  eq(oauthRefreshToken.clientId, principal.clientId),
+                  eq(oauthRefreshToken.userId, principal.userId),
                   isNull(oauthRefreshToken.revoked),
                   gt(oauthRefreshToken.expiresAt, now),
                   sql<boolean>`(
@@ -348,19 +497,19 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
               .from(auditEvent)
               .where(
                 and(
-                  eq(auditEvent.id, input.principal.auditMarkerId),
+                  eq(auditEvent.id, principal.auditMarkerId),
                   eq(auditEvent.workspaceId, registration.workspaceId),
                   eq(auditEvent.projectId, registration.projectId),
                   eq(auditEvent.environmentId, registration.environmentId),
                   eq(auditEvent.actorType, "user"),
-                  eq(auditEvent.actorId, input.principal.userId),
+                  eq(auditEvent.actorId, principal.userId),
                   eq(auditEvent.action, "studio.session.established"),
                   eq(auditEvent.resourceType, "studio_grant"),
-                  eq(auditEvent.resourceId, input.principal.grantId),
+                  eq(auditEvent.resourceId, principal.grantId),
                   eq(
                     auditEvent.requestId,
                     studioSessionAuditRequestId(
-                      input.principal.auditMarkerId,
+                      principal.auditMarkerId,
                       registration.id,
                       registration.version,
                     ),
@@ -394,9 +543,9 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
               consentResources.has(audience);
             const exactGrantDeadline =
               auditMarker !== undefined &&
-              input.principal.grantExpiresAtEpochSeconds ===
+              principal.grantExpiresAtEpochSeconds ===
                 studioGrantExpiresAtEpochSeconds(auditMarker.occurredAt) &&
-              isStudioGrantActive(input.principal.grantExpiresAtEpochSeconds, now);
+              isStudioGrantActive(principal.grantExpiresAtEpochSeconds, now);
             if (!exactConsent || !currentGrant || !exactGrantDeadline) {
               return { kind: "grant_invalid" as const };
             }
@@ -430,13 +579,16 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
             Effect.mapError((cause) => failure("studio.bootstrap.role.decode", cause)),
           );
           const bootstrap = buildStudioBootstrap({
-            registration: {
-              id: StudioRegistrationId.make(result.registration.id),
-              version: ResourceVersion.make(result.registration.version),
-              applicationOrigin: StudioApplicationOrigin.make(
-                result.registration.applicationOrigin,
-              ),
-              mountPath: StudioMountPath.make(result.registration.mountPath),
+            host: {
+              kind: "mounted",
+              registration: {
+                id: StudioRegistrationId.make(result.registration.id),
+                version: ResourceVersion.make(result.registration.version),
+                applicationOrigin: StudioApplicationOrigin.make(
+                  result.registration.applicationOrigin,
+                ),
+                mountPath: StudioMountPath.make(result.registration.mountPath),
+              },
             },
             project: {
               id: ProjectId.make(result.project.id),
@@ -455,7 +607,7 @@ export function makeStudioRepository(options: StudioRepositoryOptions = {}) {
             },
             role,
             expiresAt: IsoDateTime.make(
-              new Date(input.principal.expiresAtEpochSeconds * 1_000).toISOString(),
+              new Date(principal.expiresAtEpochSeconds * 1_000).toISOString(),
             ),
           });
           return yield* Schema.decodeUnknownEffect(StudioBootstrap)(bootstrap).pipe(

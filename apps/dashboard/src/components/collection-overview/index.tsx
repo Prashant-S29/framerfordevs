@@ -24,6 +24,7 @@ import { ArrowLeftIcon, Code2Icon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { OpenStudioLink } from "@/components/project/open-studio-link";
 import { orpc } from "@/utils/orpc";
 
 export function CollectionOverview({
@@ -84,32 +85,7 @@ export function CollectionOverview({
           <ArrowLeftIcon data-icon="inline-start" />
           Back to project
         </Button>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            render={
-              <Link
-                to="/projects/$projectId/collections/$collectionId/entries"
-                params={{ projectId, collectionId }}
-              />
-            }
-          >
-            Edit content
-          </Button>
-          {publishedRevisionId === null ? null : (
-            <Button
-              variant="outline"
-              render={
-                <Link
-                  to="/projects/$projectId/collections/$collectionId/presentation"
-                  params={{ projectId, collectionId }}
-                />
-              }
-            >
-              Edit presentation
-            </Button>
-          )}
-        </div>
+        <OpenStudioLink projectId={projectId} environmentId={environmentId} />
       </div>
 
       <header className="flex flex-col gap-3">

@@ -1,4 +1,3 @@
-import type { StudioOAuthPrincipal } from "@framerfordevs/auth";
 import { Effect, Schema } from "effect";
 
 import {
@@ -98,6 +97,7 @@ import {
   type StudioCollectionAuthority,
   StudioContentRepository,
 } from "../../services/studio-content/repository";
+import type { StudioRequestPrincipal } from "../../services/studio/principal-authenticator";
 import { StudioRepository } from "../../services/studio/repository";
 
 function invalidPath() {
@@ -339,7 +339,7 @@ export function decodeStudioSaveEntryDraftRequest(value: unknown) {
 
 export const revalidateStudioContentPrincipal = Effect.fn(
   "studio_content.public.principal.revalidate",
-)(function* (principal: StudioOAuthPrincipal, scope: StudioContentScope) {
+)(function* (principal: StudioRequestPrincipal, scope: StudioContentScope) {
   yield* (yield* StudioRepository).getBootstrap({
     principal,
     projectId: scope.projectId,
@@ -390,7 +390,7 @@ const studioOperationCost = {
   preview: 2,
 } as const satisfies Readonly<Record<StudioNestedCollectionOperation, number>>;
 
-function decodeActorId(principal: StudioOAuthPrincipal) {
+function decodeActorId(principal: StudioRequestPrincipal) {
   return Schema.decodeUnknownEffect(AuthUserId, { onExcessProperty: "error" })(
     principal.userId,
   ).pipe(Effect.mapError(() => invalidPath()));
@@ -418,7 +418,7 @@ const authorizeCurrentStudioCollection = Effect.fn(
 export const authorizeStudioCollectionOperation = Effect.fn(
   "studio_content.public.collection.authorize",
 )(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   scope: StudioCollectionLocaleScopeType,
   operation: StudioNestedCollectionOperation,
   now: Date,
@@ -436,7 +436,7 @@ export const authorizeStudioCollectionOperation = Effect.fn(
 });
 
 const listStudioEntries = Effect.fn("studio_content.public.entries.list")(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   scope: StudioCollectionLocaleScopeType,
   input: {
     readonly cursor: StudioContentCursor | null;
@@ -489,7 +489,7 @@ const listStudioEntries = Effect.fn("studio_content.public.entries.list")(functi
 });
 
 export const browseStudioEntries = Effect.fn("studio_content.public.entries.browse")(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   scope: StudioCollectionLocaleScopeType,
   query: StudioListEntriesQuery,
   now: Date,
@@ -504,7 +504,7 @@ export const browseStudioEntries = Effect.fn("studio_content.public.entries.brow
 });
 
 export const searchStudioEntries = Effect.fn("studio_content.public.entries.search")(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   scope: StudioCollectionLocaleScopeType,
   request: StudioSearchEntriesRequest,
   now: Date,
@@ -520,7 +520,7 @@ export const searchStudioEntries = Effect.fn("studio_content.public.entries.sear
 
 export const resolveStudioEntryLabels = Effect.fn("studio_content.public.entries.resolve")(
   function* (
-    principal: StudioOAuthPrincipal,
+    principal: StudioRequestPrincipal,
     scope: StudioCollectionLocaleScopeType,
     request: StudioResolveEntriesRequest,
     now: Date,
@@ -610,7 +610,7 @@ export function decodeStudioEntryId(value: string) {
 }
 
 export const getStudioNewEntryWorkspace = Effect.fn("studio_content.public.workspace.new")(
-  function* (principal: StudioOAuthPrincipal, scope: StudioCollectionLocaleScopeType, now: Date) {
+  function* (principal: StudioRequestPrincipal, scope: StudioCollectionLocaleScopeType, now: Date) {
     let authority = yield* authorizeStudioCollectionOperation(
       principal,
       scope,
@@ -650,7 +650,7 @@ export const getStudioNewEntryWorkspace = Effect.fn("studio_content.public.works
 
 export const getStudioEntryWorkspace = Effect.fn("studio_content.public.workspace.entry")(
   function* (
-    principal: StudioOAuthPrincipal,
+    principal: StudioRequestPrincipal,
     scope: StudioCollectionLocaleScopeType,
     entryId: typeof EntryId.Type,
     now: Date,
@@ -722,7 +722,7 @@ export const getStudioEntryWorkspace = Effect.fn("studio_content.public.workspac
 );
 
 export const createStudioEntry = Effect.fn("studio_content.public.entry.create")(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   scope: StudioCollectionLocaleScopeType,
   request: StudioCreateEntryRequest,
   now: Date,
@@ -769,7 +769,7 @@ export const createStudioEntry = Effect.fn("studio_content.public.entry.create")
 });
 
 export const renameStudioEntry = Effect.fn("studio_content.public.entry.rename")(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   scope: StudioCollectionLocaleScopeType,
   entryId: typeof EntryId.Type,
   request: StudioRenameEntryRequest,
@@ -788,7 +788,7 @@ export const renameStudioEntry = Effect.fn("studio_content.public.entry.rename")
 });
 
 export const saveStudioEntryDraft = Effect.fn("studio_content.public.entry.save")(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   scope: StudioCollectionLocaleScopeType,
   entryId: typeof EntryId.Type,
   request: StudioSaveEntryDraftRequest,
@@ -839,7 +839,7 @@ export const saveStudioEntryDraft = Effect.fn("studio_content.public.entry.save"
 });
 
 export const getStudioContentContext = Effect.fn("studio_content.public.context.get")(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   scope: StudioContentScope,
   now: Date,
 ) {
@@ -889,7 +889,7 @@ const loadStudioForm = Effect.fn("studio_content.public.form.load")(function* (
 
 export const listStudioEntryRevisions = Effect.fn("studio_content.public.revisions.list")(
   function* (
-    principal: StudioOAuthPrincipal,
+    principal: StudioRequestPrincipal,
     scope: StudioCollectionLocaleScopeType,
     entryId: typeof EntryId.Type,
     query: StudioListRevisionsQuery,
@@ -919,7 +919,7 @@ export const listStudioEntryRevisions = Effect.fn("studio_content.public.revisio
 );
 
 export const getStudioEntryRevision = Effect.fn("studio_content.public.revisions.get")(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   scope: StudioCollectionLocaleScopeType,
   entryId: typeof EntryId.Type,
   revisionId: typeof EntryRevisionId.Type,
@@ -940,7 +940,7 @@ export const getStudioEntryRevision = Effect.fn("studio_content.public.revisions
 
 export const compareStudioEntryRevisions = Effect.fn("studio_content.public.revisions.compare")(
   function* (
-    principal: StudioOAuthPrincipal,
+    principal: StudioRequestPrincipal,
     scope: StudioCollectionLocaleScopeType,
     entryId: typeof EntryId.Type,
     fromRevisionId: typeof EntryRevisionId.Type,
@@ -960,7 +960,7 @@ export const compareStudioEntryRevisions = Effect.fn("studio_content.public.revi
 
 export const restoreStudioEntryRevision = Effect.fn("studio_content.public.revisions.restore")(
   function* (
-    principal: StudioOAuthPrincipal,
+    principal: StudioRequestPrincipal,
     scope: StudioCollectionLocaleScopeType,
     entryId: typeof EntryId.Type,
     revisionId: typeof EntryRevisionId.Type,
@@ -1013,7 +1013,7 @@ export const restoreStudioEntryRevision = Effect.fn("studio_content.public.revis
 
 export const getStudioEntryPublication = Effect.fn("studio_content.public.publication.get")(
   function* (
-    principal: StudioOAuthPrincipal,
+    principal: StudioRequestPrincipal,
     scope: StudioCollectionLocaleScopeType,
     entryId: typeof EntryId.Type,
     now: Date,
@@ -1036,7 +1036,7 @@ export const getStudioEntryPublication = Effect.fn("studio_content.public.public
 
 export const listStudioEntryPublications = Effect.fn("studio_content.public.publications.list")(
   function* (
-    principal: StudioOAuthPrincipal,
+    principal: StudioRequestPrincipal,
     scope: StudioCollectionLocaleScopeType,
     entryId: typeof EntryId.Type,
     query: StudioListPublicationsQuery,
@@ -1072,7 +1072,7 @@ export const listStudioEntryPublications = Effect.fn("studio_content.public.publ
 export const validateStudioEntryPublication = Effect.fn(
   "studio_content.public.publication.validate",
 )(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   scope: StudioCollectionLocaleScopeType,
   entryId: typeof EntryId.Type,
   _request: StudioValidatePublicationRequest,
@@ -1091,7 +1091,7 @@ export const validateStudioEntryPublication = Effect.fn(
 });
 
 export const publishStudioEntry = Effect.fn("studio_content.public.publication.publish")(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   scope: StudioCollectionLocaleScopeType,
   entryId: typeof EntryId.Type,
   request: StudioPublishEntryRequest,
@@ -1116,7 +1116,7 @@ export const publishStudioEntry = Effect.fn("studio_content.public.publication.p
 
 export const unpublishStudioEntry = Effect.fn("studio_content.public.publication.unpublish")(
   function* (
-    principal: StudioOAuthPrincipal,
+    principal: StudioRequestPrincipal,
     scope: StudioCollectionLocaleScopeType,
     entryId: typeof EntryId.Type,
     request: StudioUnpublishEntryRequest,
@@ -1148,7 +1148,7 @@ export const unpublishStudioEntry = Effect.fn("studio_content.public.publication
 
 const resolveStudioPresentationCollection = Effect.fn(
   "studio_content.public.presentation.authorize",
-)(function* (principal: StudioOAuthPrincipal, scope: StudioCollectionScope, cost: number) {
+)(function* (principal: StudioRequestPrincipal, scope: StudioCollectionScope, cost: number) {
   yield* evaluateStudioUserRateLimit(principal, cost);
   yield* Effect.annotateCurrentSpan({
     projectId: scope.projectId,
@@ -1172,7 +1172,7 @@ const resolveStudioPresentationCollection = Effect.fn(
 });
 
 export const getStudioPresentation = Effect.fn("studio_content.public.presentation.get")(function* (
-  principal: StudioOAuthPrincipal,
+  principal: StudioRequestPrincipal,
   scope: StudioCollectionScope,
 ) {
   const target = yield* resolveStudioPresentationCollection(principal, scope, 1);
@@ -1185,7 +1185,7 @@ export const getStudioPresentation = Effect.fn("studio_content.public.presentati
 
 export const publishStudioPresentation = Effect.fn("studio_content.public.presentation.publish")(
   function* (
-    principal: StudioOAuthPrincipal,
+    principal: StudioRequestPrincipal,
     scope: StudioCollectionScope,
     request: StudioPublishPresentationRequest,
     now: Date,
@@ -1205,7 +1205,7 @@ export const publishStudioPresentation = Effect.fn("studio_content.public.presen
 
 export const issueStudioPreviewHandoff = Effect.fn("studio_content.public.preview.handoff")(
   function* (
-    principal: StudioOAuthPrincipal,
+    principal: StudioRequestPrincipal,
     scope: StudioCollectionLocaleScopeType,
     entryId: typeof EntryId.Type,
     request: PreviewHandoffRequest,
@@ -1214,6 +1214,12 @@ export const issueStudioPreviewHandoff = Effect.fn("studio_content.public.previe
   ) {
     yield* authorizeStudioCollectionOperation(principal, scope, "preview", now);
     const actorId = yield* decodeActorId(principal);
-    return yield* issuePreviewHandoff(actorId, { ...scope, entryId }, request, "studio", requestId);
+    return yield* issuePreviewHandoff(
+      actorId,
+      { ...scope, entryId },
+      request,
+      principal.kind === "studio_oauth_user" ? "studio" : "local_editor",
+      requestId,
+    );
   },
 );

@@ -371,7 +371,13 @@ describe("M18A Studio runtime authority", () => {
         formatVersion: 1,
         role: "owner",
         effectiveActions: expect.arrayContaining(["project.read", "project.update"]),
-        registration: expect.objectContaining({ id: registrationId, version: registrationVersion }),
+        host: expect.objectContaining({
+          kind: "mounted",
+          registration: expect.objectContaining({
+            id: registrationId,
+            version: registrationVersion,
+          }),
+        }),
         project: expect.objectContaining({ id: projectId, name: "Runtime Project" }),
         environment: { id: environmentId, key: "main", name: "main" },
         user: expect.objectContaining({ id: userId, email }),

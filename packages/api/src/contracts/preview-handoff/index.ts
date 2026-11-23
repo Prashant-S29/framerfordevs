@@ -23,7 +23,7 @@ export type PreviewHandoffToken = typeof PreviewHandoffToken.Type;
 export const PreviewHandoffSource = Schema.Literals(["current", "revision"]);
 export type PreviewHandoffSource = typeof PreviewHandoffSource.Type;
 
-export const PreviewHandoffIssuer = Schema.Literals(["studio", "authoring"]);
+export const PreviewHandoffIssuer = Schema.Literals(["studio", "local_editor", "authoring"]);
 export type PreviewHandoffIssuer = typeof PreviewHandoffIssuer.Type;
 
 export class PreviewHandoffClaims extends Schema.Class<PreviewHandoffClaims>(

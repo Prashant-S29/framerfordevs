@@ -279,11 +279,14 @@ describe("Studio Content nested collection gate", () => {
         });
       const bootstrap = Schema.decodeUnknownSync(StudioBootstrap, { onExcessProperty: "error" })({
         formatVersion: 1,
-        registration: {
-          id: principal.registrationId,
-          version: principal.registrationVersion,
-          applicationOrigin: "https://application.example.test",
-          mountPath: "/studio",
+        host: {
+          kind: "mounted",
+          registration: {
+            id: principal.registrationId,
+            version: principal.registrationVersion,
+            applicationOrigin: "https://application.example.test",
+            mountPath: "/studio",
+          },
         },
         project: { id: ids.project, name: "Project", workspaceId: ids.workspace },
         environment: { id: ids.environment, key: "main", name: "main" },
@@ -449,11 +452,14 @@ describe("Studio Content nested collection gate", () => {
       );
       const bootstrap = Schema.decodeUnknownSync(StudioBootstrap, { onExcessProperty: "error" })({
         formatVersion: 1,
-        registration: {
-          id: ids.registration,
-          version: 1,
-          applicationOrigin: "https://application.example.test",
-          mountPath: "/studio",
+        host: {
+          kind: "mounted",
+          registration: {
+            id: ids.registration,
+            version: 1,
+            applicationOrigin: "https://application.example.test",
+            mountPath: "/studio",
+          },
         },
         project: { id: ids.project, name: "Project", workspaceId: ids.workspace },
         environment: { id: ids.environment, key: "main", name: "main" },

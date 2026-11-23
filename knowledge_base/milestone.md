@@ -21,14 +21,14 @@ Scope per milestone. Status is in `progress.md`. A pending entry is context, not
 - 18A–18B: Studio registration authority, OAuth, mounted Studio runtime, encrypted sessions, framework adapters.
 - 19A–19B: Studio Content protocol and the mounted browse, search, edit, and recovery experience.
 - 20A: Studio revision history, compare, restore, and exact-locale publication with Authoring, SDK, and CLI parity.
+- 20B: Studio current and historical Preview through a server token handoff, and editorial Presentation publication for content_admin.
 
 ## Pending
 
 ### Milestone 20 — Studio editorial lifecycle
 
-Bring Preview and Presentation authority into the Studio before client handover, in two remaining parts. Exclude review approval, scheduling, visual editing, and schema mutation.
+Converge the local editor and the hosted dashboard on the Studio before client handover, in one remaining part. Exclude review approval, scheduling, visual editing, and schema mutation.
 
-- 20B: Studio current and historical Preview in a sandboxed iframe, with a preview URL for each environment and a short-lived server token handoff. A `presentation.publish` action lets content_admin publish labels, order, tabs, and groups. Role visibility stays with owner and developer.
 - 20C: Host the Studio workspace in `ffd editor` over its loopback transport without exposing the token. Retire dashboard editorial and preview routes after parity browser specs pass, and keep hosted structure and administration.
 
 ### Milestone 21 — Client handover and editorial safety

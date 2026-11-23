@@ -114,7 +114,7 @@ export const studioOpenApiDocument = {
         operationId: "getStudioBootstrap",
         summary: "Load current Studio bootstrap authority",
         description:
-          "Revalidates the active registration, exact token authority, current project membership, role, CMS capability, and audited grant marker. No content or management credential is returned.",
+          "For a Studio token, revalidates the active registration, exact token authority, current project membership, role, CMS capability, and audited grant marker, and returns a `mounted` host. For a local editor token, revalidates current project membership, role, and CMS capability, and returns a `local_editor` host with the environment Preview URL. No content or management credential is returned.",
         security: [{ studioBearer: [] }],
         parameters: [
           {
@@ -143,11 +143,14 @@ export const studioOpenApiDocument = {
                   ok: true,
                   data: {
                     formatVersion: 1,
-                    registration: {
-                      id: examples.registration,
-                      version: 3,
-                      applicationOrigin: "https://application.example.test",
-                      mountPath: "/studio",
+                    host: {
+                      kind: "mounted",
+                      registration: {
+                        id: examples.registration,
+                        version: 3,
+                        applicationOrigin: "https://application.example.test",
+                        mountPath: "/studio",
+                      },
                     },
                     project: {
                       id: examples.project,
@@ -216,7 +219,7 @@ export const studioOpenApiDocument = {
         scheme: "bearer",
         bearerFormat: "JWT",
         description:
-          "A five-minute Studio access token for the exact Studio v1 resource and `studio:session` scope. Cookies and browser storage are never accepted.",
+          "A five-minute Studio access token for the exact Studio v1 resource and `studio:session` scope, or an official CLI access token with the `studio:content` scope for `ffd editor`. Cookies and browser storage are never accepted.",
       },
     },
     headers: {

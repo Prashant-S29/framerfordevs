@@ -35,6 +35,9 @@ import {
   type StudioBrowserBootstrap,
   type StudioBrowserErrorCode,
 } from "../contracts";
+import { LocalEditorSchemaNotice } from "./local-editor-status";
+
+export type StudioHostMode = "mounted" | "local_editor";
 
 const DirtySignOutDialog = lazy(() => import("./content/dirty-sign-out-dialog"));
 const maximumResponseBytes = 262_144;
@@ -50,7 +53,8 @@ const StudioBootstrapContext = createContext<StudioRuntimeContext | null>(null);
 
 export interface StudioShellProps {
   readonly mountPath: string;
-  readonly dashboardOrigin: string;
+  readonly host: StudioHostMode;
+  readonly dashboardOrigin: string | null;
   readonly children?: ReactNode;
 }
 
@@ -90,7 +94,8 @@ async function loadBootstrap(mountPath: string) {
   return decoded.data;
 }
 
-function DashboardLink({ dashboardOrigin }: { readonly dashboardOrigin: string }) {
+function DashboardLink({ dashboardOrigin }: { readonly dashboardOrigin: string | null }) {
+  if (dashboardOrigin === null) return null;
   return (
     <a className={buttonVariants({ variant: "outline" })} href={dashboardOrigin}>
       Open dashboard <ExternalLink aria-hidden="true" />
@@ -101,11 +106,13 @@ function DashboardLink({ dashboardOrigin }: { readonly dashboardOrigin: string }
 function ErrorState({
   error,
   mountPath,
+  host,
   dashboardOrigin,
 }: {
   readonly error: Error;
   readonly mountPath: string;
-  readonly dashboardOrigin: string;
+  readonly host: StudioHostMode;
+  readonly dashboardOrigin: string | null;
 }) {
   const queryClient = useQueryClient();
   const main = useRef<HTMLElement>(null);
@@ -113,6 +120,7 @@ function ErrorState({
   const failure = error instanceof BootstrapFailure ? error : null;
   const requiresLogin =
     failure?.code === "STUDIO_AUTH_REQUIRED" || failure?.code === "STUDIO_SESSION_INVALID";
+  const local = host === "local_editor";
   const denied = failure?.code === "STUDIO_ORIGIN_INVALID" || failure?.code === "STUDIO_FORBIDDEN";
   const unavailableProject =
     failure?.code === "STUDIO_PROJECT_UNAVAILABLE" ||
@@ -132,17 +140,21 @@ function ErrorState({
                 : "Studio is unavailable"}
         </h1>
         <AlertDescription>
-          {requiresLogin
-            ? "Sign in again to continue. Your content remains unchanged."
-            : denied
-              ? "Your current project role does not allow this Studio session."
-              : unavailableProject
-                ? "The project, CMS capability, or Studio registration is not currently active. Use the dashboard to recover it."
-                : "The service could not be reached. Try again without reloading the page."}
+          {requiresLogin && local
+            ? "Stop the editor, run ffd login, and start ffd editor again. Your content remains unchanged."
+            : requiresLogin
+              ? "Sign in again to continue. Your content remains unchanged."
+              : denied
+                ? "Your current project role does not allow this Studio session."
+                : unavailableProject && local
+                  ? "The project or its CMS capability is not active, or you are not a member of it."
+                  : unavailableProject
+                    ? "The project, CMS capability, or Studio registration is not currently active. Use the dashboard to recover it."
+                    : "The service could not be reached. Try again without reloading the page."}
         </AlertDescription>
       </Alert>
       <div className="studio-actions">
-        {requiresLogin ? (
+        {requiresLogin && !local ? (
           <Button onClick={() => window.location.assign(`${mountPath}/auth/login`)}>Sign in</Button>
         ) : (
           <Button
@@ -159,7 +171,13 @@ function ErrorState({
   );
 }
 
-export function StudioNotFound({ dashboardOrigin }: { readonly dashboardOrigin: string }) {
+export function StudioNotFound({
+  host,
+  dashboardOrigin,
+}: {
+  readonly host: StudioHostMode;
+  readonly dashboardOrigin: string | null;
+}) {
   return (
     <main className="studio-center" aria-labelledby="studio-not-found-title" id="main-content">
       <Alert className="studio-alert">
@@ -168,8 +186,9 @@ export function StudioNotFound({ dashboardOrigin }: { readonly dashboardOrigin: 
           Studio page not found
         </h1>
         <AlertDescription>
-          This path is not part of the mounted Studio application. Return to the dashboard to
-          recover.
+          {host === "local_editor"
+            ? "This path is not part of the local editor. Open Content to continue."
+            : "This path is not part of the mounted Studio application. Return to the dashboard to recover."}
         </AlertDescription>
       </Alert>
       <div className="studio-actions">
@@ -213,10 +232,16 @@ export function StudioHome({ bootstrap }: { readonly bootstrap: StudioBrowserBoo
             <p className="studio-muted">
               Current access expires {new Date(bootstrap.session.expiresAt).toLocaleTimeString()}.
             </p>
-            <p className="studio-muted">
-              Signing out here leaves your dashboard session active. Your next Studio login requires
-              acknowledgement but may not require credentials.
-            </p>
+            {bootstrap.host.kind === "local_editor" ? (
+              <p className="studio-muted">
+                The local editor uses your CLI login. Press Ctrl+C in the terminal to stop it.
+              </p>
+            ) : (
+              <p className="studio-muted">
+                Signing out here leaves your dashboard session active. Your next Studio login
+                requires acknowledgement but may not require credentials.
+              </p>
+            )}
           </EmptyContent>
         </Empty>
       </CardContent>
@@ -224,7 +249,7 @@ export function StudioHome({ bootstrap }: { readonly bootstrap: StudioBrowserBoo
   );
 }
 
-export function StudioShell({ mountPath, dashboardOrigin, children }: StudioShellProps) {
+export function StudioShell({ mountPath, host, dashboardOrigin, children }: StudioShellProps) {
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
   const [workspaceDirty, setWorkspaceDirty] = useState(false);
@@ -260,7 +285,12 @@ export function StudioShell({ mountPath, dashboardOrigin, children }: StudioShel
   }
   if (query.isError)
     return (
-      <ErrorState error={query.error} mountPath={mountPath} dashboardOrigin={dashboardOrigin} />
+      <ErrorState
+        error={query.error}
+        mountPath={mountPath}
+        host={host}
+        dashboardOrigin={dashboardOrigin}
+      />
     );
 
   const bootstrap = query.data;
@@ -301,7 +331,9 @@ export function StudioShell({ mountPath, dashboardOrigin, children }: StudioShel
       <div className="studio-layout">
         <header className="studio-header">
           <div>
-            <p className="studio-eyebrow">Framer for Developers</p>
+            <p className="studio-eyebrow">
+              {host === "local_editor" ? "Local editor" : "Framer for Developers"}
+            </p>
             <h1>Studio</h1>
           </div>
           <nav aria-label="Studio navigation and account actions">
@@ -309,17 +341,19 @@ export function StudioShell({ mountPath, dashboardOrigin, children }: StudioShel
               Content
             </Link>
             <DashboardLink dashboardOrigin={dashboardOrigin} />
-            <Button
-              type="button"
-              variant="outline"
-              disabled={signingOut}
-              onClick={() => {
-                if (workspaceDirty) setConfirmSignOut(true);
-                else void signOut();
-              }}
-            >
-              <LogOut aria-hidden="true" /> {signingOut ? "Signing out…" : "Sign out"}
-            </Button>
+            {host === "local_editor" ? null : (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={signingOut}
+                onClick={() => {
+                  if (workspaceDirty) setConfirmSignOut(true);
+                  else void signOut();
+                }}
+              >
+                <LogOut aria-hidden="true" /> {signingOut ? "Signing out…" : "Sign out"}
+              </Button>
+            )}
             {signOutError ? (
               <p className="studio-muted" role="status">
                 Sign out could not be completed. Try again.
@@ -328,6 +362,7 @@ export function StudioShell({ mountPath, dashboardOrigin, children }: StudioShel
           </nav>
         </header>
         <main className="studio-main" id="main-content">
+          {host === "local_editor" ? <LocalEditorSchemaNotice mountPath={mountPath} /> : null}
           {children ?? <StudioHome bootstrap={bootstrap} />}
         </main>
       </div>

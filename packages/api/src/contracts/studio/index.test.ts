@@ -20,11 +20,14 @@ const ids = {
 
 const bootstrap = {
   formatVersion: 1,
-  registration: {
-    id: ids.registration,
-    version: 3,
-    applicationOrigin: "https://application.example.test",
-    mountPath: "/admin/studio",
+  host: {
+    kind: "mounted",
+    registration: {
+      id: ids.registration,
+      version: 3,
+      applicationOrigin: "https://application.example.test",
+      mountPath: "/admin/studio",
+    },
   },
   project: {
     id: ids.project,

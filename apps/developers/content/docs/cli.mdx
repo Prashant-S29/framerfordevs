@@ -109,7 +109,7 @@ ffd presentation publish --collection articles --file presentation.json --json
 
 A content administrator can also publish, but only labels, help text, placeholders, order, tabs, and groups. The server rejects a change to role visibility with `PRESENTATION_ROLE_VISIBILITY_FORBIDDEN`. Sign in again after an upgrade, because publish needs the `authoring:presentation:publish` scope.
 
-Get emits a credential-free versioned document with exact project, environment, collection, revision, and sequence authority. Edit only its `presentation` value. Publish requires the file to remain a bounded regular file inside the linked project, rejects authority drift and excess properties, and preserves an idempotent content-free retry journal after uncertain transport. Presentation mutation is a CLI/HTTP/hosted-editor operation, not an application SDK method.
+Get emits a credential-free versioned document with exact project, environment, collection, revision, and sequence authority. Edit only its `presentation` value. Publish requires the file to remain a bounded regular file inside the linked project, rejects authority drift and excess properties, and preserves an idempotent content-free retry journal after uncertain transport. Presentation mutation is a CLI, HTTP, and Studio operation, not an application SDK method.
 
 ## Content Automation
 
@@ -123,7 +123,7 @@ See [Automate content workflows](/docs/authoring/automate-content).
 ffd editor
 ```
 
-The editor validates Tier 1 source before authentication, retains hosted bearer authority only in Node memory, and exposes a closed ephemeral loopback operation surface to the browser. Structural drift and invalid local source preserve the last valid form read-only.
+The editor validates Tier 1 source, uses your `ffd login`, and serves the Studio workspace on a loopback port. The token stays in Node memory. When the local schema differs from the hosted schema, the editor pauses saving and publishing until you push. The editor does not accept `FFD_MANAGEMENT_TOKEN`.
 
 See [Edit hosted content locally](/docs/authoring/local-editor).
 
